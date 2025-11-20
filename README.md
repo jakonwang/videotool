@@ -67,7 +67,7 @@
 - **前端UI**: AdminLTE 3 + Bootstrap 5
 - **数据库**: MySQL 5.7+
 - **前端JS**: jQuery 3.6
-- **文件上传**: 本地存储（可扩展OSS）
+- **文件上传**: 本地存储 + 七牛云CDN（可选）
 
 ## 系统架构
 
@@ -251,19 +251,26 @@ $cloudPhoneAPI = new CloudPhoneAPI();
 $cloudPhoneAPI->download($url, $deviceId);
 ```
 
-### OSS存储支持
-修改 `config/filesystem.php`，配置OSS存储：
-```php
-'disks' => [
-    'oss' => [
-        'type' => 'oss',
-        'access_id' => 'your-access-id',
-        'access_key' => 'your-access-key',
-        'bucket' => 'your-bucket',
-        'endpoint' => 'your-endpoint',
-    ],
-],
-```
+### 七牛云存储支持
+系统已集成七牛云对象存储服务，支持将视频和封面自动上传到七牛云CDN。
+
+**配置说明**：
+1. 编辑 `.env` 文件或 `config/qiniu.php`
+2. 设置 `enabled = true`
+3. 填写七牛云密钥、Bucket和域名
+4. 上传文件时会自动同步到七牛云
+
+**详细配置请查看 [七牛云存储配置说明.md](七牛云存储配置说明.md)**
+
+**功能特点**：
+- ✅ 双存储策略（本地备份 + 七牛云CDN）
+- ✅ 自动上传同步
+- ✅ 智能回退机制
+- ✅ 无缝切换
+- ✅ 支持批量上传、单个编辑、分片上传
+
+### OSS存储支持（可选）
+如需使用其他OSS服务，可以扩展 `app/service/QiniuService.php` 或实现类似的服务类。
 
 ## 开发计划
 
@@ -276,7 +283,7 @@ $cloudPhoneAPI->download($url, $deviceId);
 - [x] 前台展示功能
 - [x] API接口
 - [ ] 云手机API集成
-- [ ] OSS存储支持
+- [x] 七牛云存储支持
 - [ ] 用户登录系统（可选）
 - [ ] 数据统计报表
 - [ ] 视频自动生成封面

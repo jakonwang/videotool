@@ -7,6 +7,7 @@
     "license": "Apache-2.0",
     "require": {
         "php": ">=7.2.5",
+        "qiniu/php-sdk": "^7.11",
         "topthink/framework": "^6.1.0",
         "topthink/think-orm": "^2.0",
         "topthink/think-view": "^1.0"
@@ -22,4 +23,3 @@
         "sort-packages": true
     }
 }
-

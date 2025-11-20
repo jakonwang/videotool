@@ -7,6 +7,7 @@ use app\BaseController;
 use app\model\Video as VideoModel;
 use app\model\Device as DeviceModel;
 use app\model\Platform as PlatformModel;
+use app\service\QiniuService;
 use think\facade\Filesystem;
 use think\facade\View;
 
@@ -108,9 +109,13 @@ class Video extends BaseController
             $success = 0;
             $errors = [];
             
+            // 初始化七牛云服务
+            $qiniuService = new QiniuService();
+            $qiniuEnabled = $qiniuService->isEnabled();
+            
             foreach ($files as $key => $file) {
                 try {
-                    // 上传视频 - 使用原生文件操作
+                    // 上传视频 - 使用原生文件操作（先保存到本地）
                     $videoTargetDir = root_path() . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'videos' . DIRECTORY_SEPARATOR;
                     if (!is_dir($videoTargetDir)) {
                         mkdir($videoTargetDir, 0755, true);
@@ -125,13 +130,26 @@ class Video extends BaseController
                     
                     // 使用 ThinkPHP 文件对象的 move 方法移动文件
                     $file->move($videoDateDir, $videoFileName);
-                    $videoUrl = '/uploads/videos/' . date('Ymd') . '/' . $videoFileName;
+                    $videoLocalPath = $videoDateDir . $videoFileName;
+                    $videoLocalUrl = '/uploads/videos/' . date('Ymd') . '/' . $videoFileName;
+                    
+                    // 上传到七牛云（如果启用）
+                    $videoUrl = $videoLocalUrl; // 默认使用本地URL
+                    if ($qiniuEnabled) {
+                        $videoKey = 'videos/' . date('Ymd') . '/' . $videoFileName;
+                        $qiniuResult = $qiniuService->upload($videoLocalPath, $videoKey);
+                        if ($qiniuResult['success']) {
+                            $videoUrl = $qiniuResult['url']; // 使用七牛云URL
+                        } else {
+                            \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
+                        }
+                    }
                     
                     // 生成封面（如果有封面文件）
                     $coverFile = $this->request->file('covers.' . $key);
                     $coverUrl = '';
                     if ($coverFile && $coverFile->isValid()) {
-                        // 使用原生文件操作处理封面上传
+                        // 使用原生文件操作处理封面上传（先保存到本地）
                         $coverTargetDir = root_path() . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'covers' . DIRECTORY_SEPARATOR;
                         if (!is_dir($coverTargetDir)) {
                             mkdir($coverTargetDir, 0755, true);
@@ -146,7 +164,25 @@ class Video extends BaseController
                         
                         // 使用 ThinkPHP 文件对象的 move 方法移动文件
                         $coverFile->move($coverDateDir, $coverFileName);
-                        $coverUrl = '/uploads/covers/' . date('Ymd') . '/' . $coverFileName;
+                        $coverLocalPath = $coverDateDir . $coverFileName;
+                        $coverLocalUrl = '/uploads/covers/' . date('Ymd') . '/' . $coverFileName;
+                        
+                        // 上传到七牛云（如果启用）
+                        $coverUrl = $coverLocalUrl; // 默认使用本地URL
+                        if ($qiniuEnabled) {
+                            $coverKey = 'covers/' . date('Ymd') . '/' . $coverFileName;
+                            $qiniuResult = $qiniuService->upload($coverLocalPath, $coverKey);
+                            if ($qiniuResult['success']) {
+                                $coverUrl = $qiniuResult['url']; // 使用七牛云URL
+                            } else {
+                                \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
+                            }
+                        }
+                    }
+                    
+                    // 如果没有封面，使用视频URL作为默认封面
+                    if (empty($coverUrl)) {
+                        $coverUrl = $videoUrl;
                     }
                     
                     // 获取标题
@@ -157,7 +193,7 @@ class Video extends BaseController
                         'platform_id' => $platformId,
                         'device_id' => $deviceId,
                         'title' => $title,
-                        'cover_url' => $coverUrl ?: $videoUrl, // 如果没有封面，使用视频URL
+                        'cover_url' => $coverUrl,
                         'video_url' => $videoUrl
                     ]);
                     
@@ -282,6 +318,10 @@ class Video extends BaseController
                     return json(['code' => 1, 'msg' => '平台、设备和标题为必填项']);
                 }
                 
+                // 初始化七牛云服务
+                $qiniuService = new QiniuService();
+                $qiniuEnabled = $qiniuService->isEnabled();
+                
                 // 处理封面文件上传（优先级最高）
                 // 先检查 $_FILES 中是否有文件，避免创建无效的文件对象
                 if (isset($_FILES['cover']) && $_FILES['cover']['error'] === UPLOAD_ERR_OK) {
@@ -291,7 +331,7 @@ class Video extends BaseController
                             return json(['code' => 1, 'msg' => '封面上传失败：文件无效']);
                         }
                         
-                        // 使用原生文件操作处理封面上传
+                        // 使用原生文件操作处理封面上传（先保存到本地）
                         $coverTargetDir = root_path() . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'covers' . DIRECTORY_SEPARATOR;
                         if (!is_dir($coverTargetDir)) {
                             mkdir($coverTargetDir, 0755, true);
@@ -306,7 +346,20 @@ class Video extends BaseController
                         
                         // 使用 ThinkPHP 文件对象的 move 方法移动文件
                         $coverFile->move($coverDateDir, $coverFileName);
-                        $data['cover_url'] = '/uploads/covers/' . date('Ymd') . '/' . $coverFileName;
+                        $coverLocalPath = $coverDateDir . $coverFileName;
+                        $coverLocalUrl = '/uploads/covers/' . date('Ymd') . '/' . $coverFileName;
+                        
+                        // 上传到七牛云（如果启用）
+                        $data['cover_url'] = $coverLocalUrl; // 默认使用本地URL
+                        if ($qiniuEnabled) {
+                            $coverKey = 'covers/' . date('Ymd') . '/' . $coverFileName;
+                            $qiniuResult = $qiniuService->upload($coverLocalPath, $coverKey);
+                            if ($qiniuResult['success']) {
+                                $data['cover_url'] = $qiniuResult['url']; // 使用七牛云URL
+                            } else {
+                                \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
+                            }
+                        }
                     } catch (\Exception $e) {
                         \think\facade\Log::error('封面上传错误: ' . $e->getMessage() . ' | 文件: ' . $e->getFile() . ' | 行号: ' . $e->getLine());
                         return json(['code' => 1, 'msg' => '封面上传失败：' . $e->getMessage()]);
@@ -328,7 +381,7 @@ class Video extends BaseController
                             return json(['code' => 1, 'msg' => '视频上传失败：文件无效']);
                         }
                         
-                        // 使用原生文件操作处理视频上传
+                        // 使用原生文件操作处理视频上传（先保存到本地）
                         $videoTargetDir = root_path() . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'videos' . DIRECTORY_SEPARATOR;
                         if (!is_dir($videoTargetDir)) {
                             mkdir($videoTargetDir, 0755, true);
@@ -343,7 +396,20 @@ class Video extends BaseController
                         
                         // 使用 ThinkPHP 文件对象的 move 方法移动文件
                         $videoFile->move($videoDateDir, $videoFileName);
-                        $data['video_url'] = '/uploads/videos/' . date('Ymd') . '/' . $videoFileName;
+                        $videoLocalPath = $videoDateDir . $videoFileName;
+                        $videoLocalUrl = '/uploads/videos/' . date('Ymd') . '/' . $videoFileName;
+                        
+                        // 上传到七牛云（如果启用）
+                        $data['video_url'] = $videoLocalUrl; // 默认使用本地URL
+                        if ($qiniuEnabled) {
+                            $videoKey = 'videos/' . date('Ymd') . '/' . $videoFileName;
+                            $qiniuResult = $qiniuService->upload($videoLocalPath, $videoKey);
+                            if ($qiniuResult['success']) {
+                                $data['video_url'] = $qiniuResult['url']; // 使用七牛云URL
+                            } else {
+                                \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
+                            }
+                        }
                     } catch (\Exception $e) {
                         \think\facade\Log::error('视频上传错误: ' . $e->getMessage() . ' | 文件: ' . $e->getFile() . ' | 行号: ' . $e->getLine());
                         return json(['code' => 1, 'msg' => '视频上传失败：' . $e->getMessage()]);
@@ -513,7 +579,21 @@ class Video extends BaseController
             }
             
             rename($finalPath, $targetPath);
-            $videoUrl = '/uploads/videos/' . $targetFileName;
+            $videoLocalUrl = '/uploads/videos/' . str_replace(DIRECTORY_SEPARATOR, '/', $targetFileName);
+            
+            // 初始化七牛云服务并上传视频
+            $qiniuService = new QiniuService();
+            $qiniuEnabled = $qiniuService->isEnabled();
+            $videoUrl = $videoLocalUrl; // 默认使用本地URL
+            if ($qiniuEnabled) {
+                $videoKey = 'videos/' . str_replace(DIRECTORY_SEPARATOR, '/', $targetFileName);
+                $qiniuResult = $qiniuService->upload($targetPath, $videoKey);
+                if ($qiniuResult['success']) {
+                    $videoUrl = $qiniuResult['url']; // 使用七牛云URL
+                } else {
+                    \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
+                }
+            }
             
                 // 处理封面
                 $coverUrl = '';
@@ -547,7 +627,20 @@ class Video extends BaseController
                                 // 使用 ThinkPHP 文件对象的 move 方法移动文件
                                 try {
                                     $coverFile->move($coverDateDir, $coverFileName);
-                                    $coverUrl = '/uploads/covers/' . date('Ymd') . '/' . $coverFileName;
+                                    $coverLocalPath = $coverDateDir . $coverFileName;
+                                    $coverLocalUrl = '/uploads/covers/' . date('Ymd') . '/' . $coverFileName;
+                                    
+                                    // 上传到七牛云（如果启用）
+                                    $coverUrl = $coverLocalUrl; // 默认使用本地URL
+                                    if ($qiniuEnabled) {
+                                        $coverKey = 'covers/' . date('Ymd') . '/' . $coverFileName;
+                                        $qiniuResult = $qiniuService->upload($coverLocalPath, $coverKey);
+                                        if ($qiniuResult['success']) {
+                                            $coverUrl = $qiniuResult['url']; // 使用七牛云URL
+                                        } else {
+                                            \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
+                                        }
+                                    }
                                 } catch (\Exception $e) {
                                     \think\facade\Log::warning('封面上传失败：文件移动失败 - ' . $e->getMessage());
                                 }
