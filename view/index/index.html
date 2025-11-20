@@ -438,7 +438,7 @@
                 showToast('标题已复制到剪贴板');
             }
             
-            // 下载文件 - 直接触发浏览器下载
+            // 下载文件 - 支持跨域下载
             async function downloadFile(type) {
                 if (!currentVideo) return;
                 
@@ -460,20 +460,56 @@
                     // 获取文件名
                     const urlParts = fileUrl.split('/');
                     let fileName = urlParts[urlParts.length - 1];
+                    // 去掉URL参数（?后面的部分）
+                    if (fileName.indexOf('?') > -1) {
+                        fileName = fileName.split('?')[0];
+                    }
                     if (!fileName || fileName.indexOf('.') === -1) {
                         // 如果没有文件名，根据类型生成
                         const ext = type === 'cover' ? '.jpg' : '.mp4';
                         fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
                     }
                     
+                    // 判断是否为跨域资源
+                    const isCrossOrigin = !fileUrl.startsWith(window.location.origin);
+                    
+                    let downloadUrl = fileUrl;
+                    let needRevoke = false;
+                    
+                    if (isCrossOrigin) {
+                        // 跨域资源：使用fetch下载，然后创建blob URL
+                        showToast('正在获取文件...');
+                        const response = await fetch(fileUrl);
+                        if (!response.ok) {
+                            throw new Error('下载失败: HTTP ' + response.status);
+                        }
+                        
+                        // 获取文件类型
+                        const contentType = response.headers.get('content-type') || 
+                            (type === 'cover' ? 'image/jpeg' : 'video/mp4');
+                        
+                        // 创建Blob对象
+                        const blob = await response.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        downloadUrl = blobUrl;
+                        needRevoke = true;
+                    }
+                    
                     // 创建隐藏的下载链接并触发点击
                     const link = document.createElement('a');
-                    link.href = fileUrl;
+                    link.href = downloadUrl;
                     link.download = fileName;
                     link.style.display = 'none';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
+                    
+                    // 如果是blob URL，需要释放
+                    if (needRevoke) {
+                        setTimeout(() => {
+                            URL.revokeObjectURL(downloadUrl);
+                        }, 100);
+                    }
                     
                     // 标记视频为已下载（如果是视频）
                     if (type === 'video') {
