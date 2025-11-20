@@ -32,41 +32,41 @@ jobs:
       
     - name: Create launcher icons
       run: |
-        python3 << 'PYTHON_SCRIPT'
-import os
-try:
-    from PIL import Image, ImageDraw
-except ImportError:
-    import sys
-    print("Installing Pillow...")
-    os.system(f"{sys.executable} -m pip install Pillow")
-    from PIL import Image, ImageDraw
-
-colors = {
-    'mdpi': (48, '#667eea'),
-    'hdpi': (72, '#667eea'),
-    'xhdpi': (96, '#667eea'),
-    'xxhdpi': (144, '#667eea'),
-    'xxxhdpi': (192, '#667eea'),
-}
-
-for density, (size, color) in colors.items():
-    img = Image.new('RGB', (size, size), color)
-    draw = ImageDraw.Draw(img)
-    offset = size // 6
-    points = [
-        (size // 2 - offset, size // 2 - offset),
-        (size // 2 - offset, size // 2 + offset),
-        (size // 2 + offset, size // 2),
-    ]
-    draw.polygon(points, fill='white')
-    os.makedirs(f'android_app/app/src/main/res/mipmap-{density}', exist_ok=True)
-    img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher.png')
-    img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher_round.png')
-    print(f"Created icon for {density}: {size}x{size}")
-
-print("All icons created successfully!")
-PYTHON_SCRIPT
+        python3 -c "
+        import os
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            import sys
+            print('Installing Pillow...')
+            os.system(sys.executable + ' -m pip install Pillow')
+            from PIL import Image, ImageDraw
+        
+        colors = {
+            'mdpi': (48, '#667eea'),
+            'hdpi': (72, '#667eea'),
+            'xhdpi': (96, '#667eea'),
+            'xxhdpi': (144, '#667eea'),
+            'xxxhdpi': (192, '#667eea'),
+        }
+        
+        for density, (size, color) in colors.items():
+            img = Image.new('RGB', (size, size), color)
+            draw = ImageDraw.Draw(img)
+            offset = size // 6
+            points = [
+                (size // 2 - offset, size // 2 - offset),
+                (size // 2 - offset, size // 2 + offset),
+                (size // 2 + offset, size // 2),
+            ]
+            draw.polygon(points, fill='white')
+            os.makedirs(f'android_app/app/src/main/res/mipmap-{density}', exist_ok=True)
+            img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher.png')
+            img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher_round.png')
+            print(f'Created icon for {density}: {size}x{size}')
+        
+        print('All icons created successfully!')
+        "
       
     - name: Grant execute permission for gradlew
       run: chmod +x android_app/gradlew
