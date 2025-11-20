@@ -102,12 +102,22 @@
 {/block}
 
 {block name="script"}
+<!-- 引入七牛云JavaScript SDK -->
+<script src="https://unpkg.com/qiniu-js@3.4.0/dist/qiniu.min.js"></script>
 <script>
     (function() {
         'use strict';
         
         let videoFiles = [];
         let isProcessing = false; // 防止重复处理
+        let qiniuConfig = null; // 七牛云配置缓存
+        
+        // 简单的文件名生成函数（使用时间戳和随机数）
+        function generateFileName(prefix, ext) {
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substr(2, 9);
+            return prefix + '_' + timestamp + '_' + random + '.' + ext;
+        }
         
         // 平台改变时加载设备
         $('#platform_id').off('change').on('change', function() {
@@ -524,82 +534,298 @@
             const originalText = btn.html();
             btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 上传中...');
             
-            // 使用分片上传（带并发控制：限制同时上传的文件数量）
-            const MAX_CONCURRENT_FILES = 6; // 最多同时上传6个文件（大幅提升并发度）
-            const DIRECT_UPLOAD_THRESHOLD = 30 * 1024 * 1024; // 30MB以下直接上传，不分片（更快）
-            const uploadQueue = [];
-            const uploadResults = [];
-            let currentUploads = 0;
-            let completedCount = 0;
+            // 获取七牛云上传配置（前端直传，最快方式）
+            $.get('/api/qiniu/uploadToken', function(qiniuRes) {
+                if (qiniuRes && qiniuRes.code === 0 && qiniuRes.data && qiniuRes.data.token) {
+                    qiniuConfig = qiniuRes.data;
+                    // 使用七牛云前端直传（最佳方案）
+                    startQiniuDirectUpload();
+                } else {
+                    // 七牛云未启用，使用传统上传方式
+                    console.warn('七牛云未启用，使用传统上传方式');
+                    startTraditionalUpload();
+                }
+            }).fail(function() {
+                // 获取token失败，使用传统上传方式
+                console.warn('获取七牛云配置失败，使用传统上传方式');
+                startTraditionalUpload();
+            });
             
-            // 直接上传函数（用于小文件，不分片，更快）
-            function uploadFileDirect(file, fileIndex, platformId, deviceId, titles, coverFile) {
-                return new Promise(function(resolve, reject) {
-                    const $item = $(`.video-item[data-index="${fileIndex}"]`);
-                    const $progress = $item.find('.upload-progress');
-                    if ($progress.length === 0) {
-                        $item.find('.btn-remove-video').after(`<div class="upload-progress mt-2"><div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">上传中...</div></div></div>`);
+            // 七牛云前端直传（最佳方案：文件直接从浏览器上传到七牛云，不经过服务器）
+            function startQiniuDirectUpload() {
+                const MAX_CONCURRENT_FILES = 8; // 前端直传可以更多并发
+                const uploadQueue = [];
+                const uploadResults = [];
+                let currentUploads = 0;
+                let completedCount = 0;
+                
+                // 初始化上传队列
+                videoFiles.forEach(function(file, index) {
+                    if (file) {
+                        uploadQueue.push({
+                            file: file,
+                            index: index,
+                            coverFile: $(`.video-item[data-index="${index}"]`).find('input[name^="covers"]')[0]?.files[0] || null,
+                            title: titles[index] || file.name.replace(/\.[^/.]+$/, '')
+                        });
                     }
-                    
-                    const formData = new FormData();
-                    formData.append('videos[]', file);
-                    formData.append('platform_id', platformId);
-                    formData.append('device_id', deviceId);
-                    
-                    // 添加标题（批量上传接口期望的格式）
-                    const titlesArray = [];
-                    titlesArray[fileIndex] = titles[fileIndex] || file.name.replace(/\.[^/.]+$/, '');
-                    formData.append('titles[' + fileIndex + ']', titlesArray[fileIndex]);
-                    
-                    // 添加封面（如果存在）
-                    if (coverFile) {
-                        formData.append('covers[' + fileIndex + ']', coverFile);
-                    }
-                    
-                    $.ajax({
-                        url: '/admin.php/video/batchUpload',
-                        type: 'POST',
-                        data: formData,
-                        processData: false,
-                        contentType: false,
-                        timeout: 300000, // 5分钟超时
-                        xhr: function() {
-                            const xhr = new window.XMLHttpRequest();
-                            xhr.upload.addEventListener('progress', function(e) {
-                                if (e.lengthComputable) {
-                                    const progress = Math.round((e.loaded / e.total) * 100);
-                                    $item.find('.progress-bar').css('width', progress + '%').text(progress + '%');
-                                }
-                            }, false);
-                            return xhr;
-                        },
-                        success: function(res) {
-                            if (res && res.code === 0) {
-                                $item.find('.progress-bar').removeClass('progress-bar-warning').addClass('progress-bar-success').text('完成');
-                                resolve({code: 0, msg: '上传成功'}); // 统一返回格式
-                            } else {
-                                reject(new Error(res.msg || '上传失败'));
-                            }
-                        },
-                        error: function(xhr, status, error) {
-                            const errorMsg = xhr.status === 413 ? '文件过大，请使用分片上传' : ('上传失败: ' + (error || status));
-                            reject(new Error(errorMsg));
-                        }
-                    });
                 });
-            }
-            
-            // 初始化上传队列
-            videoFiles.forEach(function(file, index) {
-                if (file) {
-                    uploadQueue.push({
-                        file: file,
-                        index: index,
-                        coverFile: $(`.video-item[data-index="${index}"]`).find('input[name^="covers"]')[0]?.files[0] || null,
-                        useDirectUpload: file.size < DIRECT_UPLOAD_THRESHOLD // 小文件直接上传
+                
+                // 使用七牛云前端直传上传文件
+                function uploadToQiniuDirect(file, fileIndex, title, coverFile) {
+                    return new Promise(function(resolve, reject) {
+                        const $item = $(`.video-item[data-index="${fileIndex}"]`);
+                        const $progress = $item.find('.upload-progress');
+                        if ($progress.length === 0) {
+                            $item.find('.btn-remove-video').after(`<div class="upload-progress mt-2"><div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div></div></div>`);
+                        }
+                        
+                        // 生成文件key
+                        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = generateFileName(fileIndex, fileExt);
+                        const videoKey = 'videos/' + dateStr + '/' + fileName;
+                        
+                        // 使用七牛云SDK进行前端直传（最佳方案：文件直接从浏览器上传到七牛云）
+                        // 配置上传选项
+                        const putExtra = {
+                            fname: file.name,
+                            mimeType: file.type || 'video/mp4',
+                            params: {}
+                        };
+                        
+                        const config = {
+                            useCdnDomain: true,
+                            region: qiniu.region.z2 // 华东区域，可根据bucket区域调整
+                        };
+                        
+                        // 开始上传
+                        const observable = qiniu.upload(file, videoKey, qiniuConfig.token, putExtra, config);
+                        
+                        let videoUrl = '';
+                        let coverUrl = '';
+                        
+                        observable.subscribe({
+                            next: function(res) {
+                                // 上传进度
+                                const progress = Math.round((res.total.loaded / res.total.size) * 100);
+                                $item.find('.progress-bar').css('width', progress + '%').text(progress + '%');
+                            },
+                            error: function(err) {
+                                $item.find('.progress-bar').removeClass('progress-bar-warning').addClass('progress-bar-danger').text('失败');
+                                reject(new Error('上传失败: ' + (err.message || '未知错误')));
+                            },
+                            complete: function(res) {
+                                // 上传完成
+                                videoUrl = qiniuConfig.domain + '/' + videoKey;
+                                $item.find('.progress-bar').css('width', '100%').text('100%');
+                                
+                                // 上传封面（如果有）
+                                if (coverFile) {
+                                    const coverExt = coverFile.name.split('.').pop();
+                                    const coverFileName = generateFileName(fileIndex + '_cover', coverExt);
+                                    const coverKey = 'covers/' + dateStr + '/' + coverFileName;
+                                    
+                                    const coverPutExtra = {
+                                        fname: coverFile.name,
+                                        mimeType: coverFile.type || 'image/jpeg',
+                                        params: {}
+                                    };
+                                    
+                                    const coverObservable = qiniu.upload(coverFile, coverKey, qiniuConfig.token, coverPutExtra, config);
+                                    
+                                    coverObservable.subscribe({
+                                        next: function(res) {
+                                            const progress = Math.round((res.total.loaded / res.total.size) * 100);
+                                            // 封面进度可以显示在另一个进度条或忽略
+                                        },
+                                        error: function(err) {
+                                            console.warn('封面上传失败:', err);
+                                            // 封面上传失败不影响视频
+                                        },
+                                        complete: function(res) {
+                                            coverUrl = qiniuConfig.domain + '/' + coverKey;
+                                            // 保存到数据库
+                                            saveUploadedFileInfo(videoUrl, coverUrl, title, fileIndex).then(resolve).catch(reject);
+                                        }
+                                    });
+                                } else {
+                                    // 没有封面，直接保存
+                                    saveUploadedFileInfo(videoUrl, videoUrl, title, fileIndex).then(resolve).catch(reject);
+                                }
+                            }
+                        });
                     });
                 }
-            });
+                
+                // 保存上传成功的文件信息到数据库
+                function saveUploadedFileInfo(videoUrl, coverUrl, title, fileIndex) {
+                    return new Promise(function(resolve, reject) {
+                        $.ajax({
+                            url: '/api/video/saveUploaded',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                platform_id: platformId,
+                                device_id: deviceId,
+                                title: title,
+                                video_url: videoUrl,
+                                cover_url: coverUrl
+                            }),
+                            success: function(res) {
+                                if (res && res.code === 0) {
+                                    resolve(res);
+                                } else {
+                                    reject(new Error(res.msg || '保存失败'));
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                reject(new Error('保存失败: ' + (error || status)));
+                            }
+                        });
+                    });
+                }
+                
+                // 处理上传结果
+                function handleUploadComplete() {
+                    if (completedCount < videoFiles.length) {
+                        return;
+                    }
+                    
+                    const errors = [];
+                    let successCount = 0;
+                    
+                    uploadResults.forEach(function(result) {
+                        if (result && result.error) {
+                            errors.push(result.fileName + ': ' + result.error);
+                        } else if (result) {
+                            successCount++;
+                        }
+                    });
+                    
+                    if (successCount > 0) {
+                        alert('成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
+                        setTimeout(function() {
+                            location.href = '/admin.php/video';
+                        }, 500);
+                    } else {
+                        alert('上传失败：\n' + errors.join('\n'));
+                        btn.prop('disabled', false).html(originalText);
+                    }
+                }
+                
+                // 开始上传下一个文件
+                function startNextUpload() {
+                    while (currentUploads < MAX_CONCURRENT_FILES && uploadQueue.length > 0) {
+                        const task = uploadQueue.shift();
+                        currentUploads++;
+                        
+                        const $item = $(`.video-item[data-index="${task.index}"]`);
+                        $item.find('.progress-bar').removeClass('progress-bar-success progress-bar-danger')
+                            .addClass('progress-bar-warning').text('上传中...');
+                        
+                        uploadToQiniuDirect(task.file, task.index, task.title, task.coverFile)
+                            .then(function(result) {
+                                uploadResults[task.index] = result;
+                                const $item = $(`.video-item[data-index="${task.index}"]`);
+                                $item.find('.progress-bar').removeClass('progress-bar-warning')
+                                    .addClass('progress-bar-success').text('完成');
+                            })
+                            .catch(function(error) {
+                                uploadResults[task.index] = { 
+                                    error: error.message, 
+                                    index: task.index, 
+                                    fileName: task.file.name 
+                                };
+                                const $item = $(`.video-item[data-index="${task.index}"]`);
+                                $item.find('.progress-bar').removeClass('progress-bar-warning')
+                                    .addClass('progress-bar-danger').text('失败');
+                            })
+                            .finally(function() {
+                                currentUploads--;
+                                completedCount++;
+                                startNextUpload();
+                                handleUploadComplete();
+                            });
+                    }
+                }
+                
+                // 开始上传
+                startNextUpload();
+            }
+            
+            // 传统上传方式（七牛云未启用时使用）
+            function startTraditionalUpload() {
+                const MAX_CONCURRENT_FILES = 6;
+                const DIRECT_UPLOAD_THRESHOLD = 30 * 1024 * 1024;
+                const uploadQueue = [];
+                const uploadResults = [];
+                let currentUploads = 0;
+                let completedCount = 0;
+                
+                // 直接上传函数（用于小文件，不分片，更快）
+                function uploadFileDirect(file, fileIndex, platformId, deviceId, titles, coverFile) {
+                    return new Promise(function(resolve, reject) {
+                        const $item = $(`.video-item[data-index="${fileIndex}"]`);
+                        const $progress = $item.find('.upload-progress');
+                        if ($progress.length === 0) {
+                            $item.find('.btn-remove-video').after(`<div class="upload-progress mt-2"><div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">上传中...</div></div></div>`);
+                        }
+                        
+                        const formData = new FormData();
+                        formData.append('videos[]', file);
+                        formData.append('platform_id', platformId);
+                        formData.append('device_id', deviceId);
+                        formData.append('titles[' + fileIndex + ']', titles[fileIndex] || file.name.replace(/\.[^/.]+$/, ''));
+                        
+                        if (coverFile) {
+                            formData.append('covers[' + fileIndex + ']', coverFile);
+                        }
+                        
+                        $.ajax({
+                            url: '/admin.php/video/batchUpload',
+                            type: 'POST',
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            timeout: 300000,
+                            xhr: function() {
+                                const xhr = new window.XMLHttpRequest();
+                                xhr.upload.addEventListener('progress', function(e) {
+                                    if (e.lengthComputable) {
+                                        const progress = Math.round((e.loaded / e.total) * 100);
+                                        $item.find('.progress-bar').css('width', progress + '%').text(progress + '%');
+                                    }
+                                }, false);
+                                return xhr;
+                            },
+                            success: function(res) {
+                                if (res && res.code === 0) {
+                                    $item.find('.progress-bar').removeClass('progress-bar-warning').addClass('progress-bar-success').text('完成');
+                                    resolve({code: 0, msg: '上传成功'});
+                                } else {
+                                    reject(new Error(res.msg || '上传失败'));
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                const errorMsg = xhr.status === 413 ? '文件过大，请使用分片上传' : ('上传失败: ' + (error || status));
+                                reject(new Error(errorMsg));
+                            }
+                        });
+                    });
+                }
+                
+                // 初始化上传队列
+                videoFiles.forEach(function(file, index) {
+                    if (file) {
+                        uploadQueue.push({
+                            file: file,
+                            index: index,
+                            coverFile: $(`.video-item[data-index="${index}"]`).find('input[name^="covers"]')[0]?.files[0] || null,
+                            useDirectUpload: file.size < DIRECT_UPLOAD_THRESHOLD
+                        });
+                    }
+                });
             
             // 处理上传结果
             function handleUploadComplete() {

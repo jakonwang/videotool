@@ -66,6 +66,74 @@ class QiniuService
     }
     
     /**
+     * 生成前端直传Token（用于前端直接上传到七牛云）
+     * @param string $key 文件key（可选，不指定则允许任意key）
+     * @param int $expires 过期时间（秒），默认3600秒
+     * @return array ['token' => string, 'domain' => string, 'bucket' => string]
+     */
+    public function generateUploadToken(string $key = null, int $expires = 3600): array
+    {
+        if (!$this->enabled) {
+            return [
+                'token' => '',
+                'domain' => '',
+                'bucket' => '',
+                'msg' => '七牛云未配置或未启用'
+            ];
+        }
+        
+        try {
+            // 生成上传策略（允许任意key，前端会指定）
+            $policy = [
+                'scope' => $this->bucket, // 允许上传到整个bucket
+                'deadline' => time() + $expires,
+                'returnBody' => json_encode([
+                    'key' => '$(key)',
+                    'hash' => '$(etag)',
+                    'fsize' => '$(fsize)',
+                    'mimeType' => '$(mimeType)',
+                    'url' => $this->domain . '/$(key)'
+                ], JSON_UNESCAPED_UNICODE)
+            ];
+            
+            // 生成上传token（不指定key，允许前端指定任意key）
+            $token = $this->auth->uploadToken($this->bucket, null, $expires, $policy);
+            
+            return [
+                'token' => $token,
+                'domain' => $this->domain,
+                'bucket' => $this->bucket,
+                'uploadUrl' => $this->getUploadUrl(),
+                'msg' => 'success'
+            ];
+        } catch (\Exception $e) {
+            Log::error('生成七牛云上传Token失败: ' . $e->getMessage());
+            return [
+                'token' => '',
+                'domain' => '',
+                'bucket' => '',
+                'msg' => '生成Token失败: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * 获取上传地址
+     * @return string
+     */
+    private function getUploadUrl(): string
+    {
+        // 根据bucket区域返回对应的上传地址
+        // 默认使用华东区域（z2），如果bucket在其他区域需要调整
+        // 华东: upload-z2.qiniup.com
+        // 华北: upload-z1.qiniup.com
+        // 华南: upload-z0.qiniup.com
+        // 北美: upload-na0.qiniup.com
+        // 东南亚: upload-as0.qiniup.com
+        return 'https://upload-z2.qiniup.com';
+    }
+    
+    /**
      * 上传文件到七牛云
      * @param string $localFilePath 本地文件路径
      * @param string $key 七牛云文件key（路径）

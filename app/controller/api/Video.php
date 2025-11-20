@@ -7,6 +7,7 @@ use app\BaseController;
 use app\model\Video as VideoModel;
 use app\model\Device;
 use app\model\Platform;
+use app\service\QiniuService;
 
 /**
  * 视频API
@@ -151,6 +152,91 @@ class Video extends BaseController
             return json([
                 'code' => 1,
                 'msg' => '服务器错误：' . $e->getMessage()
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        }
+    }
+    
+    /**
+     * 获取七牛云上传Token（用于前端直传）
+     */
+    public function getQiniuUploadToken()
+    {
+        try {
+            $qiniuService = new QiniuService();
+            if (!$qiniuService->isEnabled()) {
+                return json([
+                    'code' => 1,
+                    'msg' => '七牛云未配置或未启用'
+                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+            
+            $result = $qiniuService->generateUploadToken();
+            
+            if (empty($result['token'])) {
+                return json([
+                    'code' => 1,
+                    'msg' => $result['msg'] ?? '获取上传Token失败'
+                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+            
+            return json([
+                'code' => 0,
+                'msg' => '获取成功',
+                'data' => [
+                    'token' => $result['token'],
+                    'domain' => $result['domain'],
+                    'bucket' => $result['bucket'],
+                    'uploadUrl' => $result['uploadUrl']
+                ]
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        } catch (\Exception $e) {
+            \think\facade\Log::error('获取七牛云上传Token错误: ' . $e->getMessage());
+            return json([
+                'code' => 1,
+                'msg' => '服务器错误：' . $e->getMessage()
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        }
+    }
+    
+    /**
+     * 保存上传成功的文件信息（前端直传成功后调用）
+     */
+    public function saveUploadedFile()
+    {
+        try {
+            $data = $this->request->post();
+            
+            // 验证必填字段
+            if (empty($data['platform_id']) || empty($data['device_id']) || empty($data['video_url'])) {
+                return json([
+                    'code' => 1,
+                    'msg' => '参数不完整：缺少平台ID、设备ID或视频URL'
+                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+            
+            // 创建视频记录
+            $video = VideoModel::create([
+                'platform_id' => (int)$data['platform_id'],
+                'device_id' => (int)$data['device_id'],
+                'title' => $data['title'] ?? '视频标题',
+                'cover_url' => $data['cover_url'] ?? $data['video_url'],
+                'video_url' => $data['video_url']
+            ]);
+            
+            return json([
+                'code' => 0,
+                'msg' => '保存成功',
+                'data' => [
+                    'id' => $video->id,
+                    'video_url' => $video->video_url,
+                    'cover_url' => $video->cover_url
+                ]
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        } catch (\Exception $e) {
+            \think\facade\Log::error('保存上传文件信息错误: ' . $e->getMessage());
+            return json([
+                'code' => 1,
+                'msg' => '保存失败：' . $e->getMessage()
             ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         }
     }
