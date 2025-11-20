@@ -333,27 +333,32 @@
             });
         }
     
-        // 分片上传函数
+        // 分片上传函数（优化版：支持重试，分片串行但文件并发）
         function uploadFileInChunks(file, fileIndex, totalFiles, platformId, deviceId, titles, coverFile) {
             return new Promise(function(resolve, reject) {
-                const chunkSize = 5 * 1024 * 1024; // 5MB 每块
+                // 动态调整分片大小：大文件用10MB，小文件用5MB
+                const chunkSize = file.size > 50 * 1024 * 1024 ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
                 const totalChunks = Math.ceil(file.size / chunkSize);
+                const fileId = 'file_' + Date.now() + '_' + fileIndex + '_' + Math.random().toString(36).substr(2, 9);
+                const maxRetries = 3; // 每个分片最多重试3次
+                
                 let uploadedChunks = 0;
-                const fileId = 'file_' + Date.now() + '_' + fileIndex;
+                
+                // 初始化进度条
+                const $item = $(`.video-item[data-index="${fileIndex}"]`);
+                const $progress = $item.find('.upload-progress');
+                if ($progress.length === 0) {
+                    $item.find('.btn-remove-video').after(`<div class="upload-progress mt-2"><div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div></div></div>`);
+                }
                 
                 // 更新进度
-                function updateProgress(chunkIndex) {
-                    const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-                    const $item = $(`.video-item[data-index="${fileIndex}"]`);
-                    const $progress = $item.find('.upload-progress');
-                    if ($progress.length === 0) {
-                        $item.find('.btn-remove-video').after(`<div class="upload-progress mt-2"><div class="progress"><div class="progress-bar" role="progressbar" style="width: 0%">0%</div></div></div>`);
-                    }
+                function updateProgress() {
+                    const progress = Math.round((uploadedChunks / totalChunks) * 100);
                     $item.find('.progress-bar').css('width', progress + '%').text(progress + '%');
                 }
                 
-                // 上传单个分片
-                function uploadChunk(chunkIndex) {
+                // 上传单个分片（带重试机制）
+                function uploadChunk(chunkIndex, retryCount = 0) {
                     const start = chunkIndex * chunkSize;
                     const end = Math.min(start + chunkSize, file.size);
                     const chunk = file.slice(start, end);
@@ -381,31 +386,46 @@
                         data: formData,
                         processData: false,
                         contentType: false,
+                        timeout: 120000, // 120秒超时
                         success: function(res) {
                             if (res && res.code === 0) {
                                 uploadedChunks++;
-                                updateProgress(chunkIndex);
+                                updateProgress();
                                 
                                 if (uploadedChunks === totalChunks) {
                                     // 所有分片上传完成
                                     resolve(res);
                                 } else {
-                                    // 继续上传下一个分片
+                                    // 继续上传下一个分片（串行）
                                     uploadChunk(chunkIndex + 1);
                                 }
                             } else {
-                                reject(new Error(res.msg || '上传失败'));
+                                // 重试逻辑
+                                if (retryCount < maxRetries) {
+                                    setTimeout(function() {
+                                        uploadChunk(chunkIndex, retryCount + 1);
+                                    }, 1000 * (retryCount + 1)); // 递增延迟重试
+                                } else {
+                                    reject(new Error(res.msg || '上传失败（已重试' + maxRetries + '次）'));
+                                }
                             }
                         },
                         error: function(xhr, status, error) {
-                            if (xhr.status === 413) {
-                                reject(new Error('文件过大，请使用分片上传（已自动启用）'));
+                            // 重试逻辑
+                            if (retryCount < maxRetries && xhr.status !== 413) {
+                                setTimeout(function() {
+                                    uploadChunk(chunkIndex, retryCount + 1);
+                                }, 1000 * (retryCount + 1));
                             } else {
-                                reject(new Error('上传失败: ' + error));
+                                const errorMsg = xhr.status === 413 ? '文件过大' : ('上传失败: ' + (error || status) + (retryCount >= maxRetries ? '（已重试' + maxRetries + '次）' : ''));
+                                reject(new Error(errorMsg));
                             }
                         }
                     });
                 }
+                
+                // 初始化进度
+                updateProgress();
                 
                 // 开始上传第一个分片
                 uploadChunk(0);
@@ -444,31 +464,37 @@
             const originalText = btn.html();
             btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 上传中...');
             
-            // 使用分片上传
-            const uploadPromises = [];
+            // 使用分片上传（带并发控制：限制同时上传的文件数量）
+            const MAX_CONCURRENT_FILES = 3; // 最多同时上传3个文件，避免服务器压力过大
+            const uploadQueue = [];
+            const uploadResults = [];
+            let currentUploads = 0;
+            let completedCount = 0;
+            
+            // 初始化上传队列
             videoFiles.forEach(function(file, index) {
                 if (file) {
-                    const $item = $(`.video-item[data-index="${index}"]`);
-                    const coverFile = $item.find('input[name^="covers"]')[0]?.files[0] || null;
-                    
-                    uploadPromises.push(
-                        uploadFileInChunks(file, index, videoFiles.length, platformId, deviceId, titles, coverFile)
-                            .catch(function(error) {
-                                return { error: error.message, index: index, fileName: file.name };
-                            })
-                    );
+                    uploadQueue.push({
+                        file: file,
+                        index: index,
+                        coverFile: $(`.video-item[data-index="${index}"]`).find('input[name^="covers"]')[0]?.files[0] || null
+                    });
                 }
             });
             
-            // 等待所有文件上传完成
-            Promise.all(uploadPromises).then(function(results) {
+            // 处理上传结果
+            function handleUploadComplete() {
+                if (completedCount < videoFiles.length) {
+                    return; // 还有文件未完成
+                }
+                
                 const errors = [];
                 let successCount = 0;
                 
-                results.forEach(function(result) {
-                    if (result.error) {
+                uploadResults.forEach(function(result) {
+                    if (result && result.error) {
                         errors.push(result.fileName + ': ' + result.error);
-                    } else {
+                    } else if (result) {
                         successCount++;
                     }
                 });
@@ -482,7 +508,47 @@
                     alert('上传失败：\n' + errors.join('\n'));
                     btn.prop('disabled', false).html(originalText);
                 }
-            });
+            }
+            
+            // 开始上传下一个文件
+            function startNextUpload() {
+                // 检查是否可以开始新任务
+                while (currentUploads < MAX_CONCURRENT_FILES && uploadQueue.length > 0) {
+                    const task = uploadQueue.shift();
+                    currentUploads++;
+                    
+                    const $item = $(`.video-item[data-index="${task.index}"]`);
+                    $item.find('.progress-bar').removeClass('progress-bar-success progress-bar-danger')
+                        .addClass('progress-bar-warning').text('上传中...');
+                    
+                    uploadFileInChunks(task.file, task.index, videoFiles.length, platformId, deviceId, titles, task.coverFile)
+                        .then(function(result) {
+                            uploadResults[task.index] = result;
+                            const $item = $(`.video-item[data-index="${task.index}"]`);
+                            $item.find('.progress-bar').removeClass('progress-bar-warning')
+                                .addClass('progress-bar-success').text('完成');
+                        })
+                        .catch(function(error) {
+                            uploadResults[task.index] = { 
+                                error: error.message, 
+                                index: task.index, 
+                                fileName: task.file.name 
+                            };
+                            const $item = $(`.video-item[data-index="${task.index}"]`);
+                            $item.find('.progress-bar').removeClass('progress-bar-warning')
+                                .addClass('progress-bar-danger').text('失败');
+                        })
+                        .finally(function() {
+                            currentUploads--;
+                            completedCount++;
+                            startNextUpload(); // 继续下一个文件
+                            handleUploadComplete(); // 检查是否全部完成
+                        });
+                }
+            }
+            
+            // 开始上传
+            startNextUpload();
             
             return false;
         });
