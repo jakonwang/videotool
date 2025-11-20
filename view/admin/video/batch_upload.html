@@ -1,0 +1,491 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}批量上传视频{/block}
+
+{block name="style"}
+<style>
+    .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .upload-area:hover {
+        border-color: #007bff;
+        background: #e7f3ff;
+    }
+    .upload-area.dragover {
+        border-color: #007bff;
+        background: #cfe2ff;
+    }
+    .video-item {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background: white;
+    }
+    .video-preview {
+        max-width: 200px;
+        max-height: 150px;
+        border-radius: 5px;
+    }
+    
+    /* 统一按钮样式 */
+    .card-body .btn {
+        margin-right: 10px;
+        min-width: 120px;
+    }
+    
+    .video-item .btn {
+        min-width: 80px;
+    }
+</style>
+{/block}
+
+{block name="content"}
+<section class="content-header">
+    <div class="container-fluid">
+        <h1>批量上传视频</h1>
+    </div>
+</section>
+
+<section class="content">
+    <div class="container-fluid">
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label>选择平台 <span class="text-danger">*</span></label>
+                            <select name="platform_id" id="platform_id" class="form-control" required>
+                                <option value="">请选择</option>
+                                {volist name="platforms" id="platform"}
+                                <option value="{$platform.id}">{$platform.name}</option>
+                                {/volist}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label>选择设备 <span class="text-danger">*</span></label>
+                            <select name="device_id" id="device_id" class="form-control" required>
+                                <option value="">请先选择平台</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-primary"></i>
+                        <h5>点击或拖拽文件到此处上传</h5>
+                        <p class="text-muted">支持批量上传视频文件（MP4、AVI、MOV等格式）</p>
+                        <p class="text-warning"><small>⚠️ 单个文件最大100MB，如果上传失败，请检查服务器配置</small></p>
+                        <input type="file" id="videoFiles" name="videos[]" multiple accept="video/*" style="display:none">
+                    </div>
+                    
+                    <div id="videoList" class="mt-4"></div>
+                    
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> 开始上传
+                        </button>
+                        <a href="/admin.php/video" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 返回
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{/block}
+
+{block name="script"}
+<script>
+    (function() {
+        'use strict';
+        
+        let videoFiles = [];
+        let isProcessing = false; // 防止重复处理
+        
+        // 平台改变时加载设备
+        $('#platform_id').off('change').on('change', function() {
+            const platformId = $(this).val();
+            if (platformId) {
+                $.get('/admin.php/device/getByPlatform', {platform_id: platformId}, function(res) {
+                    const select = $('#device_id');
+                    select.html('<option value="">请选择</option>');
+                    if (res.code === 0 && res.data) {
+                        res.data.forEach(function(device) {
+                            select.append(`<option value="${device.id}">${device.device_name || device.ip_address}</option>`);
+                        });
+                    }
+                });
+            }
+        });
+        
+        // 点击上传区域 - 使用原生事件监听，避免jQuery事件循环
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('videoFiles');
+        
+        if (uploadArea && fileInput) {
+            uploadArea.addEventListener('click', function(e) {
+                // 如果点击的是文件输入框或其子元素，不处理
+                if (e.target === fileInput || fileInput.contains(e.target)) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isProcessing) {
+                    // 使用原生方法触发点击
+                    fileInput.click();
+                }
+            }, false);
+            
+            // 阻止文件输入框的点击事件冒泡
+            fileInput.addEventListener('click', function(e) {
+                e.stopPropagation();
+            }, false);
+        }
+        
+        // 拖拽上传
+        $('#uploadArea').off('dragover dragleave drop').on('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).addClass('dragover');
+        }).on('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).removeClass('dragover');
+        }).on('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).removeClass('dragover');
+            if (!isProcessing) {
+                const files = e.originalEvent.dataTransfer.files;
+                handleFiles(files);
+            }
+        });
+        
+        // 文件选择 - 使用原生事件监听，避免jQuery事件循环
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isProcessing && this.files && this.files.length > 0) {
+                    handleFiles(this.files);
+                    // 清空input，允许重复选择相同文件
+                    this.value = '';
+                }
+            }, false);
+        }
+    
+        // 处理文件
+        function handleFiles(files) {
+            if (isProcessing || !files || files.length === 0) {
+                return;
+            }
+            
+            isProcessing = true;
+            
+            try {
+                const fileArray = Array.from(files);
+                const validFiles = [];
+                const maxSize = 100 * 1024 * 1024; // 100MB
+                const errors = [];
+                
+                // 先过滤有效文件
+                fileArray.forEach(function(file) {
+                    if (!file) {
+                        return;
+                    }
+                    
+                    // 检查文件类型
+                    if (!file.type || !file.type.startsWith('video/')) {
+                        errors.push('文件 "' + file.name + '" 不是视频格式，已跳过');
+                        return;
+                    }
+                    
+                    // 检查文件大小（100MB限制）
+                    if (file.size > maxSize) {
+                        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                        errors.push('文件 "' + file.name + '" 大小 ' + sizeMB + 'MB，超过100MB限制，已跳过');
+                        return;
+                    }
+                    
+                    validFiles.push(file);
+                });
+                
+                // 显示错误提示
+                if (errors.length > 0) {
+                    alert('以下文件无法上传：\n' + errors.join('\n'));
+                }
+                
+                // 再添加到数组和DOM
+                validFiles.forEach(function(file) {
+                    videoFiles.push(file);
+                    addVideoItem(file);
+                });
+            } catch (error) {
+                console.error('处理文件时出错:', error);
+                alert('处理文件时出错，请重试');
+            } finally {
+                // 延迟重置，确保所有操作完成
+                setTimeout(function() {
+                    isProcessing = false;
+                }, 100);
+            }
+        }
+        
+        // 添加视频项
+        function addVideoItem(file) {
+            const index = videoFiles.length - 1;
+            const videoUrl = URL.createObjectURL(file);
+            
+            const item = $(`
+                <div class="video-item" data-index="${index}">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <video class="video-preview" src="${videoUrl}" controls></video>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="mb-2">
+                                <label>标题</label>
+                                <input type="text" name="titles[${index}]" class="form-control" 
+                                       value="${file.name.replace(/\.[^/.]+$/, '')}" placeholder="视频标题">
+                            </div>
+                            <div class="mb-2">
+                                <label>封面（可选）</label>
+                                <input type="file" name="covers[${index}]" class="form-control" accept="image/*">
+                            </div>
+                            <button type="button" class="btn btn-danger btn-remove-video" data-index="${index}">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            $('#videoList').append(item);
+        }
+        
+        // 使用事件委托处理删除按钮点击（只绑定一次）
+        $(document).off('click', '.btn-remove-video').on('click', '.btn-remove-video', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt($(this).data('index'));
+            if (!isNaN(index)) {
+                removeVideo(index);
+            }
+        });
+        
+        // 删除视频
+        function removeVideo(index) {
+            // 边界检查
+            if (isNaN(index) || index < 0 || index >= videoFiles.length) {
+                console.warn('Invalid index:', index);
+                return;
+            }
+            
+            // 找到要删除的元素
+            const $item = $(`.video-item[data-index="${index}"]`);
+            if ($item.length === 0) {
+                console.warn('Item not found for index:', index);
+                return;
+            }
+            
+            // 释放视频URL对象，避免内存泄漏
+            const $video = $item.find('video.video-preview');
+            if ($video.length > 0) {
+                const videoSrc = $video.attr('src');
+                if (videoSrc && videoSrc.startsWith('blob:')) {
+                    URL.revokeObjectURL(videoSrc);
+                }
+            }
+            
+            // 移除DOM元素
+            $item.remove();
+            
+            // 从数组中删除
+            videoFiles.splice(index, 1);
+            
+            // 重新索引所有剩余项（简化逻辑，避免递归）
+            const $allItems = $('.video-item');
+            let newIndex = 0;
+            $allItems.each(function() {
+                const $currentItem = $(this);
+                $currentItem.attr('data-index', newIndex);
+                $currentItem.find('.btn-remove-video').attr('data-index', newIndex);
+                
+                // 更新所有input的name属性
+                $currentItem.find('input').each(function() {
+                    const $input = $(this);
+                    let name = $input.attr('name');
+                    if (name) {
+                        // 替换第一个数字索引
+                        name = name.replace(/\[(\d+)\]/, `[${newIndex}]`);
+                        $input.attr('name', name);
+                    }
+                });
+                
+                newIndex++;
+            });
+        }
+    
+        // 分片上传函数
+        function uploadFileInChunks(file, fileIndex, totalFiles, platformId, deviceId, titles, coverFile) {
+            return new Promise(function(resolve, reject) {
+                const chunkSize = 5 * 1024 * 1024; // 5MB 每块
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                let uploadedChunks = 0;
+                const fileId = 'file_' + Date.now() + '_' + fileIndex;
+                
+                // 更新进度
+                function updateProgress(chunkIndex) {
+                    const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                    const $item = $(`.video-item[data-index="${fileIndex}"]`);
+                    const $progress = $item.find('.upload-progress');
+                    if ($progress.length === 0) {
+                        $item.find('.btn-remove-video').after(`<div class="upload-progress mt-2"><div class="progress"><div class="progress-bar" role="progressbar" style="width: 0%">0%</div></div></div>`);
+                    }
+                    $item.find('.progress-bar').css('width', progress + '%').text(progress + '%');
+                }
+                
+                // 上传单个分片
+                function uploadChunk(chunkIndex) {
+                    const start = chunkIndex * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+                    
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('chunkIndex', chunkIndex);
+                    formData.append('totalChunks', totalChunks);
+                    formData.append('fileId', fileId);
+                    formData.append('fileName', file.name);
+                    formData.append('fileSize', file.size);
+                    formData.append('fileIndex', fileIndex);
+                    formData.append('platform_id', platformId);
+                    formData.append('device_id', deviceId);
+                    formData.append('title', titles[fileIndex] || file.name.replace(/\.[^/.]+$/, ''));
+                    
+                    // 如果是最后一个分片，添加封面文件
+                    if (chunkIndex === totalChunks - 1 && coverFile) {
+                        formData.append('cover', coverFile);
+                    }
+                    
+                    $.ajax({
+                        url: '/admin.php/video/uploadChunk',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(res) {
+                            if (res && res.code === 0) {
+                                uploadedChunks++;
+                                updateProgress(chunkIndex);
+                                
+                                if (uploadedChunks === totalChunks) {
+                                    // 所有分片上传完成
+                                    resolve(res);
+                                } else {
+                                    // 继续上传下一个分片
+                                    uploadChunk(chunkIndex + 1);
+                                }
+                            } else {
+                                reject(new Error(res.msg || '上传失败'));
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            if (xhr.status === 413) {
+                                reject(new Error('文件过大，请使用分片上传（已自动启用）'));
+                            } else {
+                                reject(new Error('上传失败: ' + error));
+                            }
+                        }
+                    });
+                }
+                
+                // 开始上传第一个分片
+                uploadChunk(0);
+            });
+        }
+        
+        // 表单提交
+        $('#uploadForm').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (videoFiles.length === 0) {
+                alert('请选择视频文件');
+                return false;
+            }
+            
+            const $form = $(this);
+            const platformId = $('#platform_id').val();
+            const deviceId = $('#device_id').val();
+            
+            if (!platformId || !deviceId) {
+                alert('请选择平台和设备');
+                return false;
+            }
+            
+            // 获取标题
+            const titles = [];
+            $('.video-item').each(function() {
+                const index = $(this).attr('data-index');
+                const title = $(this).find('input[name^="titles"]').val();
+                titles[index] = title;
+            });
+            
+            // 显示加载
+            const btn = $form.find('button[type="submit"]');
+            const originalText = btn.html();
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 上传中...');
+            
+            // 使用分片上传
+            const uploadPromises = [];
+            videoFiles.forEach(function(file, index) {
+                if (file) {
+                    const $item = $(`.video-item[data-index="${index}"]`);
+                    const coverFile = $item.find('input[name^="covers"]')[0]?.files[0] || null;
+                    
+                    uploadPromises.push(
+                        uploadFileInChunks(file, index, videoFiles.length, platformId, deviceId, titles, coverFile)
+                            .catch(function(error) {
+                                return { error: error.message, index: index, fileName: file.name };
+                            })
+                    );
+                }
+            });
+            
+            // 等待所有文件上传完成
+            Promise.all(uploadPromises).then(function(results) {
+                const errors = [];
+                let successCount = 0;
+                
+                results.forEach(function(result) {
+                    if (result.error) {
+                        errors.push(result.fileName + ': ' + result.error);
+                    } else {
+                        successCount++;
+                    }
+                });
+                
+                if (successCount > 0) {
+                    alert('成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
+                    setTimeout(function() {
+                        location.href = '/admin.php/video';
+                    }, 500);
+                } else {
+                    alert('上传失败：\n' + errors.join('\n'));
+                    btn.prop('disabled', false).html(originalText);
+                }
+            });
+            
+            return false;
+        });
+    })();
+</script>
+{/block}

@@ -1,0 +1,116 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}批量编辑视频{/block}
+
+{block name="content"}
+<section class="content-header">
+    <div class="container-fluid">
+        <h1>批量编辑视频 <small>共 {$count} 条</small></h1>
+    </div>
+</section>
+
+<section class="content">
+    <div class="container-fluid">
+        <form id="editForm">
+            <input type="hidden" name="ids" value="{$ids_str}">
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">批量修改</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 提示：将统一修改所有选中视频的标题为输入的内容
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>批量修改标题 <span class="text-danger">*</span></label>
+                        <textarea name="title" class="form-control" rows="3" required placeholder="输入新的标题，将统一修改所有选中视频的标题"></textarea>
+                        <small class="form-text text-muted">将统一修改所有选中视频的标题为以上内容</small>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h5>视频列表预览（共 {$count} 条）</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>标题</th>
+                                    <th>封面</th>
+                                    <th>设备</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {volist name="list" id="video"}
+                                <tr>
+                                    <td>{$video.id}</td>
+                                    <td>{$video.title|mb_substr=0,50,'utf-8'}{if mb_strlen($video.title, 'utf-8') > 50}...{/if}</td>
+                                    <td>
+                                        {if $video.cover_url}
+                                        <img src="{$video.cover_url}" style="max-width:80px; max-height:50px; object-fit: cover;" onerror="this.style.display='none'">
+                                        {else}
+                                        <span class="text-muted">无封面</span>
+                                        {/if}
+                                    </td>
+                                    <td>{if isset($video.device)}{$video.device.device_name}{else}未知设备{/if}</td>
+                                </tr>
+                                {/volist}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存修改</button>
+                    <a href="/admin.php/video" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> 取消</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{/block}
+
+{block name="script"}
+<script>
+    $('#editForm').submit(function(e) {
+        e.preventDefault();
+        
+        const title = $('textarea[name="title"]').val().trim();
+        if (!title) {
+            alert('请输入要修改的标题');
+            return false;
+        }
+        
+        const btn = $(this).find('button[type="submit"]');
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 保存中...');
+        
+        $.post('/admin.php/video/batchEdit', $(this).serialize(), function(res) {
+            if (res && res.code === 0) {
+                alert(res.msg || '保存成功');
+                location.href = '/admin.php/video';
+            } else {
+                alert(res.msg || '保存失败');
+                btn.prop('disabled', false).html(originalText);
+            }
+        }).fail(function(xhr, status, error) {
+            let errorMsg = '保存失败，请重试';
+            if (xhr.responseJSON && xhr.responseJSON.msg) {
+                errorMsg = xhr.responseJSON.msg;
+            } else if (xhr.responseText) {
+                try {
+                    const res = JSON.parse(xhr.responseText);
+                    if (res.msg) {
+                        errorMsg = res.msg;
+                    }
+                } catch (e) {
+                    // 忽略解析错误
+                }
+            }
+            alert(errorMsg);
+            btn.prop('disabled', false).html(originalText);
+        });
+    });
+</script>
+{/block}

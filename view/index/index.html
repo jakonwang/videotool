@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok视频管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        .header .ip {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .video-container {
+            margin-bottom: 20px;
+        }
+        
+        .cover-image {
+            width: 100%;
+            max-width: 300px;
+            max-height: 200px;
+            object-fit: contain;
+            border-radius: 10px;
+            margin: 0 auto 15px;
+            display: block;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .video-player {
+            width: 100%;
+            max-width: 300px;
+            max-height: 200px;
+            border-radius: 10px;
+            margin: 0 auto 15px;
+            display: block;
+            background: #000;
+        }
+        
+        .title-section {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .title-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .title-text {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            word-break: break-word;
+        }
+        
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 44px;
+            box-sizing: border-box;
+        }
+        
+        .btn-full {
+            width: 100%;
+        }
+        
+        .btn-copy {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-copy:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-download {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-download:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #667eea;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+        }
+        
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin-left: -8px;
+            margin-top: -8px;
+            border: 2px solid #ffffff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #ef4444;
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 视频管理</h1>
+            <div class="ip">IP地址: {$ip}</div>
+            <div class="ip" style="margin-top: 5px; font-size: 12px;" id="platformInfo">平台: 加载中...</div>
+        </div>
+        
+        <div class="content" id="content">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        (function() {
+            'use strict';
+            
+            // 开发模式标志（生产环境设为 false）
+            const DEBUG = false;
+            
+            // 调试日志函数
+            function debugLog(...args) {
+                if (DEBUG) {
+                    console.log(...args);
+                }
+            }
+            
+            function debugError(...args) {
+                if (DEBUG) {
+                    console.error(...args);
+                }
+            }
+            
+            let currentVideo = null;
+            const platform = new URLSearchParams(window.location.search).get('platform') || 'tiktok';
+            
+            // 更新平台信息显示
+            document.getElementById('platformInfo').textContent = '平台: ' + platform;
+            
+            // 获取基础URL
+            function getBaseUrl() {
+                const path = window.location.pathname;
+                // 如果路径是 /index.php 或 /，返回空字符串（根目录）
+                if (path === '/' || path === '/index.php' || path.endsWith('/index.php')) {
+                    return '';
+                }
+                // 否则返回路径（去掉文件名）
+                const lastSlash = path.lastIndexOf('/');
+                return lastSlash > 0 ? path.substring(0, lastSlash) : '';
+            }
+            
+            // 加载视频
+            async function loadVideo() {
+                const contentEl = document.getElementById('content');
+                contentEl.innerHTML = '<div class="loading">加载中</div>';
+                
+                try {
+                    const baseUrl = getBaseUrl();
+                    debugLog('当前平台:', platform);
+                    debugLog('基础URL:', baseUrl);
+                    
+                    // 先尝试简化版API
+                    let apiUrl = baseUrl + '/api_simple.php?platform=' + platform;
+                    debugLog('尝试API 1:', apiUrl);
+                    
+                    let response = await fetch(apiUrl);
+                    debugLog('API 1 响应状态:', response.status);
+                    
+                    // 如果简化版失败，尝试路由API
+                    if (!response.ok) {
+                        apiUrl = baseUrl + '/api/video/getVideo?platform=' + platform;
+                        debugLog('尝试API 2:', apiUrl);
+                        response = await fetch(apiUrl);
+                        debugLog('API 2 响应状态:', response.status);
+                    }
+                    
+                    // 检查响应类型
+                    const contentType = response.headers.get('content-type');
+                    debugLog('响应类型:', contentType);
+                    
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        debugError('API返回非JSON:', text.substring(0, 500));
+                        throw new Error('API返回格式错误，请检查服务器配置');
+                    }
+                    
+                    const result = await response.json();
+                    debugLog('API返回结果:', result);
+                    
+                    if (result.code === 0 && result.data) {
+                        currentVideo = result.data;
+                        debugLog('视频数据:', result.data);
+                        renderVideo(result.data);
+                    } else {
+                        contentEl.innerHTML = `
+                            <div class="empty">
+                                <div class="empty-icon">📭</div>
+                                <div style="font-size: 16px; margin-bottom: 10px;">${escapeHtml(result.msg || '暂无可用视频')}</div>
+                                <div style="font-size: 12px; color: #999;">
+                                    请检查：1. 后台是否已上传视频 2. 平台代码是否正确（当前：${escapeHtml(platform)}）
+                                </div>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    debugError('加载视频错误:', error);
+                    contentEl.innerHTML = `
+                        <div class="error">
+                            <div style="font-size: 18px; margin-bottom: 15px;">⚠️ 加载失败</div>
+                            <div style="font-size: 14px; color: #dc3545; margin-bottom: 15px;">${escapeHtml(error.message)}</div>
+                            <button onclick="location.reload()" class="btn btn-download btn-full" style="margin-top: 10px;">
+                                🔄 刷新重试
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+            
+            // 转换为绝对URL
+            function toAbsoluteUrl(url) {
+                if (!url) return '';
+                // 如果已经是完整URL，直接返回
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    return url;
+                }
+                // 如果是相对路径，转换为绝对路径
+                if (url.startsWith('/')) {
+                    return window.location.origin + url;
+                }
+                // 其他情况，使用当前路径
+                const baseUrl = window.location.origin + getBaseUrl();
+                return baseUrl + (url.startsWith('./') ? url.substring(1) : '/' + url);
+            }
+            
+            // 渲染视频
+            function renderVideo(video) {
+                let coverUrl = toAbsoluteUrl(video.cover_url);
+                const videoUrl = toAbsoluteUrl(video.video_url);
+                
+                // 如果没有封面URL，使用视频URL作为默认封面
+                if (!coverUrl || coverUrl === '') {
+                    coverUrl = videoUrl;
+                }
+                
+                debugLog('封面URL:', coverUrl);
+                debugLog('视频URL:', videoUrl);
+                
+                document.getElementById('content').innerHTML = `
+                    <div class="video-container">
+                        <img src="${escapeHtml(coverUrl)}" alt="封面" class="cover-image" 
+                             onerror="this.onerror=null; this.src='${escapeHtml(videoUrl)}'; debugError('封面加载失败，使用视频作为封面');">
+                        <video src="${escapeHtml(videoUrl)}" controls class="video-player" 
+                               preload="metadata"
+                               onerror="this.style.display='none'; debugError('视频加载失败:', this.src);">
+                            您的浏览器不支持视频播放
+                        </video>
+                    
+                    <div class="title-section">
+                        <div class="title-label">视频标题</div>
+                        <div class="title-text" id="titleText">${escapeHtml(video.title)}</div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-copy" onclick="copyTitle()">
+                            📋 复制标题
+                        </button>
+                        <button class="btn btn-download" onclick="downloadFile('cover')">
+                            🖼️ 下载封面
+                        </button>
+                    </div>
+                    
+                    <button class="btn btn-download btn-full" onclick="downloadFile('video')">
+                        ⬇️ 下载视频
+                    </button>
+                </div>
+                `;
+            }
+            
+            // 复制标题
+            function copyTitle() {
+                const titleText = document.getElementById('titleText').textContent;
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(titleText).then(() => {
+                        showToast('标题已复制到剪贴板');
+                    }).catch(() => {
+                        fallbackCopy(titleText);
+                    });
+                } else {
+                    fallbackCopy(titleText);
+                }
+            }
+            
+            function fallbackCopy(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('标题已复制到剪贴板');
+            }
+            
+            // 下载文件 - 直接触发浏览器下载
+            async function downloadFile(type) {
+                if (!currentVideo) return;
+                
+                // 禁用所有下载按钮
+                const buttons = document.querySelectorAll('.btn-download');
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('btn-loading');
+                });
+                
+                try {
+                    showToast('正在下载...');
+                    
+                    // 获取文件URL
+                    const fileUrl = type === 'cover' 
+                        ? toAbsoluteUrl(currentVideo.cover_url) 
+                        : toAbsoluteUrl(currentVideo.video_url);
+                    
+                    // 获取文件名
+                    const urlParts = fileUrl.split('/');
+                    let fileName = urlParts[urlParts.length - 1];
+                    if (!fileName || fileName.indexOf('.') === -1) {
+                        // 如果没有文件名，根据类型生成
+                        const ext = type === 'cover' ? '.jpg' : '.mp4';
+                        fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
+                    }
+                    
+                    // 创建隐藏的下载链接并触发点击
+                    const link = document.createElement('a');
+                    link.href = fileUrl;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // 标记视频为已下载（如果是视频）
+                    if (type === 'video') {
+                        try {
+                            const baseUrl = getBaseUrl();
+                            await fetch(baseUrl + '/api/video/markDownloaded', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    video_id: currentVideo.id
+                                })
+                            });
+                        } catch (e) {
+                            debugError('标记下载状态失败，但不影响下载:', e);
+                        }
+                        
+                        showToast('视频下载成功');
+                        // 延迟后加载下一个视频
+                        setTimeout(() => {
+                            loadVideo();
+                        }, 1000);
+                    } else {
+                        showToast('封面下载成功');
+                        // 恢复按钮状态
+                        buttons.forEach(btn => {
+                            btn.disabled = false;
+                            btn.classList.remove('btn-loading');
+                        });
+                    }
+                } catch (error) {
+                    debugError('下载失败:', error);
+                    showToast('下载失败: ' + error.message);
+                    // 恢复按钮状态
+                    buttons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.classList.remove('btn-loading');
+                    });
+                }
+            }
+            
+            // 显示提示
+            function showToast(message) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 2000);
+            }
+            
+            // HTML转义
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            // 将函数暴露到全局作用域
+            window.loadVideo = loadVideo;
+            window.downloadFile = downloadFile;
+            window.copyTitle = copyTitle;
+            window.debugLog = debugLog;
+            window.debugError = debugError;
+            
+            // 页面加载时获取视频
+            loadVideo();
+        })();
+    </script>
+</body>
+</html>
+

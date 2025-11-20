@@ -1,0 +1,11 @@
+# Apache 配置文件示例
+# 如果使用 Apache，可以将此文件重命名为 .htaccess
+
+# 设置上传文件大小限制
+php_value upload_max_filesize 100M
+php_value post_max_size 100M
+php_value max_execution_time 300
+php_value memory_limit 256M
+
+# 如果服务器不允许在 .htaccess 中设置 PHP 配置，请直接在 php.ini 中修改
+

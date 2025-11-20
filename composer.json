@@ -1,0 +1,25 @@
+{
+    "name": "videotool/app",
+    "description": "多平台视频管理系统",
+    "type": "project",
+    "keywords": ["thinkphp", "video", "management"],
+    "homepage": "https://github.com/top-think/framework",
+    "license": "Apache-2.0",
+    "require": {
+        "php": ">=7.2.5",
+        "topthink/framework": "^6.1.0",
+        "topthink/think-orm": "^2.0",
+        "topthink/think-view": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "app\\": "app"
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
+

@@ -1,0 +1,18 @@
+# 指定默认入口文件为 index.php（必须在第一位）
+DirectoryIndex index.php index.html admin.php
+
+<IfModule mod_rewrite.c>
+  Options +FollowSymlinks -Multiviews
+  RewriteEngine On
+
+  # 如果访问根目录，强制使用 index.php
+  RewriteRule ^$ index.php [L,QSA]
+  
+  # 禁止直接访问敏感文件
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-f
+  
+  # 其他请求也路由到 index.php
+  RewriteRule ^(.*)$ index.php/$1 [QSA,PT,L]
+</IfModule>
+

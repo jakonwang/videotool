@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>视频管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <style>
+        .video-thumb { max-width: 100px; max-height: 60px; object-fit: cover; }
+        
+        /* 统一按钮样式 */
+        .content-header .btn {
+            margin-left: 5px;
+            min-width: 100px;
+        }
+        
+        .card-header .btn {
+            margin-left: 5px;
+        }
+        
+        .table .btn {
+            margin-right: 5px;
+            padding: 4px 8px;
+            font-size: 12px;
+            min-width: 60px;
+            display: inline-block;
+        }
+        
+        .table .btn:last-child {
+            margin-right: 0;
+        }
+        
+        .table td {
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="hold-transition sidebar-mini">
+    <div class="wrapper">
+        <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+                </li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <span class="nav-link">视频管理系统</span>
+                </li>
+            </ul>
+        </nav>
+
+        <aside class="main-sidebar sidebar-dark-primary elevation-4">
+            <a href="/admin.php" class="brand-link">
+                <span class="brand-text font-weight-light">视频管理系统</span>
+            </a>
+            <div class="sidebar">
+                <nav class="mt-2">
+                    <ul class="nav nav-pills nav-sidebar flex-column">
+                        <li class="nav-item">
+                            <a href="/admin.php" class="nav-link">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <p>首页</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin.php/platform" class="nav-link">
+                                <i class="nav-icon fas fa-th"></i>
+                                <p>平台管理</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin.php/device" class="nav-link">
+                                <i class="nav-icon fas fa-mobile-alt"></i>
+                                <p>设备管理</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin.php/video" class="nav-link active">
+                                <i class="nav-icon fas fa-video"></i>
+                                <p>视频管理</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/admin.php/video/batchUpload" class="nav-link">
+                                <i class="nav-icon fas fa-upload"></i>
+                                <p>批量上传</p>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+
+        <div class="content-wrapper">
+            <section class="content-header">
+                <div class="container-fluid">
+                    <h1>视频管理 
+                        <a href="/admin.php/video/batchUpload" class="btn btn-success"><i class="fas fa-upload"></i> 批量上传</a>
+                        <button onclick="batchEdit()" class="btn btn-warning"><i class="fas fa-edit"></i> 批量编辑</button>
+                        <button onclick="batchDelete()" class="btn btn-danger"><i class="fas fa-trash"></i> 批量删除</button>
+                    </h1>
+                </div>
+            </section>
+            
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="card">
+                        <div class="card-header">
+                            <form method="get" class="form-inline">
+                                <select name="platform_id" class="form-control mr-2">
+                                    <option value="">全部平台</option>
+                                    {volist name="platforms" id="platform"}
+                                    <option value="{$platform.id}" {if $platform_id == $platform.id}selected{/if}>{$platform.name}</option>
+                                    {/volist}
+                                </select>
+                                <select name="device_id" class="form-control mr-2">
+                                    <option value="">全部设备</option>
+                                    {volist name="devices" id="device"}
+                                    <option value="{$device.id}" {if $device_id == $device.id}selected{/if}>{$device.device_name}</option>
+                                    {/volist}
+                                </select>
+                                <select name="is_downloaded" class="form-control mr-2">
+                                    <option value="-1">全部状态</option>
+                                    <option value="0" {if $is_downloaded == 0}selected{/if}>未下载</option>
+                                    <option value="1" {if $is_downloaded == 1}selected{/if}>已下载</option>
+                                </select>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> 筛选</button>
+                            </form>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th width="50"><input type="checkbox" id="checkAll"></th>
+                                        <th>ID</th>
+                                        <th>平台</th>
+                                        <th>设备</th>
+                                        <th>封面</th>
+                                        <th>标题</th>
+                                        <th>状态</th>
+                                        <th>创建时间</th>
+                                        <th width="150">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {volist name="list" id="item"}
+                                    <tr>
+                                        <td><input type="checkbox" class="check-item" value="{$item.id}"></td>
+                                        <td>{$item.id}</td>
+                                        <td>{$item.platform.name}</td>
+                                        <td>{$item.device.device_name}</td>
+                                        <td><img src="{$item.cover_url}" class="video-thumb" onerror="this.style.display='none'"></td>
+                                        <td>{$item.title|mb_substr=0,30,'utf-8'}{if mb_strlen($item.title, 'utf-8') > 30}...{/if}</td>
+                                        <td>
+                                            {if $item.is_downloaded == 1}
+                                            <span class="badge badge-success">已下载</span>
+                                            {else}
+                                            <span class="badge badge-warning">未下载</span>
+                                            {/if}
+                                        </td>
+                                        <td>{$item.created_at}</td>
+                                        <td>
+                                            <a href="/admin.php/video/edit/{$item.id}" class="btn btn-info"><i class="fas fa-edit"></i> 编辑</a>
+                                            <button onclick="deleteItem({$item.id})" class="btn btn-danger"><i class="fas fa-trash"></i> 删除</button>
+                                        </td>
+                                    </tr>
+                                    {/volist}
+                                </tbody>
+                            </table>
+                            <div class="pagination-wrapper mt-3">
+                                {$list->render()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <div class="float-right d-none d-sm-block">
+                <b>Version</b> 1.0.0
+            </div>
+            <strong>Copyright &copy; 2024 视频管理系统.</strong> All rights reserved.
+        </footer>
+    </div>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+    <script>
+        $('#checkAll').change(function() {
+            $('.check-item').prop('checked', $(this).prop('checked'));
+        });
+        
+        function getCheckedIds() {
+            const ids = [];
+            $('.check-item:checked').each(function() {
+                ids.push($(this).val());
+            });
+            return ids;
+        }
+        
+        function batchEdit() {
+            const ids = getCheckedIds();
+            if (ids.length === 0) {
+                alert('请选择要编辑的视频');
+                return;
+            }
+            location.href = '/admin.php/video/batchEdit?ids=' + ids.join(',');
+        }
+        
+        function batchDelete() {
+            const ids = getCheckedIds();
+            if (ids.length === 0) {
+                alert('请选择要删除的视频');
+                return;
+            }
+            if (confirm('确定要删除选中的 ' + ids.length + ' 个视频吗？')) {
+                $.post('/admin.php/video/batchDelete', {ids: ids}, function(res) {
+                    if (res.code === 0) {
+                        alert(res.msg);
+                        location.reload();
+                    } else {
+                        alert(res.msg);
+                    }
+                });
+            }
+        }
+        
+        function deleteItem(id) {
+            if (confirm('确定要删除吗？')) {
+                $.post('/admin.php/video/delete/' + id, {}, function(res) {
+                    if (res.code === 0) {
+                        alert(res.msg);
+                        location.reload();
+                    } else {
+                        alert(res.msg);
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
