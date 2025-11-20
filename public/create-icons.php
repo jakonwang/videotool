@@ -44,6 +44,7 @@ function createIcon($size, $filename) {
 // 生成图标
 $icon192 = __DIR__ . '/icon-192.png';
 $icon512 = __DIR__ . '/icon-512.png';
+$favicon = __DIR__ . '/favicon.ico';
 
 $success = true;
 $messages = [];
@@ -68,6 +69,38 @@ if (!file_exists($icon512)) {
     }
 } else {
     $messages[] = "ℹ️ icon-512.png 已存在";
+}
+
+// 生成 favicon.ico（使用32x32图标）
+if (!file_exists($favicon)) {
+    $faviconImage = imagecreatetruecolor(32, 32);
+    $color1 = imagecolorallocate($faviconImage, 102, 126, 234);
+    $color2 = imagecolorallocate($faviconImage, 118, 75, 162);
+    $white = imagecolorallocate($faviconImage, 255, 255, 255);
+    
+    imagefill($faviconImage, 0, 0, $color1);
+    $centerX = 16;
+    $centerY = 16;
+    imagefilledellipse($faviconImage, $centerX, $centerY, 24, 24, $color2);
+    
+    $triangleSize = 10;
+    $points = array(
+        $centerX - 3, $centerY - 5,
+        $centerX - 3, $centerY + 5,
+        $centerX + 5, $centerY
+    );
+    imagefilledpolygon($faviconImage, $points, 3, $white);
+    
+    imagepng($faviconImage, $favicon);
+    imagedestroy($faviconImage);
+    
+    if (file_exists($favicon)) {
+        $messages[] = "✅ 已生成 favicon.ico";
+    } else {
+        $messages[] = "❌ 生成 favicon.ico 失败";
+    }
+} else {
+    $messages[] = "ℹ️ favicon.ico 已存在";
 }
 
 // 输出结果
