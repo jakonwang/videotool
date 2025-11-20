@@ -826,79 +826,80 @@
                         });
                     }
                 });
-            
-            // 处理上传结果
-            function handleUploadComplete() {
-                if (completedCount < videoFiles.length) {
-                    return; // 还有文件未完成
-                }
                 
-                const errors = [];
-                let successCount = 0;
-                
-                uploadResults.forEach(function(result) {
-                    if (result && result.error) {
-                        errors.push(result.fileName + ': ' + result.error);
-                    } else if (result) {
-                        successCount++;
+                // 处理上传结果
+                function handleUploadComplete() {
+                    if (completedCount < videoFiles.length) {
+                        return; // 还有文件未完成
                     }
-                });
+                    
+                    const errors = [];
+                    let successCount = 0;
+                    
+                    uploadResults.forEach(function(result) {
+                        if (result && result.error) {
+                            errors.push(result.fileName + ': ' + result.error);
+                        } else if (result) {
+                            successCount++;
+                        }
+                    });
+                    
+                    if (successCount > 0) {
+                        alert('成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
+                        setTimeout(function() {
+                            location.href = '/admin.php/video';
+                        }, 500);
+                    } else {
+                        alert('上传失败：\n' + errors.join('\n'));
+                        btn.prop('disabled', false).html(originalText);
+                    }
+                }
                 
-                if (successCount > 0) {
-                    alert('成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
-                    setTimeout(function() {
-                        location.href = '/admin.php/video';
-                    }, 500);
-                } else {
-                    alert('上传失败：\n' + errors.join('\n'));
-                    btn.prop('disabled', false).html(originalText);
+                // 开始上传下一个文件
+                function startNextUpload() {
+                    // 检查是否可以开始新任务
+                    while (currentUploads < MAX_CONCURRENT_FILES && uploadQueue.length > 0) {
+                        const task = uploadQueue.shift();
+                        currentUploads++;
+                        
+                        const $item = $(`.video-item[data-index="${task.index}"]`);
+                        $item.find('.progress-bar').removeClass('progress-bar-success progress-bar-danger')
+                            .addClass('progress-bar-warning').text('上传中...');
+                        
+                        // 小文件直接上传，大文件分片上传
+                        const uploadPromise = task.useDirectUpload 
+                            ? uploadFileDirect(task.file, task.index, platformId, deviceId, titles, task.coverFile)
+                            : uploadFileInChunks(task.file, task.index, videoFiles.length, platformId, deviceId, titles, task.coverFile);
+                        
+                        uploadPromise
+                            .then(function(result) {
+                                uploadResults[task.index] = result;
+                                const $item = $(`.video-item[data-index="${task.index}"]`);
+                                $item.find('.progress-bar').removeClass('progress-bar-warning')
+                                    .addClass('progress-bar-success').text('完成');
+                            })
+                            .catch(function(error) {
+                                uploadResults[task.index] = { 
+                                    error: error.message, 
+                                    index: task.index, 
+                                    fileName: task.file.name 
+                                };
+                                const $item = $(`.video-item[data-index="${task.index}"]`);
+                                $item.find('.progress-bar').removeClass('progress-bar-warning')
+                                    .addClass('progress-bar-danger').text('失败');
+                            })
+                            .finally(function() {
+                                currentUploads--;
+                                completedCount++;
+                                startNextUpload(); // 继续下一个文件
+                                handleUploadComplete(); // 检查是否全部完成
+                            });
+                    }
                 }
+                
+                // 开始上传
+                startNextUpload();
             }
-            
-            // 开始上传下一个文件
-            function startNextUpload() {
-                // 检查是否可以开始新任务
-                while (currentUploads < MAX_CONCURRENT_FILES && uploadQueue.length > 0) {
-                    const task = uploadQueue.shift();
-                    currentUploads++;
-                    
-                    const $item = $(`.video-item[data-index="${task.index}"]`);
-                    $item.find('.progress-bar').removeClass('progress-bar-success progress-bar-danger')
-                        .addClass('progress-bar-warning').text('上传中...');
-                    
-                    // 小文件直接上传，大文件分片上传
-                    const uploadPromise = task.useDirectUpload 
-                        ? uploadFileDirect(task.file, task.index, platformId, deviceId, titles, task.coverFile)
-                        : uploadFileInChunks(task.file, task.index, videoFiles.length, platformId, deviceId, titles, task.coverFile);
-                    
-                    uploadPromise
-                        .then(function(result) {
-                            uploadResults[task.index] = result;
-                            const $item = $(`.video-item[data-index="${task.index}"]`);
-                            $item.find('.progress-bar').removeClass('progress-bar-warning')
-                                .addClass('progress-bar-success').text('完成');
-                        })
-                        .catch(function(error) {
-                            uploadResults[task.index] = { 
-                                error: error.message, 
-                                index: task.index, 
-                                fileName: task.file.name 
-                            };
-                            const $item = $(`.video-item[data-index="${task.index}"]`);
-                            $item.find('.progress-bar').removeClass('progress-bar-warning')
-                                .addClass('progress-bar-danger').text('失败');
-                        })
-                        .finally(function() {
-                            currentUploads--;
-                            completedCount++;
-                            startNextUpload(); // 继续下一个文件
-                            handleUploadComplete(); // 检查是否全部完成
-                        });
-                }
-            }
-            
-            // 开始上传
-            startNextUpload();
             
             return false;
         });
