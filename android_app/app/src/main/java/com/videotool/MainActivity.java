@@ -169,16 +169,17 @@ public class MainActivity extends AppCompatActivity {
                                 adapter.notifyDataSetChanged();
                             });
                         } else {
+                            String errorMsg = jsonObject.optString("msg", "加载失败");
                             runOnUiThread(() -> {
                                 hideProgress();
-                                Toast.makeText(MainActivity.this, 
-                                    jsonObject.getString("msg"), Toast.LENGTH_SHORT).show();
+                                Toast.makeText(MainActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
                             });
                         }
                     } catch (JSONException e) {
+                        final String errorMsg = "解析数据失败: " + e.getMessage();
                         runOnUiThread(() -> {
                             hideProgress();
-                            Toast.makeText(MainActivity.this, "解析数据失败", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
                         });
                     }
                 } else {
