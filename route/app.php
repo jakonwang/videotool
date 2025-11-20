@@ -6,7 +6,10 @@ use think\facade\Route;
 // 只在前台入口文件时加载此路由（或者未定义 ENTRY_FILE 时，默认前台）
 if (!defined('ENTRY_FILE') || ENTRY_FILE === 'index') {
     Route::get('/', 'app\controller\index\Index@index');
-    Route::get('/platforms', 'app\controller\index\Index@platforms');
+    Route::get('platforms', 'app\controller\index\Index@platforms');
+    Route::get('platforms.html', 'app\controller\index\Index@platforms');
+    // 兼容默认路由格式
+    Route::get('index/platforms', 'app\controller\index\Index@platforms');
 }
 
 // 只加载 API 路由，不加载后台路由
