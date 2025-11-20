@@ -25,8 +25,18 @@ jobs:
       uses: android-actions/setup-android@v3
       
     - name: Grant execute permission for gradlew
-      run: chmod +x android_app/gradlew
-      working-directory: .
+      run: |
+        if [ -f android_app/gradlew ]; then
+          chmod +x android_app/gradlew
+        else
+          echo "Warning: gradlew not found, creating it..."
+          # Create a simple gradlew wrapper if it doesn't exist
+          cat > android_app/gradlew << 'EOF'
+#!/bin/sh
+exec java -jar gradle/wrapper/gradle-wrapper.jar "$@"
+EOF
+          chmod +x android_app/gradlew
+        fi
       
     - name: Build APK
       working-directory: ./android_app
