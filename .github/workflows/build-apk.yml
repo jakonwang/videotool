@@ -24,6 +24,38 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
+    - name: Create launcher icons
+      run: |
+        mkdir -p android_app/app/src/main/res/mipmap-mdpi
+        mkdir -p android_app/app/src/main/res/mipmap-hdpi
+        mkdir -p android_app/app/src/main/res/mipmap-xhdpi
+        mkdir -p android_app/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android_app/app/src/main/res/mipmap-xxxhdpi
+        
+        # Create simple colored icon using ImageMagick or convert
+        # If ImageMagick is not available, download a placeholder
+        if command -v convert &> /dev/null; then
+          convert -size 48x48 xc:"#667eea" -fill white -draw "polygon 18,14 18,34 30,24" android_app/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert -size 72x72 xc:"#667eea" -fill white -draw "polygon 27,21 27,51 45,36" android_app/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert -size 96x96 xc:"#667eea" -fill white -draw "polygon 36,28 36,68 60,48" android_app/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert -size 144x144 xc:"#667eea" -fill white -draw "polygon 54,42 54,102 90,72" android_app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert -size 192x192 xc:"#667eea" -fill white -draw "polygon 72,56 72,136 120,96" android_app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        else
+          # Download placeholder icon from a public CDN
+          curl -L -o android_app/app/src/main/res/mipmap-mdpi/ic_launcher.png "https://via.placeholder.com/48x48/667eea/ffffff?text=VT"
+          curl -L -o android_app/app/src/main/res/mipmap-hdpi/ic_launcher.png "https://via.placeholder.com/72x72/667eea/ffffff?text=VT"
+          curl -L -o android_app/app/src/main/res/mipmap-xhdpi/ic_launcher.png "https://via.placeholder.com/96x96/667eea/ffffff?text=VT"
+          curl -L -o android_app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png "https://via.placeholder.com/144x144/667eea/ffffff?text=VT"
+          curl -L -o android_app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png "https://via.placeholder.com/192x192/667eea/ffffff?text=VT"
+        fi
+        
+        # Also create round icons (same as regular icons)
+        cp android_app/app/src/main/res/mipmap-mdpi/ic_launcher.png android_app/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+        cp android_app/app/src/main/res/mipmap-hdpi/ic_launcher.png android_app/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+        cp android_app/app/src/main/res/mipmap-xhdpi/ic_launcher.png android_app/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+        cp android_app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png android_app/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+        cp android_app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android_app/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+      
     - name: Grant execute permission for gradlew
       run: chmod +x android_app/gradlew
       
