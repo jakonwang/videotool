@@ -216,6 +216,7 @@ class Video extends BaseController
     
     /**
      * 异步上传到七牛云（后台任务，不阻塞主流程）
+     * 上传成功后自动删除本地文件以节省存储空间
      */
     private function uploadToQiniuAsync($qiniuService, $videoModel, $videoLocalPath, $coverLocalPath = null)
     {
@@ -227,8 +228,17 @@ class Video extends BaseController
                 $videoModel->video_url = $qiniuResult['url'];
                 $videoModel->save();
                 \think\facade\Log::info('七牛云视频上传成功: ' . $qiniuResult['url'] . ' | 视频ID: ' . $videoModel->id);
+                
+                // 七牛云上传成功后，删除本地文件以节省存储空间
+                if (file_exists($videoLocalPath)) {
+                    if (@unlink($videoLocalPath)) {
+                        \think\facade\Log::info('本地视频文件已删除: ' . $videoLocalPath . ' | 视频ID: ' . $videoModel->id);
+                    } else {
+                        \think\facade\Log::warning('本地视频文件删除失败: ' . $videoLocalPath . ' | 视频ID: ' . $videoModel->id);
+                    }
+                }
             } else {
-                \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 视频ID: ' . $videoModel->id . ' | 使用本地URL');
+                \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 视频ID: ' . $videoModel->id . ' | 使用本地URL，保留本地文件');
             }
             
             // 上传封面到七牛云
@@ -239,8 +249,17 @@ class Video extends BaseController
                     $videoModel->cover_url = $qiniuResult['url'];
                     $videoModel->save();
                     \think\facade\Log::info('七牛云封面上传成功: ' . $qiniuResult['url'] . ' | 视频ID: ' . $videoModel->id);
+                    
+                    // 七牛云上传成功后，删除本地封面文件以节省存储空间
+                    if (file_exists($coverLocalPath)) {
+                        if (@unlink($coverLocalPath)) {
+                            \think\facade\Log::info('本地封面文件已删除: ' . $coverLocalPath . ' | 视频ID: ' . $videoModel->id);
+                        } else {
+                            \think\facade\Log::warning('本地封面文件删除失败: ' . $coverLocalPath . ' | 视频ID: ' . $videoModel->id);
+                        }
+                    }
                 } else {
-                    \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 视频ID: ' . $videoModel->id . ' | 使用本地URL');
+                    \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 视频ID: ' . $videoModel->id . ' | 使用本地URL，保留本地文件');
                 }
             }
         } catch (\Exception $e) {
@@ -385,6 +404,10 @@ class Video extends BaseController
                             $qiniuResult = $qiniuService->upload($coverLocalPath, $coverKey);
                             if ($qiniuResult['success']) {
                                 $data['cover_url'] = $qiniuResult['url']; // 使用七牛云URL
+                                // 七牛云上传成功后，删除本地文件以节省存储空间
+                                if (file_exists($coverLocalPath) && @unlink($coverLocalPath)) {
+                                    \think\facade\Log::info('单个编辑：本地封面文件已删除: ' . $coverLocalPath);
+                                }
                             } else {
                                 \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
                             }
@@ -435,6 +458,10 @@ class Video extends BaseController
                             $qiniuResult = $qiniuService->upload($videoLocalPath, $videoKey);
                             if ($qiniuResult['success']) {
                                 $data['video_url'] = $qiniuResult['url']; // 使用七牛云URL
+                                // 七牛云上传成功后，删除本地文件以节省存储空间
+                                if (file_exists($videoLocalPath) && @unlink($videoLocalPath)) {
+                                    \think\facade\Log::info('单个编辑：本地视频文件已删除: ' . $videoLocalPath);
+                                }
                             } else {
                                 \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
                             }
@@ -580,19 +607,53 @@ class Video extends BaseController
             
             // 如果是最后一个分片，合并文件
             if ($chunkIndex == $totalChunks - 1) {
-            // 合并所有分片
-            $finalPath = $tempDir . 'final_' . $fileName;
-            $fp = fopen($finalPath, 'wb');
-            
-            for ($i = 0; $i < $totalChunks; $i++) {
-                $chunkFile = $tempDir . 'chunk_' . $i;
-                if (file_exists($chunkFile)) {
-                    $chunkData = file_get_contents($chunkFile);
-                    fwrite($fp, $chunkData);
-                    unlink($chunkFile); // 删除分片文件
+                // 等待所有分片上传完成（检查分片文件是否存在）
+                $maxWaitTime = 30; // 最多等待30秒
+                $waitTime = 0;
+                $allChunksReady = false;
+                
+                while ($waitTime < $maxWaitTime) {
+                    $allChunksReady = true;
+                    for ($i = 0; $i < $totalChunks; $i++) {
+                        $chunkFile = $tempDir . 'chunk_' . $i;
+                        if (!file_exists($chunkFile)) {
+                            $allChunksReady = false;
+                            break;
+                        }
+                    }
+                    if ($allChunksReady) {
+                        break;
+                    }
+                    usleep(200000); // 等待200毫秒
+                    $waitTime += 0.2;
                 }
-            }
-            fclose($fp);
+                
+                // 合并所有分片（使用流式读取，避免内存溢出）
+                $finalPath = $tempDir . 'final_' . $fileName;
+                $fp = fopen($finalPath, 'wb');
+                
+                if (!$fp) {
+                    return json(['code' => 1, 'msg' => '创建合并文件失败']);
+                }
+                
+                for ($i = 0; $i < $totalChunks; $i++) {
+                    $chunkFile = $tempDir . 'chunk_' . $i;
+                    if (file_exists($chunkFile)) {
+                        // 使用流式读取，避免大文件内存溢出
+                        $chunkFp = fopen($chunkFile, 'rb');
+                        if ($chunkFp) {
+                            while (!feof($chunkFp)) {
+                                $chunkData = fread($chunkFp, 8192); // 每次读取8KB
+                                if ($chunkData !== false) {
+                                    fwrite($fp, $chunkData);
+                                }
+                            }
+                            fclose($chunkFp);
+                        }
+                        unlink($chunkFile); // 删除分片文件
+                    }
+                }
+                fclose($fp);
             
             // 上传合并后的文件 - 直接移动到目标目录
             $targetDir = root_path() . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'videos' . DIRECTORY_SEPARATOR;
@@ -610,19 +671,8 @@ class Video extends BaseController
             rename($finalPath, $targetPath);
             $videoLocalUrl = '/uploads/videos/' . str_replace(DIRECTORY_SEPARATOR, '/', $targetFileName);
             
-            // 初始化七牛云服务并上传视频
-            $qiniuService = new QiniuService();
-            $qiniuEnabled = $qiniuService->isEnabled();
-            $videoUrl = $videoLocalUrl; // 默认使用本地URL
-            if ($qiniuEnabled) {
-                $videoKey = 'videos/' . str_replace(DIRECTORY_SEPARATOR, '/', $targetFileName);
-                $qiniuResult = $qiniuService->upload($targetPath, $videoKey);
-                if ($qiniuResult['success']) {
-                    $videoUrl = $qiniuResult['url']; // 使用七牛云URL
-                } else {
-                    \think\facade\Log::warning('七牛云视频上传失败: ' . $qiniuResult['msg'] . ' | 使用本地URL');
-                }
-            }
+            // 先使用本地URL，七牛云上传改为异步（避免阻塞最后一个分片）
+            $videoUrl = $videoLocalUrl;
             
                 // 处理封面
                 $coverUrl = '';
@@ -689,8 +739,12 @@ class Video extends BaseController
                     ]);
                     
                     // 异步上传到七牛云（不阻塞主流程）
-                    if ($qiniuEnabled && $videoModel) {
-                        $this->uploadToQiniuAsync($qiniuService, $videoModel, $targetPath, isset($coverLocalPath) ? $coverLocalPath : null);
+                    if ($videoModel) {
+                        $qiniuService = new QiniuService();
+                        $qiniuEnabled = $qiniuService->isEnabled();
+                        if ($qiniuEnabled) {
+                            $this->uploadToQiniuAsync($qiniuService, $videoModel, $targetPath, isset($coverLocalPath) ? $coverLocalPath : null);
+                        }
                     }
                 } catch (\Exception $e) {
                     // 数据库保存失败，删除已上传的文件

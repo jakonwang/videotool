@@ -333,16 +333,29 @@
             });
         }
     
-        // 分片上传函数（优化版：支持重试，分片串行但文件并发）
+        // 分片上传函数（优化版：分片并发上传，大幅提升速度）
         function uploadFileInChunks(file, fileIndex, totalFiles, platformId, deviceId, titles, coverFile) {
             return new Promise(function(resolve, reject) {
-                // 动态调整分片大小：大文件用10MB，小文件用5MB
-                const chunkSize = file.size > 50 * 1024 * 1024 ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+                // 增大分片大小以减少分片数量：大文件用20MB，中文件用10MB，小文件用5MB
+                let chunkSize;
+                if (file.size > 100 * 1024 * 1024) {
+                    chunkSize = 20 * 1024 * 1024; // 大文件：20MB
+                } else if (file.size > 30 * 1024 * 1024) {
+                    chunkSize = 10 * 1024 * 1024; // 中文件：10MB
+                } else {
+                    chunkSize = 5 * 1024 * 1024; // 小文件：5MB
+                }
+                
                 const totalChunks = Math.ceil(file.size / chunkSize);
                 const fileId = 'file_' + Date.now() + '_' + fileIndex + '_' + Math.random().toString(36).substr(2, 9);
-                const maxRetries = 3; // 每个分片最多重试3次
+                const maxRetries = 2; // 每个分片最多重试2次（减少重试次数提升速度）
+                const maxConcurrentChunks = 3; // 每个文件最多同时上传3个分片（并发）
                 
                 let uploadedChunks = 0;
+                let activeUploads = 0;
+                let currentChunk = 0;
+                let hasError = false;
+                const chunkStatus = {}; // 记录分片状态
                 
                 // 初始化进度条
                 const $item = $(`.video-item[data-index="${fileIndex}"]`);
@@ -359,6 +372,14 @@
                 
                 // 上传单个分片（带重试机制）
                 function uploadChunk(chunkIndex, retryCount = 0) {
+                    // 如果已经有错误或分片已完成，跳过
+                    if (hasError || chunkStatus[chunkIndex] === 'completed') {
+                        return Promise.resolve();
+                    }
+                    
+                    // 如果是最后一个分片，需要特殊处理
+                    const isLastChunk = (chunkIndex === totalChunks - 1);
+                    
                     const start = chunkIndex * chunkSize;
                     const end = Math.min(start + chunkSize, file.size);
                     const chunk = file.slice(start, end);
@@ -376,59 +397,94 @@
                     formData.append('title', titles[fileIndex] || file.name.replace(/\.[^/.]+$/, ''));
                     
                     // 如果是最后一个分片，添加封面文件
-                    if (chunkIndex === totalChunks - 1 && coverFile) {
+                    if (isLastChunk && coverFile) {
                         formData.append('cover', coverFile);
                     }
                     
-                    $.ajax({
-                        url: '/admin.php/video/uploadChunk',
-                        type: 'POST',
-                        data: formData,
-                        processData: false,
-                        contentType: false,
-                        timeout: 120000, // 120秒超时
-                        success: function(res) {
-                            if (res && res.code === 0) {
-                                uploadedChunks++;
-                                updateProgress();
-                                
-                                if (uploadedChunks === totalChunks) {
-                                    // 所有分片上传完成
-                                    resolve(res);
+                    return new Promise(function(resolveChunk, rejectChunk) {
+                        chunkStatus[chunkIndex] = 'uploading';
+                        
+                        $.ajax({
+                            url: '/admin.php/video/uploadChunk',
+                            type: 'POST',
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            timeout: 180000, // 180秒超时（大文件需要更长时间）
+                            success: function(res) {
+                                if (res && res.code === 0) {
+                                    chunkStatus[chunkIndex] = 'completed';
+                                    uploadedChunks++;
+                                    updateProgress();
+                                    
+                                    if (uploadedChunks === totalChunks) {
+                                        // 所有分片上传完成
+                                        resolve(res);
+                                    }
+                                    
+                                    resolveChunk();
                                 } else {
-                                    // 继续上传下一个分片（串行）
-                                    uploadChunk(chunkIndex + 1);
+                                    // 重试逻辑
+                                    if (retryCount < maxRetries && !isLastChunk) {
+                                        chunkStatus[chunkIndex] = 'retrying';
+                                        setTimeout(function() {
+                                            uploadChunk(chunkIndex, retryCount + 1).then(resolveChunk).catch(rejectChunk);
+                                        }, 500 * (retryCount + 1)); // 快速重试
+                                    } else {
+                                        chunkStatus[chunkIndex] = 'failed';
+                                        hasError = true;
+                                        rejectChunk(new Error(res.msg || '上传失败'));
+                                    }
                                 }
-                            } else {
+                            },
+                            error: function(xhr, status, error) {
                                 // 重试逻辑
-                                if (retryCount < maxRetries) {
+                                if (retryCount < maxRetries && xhr.status !== 413 && !isLastChunk) {
+                                    chunkStatus[chunkIndex] = 'retrying';
                                     setTimeout(function() {
-                                        uploadChunk(chunkIndex, retryCount + 1);
-                                    }, 1000 * (retryCount + 1)); // 递增延迟重试
+                                        uploadChunk(chunkIndex, retryCount + 1).then(resolveChunk).catch(rejectChunk);
+                                    }, 500 * (retryCount + 1));
                                 } else {
-                                    reject(new Error(res.msg || '上传失败（已重试' + maxRetries + '次）'));
+                                    chunkStatus[chunkIndex] = 'failed';
+                                    hasError = true;
+                                    const errorMsg = xhr.status === 413 ? '文件过大' : ('上传失败: ' + (error || status));
+                                    rejectChunk(new Error(errorMsg));
                                 }
                             }
-                        },
-                        error: function(xhr, status, error) {
-                            // 重试逻辑
-                            if (retryCount < maxRetries && xhr.status !== 413) {
-                                setTimeout(function() {
-                                    uploadChunk(chunkIndex, retryCount + 1);
-                                }, 1000 * (retryCount + 1));
-                            } else {
-                                const errorMsg = xhr.status === 413 ? '文件过大' : ('上传失败: ' + (error || status) + (retryCount >= maxRetries ? '（已重试' + maxRetries + '次）' : ''));
-                                reject(new Error(errorMsg));
-                            }
-                        }
+                        });
                     });
+                }
+                
+                // 并发上传分片
+                function startNextChunk() {
+                    // 如果所有分片已上传完成或出现错误，停止
+                    if (uploadedChunks >= totalChunks || hasError) {
+                        return;
+                    }
+                    
+                    // 启动新的并发上传
+                    while (activeUploads < maxConcurrentChunks && currentChunk < totalChunks && !hasError) {
+                        const chunkIndex = currentChunk++;
+                        activeUploads++;
+                        
+                        uploadChunk(chunkIndex).then(function() {
+                            activeUploads--;
+                            startNextChunk(); // 继续下一个分片
+                        }).catch(function(error) {
+                            activeUploads--;
+                            if (!hasError) {
+                                hasError = true;
+                                reject(error);
+                            }
+                        });
+                    }
                 }
                 
                 // 初始化进度
                 updateProgress();
                 
-                // 开始上传第一个分片
-                uploadChunk(0);
+                // 开始并发上传分片
+                startNextChunk();
             });
         }
         
@@ -465,7 +521,7 @@
             btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 上传中...');
             
             // 使用分片上传（带并发控制：限制同时上传的文件数量）
-            const MAX_CONCURRENT_FILES = 3; // 最多同时上传3个文件，避免服务器压力过大
+            const MAX_CONCURRENT_FILES = 4; // 最多同时上传4个文件（提升并发度）
             const uploadQueue = [];
             const uploadResults = [];
             let currentUploads = 0;
