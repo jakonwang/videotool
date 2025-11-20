@@ -29,29 +29,9 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Create launcher icons
+    - name: Create launcher icons script
       run: |
-        mkdir -p android_app/app/src/main/res/mipmap-mdpi
-        mkdir -p android_app/app/src/main/res/mipmap-hdpi
-        mkdir -p android_app/app/src/main/res/mipmap-xhdpi
-        mkdir -p android_app/app/src/main/res/mipmap-xxhdpi
-        mkdir -p android_app/app/src/main/res/mipmap-xxxhdpi
-        
-        # Install ImageMagick if not available
-        sudo apt-get update -qq || true
-        sudo apt-get install -y -qq imagemagick || true
-        
-        # Create icons using ImageMagick (convert command)
-        # Create purple gradient background with play icon
-        if command -v convert &> /dev/null; then
-          convert -size 48x48 xc:"#667eea" -fill white -draw "polygon 18,14 18,34 30,24" android_app/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          convert -size 72x72 xc:"#667eea" -fill white -draw "polygon 27,21 27,51 45,36" android_app/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          convert -size 96x96 xc:"#667eea" -fill white -draw "polygon 36,28 36,68 60,48" android_app/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          convert -size 144x144 xc:"#667eea" -fill white -draw "polygon 54,42 54,102 90,72" android_app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          convert -size 192x192 xc:"#667eea" -fill white -draw "polygon 72,56 72,136 120,96" android_app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-        else
-          # Fallback: Use Python PIL to create simple icons
-          python3 << 'PYTHON'
+        cat > /tmp/create_icons.py << 'EOF'
 import os
 from PIL import Image, ImageDraw
 
@@ -66,7 +46,6 @@ colors = {
 for density, (size, color) in colors.items():
     img = Image.new('RGB', (size, size), color)
     draw = ImageDraw.Draw(img)
-    # Draw simple play triangle
     offset = size // 6
     points = [
         (size // 2 - offset, size // 2 - offset),
@@ -76,15 +55,12 @@ for density, (size, color) in colors.items():
     draw.polygon(points, fill='white')
     os.makedirs(f'android_app/app/src/main/res/mipmap-{density}', exist_ok=True)
     img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher.png')
-PYTHON
-        fi
-        
-        # Create round icons (copy regular icons)
-        for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-          if [ -f android_app/app/src/main/res/mipmap-${density}/ic_launcher.png ]; then
-            cp android_app/app/src/main/res/mipmap-${density}/ic_launcher.png android_app/app/src/main/res/mipmap-${density}/ic_launcher_round.png
-          fi
-        done
+    img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher_round.png')
+EOF
+    
+    - name: Create launcher icons
+      run: |
+        python3 /tmp/create_icons.py
       
     - name: Grant execute permission for gradlew
       run: chmod +x android_app/gradlew
