@@ -21,19 +21,26 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
     
-    - name: Install Python and PIL
+    - name: Install Python and Pillow
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y -qq python3-pil || pip3 install Pillow
+        python3 -m pip install --upgrade pip
+        pip3 install Pillow
         
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Create launcher icons script
+    - name: Create launcher icons
       run: |
-        cat > /tmp/create_icons.py << 'EOF'
+        python3 << 'PYTHON_SCRIPT'
 import os
-from PIL import Image, ImageDraw
+try:
+    from PIL import Image, ImageDraw
+except ImportError:
+    import sys
+    print("Installing Pillow...")
+    os.system(f"{sys.executable} -m pip install Pillow")
+    from PIL import Image, ImageDraw
 
 colors = {
     'mdpi': (48, '#667eea'),
@@ -56,11 +63,10 @@ for density, (size, color) in colors.items():
     os.makedirs(f'android_app/app/src/main/res/mipmap-{density}', exist_ok=True)
     img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher.png')
     img.save(f'android_app/app/src/main/res/mipmap-{density}/ic_launcher_round.png')
-EOF
-    
-    - name: Create launcher icons
-      run: |
-        python3 /tmp/create_icons.py
+    print(f"Created icon for {density}: {size}x{size}")
+
+print("All icons created successfully!")
+PYTHON_SCRIPT
       
     - name: Grant execute permission for gradlew
       run: chmod +x android_app/gradlew
