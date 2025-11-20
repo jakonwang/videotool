@@ -3,9 +3,6 @@ declare (strict_types = 1);
 
 namespace app\service;
 
-use Qiniu\Auth;
-use Qiniu\Storage\UploadManager;
-use Qiniu\Storage\BucketManager;
 use think\facade\Config;
 use think\facade\Log;
 
@@ -32,18 +29,30 @@ class QiniuService
             return;
         }
         
+        // 检查七牛云SDK是否已加载
+        if (!class_exists('Qiniu\Auth')) {
+            Log::warning('七牛云SDK未加载，请运行 composer install 安装依赖。将使用本地存储。');
+            $this->enabled = false;
+            return;
+        }
+        
         $this->accessKey = $config['access_key'];
         $this->secretKey = $config['secret_key'];
         $this->bucket = $config['bucket'];
         $this->domain = rtrim($config['domain'] ?? '', '/');
         
         try {
-            $this->auth = new Auth($this->accessKey, $this->secretKey);
-            $this->uploadManager = new UploadManager();
-            $this->bucketManager = new BucketManager($this->auth);
+            // 使用完整命名空间避免自动加载问题
+            $authClass = 'Qiniu\\Auth';
+            $uploadManagerClass = 'Qiniu\\Storage\\UploadManager';
+            $bucketManagerClass = 'Qiniu\\Storage\\BucketManager';
+            
+            $this->auth = new $authClass($this->accessKey, $this->secretKey);
+            $this->uploadManager = new $uploadManagerClass();
+            $this->bucketManager = new $bucketManagerClass($this->auth);
             $this->enabled = true;
         } catch (\Exception $e) {
-            Log::error('七牛云初始化失败: ' . $e->getMessage());
+            Log::error('七牛云初始化失败: ' . $e->getMessage() . ' | 文件: ' . $e->getFile() . ' | 行号: ' . $e->getLine());
             $this->enabled = false;
         }
     }
