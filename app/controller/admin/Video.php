@@ -608,27 +608,40 @@ class Video extends BaseController
             // 如果是最后一个分片，合并文件
             if ($chunkIndex == $totalChunks - 1) {
                 // 等待所有分片上传完成（检查分片文件是否存在）
-                $maxWaitTime = 30; // 最多等待30秒
+                $maxWaitTime = 60; // 最多等待60秒（大文件需要更多时间）
                 $waitTime = 0;
                 $allChunksReady = false;
                 
                 while ($waitTime < $maxWaitTime) {
                     $allChunksReady = true;
+                    $missingChunks = [];
                     for ($i = 0; $i < $totalChunks; $i++) {
                         $chunkFile = $tempDir . 'chunk_' . $i;
                         if (!file_exists($chunkFile)) {
                             $allChunksReady = false;
-                            break;
+                            $missingChunks[] = $i;
                         }
                     }
                     if ($allChunksReady) {
                         break;
                     }
-                    usleep(200000); // 等待200毫秒
-                    $waitTime += 0.2;
+                    // 动态等待时间：刚开始快速检查，后面逐渐延长
+                    $sleepTime = $waitTime < 5 ? 100000 : 500000; // 前5秒每100ms检查，之后每500ms
+                    usleep($sleepTime);
+                    $waitTime += ($sleepTime / 1000000);
+                    
+                    // 每5秒记录一次日志
+                    if (floor($waitTime) % 5 == 0 && $waitTime > 0) {
+                        \think\facade\Log::info("等待分片上传完成: 已等待{$waitTime}秒, 缺失分片: " . implode(',', $missingChunks));
+                    }
                 }
                 
-                // 合并所有分片（使用流式读取，避免内存溢出）
+                // 检查是否所有分片都已准备好
+                if (!$allChunksReady) {
+                    return json(['code' => 1, 'msg' => '等待分片上传超时，请重试']);
+                }
+                
+                // 合并所有分片（使用流式读取，增大读取块以提升速度）
                 $finalPath = $tempDir . 'final_' . $fileName;
                 $fp = fopen($finalPath, 'wb');
                 
@@ -636,21 +649,29 @@ class Video extends BaseController
                     return json(['code' => 1, 'msg' => '创建合并文件失败']);
                 }
                 
+                // 优化：增大读取块大小，提升合并速度
+                $readBufferSize = 1024 * 1024; // 1MB 读取块（比8KB快很多）
+                
                 for ($i = 0; $i < $totalChunks; $i++) {
                     $chunkFile = $tempDir . 'chunk_' . $i;
                     if (file_exists($chunkFile)) {
-                        // 使用流式读取，避免大文件内存溢出
+                        // 使用流式读取，增大读取块以提升合并速度
                         $chunkFp = fopen($chunkFile, 'rb');
                         if ($chunkFp) {
                             while (!feof($chunkFp)) {
-                                $chunkData = fread($chunkFp, 8192); // 每次读取8KB
-                                if ($chunkData !== false) {
+                                $chunkData = fread($chunkFp, $readBufferSize); // 每次读取1MB
+                                if ($chunkData !== false && strlen($chunkData) > 0) {
                                     fwrite($fp, $chunkData);
                                 }
                             }
                             fclose($chunkFp);
                         }
-                        unlink($chunkFile); // 删除分片文件
+                        // 立即删除分片文件，释放空间
+                        @unlink($chunkFile);
+                    } else {
+                        fclose($fp);
+                        @unlink($finalPath);
+                        return json(['code' => 1, 'msg' => "分片 {$i} 缺失，合并失败"]);
                     }
                 }
                 fclose($fp);
