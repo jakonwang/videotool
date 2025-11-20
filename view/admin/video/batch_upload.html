@@ -112,6 +112,15 @@
         let isProcessing = false; // 防止重复处理
         let qiniuConfig = null; // 七牛云配置缓存
         
+        // 七牛云区域映射
+        const qiniuRegionMap = {
+            'z0': qiniu.region.z0,  // 华南
+            'z1': qiniu.region.z1,  // 华北
+            'z2': qiniu.region.z2,  // 华东
+            'na0': qiniu.region.na0, // 北美
+            'as0': qiniu.region.as0  // 东南亚
+        };
+        
         // 简单的文件名生成函数（使用时间戳和随机数）
         function generateFileName(prefix, ext) {
             const timestamp = Date.now();
@@ -594,9 +603,13 @@
                             params: {}
                         };
                         
+                        // 根据后端返回的区域配置
+                        const regionCode = qiniuConfig.region || 'z2';
+                        const region = qiniuRegionMap[regionCode] || qiniu.region.z2;
+                        
                         const config = {
                             useCdnDomain: true,
-                            region: qiniu.region.z2 // 华东区域，可根据bucket区域调整
+                            region: region // 根据配置自动选择区域
                         };
                         
                         // 开始上传

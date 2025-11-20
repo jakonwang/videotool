@@ -186,7 +186,8 @@ class Video extends BaseController
                     'token' => $result['token'],
                     'domain' => $result['domain'],
                     'bucket' => $result['bucket'],
-                    'uploadUrl' => $result['uploadUrl']
+                    'uploadUrl' => $result['uploadUrl'],
+                    'region' => $result['region'] ?? 'z2'
                 ]
             ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         } catch (\Exception $e) {

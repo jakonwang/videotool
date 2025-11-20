@@ -15,6 +15,7 @@ class QiniuService
     private $secretKey;
     private $bucket;
     private $domain;
+    private $region;
     private $auth;
     private $uploadManager;
     private $bucketManager;
@@ -40,6 +41,7 @@ class QiniuService
         $this->secretKey = $config['secret_key'];
         $this->bucket = $config['bucket'];
         $this->domain = rtrim($config['domain'] ?? '', '/');
+        $this->region = $config['region'] ?? 'z2'; // 默认华东
         
         try {
             // 使用完整命名空间避免自动加载问题
@@ -104,6 +106,7 @@ class QiniuService
                 'domain' => $this->domain,
                 'bucket' => $this->bucket,
                 'uploadUrl' => $this->getUploadUrl(),
+                'region' => $this->region,
                 'msg' => 'success'
             ];
         } catch (\Exception $e) {
@@ -124,13 +127,16 @@ class QiniuService
     private function getUploadUrl(): string
     {
         // 根据bucket区域返回对应的上传地址
-        // 默认使用华东区域（z2），如果bucket在其他区域需要调整
-        // 华东: upload-z2.qiniup.com
-        // 华北: upload-z1.qiniup.com
-        // 华南: upload-z0.qiniup.com
-        // 北美: upload-na0.qiniup.com
-        // 东南亚: upload-as0.qiniup.com
-        return 'https://upload-z2.qiniup.com';
+        $regionUrls = [
+            'z0' => 'https://upload-z0.qiniup.com',  // 华南
+            'z1' => 'https://upload-z1.qiniup.com',  // 华北
+            'z2' => 'https://upload-z2.qiniup.com',  // 华东
+            'na0' => 'https://upload-na0.qiniup.com', // 北美
+            'as0' => 'https://upload-as0.qiniup.com'  // 东南亚
+        ];
+        
+        $region = $this->region ?? 'z2';
+        return $regionUrls[$region] ?? $regionUrls['z2'];
     }
     
     /**
