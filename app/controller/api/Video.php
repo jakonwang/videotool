@@ -99,6 +99,29 @@ class Video extends BaseController
     }
     
     /**
+     * 获取平台列表
+     */
+    public function getPlatforms()
+    {
+        try {
+            $platforms = Platform::where('status', 1)
+                ->order('id', 'desc')
+                ->field('id,name,code,icon')
+                ->select();
+            
+            return json([
+                'code' => 0,
+                'data' => $platforms
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        } catch (\Exception $e) {
+            return json([
+                'code' => 1,
+                'msg' => '服务器错误：' . $e->getMessage()
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        }
+    }
+    
+    /**
      * 标记视频为已下载
      */
     public function markDownloaded()

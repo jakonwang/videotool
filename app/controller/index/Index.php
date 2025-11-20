@@ -16,5 +16,10 @@ class Index extends BaseController
         $ip = get_client_ip();
         return View::fetch('index/index', ['ip' => $ip]);
     }
+    
+    public function platforms()
+    {
+        return View::fetch('index/platforms');
+    }
 }
 

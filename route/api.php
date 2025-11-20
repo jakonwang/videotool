@@ -7,5 +7,6 @@ Route::group('api', function() {
         Route::get('getVideo', 'app\controller\api\Video@getVideo');
         Route::post('markDownloaded', 'app\controller\api\Video@markDownloaded');
     });
+    Route::get('platforms', 'app\controller\api\Video@getPlatforms');
 });
 
