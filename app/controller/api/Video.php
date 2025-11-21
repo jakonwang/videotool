@@ -564,13 +564,19 @@ class Video extends BaseController
         $fileName = preg_replace('/[^\w\s-]/', '', $title) . $ext;
         $mimeType = $type === 'cover' ? 'image/jpeg' : 'video/mp4';
         
-        // 清除输出缓冲，立即开始传输（重要：在设置响应头之前清除）
+        // 清除所有输出缓冲，立即开始传输（关键：在设置响应头之前清除）
         while (ob_get_level()) {
             ob_end_clean();
         }
         
+        // 禁用输出缓冲，立即发送响应头
+        if (function_exists('apache_setenv')) {
+            @apache_setenv('no-gzip', 1);
+        }
+        @ini_set('zlib.output_compression', 0);
+        
         // 设置响应头 - 关键：使用attachment强制浏览器下载而不是打开
-        // 注意：不设置Content-Length，使用chunked传输，立即开始下载
+        // 重要：不设置Content-Length，使用Transfer-Encoding: chunked，立即开始下载
         // 这样浏览器不会等待"计算文件大小"，会立即开始下载
         header('Content-Type: ' . $mimeType);
         header('Content-Disposition: attachment; filename="' . rawurlencode($fileName) . '"');
@@ -578,8 +584,18 @@ class Video extends BaseController
         header('Pragma: no-cache');
         header('Expires: 0');
         header('Accept-Ranges: bytes');
-        // 重要：不设置Content-Length，使用chunked传输，浏览器立即开始下载
-        // PHP会自动使用Transfer-Encoding: chunked
+        // 关键：显式设置Transfer-Encoding: chunked，确保立即开始传输
+        header('Transfer-Encoding: chunked');
+        // 不要设置Content-Length，让浏览器使用chunked传输
+        
+        // 立即发送响应头（重要：在开始传输数据之前发送）
+        if (function_exists('fastcgi_finish_request')) {
+            // FastCGI环境：立即发送响应头
+            fastcgi_finish_request();
+        } else {
+            // 其他环境：立即刷新输出
+            flush();
+        }
         
         // 初始化cURL
         $ch = curl_init($url);
@@ -604,19 +620,21 @@ class Video extends BaseController
             CURLOPT_ENCODING => '', // 自动处理压缩
             CURLOPT_TCP_NODELAY => 1, // 禁用Nagle算法，立即发送数据
             CURLOPT_TCP_KEEPALIVE => 1, // 启用TCP keepalive
-            // 关键：立即开始写入数据，不等待完整响应，优化刷新频率
+            // 关键：立即开始写入数据，不等待完整响应
+            // 优化：立即输出并刷新，确保浏览器立即开始下载（不等待文件大小）
             CURLOPT_WRITEFUNCTION => function($ch, $data) {
+                // 立即输出数据（chunked编码会自动处理）
                 echo $data;
-                // 优化：减少刷新频率，提高传输速度（每64KB刷新一次）
-                static $buffer = '';
-                static $flushSize = 65536; // 64KB刷新一次
-                $buffer .= $data;
-                if (strlen($buffer) >= $flushSize) {
+                // 立即刷新输出，确保浏览器立即开始下载
+                // 注意：使用较小的刷新频率，确保及时传输
+                static $chunkCount = 0;
+                $chunkCount++;
+                // 每10个chunk刷新一次，平衡性能和及时性
+                if ($chunkCount % 10 === 0) {
                     if (ob_get_level()) {
                         ob_flush();
                     }
                     flush();
-                    $buffer = '';
                 }
                 return strlen($data);
             },
@@ -652,17 +670,24 @@ class Video extends BaseController
         // 注意：输出缓冲已在方法开始处清除，这里不需要重复清除
         
         // 执行下载 - 立即开始流式传输，不等待Content-Length
+        // 数据会立即通过CURLOPT_WRITEFUNCTION输出，浏览器立即开始下载
         $result = curl_exec($ch);
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         
-        // 最后刷新缓冲区
+        // 最后刷新缓冲区，确保所有数据已发送
         if (ob_get_level()) {
             ob_flush();
         }
         flush();
         
         curl_close($ch);
+        
+        // 重要：如果使用chunked传输，需要发送结束标记
+        // PHP的chunked编码会自动处理，但我们需要确保输出已结束
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        }
         
         if ($result === false || !empty($error)) {
             return json([
