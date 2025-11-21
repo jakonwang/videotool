@@ -475,14 +475,34 @@
                                        fileUrl.startsWith('http://localhost') ||
                                        fileUrl.startsWith('http://127.0.0.1');
                     
+                    // 判断是否为CDN文件（通过URL域名判断，如果包含常见CDN域名）
+                    // CDN文件可以直接下载，速度快
+                    const isCDNFile = !isLocalFile && (
+                        fileUrl.includes('qiniucdn.com') || 
+                        fileUrl.includes('qiniucdn') || 
+                        fileUrl.includes('cdn.') ||
+                        fileUrl.includes('oss.') ||
+                        fileUrl.includes('cos.')
+                    );
+                    
+                    // 生成文件名
+                    const ext = type === 'cover' ? '.jpg' : '.mp4';
+                    const fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
+                    
                     let downloadUrl;
+                    let useDirectDownload = false; // 是否直接下载（不经过代理）
                     
                     if (isLocalFile) {
-                        // 本地文件：使用代理下载接口（流式传输）
+                        // 本地文件：必须使用代理下载接口（流式传输）
                         downloadUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type;
                         debugLog('本地文件，使用代理下载:', downloadUrl);
+                    } else if (isCDNFile) {
+                        // CDN文件：直接使用原始URL + download属性，利用CDN速度（最快）
+                        downloadUrl = fileUrl;
+                        useDirectDownload = true;
+                        debugLog('CDN文件，直接下载（最快）:', downloadUrl);
                     } else {
-                        // 远程文件（CDN）：使用代理下载接口（支持跨域）
+                        // 其他远程文件：使用代理下载接口（支持跨域和强制下载）
                         downloadUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type;
                         debugLog('远程文件，使用代理下载:', downloadUrl);
                     }
@@ -490,10 +510,6 @@
                     // APP环境：使用原生下载功能
                     if (isAppEnvironment() && typeof window.Android !== 'undefined' && window.Android.downloadFile) {
                         debugLog('使用APP原生下载:', downloadUrl);
-                        
-                        // 生成文件名
-                        const ext = type === 'cover' ? '.jpg' : '.mp4';
-                        const fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
                         
                         // 调用APP原生下载接口
                         window.Android.downloadFile(downloadUrl, fileName);
@@ -507,18 +523,11 @@
                         }, 1000);
                     } else {
                         // 浏览器环境：使用最优下载方式
-                        // 服务器已设置Content-Disposition: attachment，浏览器会自动下载
-                        // 使用a标签触发下载，最简单高效
                         const link = document.createElement('a');
                         link.href = downloadUrl;
-                        
-                        // 生成文件名（用于download属性，作为备用）
-                        const ext = type === 'cover' ? '.jpg' : '.mp4';
-                        const fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
-                        link.download = fileName;
+                        link.download = fileName; // 设置download属性，强制下载
                         
                         link.style.display = 'none';
-                        // 不使用target，直接在当前页面触发下载
                         document.body.appendChild(link);
                         link.click();
                         

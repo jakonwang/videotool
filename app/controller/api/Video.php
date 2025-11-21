@@ -589,27 +589,35 @@ class Video extends BaseController
         }
         
         // 优化：增大缓冲区大小，提高传输速度
-        $bufferSize = 65536; // 64KB buffer
+        $bufferSize = 131072; // 128KB buffer（增大缓冲区，减少系统调用次数）
         
-        // 设置cURL选项 - 关键：立即开始传输，不等待完整响应头
+        // 设置cURL选项 - 关键：立即开始传输，不等待完整响应头，优化传输速度
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_CONNECTTIMEOUT => 10, // 连接超时10秒
             CURLOPT_TIMEOUT => 0, // 无超时限制
-            CURLOPT_BUFFERSIZE => $bufferSize, // 设置缓冲区大小
+            CURLOPT_BUFFERSIZE => $bufferSize, // 设置缓冲区大小（128KB）
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_ENCODING => '', // 自动处理压缩
-            // 关键：立即开始写入数据，不等待完整响应
+            CURLOPT_TCP_NODELAY => 1, // 禁用Nagle算法，立即发送数据
+            CURLOPT_TCP_KEEPALIVE => 1, // 启用TCP keepalive
+            // 关键：立即开始写入数据，不等待完整响应，优化刷新频率
             CURLOPT_WRITEFUNCTION => function($ch, $data) {
                 echo $data;
-                // 立即刷新输出，不等待缓冲区满
-                if (ob_get_level()) {
-                    ob_flush();
+                // 优化：减少刷新频率，提高传输速度（每64KB刷新一次）
+                static $buffer = '';
+                static $flushSize = 65536; // 64KB刷新一次
+                $buffer .= $data;
+                if (strlen($buffer) >= $flushSize) {
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+                    $buffer = '';
                 }
-                flush();
                 return strlen($data);
             },
             // 简化响应头处理，只转发必要的头，不转发Content-Length
@@ -647,6 +655,13 @@ class Video extends BaseController
         $result = curl_exec($ch);
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        // 最后刷新缓冲区
+        if (ob_get_level()) {
+            ob_flush();
+        }
+        flush();
+        
         curl_close($ch);
         
         if ($result === false || !empty($error)) {
