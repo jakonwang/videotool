@@ -272,6 +272,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         
+        // 使用final副本变量，以便在lambda中使用
+        final String finalUrl = url;
+        final String finalFileName = fileName;
+        
         new Thread(() -> {
             try {
                 // 从URL判断MIME类型
@@ -279,53 +283,61 @@ public class MainActivity extends AppCompatActivity {
                 boolean isVideo = false;
                 boolean isImage = false;
                 
-                if (url.contains(".mp4") || url.contains("video") || url.contains("/api/video/download?type=video")) {
+                if (finalUrl.contains(".mp4") || finalUrl.contains("video") || finalUrl.contains("/api/video/download?type=video")) {
                     mimeType = "video/mp4";
                     isVideo = true;
-                } else if (url.contains(".jpg") || url.contains(".jpeg") || url.contains("image") || url.contains("/api/video/download?type=cover")) {
+                } else if (finalUrl.contains(".jpg") || finalUrl.contains(".jpeg") || finalUrl.contains("image") || finalUrl.contains("/api/video/download?type=cover")) {
                     mimeType = "image/jpeg";
                     isImage = true;
-                } else if (url.contains(".png")) {
+                } else if (finalUrl.contains(".png")) {
                     mimeType = "image/png";
                     isImage = true;
                 }
                 
-                // 确保文件名有扩展名
-                if (fileName != null && !fileName.isEmpty()) {
-                    if (!fileName.contains(".")) {
+                // 处理文件名（在lambda内部创建新变量，避免修改外部变量）
+                String processedFileName = finalFileName;
+                if (processedFileName != null && !processedFileName.isEmpty()) {
+                    if (!processedFileName.contains(".")) {
                         if (mimeType != null) {
                             if (mimeType.contains("video")) {
-                                fileName += ".mp4";
+                                processedFileName = processedFileName + ".mp4";
                             } else if (mimeType.contains("image")) {
-                                fileName += ".jpg";
+                                processedFileName = processedFileName + ".jpg";
                             }
                         }
                     }
                 } else {
-                    fileName = "videotool_" + System.currentTimeMillis();
+                    processedFileName = "videotool_" + System.currentTimeMillis();
                     if (mimeType != null) {
                         if (mimeType.contains("video")) {
-                            fileName += ".mp4";
+                            processedFileName = processedFileName + ".mp4";
                         } else if (mimeType.contains("image")) {
-                            fileName += ".jpg";
+                            processedFileName = processedFileName + ".jpg";
                         }
                     }
                 }
                 
+                // 创建final副本用于lambda
+                final String finalProcessedFileName = processedFileName;
+                final String finalMimeType = mimeType;
+                final boolean finalIsVideo = isVideo;
+                final boolean finalIsImage = isImage;
+                
                 runOnUiThread(() -> {
-                    Toast.makeText(this, "开始下载: " + fileName, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "开始下载: " + finalProcessedFileName, Toast.LENGTH_SHORT).show();
                 });
                 
                 // 使用OkHttp下载文件
                 OkHttpClient client = new OkHttpClient();
                 Request request = new Request.Builder()
-                        .url(url)
+                        .url(finalUrl)
                         .build();
                 
                 Response response = client.newCall(request).execute();
                 if (!response.isSuccessful()) {
+                    final int httpCode = response.code();
                     runOnUiThread(() -> {
-                        Toast.makeText(this, "下载失败: HTTP " + response.code(), Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show();
                     });
                     return;
                 }
@@ -336,22 +348,26 @@ public class MainActivity extends AppCompatActivity {
                 Uri uri = null;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     // Android 10+ 使用MediaStore API
-                    uri = saveToMediaStore(fileName, mimeType, isVideo, isImage, inputStream);
+                    uri = saveToMediaStore(finalProcessedFileName, finalMimeType, finalIsVideo, finalIsImage, inputStream);
                 } else {
                     // Android 9及以下使用传统方式
-                    uri = saveToLegacyStorage(fileName, mimeType, isVideo, isImage, inputStream);
+                    uri = saveToLegacyStorage(finalProcessedFileName, finalMimeType, finalIsVideo, finalIsImage, inputStream);
                 }
                 
                 inputStream.close();
                 
-                if (uri != null) {
+                // 创建final副本用于lambda
+                final Uri finalUri = uri;
+                final boolean finalIsVideoForCallback = finalIsVideo;
+                
+                if (finalUri != null) {
                     // 通知媒体库更新
                     MediaScannerConnection.scanFile(this,
-                            new String[]{uri.toString()},
-                            new String[]{mimeType},
+                            new String[]{finalUri.toString()},
+                            new String[]{finalMimeType},
                             (path, uri2) -> {
                                 runOnUiThread(() -> {
-                                    if (isVideo) {
+                                    if (finalIsVideoForCallback) {
                                         Toast.makeText(this, "视频已保存到相册", Toast.LENGTH_SHORT).show();
                                     } else {
                                         Toast.makeText(this, "图片已保存到相册", Toast.LENGTH_SHORT).show();
@@ -360,7 +376,7 @@ public class MainActivity extends AppCompatActivity {
                             });
                     
                     // 通知相册刷新
-                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, finalUri));
                 } else {
                     runOnUiThread(() -> {
                         Toast.makeText(this, "保存失败", Toast.LENGTH_LONG).show();
@@ -368,8 +384,9 @@ public class MainActivity extends AppCompatActivity {
                 }
                 
             } catch (Exception e) {
+                final String errorMsg = e.getMessage();
                 runOnUiThread(() -> {
-                    Toast.makeText(this, "下载失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "下载失败: " + errorMsg, Toast.LENGTH_LONG).show();
                 });
                 e.printStackTrace();
             }
