@@ -584,18 +584,13 @@ class Video extends BaseController
         header('Pragma: no-cache');
         header('Expires: 0');
         header('Accept-Ranges: bytes');
-        // 关键：显式设置Transfer-Encoding: chunked，确保立即开始传输
-        header('Transfer-Encoding: chunked');
-        // 不要设置Content-Length，让浏览器使用chunked传输
+        // 关键：不设置Content-Length，使用chunked传输
+        // 注意：不要显式设置Transfer-Encoding: chunked，让PHP自动处理
+        // 如果服务器支持chunked，PHP会自动使用；如果不支持，设置可能会出错
+        // header('Transfer-Encoding: chunked'); // 不要显式设置，让PHP自动处理
         
-        // 立即发送响应头（重要：在开始传输数据之前发送）
-        if (function_exists('fastcgi_finish_request')) {
-            // FastCGI环境：立即发送响应头
-            fastcgi_finish_request();
-        } else {
-            // 其他环境：立即刷新输出
-            flush();
-        }
+        // 刷新输出缓冲区，立即发送响应头（但不关闭连接）
+        flush();
         
         // 初始化cURL
         $ch = curl_init($url);
@@ -621,20 +616,21 @@ class Video extends BaseController
             CURLOPT_TCP_NODELAY => 1, // 禁用Nagle算法，立即发送数据
             CURLOPT_TCP_KEEPALIVE => 1, // 启用TCP keepalive
             // 关键：立即开始写入数据，不等待完整响应
-            // 优化：立即输出并刷新，确保浏览器立即开始下载（不等待文件大小）
+            // 优化：立即输出并刷新，确保浏览器立即开始下载
             CURLOPT_WRITEFUNCTION => function($ch, $data) {
-                // 立即输出数据（chunked编码会自动处理）
+                // 立即输出数据
                 echo $data;
                 // 立即刷新输出，确保浏览器立即开始下载
-                // 注意：使用较小的刷新频率，确保及时传输
-                static $chunkCount = 0;
-                $chunkCount++;
-                // 每10个chunk刷新一次，平衡性能和及时性
-                if ($chunkCount % 10 === 0) {
+                // 每64KB刷新一次，平衡性能和及时性
+                static $buffer = '';
+                static $flushSize = 65536; // 64KB刷新一次
+                $buffer .= $data;
+                if (strlen($buffer) >= $flushSize) {
                     if (ob_get_level()) {
                         ob_flush();
                     }
                     flush();
+                    $buffer = '';
                 }
                 return strlen($data);
             },
@@ -683,12 +679,7 @@ class Video extends BaseController
         
         curl_close($ch);
         
-        // 重要：如果使用chunked传输，需要发送结束标记
-        // PHP的chunked编码会自动处理，但我们需要确保输出已结束
-        if (function_exists('fastcgi_finish_request')) {
-            fastcgi_finish_request();
-        }
-        
+        // 检查cURL执行结果
         if ($result === false || !empty($error)) {
             return json([
                 'code' => 1,
