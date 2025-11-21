@@ -438,7 +438,18 @@
                 showToast('标题已复制到剪贴板');
             }
             
-            // 下载文件 - 优先使用代理下载接口，解决跨域和大文件下载问题
+            // 检测是否为APP环境
+            function isAppEnvironment() {
+                // 检测是否有Android接口
+                if (typeof window.Android !== 'undefined' && window.Android.downloadFile) {
+                    return true;
+                }
+                // 检测User-Agent
+                const ua = navigator.userAgent || navigator.vendor || window.opera;
+                return /android/i.test(ua);
+            }
+            
+            // 下载文件 - 智能下载策略：APP使用原生下载，浏览器使用Web下载
             async function downloadFile(type) {
                 if (!currentVideo) return;
                 
@@ -454,25 +465,61 @@
                     
                     const baseUrl = getBaseUrl();
                     
-                    // 优先使用代理下载接口（避免跨域问题，支持大文件流式传输）
-                    const proxyUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type;
+                    // 获取文件URL
+                    const fileUrl = type === 'cover' 
+                        ? toAbsoluteUrl(currentVideo.cover_url) 
+                        : toAbsoluteUrl(currentVideo.video_url);
                     
-                    debugLog('使用代理下载:', proxyUrl);
+                    // 判断是否为本地文件
+                    const isLocalFile = fileUrl.startsWith(window.location.origin) || 
+                                       fileUrl.startsWith('http://localhost') ||
+                                       fileUrl.startsWith('http://127.0.0.1');
                     
-                    // 创建隐藏的iframe或直接打开链接（推荐方式，支持大文件和断点续传）
-                    // 方法1：使用a标签直接下载（推荐，支持浏览器原生下载功能）
-                    const link = document.createElement('a');
-                    link.href = proxyUrl;
-                    link.download = ''; // 让服务器设置文件名
-                    link.style.display = 'none';
-                    link.target = '_blank'; // 新窗口打开，避免页面跳转
-                    document.body.appendChild(link);
-                    link.click();
+                    let downloadUrl;
                     
-                    // 延迟移除链接
-                    setTimeout(() => {
-                        document.body.removeChild(link);
-                    }, 100);
+                    if (isLocalFile) {
+                        // 本地文件：使用代理下载接口（流式传输）
+                        downloadUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type;
+                        debugLog('本地文件，使用代理下载:', downloadUrl);
+                    } else {
+                        // 远程文件（CDN）：使用代理下载接口（支持跨域）
+                        downloadUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type;
+                        debugLog('远程文件，使用代理下载:', downloadUrl);
+                    }
+                    
+                    // APP环境：使用原生下载功能
+                    if (isAppEnvironment() && typeof window.Android !== 'undefined' && window.Android.downloadFile) {
+                        debugLog('使用APP原生下载:', downloadUrl);
+                        
+                        // 生成文件名
+                        const ext = type === 'cover' ? '.jpg' : '.mp4';
+                        const fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
+                        
+                        // 调用APP原生下载接口
+                        window.Android.downloadFile(downloadUrl, fileName);
+                        
+                        // 恢复按钮状态
+                        setTimeout(() => {
+                            buttons.forEach(btn => {
+                                btn.disabled = false;
+                                btn.classList.remove('btn-loading');
+                            });
+                        }, 1000);
+                    } else {
+                        // 浏览器环境：使用a标签下载
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = ''; // 让服务器设置文件名
+                        link.style.display = 'none';
+                        link.target = '_blank'; // 新窗口打开，避免页面跳转
+                        document.body.appendChild(link);
+                        link.click();
+                        
+                        // 延迟移除链接
+                        setTimeout(() => {
+                            document.body.removeChild(link);
+                        }, 100);
+                    }
                     
                     // 标记视频为已下载（如果是视频）
                     if (type === 'video') {

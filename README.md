@@ -225,18 +225,84 @@ Response:
 ### 代理下载文件
 ```
 GET /api/video/download?video_id=1&type=video
+
 参数:
 - video_id: 视频ID（必填）
 - type: 下载类型，cover（封面）或 video（视频），默认为video
+- format: 返回格式，json（返回JSON）或空（直接下载），默认空
+- app: APP标识，1表示APP请求（等同于format=json），默认0
 
 说明:
-- 该接口提供代理下载功能，支持本地文件和七牛云等远程文件的流式传输下载
-- 解决跨域下载问题，支持大文件下载，避免浏览器内存溢出
+- 浏览器访问：直接返回文件流或302重定向到CDN，浏览器自动下载
+- APP访问：使用 format=json 参数，返回JSON格式的下载URL
+- 支持本地文件和七牛云等远程文件的流式传输下载
+- 解决跨域下载问题，支持大文件下载
 - 支持断点续传（Range请求）
-- 直接返回文件流，浏览器会自动下载
 
-响应:
+响应（浏览器，format为空）:
 直接返回文件流，Content-Type根据文件类型自动设置
+
+响应（APP，format=json）:
+{
+    "code": 0,
+    "msg": "获取成功",
+    "data": {
+        "video_id": 1,
+        "type": "video",
+        "file_url": "https://storage.banono-us.com/videos/xxx.mp4",
+        "download_url": "https://your-domain.com/api/video/download?video_id=1&type=video",
+        "file_name": "视频标题.mp4",
+        "file_size": null
+    }
+}
+```
+
+#### APP使用示例
+
+**获取下载URL（JSON格式）:**
+```
+GET /api/video/download?video_id=1&type=video&format=json
+或
+GET /api/video/download?video_id=1&type=video&app=1
+```
+
+**返回JSON后，APP可以使用以下两种方式下载:**
+1. 使用原始文件URL（file_url）- 如果APP可以直接访问CDN
+2. 使用代理下载URL（download_url）- 如果CDN有跨域限制，推荐使用此URL
+
+**Android示例（使用OkHttp）:**
+```java
+// 先获取下载URL
+String url = "https://your-domain.com/api/video/download?video_id=1&type=video&format=json";
+Response response = client.newCall(new Request.Builder().url(url).build()).execute();
+JSONObject json = new JSONObject(response.body().string());
+String downloadUrl = json.getJSONObject("data").getString("download_url");
+
+// 然后下载文件
+Request request = new Request.Builder().url(downloadUrl).build();
+Response downloadResponse = client.newCall(request).execute();
+// 保存文件...
+```
+
+**iOS示例（使用AFNetworking）:**
+```swift
+// 先获取下载URL
+let url = "https://your-domain.com/api/video/download?video_id=1&type=video&format=json"
+AF.request(url).responseJSON { response in
+    if let json = response.value as? [String: Any],
+       let data = json["data"] as? [String: Any],
+       let downloadUrl = data["download_url"] as? String {
+        // 然后下载文件
+        let destination: DownloadRequest.Destination = { _, _ in
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let fileURL = documentsPath.appendingPathComponent("video.mp4")
+            return (fileURL, [.removePreviousFile, .createIntermediateDirectories])
+        }
+        AF.download(downloadUrl, to: destination).response { downloadResponse in
+            // 处理下载结果...
+        }
+    }
+}
 ```
 
 ## 功能扩展

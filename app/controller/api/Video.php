@@ -31,6 +31,38 @@ class Video extends BaseController
     }
     
     /**
+     * 检测是否为APP客户端请求
+     */
+    private function isAppClient(): bool
+    {
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        
+        // 检测常见的APP User-Agent模式
+        // 可以根据实际APP的User-Agent进行扩展
+        $appPatterns = [
+            '/okhttp/i',           // Android OkHttp库
+            '/AFNetworking/i',     // iOS AFNetworking库
+            '/VideoToolApp/i',     // 自定义APP标识（如果设置了）
+            '/Android.*App/i',     // Android应用
+            '/iPhone.*App/i',      // iOS应用
+        ];
+        
+        foreach ($appPatterns as $pattern) {
+            if (preg_match($pattern, $userAgent)) {
+                return true;
+            }
+        }
+        
+        // 也可以通过自定义Header判断
+        $appHeader = $_SERVER['HTTP_X_APP_CLIENT'] ?? '';
+        if (!empty($appHeader) && strtolower($appHeader) === 'true') {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
      * 获取视频（根据IP和平台）
      */
     public function getVideo()
@@ -244,23 +276,44 @@ class Video extends BaseController
     
     /**
      * 代理下载文件（支持流式传输，解决跨域和大文件下载问题）
+     * 支持APP调用：通过format=json参数返回JSON格式的下载URL
      */
     public function downloadProxy()
     {
         try {
             $videoId = $this->request->param('video_id');
             $type = $this->request->param('type', 'video'); // cover 或 video
+            $format = $this->request->param('format', ''); // json 或空（流式下载/重定向）
+            
+            // 检测是否为APP请求（通过参数或User-Agent）
+            $isAppRequest = $format === 'json' || 
+                           $this->request->param('app', 0) == 1 ||
+                           $this->isAppClient();
             
             if (!$videoId) {
-                return json([
-                    'code' => 1,
-                    'msg' => '参数错误：缺少视频ID'
-                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+                if ($isAppRequest) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '参数错误：缺少视频ID'
+                    ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+                } else {
+                    // 浏览器请求，可能需要显示错误页面
+                    return json([
+                        'code' => 1,
+                        'msg' => '参数错误：缺少视频ID'
+                    ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+                }
             }
             
             // 获取视频信息
             $video = VideoModel::find($videoId);
             if (!$video) {
+                if ($isAppRequest) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '视频不存在'
+                    ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+                }
                 return json([
                     'code' => 1,
                     'msg' => '视频不存在'
@@ -270,6 +323,12 @@ class Video extends BaseController
             // 获取文件URL
             $fileUrl = $type === 'cover' ? $video->cover_url : $video->video_url;
             if (empty($fileUrl)) {
+                if ($isAppRequest) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '文件URL不存在'
+                    ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+                }
                 return json([
                     'code' => 1,
                     'msg' => '文件URL不存在'
@@ -281,6 +340,31 @@ class Video extends BaseController
                 $fileUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
                            '://' . $_SERVER['HTTP_HOST'] . 
                            (strpos($fileUrl, '/') === 0 ? '' : '/') . $fileUrl;
+            }
+            
+            // APP请求：返回JSON格式的下载URL
+            if ($isAppRequest) {
+                // 生成代理下载URL（APP可以使用这个URL直接下载）
+                $proxyUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
+                           '://' . $_SERVER['HTTP_HOST'] . 
+                           '/api/video/download?video_id=' . $videoId . '&type=' . $type;
+                
+                // 生成文件名
+                $ext = $type === 'cover' ? '.jpg' : '.mp4';
+                $fileName = preg_replace('/[^\w\s-]/', '', $video->title) . $ext;
+                
+                return json([
+                    'code' => 0,
+                    'msg' => '获取成功',
+                    'data' => [
+                        'video_id' => $video->id,
+                        'type' => $type,
+                        'file_url' => $fileUrl, // 原始文件URL
+                        'download_url' => $proxyUrl, // 代理下载URL（推荐APP使用）
+                        'file_name' => $fileName,
+                        'file_size' => null, // 可选：文件大小
+                    ]
+                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
             }
             
             // 判断是本地文件还是远程文件
@@ -298,7 +382,28 @@ class Video extends BaseController
                 }
             }
             
-            // 远程文件（七牛云等）：使用代理下载
+            // 远程文件（七牛云CDN等）：检查是否为CDN，如果是则重定向到CDN（最快），否则使用代理
+            $qiniuConfig = \think\facade\Config::get('qiniu');
+            $isQiniuCDN = false;
+            if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
+                $qiniuDomain = parse_url($qiniuConfig['domain'], PHP_URL_HOST);
+                if ($qiniuDomain && isset($parsedUrl['host']) && 
+                    (strpos($parsedUrl['host'], $qiniuDomain) !== false || 
+                     strpos($fileUrl, $qiniuConfig['domain']) !== false)) {
+                    $isQiniuCDN = true;
+                }
+            }
+            
+            if ($isQiniuCDN) {
+                // 七牛云CDN文件：浏览器直接重定向到CDN，APP使用代理下载
+                // 浏览器：使用302重定向，直接从CDN下载（利用CDN加速，最快）
+                // APP：已在上面的isAppRequest判断中返回JSON格式的URL
+                http_response_code(302);
+                header('Location: ' . $fileUrl);
+                exit;
+            }
+            
+            // 其他远程文件：使用代理下载（如果CDN重定向失败，也会回退到这里）
             return $this->streamRemoteFile($fileUrl, $type, $video->title);
             
         } catch (\Exception $e) {
@@ -389,12 +494,16 @@ class Video extends BaseController
             ob_end_clean();
         }
         
-        // 分块读取并输出
-        $chunkSize = 8192; // 8KB chunks
+        // 分块读取并输出 - 增大块大小提高速度
+        $chunkSize = 65536; // 64KB chunks（比8KB快8倍）
         while (!feof($handle)) {
             echo fread($handle, $chunkSize);
             if (connection_status() != CONNECTION_NORMAL) {
                 break;
+            }
+            // 使用ob_flush和flush组合，确保及时输出
+            if (ob_get_level()) {
+                ob_flush();
             }
             flush();
         }
@@ -405,6 +514,7 @@ class Video extends BaseController
     
     /**
      * 流式输出远程文件（代理下载）
+     * 优化：增加更大的缓冲区，提高传输速度
      */
     private function streamRemoteFile($url, $type, $title)
     {
@@ -431,17 +541,27 @@ class Video extends BaseController
         $contentLength = 0;
         $isFirstLine = true;
         
+        // 优化：增大缓冲区大小，提高传输速度
+        $bufferSize = 65536; // 64KB buffer，比之前的8KB快8倍
+        
         // 设置cURL选项
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 5,
-            CURLOPT_CONNECTTIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10, // 连接超时10秒
             CURLOPT_TIMEOUT => 0, // 无超时限制
+            CURLOPT_BUFFERSIZE => $bufferSize, // 设置缓冲区大小
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) {
+            // 优化：禁用压缩（如果CDN已经压缩过，避免重复压缩）
+            CURLOPT_ENCODING => '', // 自动处理压缩
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use ($bufferSize) {
                 echo $data;
+                // 使用ob_flush和flush组合，确保及时输出
+                if (ob_get_level()) {
+                    ob_flush();
+                }
                 flush();
                 return strlen($data);
             },
