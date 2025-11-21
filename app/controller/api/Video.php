@@ -441,30 +441,8 @@ class Video extends BaseController
                 }
             }
             
-            // 远程文件（七牛云CDN等）：检查是否为CDN
-            $qiniuConfig = \think\facade\Config::get('qiniu');
-            $isQiniuCDN = false;
-            if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
-                $qiniuDomain = parse_url($qiniuConfig['domain'], PHP_URL_HOST);
-                if ($qiniuDomain && isset($parsedUrl['host']) && 
-                    (strpos($parsedUrl['host'], $qiniuDomain) !== false || 
-                     strpos($fileUrl, $qiniuConfig['domain']) !== false)) {
-                    $isQiniuCDN = true;
-                }
-            }
-            
-            // 优化：CDN文件直接重定向，浏览器立即开始下载（最快，无需等待文件大小计算）
-            if ($isQiniuCDN) {
-                // 302重定向到CDN，浏览器直接从CDN下载
-                // CDN文件下载通常支持断点续传和快速下载
-                // 浏览器会自动处理下载，无需服务器代理
-                http_response_code(302);
-                header('Location: ' . $fileUrl);
-                header('Cache-Control: no-cache');
-                exit;
-            }
-            
-            // 其他远程文件：使用代理下载（立即流式传输，不等待文件大小）
+            // 所有远程文件统一使用代理下载，确保浏览器强制下载而不是打开
+            // 使用chunked传输，立即开始下载，不等待文件大小计算
             return $this->streamRemoteFile($fileUrl, $type, $video->title);
             
         } catch (\Exception $e) {
