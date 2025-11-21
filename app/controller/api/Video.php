@@ -32,19 +32,62 @@ class Video extends BaseController
     
     /**
      * 检测是否为APP客户端请求
+     * 注意：要排除浏览器（浏览器User-Agent可能包含Android等关键词）
      */
     private function isAppClient(): bool
     {
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
         
-        // 检测常见的APP User-Agent模式
-        // 可以根据实际APP的User-Agent进行扩展
+        // 先排除浏览器（浏览器优先判断）
+        $browserPatterns = [
+            '/Chrome/i',
+            '/Firefox/i',
+            '/Safari/i',
+            '/Edge/i',
+            '/Opera/i',
+            '/MSIE/i',
+            '/Trident/i',
+            '/Mobile Safari/i',
+            '/Version/i',  // iOS Safari通常包含Version
+        ];
+        
+        // 如果包含浏览器标识，且没有明确的APP标识，则认为是浏览器
+        $hasBrowser = false;
+        foreach ($browserPatterns as $pattern) {
+            if (preg_match($pattern, $userAgent)) {
+                $hasBrowser = true;
+                break;
+            }
+        }
+        
+        // 如果检测到浏览器标识，且没有明确的APP标识，则不是APP
+        if ($hasBrowser) {
+            // 检查是否有明确的APP标识
+            $appSpecificPatterns = [
+                '/okhttp/i',           // Android OkHttp库（明确的APP库）
+                '/AFNetworking/i',     // iOS AFNetworking库（明确的APP库）
+                '/VideoToolApp/i',     // 自定义APP标识
+            ];
+            
+            $hasAppSpecific = false;
+            foreach ($appSpecificPatterns as $pattern) {
+                if (preg_match($pattern, $userAgent)) {
+                    $hasAppSpecific = true;
+                    break;
+                }
+            }
+            
+            // 有浏览器标识但没有APP特定标识，则认为是浏览器
+            if (!$hasAppSpecific) {
+                return false;
+            }
+        }
+        
+        // 检查明确的APP标识
         $appPatterns = [
             '/okhttp/i',           // Android OkHttp库
             '/AFNetworking/i',     // iOS AFNetworking库
-            '/VideoToolApp/i',     // 自定义APP标识（如果设置了）
-            '/Android.*App/i',     // Android应用
-            '/iPhone.*App/i',      // iOS应用
+            '/VideoToolApp/i',     // 自定义APP标识
         ];
         
         foreach ($appPatterns as $pattern) {
@@ -53,12 +96,13 @@ class Video extends BaseController
             }
         }
         
-        // 也可以通过自定义Header判断
+        // 通过自定义Header判断（最可靠的方式）
         $appHeader = $_SERVER['HTTP_X_APP_CLIENT'] ?? '';
         if (!empty($appHeader) && strtolower($appHeader) === 'true') {
             return true;
         }
         
+        // 默认不是APP（避免误判浏览器）
         return false;
     }
     
@@ -286,9 +330,24 @@ class Video extends BaseController
             $format = $this->request->param('format', ''); // json 或空（流式下载/重定向）
             
             // 检测是否为APP请求（通过参数或User-Agent）
-            $isAppRequest = $format === 'json' || 
-                           $this->request->param('app', 0) == 1 ||
-                           $this->isAppClient();
+            // 优先检查format参数（最可靠），然后检查app参数，最后检查User-Agent
+            // 注意：不要仅依赖User-Agent，因为可能误判浏览器为APP
+            $isAppRequest = false;
+            
+            // 方式1：通过format参数明确指定（最可靠）
+            if ($format === 'json') {
+                $isAppRequest = true;
+            }
+            // 方式2：通过app参数指定
+            elseif ($this->request->param('app', 0) == 1) {
+                $isAppRequest = true;
+            }
+            // 方式3：通过User-Agent判断（保守策略，避免误判浏览器）
+            elseif ($this->isAppClient()) {
+                $isAppRequest = true;
+            }
+            
+            // 默认：浏览器请求，返回文件流
             
             if (!$videoId) {
                 if ($isAppRequest) {
