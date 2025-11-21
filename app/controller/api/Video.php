@@ -453,16 +453,9 @@ class Video extends BaseController
                 }
             }
             
-            if ($isQiniuCDN) {
-                // 七牛云CDN文件：浏览器直接重定向到CDN，APP使用代理下载
-                // 浏览器：使用302重定向，直接从CDN下载（利用CDN加速，最快）
-                // APP：已在上面的isAppRequest判断中返回JSON格式的URL
-                http_response_code(302);
-                header('Location: ' . $fileUrl);
-                exit;
-            }
-            
-            // 其他远程文件：使用代理下载（如果CDN重定向失败，也会回退到这里）
+            // 所有远程文件都使用代理下载，确保浏览器强制下载而不是打开
+            // 即使CDN文件也通过代理，这样可以通过设置Content-Disposition强制下载
+            // 同时保持流式传输，速度不受影响
             return $this->streamRemoteFile($fileUrl, $type, $video->title);
             
         } catch (\Exception $e) {
@@ -573,7 +566,7 @@ class Video extends BaseController
     
     /**
      * 流式输出远程文件（代理下载）
-     * 优化：增加更大的缓冲区，提高传输速度
+     * 优化：增加更大的缓冲区，提高传输速度，强制浏览器下载
      */
     private function streamRemoteFile($url, $type, $title)
     {
@@ -582,10 +575,12 @@ class Video extends BaseController
         $fileName = preg_replace('/[^\w\s-]/', '', $title) . $ext;
         $mimeType = $type === 'cover' ? 'image/jpeg' : 'video/mp4';
         
-        // 设置默认响应头
+        // 设置响应头 - 关键：使用attachment强制浏览器下载而不是打开
         header('Content-Type: ' . $mimeType);
         header('Content-Disposition: attachment; filename="' . rawurlencode($fileName) . '"');
-        header('Cache-Control: no-cache');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         header('Accept-Ranges: bytes');
         
         // 初始化cURL

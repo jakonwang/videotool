@@ -506,19 +506,36 @@
                             });
                         }, 1000);
                     } else {
-                        // 浏览器环境：使用a标签下载
+                        // 浏览器环境：使用最优下载方式
+                        // 服务器已设置Content-Disposition: attachment，浏览器会自动下载
+                        // 使用a标签触发下载，最简单高效
                         const link = document.createElement('a');
                         link.href = downloadUrl;
-                        link.download = ''; // 让服务器设置文件名
+                        
+                        // 生成文件名（用于download属性，作为备用）
+                        const ext = type === 'cover' ? '.jpg' : '.mp4';
+                        const fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
+                        link.download = fileName;
+                        
                         link.style.display = 'none';
-                        link.target = '_blank'; // 新窗口打开，避免页面跳转
+                        // 不使用target，直接在当前页面触发下载
                         document.body.appendChild(link);
                         link.click();
                         
                         // 延迟移除链接
                         setTimeout(() => {
-                            document.body.removeChild(link);
+                            if (link.parentNode) {
+                                document.body.removeChild(link);
+                            }
                         }, 100);
+                        
+                        // 恢复按钮状态（下载已触发）
+                        setTimeout(() => {
+                            buttons.forEach(btn => {
+                                btn.disabled = false;
+                                btn.classList.remove('btn-loading');
+                            });
+                        }, 500);
                     }
                     
                     // 标记视频为已下载（如果是视频）
@@ -539,21 +556,21 @@
                                 debugError('标记下载状态失败，但不影响下载:', e);
                             }
                             
-                            showToast('视频下载已开始');
-                            // 延迟后加载下一个视频
-                            setTimeout(() => {
-                                loadVideo();
-                            }, 1500);
+                            // 浏览器环境已经恢复了按钮，这里不再重复
+                            // APP环境会在上面的代码中恢复按钮
+                            if (!isAppEnvironment() || typeof window.Android === 'undefined') {
+                                showToast('视频下载已开始');
+                                // 延迟后加载下一个视频
+                                setTimeout(() => {
+                                    loadVideo();
+                                }, 1500);
+                            }
                         }, 500);
                     } else {
-                        showToast('封面下载已开始');
-                        // 恢复按钮状态
-                        setTimeout(() => {
-                            buttons.forEach(btn => {
-                                btn.disabled = false;
-                                btn.classList.remove('btn-loading');
-                            });
-                        }, 1000);
+                        // 封面下载，浏览器环境已经恢复了按钮
+                        if (!isAppEnvironment() || typeof window.Android === 'undefined') {
+                            showToast('封面下载已开始');
+                        }
                     }
                 } catch (error) {
                     debugError('下载失败:', error);
