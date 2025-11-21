@@ -462,56 +462,11 @@ public class MainActivity extends AppCompatActivity {
         // 使用统一的下载方法
         downloadFileWithName(url, fileName);
     }
-        try {
-            // 提取文件名
-            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-            if (fileName == null || fileName.isEmpty()) {
-                fileName = "download_" + System.currentTimeMillis();
-                if (mimeType != null) {
-                    if (mimeType.contains("video")) {
-                        fileName += ".mp4";
-                    } else if (mimeType.contains("image")) {
-                        fileName += ".jpg";
-                    }
-                }
-            }
-            
-            // 创建下载请求
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            
-            // 设置下载目录
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-            
-            // 设置下载通知
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setTitle("正在下载: " + fileName);
-            request.setDescription("文件正在下载中...");
-            
-            // 允许在移动网络和WiFi下下载
-            request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
-            request.setAllowedOverRoaming(true);
-            
-            // 设置MIME类型
-            if (mimeType != null && !mimeType.isEmpty()) {
-                request.setMimeType(mimeType);
-            }
-            
-            // 开始下载
-            downloadId = downloadManager.enqueue(request);
-            
-            // 注册下载完成监听
-            registerDownloadReceiver();
-            
-            Toast.makeText(this, "开始下载: " + fileName, Toast.LENGTH_SHORT).show();
-            
-        } catch (Exception e) {
-            Toast.makeText(this, "下载失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            e.printStackTrace();
-        }
-    }
     
     /**
      * 注册下载完成广播接收器
+     * 注意：使用MediaStore API保存到相册时，不需要此方法
+     * 保留此方法以防将来需要使用DownloadManager
      */
     private void registerDownloadReceiver() {
         BroadcastReceiver receiver = new BroadcastReceiver() {
