@@ -441,7 +441,7 @@ class Video extends BaseController
                 }
             }
             
-            // 远程文件（七牛云CDN等）：检查是否为CDN，如果是则重定向到CDN（最快），否则使用代理
+            // 远程文件（七牛云CDN等）：检查是否为CDN
             $qiniuConfig = \think\facade\Config::get('qiniu');
             $isQiniuCDN = false;
             if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
@@ -453,9 +453,18 @@ class Video extends BaseController
                 }
             }
             
-            // 所有远程文件都使用代理下载，确保浏览器强制下载而不是打开
-            // 即使CDN文件也通过代理，这样可以通过设置Content-Disposition强制下载
-            // 同时保持流式传输，速度不受影响
+            // 优化：CDN文件直接重定向，浏览器立即开始下载（最快，无需等待文件大小计算）
+            if ($isQiniuCDN) {
+                // 302重定向到CDN，浏览器直接从CDN下载
+                // CDN文件下载通常支持断点续传和快速下载
+                // 浏览器会自动处理下载，无需服务器代理
+                http_response_code(302);
+                header('Location: ' . $fileUrl);
+                header('Cache-Control: no-cache');
+                exit;
+            }
+            
+            // 其他远程文件：使用代理下载（立即流式传输，不等待文件大小）
             return $this->streamRemoteFile($fileUrl, $type, $video->title);
             
         } catch (\Exception $e) {
@@ -524,9 +533,11 @@ class Video extends BaseController
         
         header('Content-Type: ' . $mimeType);
         header('Content-Disposition: attachment; filename="' . rawurlencode($fileName) . '"');
-        header('Content-Length: ' . $fileSize);
+        header('Content-Length: ' . $fileSize); // 本地文件有大小，设置Content-Length
         header('Accept-Ranges: bytes');
-        header('Cache-Control: no-cache');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         
         // 支持断点续传
         $range = $_SERVER['HTTP_RANGE'] ?? null;
@@ -575,13 +586,22 @@ class Video extends BaseController
         $fileName = preg_replace('/[^\w\s-]/', '', $title) . $ext;
         $mimeType = $type === 'cover' ? 'image/jpeg' : 'video/mp4';
         
+        // 清除输出缓冲，立即开始传输（重要：在设置响应头之前清除）
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
         // 设置响应头 - 关键：使用attachment强制浏览器下载而不是打开
+        // 注意：不设置Content-Length，使用chunked传输，立即开始下载
+        // 这样浏览器不会等待"计算文件大小"，会立即开始下载
         header('Content-Type: ' . $mimeType);
         header('Content-Disposition: attachment; filename="' . rawurlencode($fileName) . '"');
         header('Cache-Control: no-cache, no-store, must-revalidate');
         header('Pragma: no-cache');
         header('Expires: 0');
         header('Accept-Ranges: bytes');
+        // 重要：不设置Content-Length，使用chunked传输，浏览器立即开始下载
+        // PHP会自动使用Transfer-Encoding: chunked
         
         // 初始化cURL
         $ch = curl_init($url);
@@ -590,15 +610,10 @@ class Video extends BaseController
             return json(['code' => 1, 'msg' => '无法初始化下载'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         }
         
-        // 使用变量存储header信息
-        $headerSize = 0;
-        $contentLength = 0;
-        $isFirstLine = true;
-        
         // 优化：增大缓冲区大小，提高传输速度
-        $bufferSize = 65536; // 64KB buffer，比之前的8KB快8倍
+        $bufferSize = 65536; // 64KB buffer
         
-        // 设置cURL选项
+        // 设置cURL选项 - 关键：立即开始传输，不等待完整响应头
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_FOLLOWLOCATION => true,
@@ -608,53 +623,33 @@ class Video extends BaseController
             CURLOPT_BUFFERSIZE => $bufferSize, // 设置缓冲区大小
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
-            // 优化：禁用压缩（如果CDN已经压缩过，避免重复压缩）
             CURLOPT_ENCODING => '', // 自动处理压缩
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use ($bufferSize) {
+            // 关键：立即开始写入数据，不等待完整响应
+            CURLOPT_WRITEFUNCTION => function($ch, $data) {
                 echo $data;
-                // 使用ob_flush和flush组合，确保及时输出
+                // 立即刷新输出，不等待缓冲区满
                 if (ob_get_level()) {
                     ob_flush();
                 }
                 flush();
                 return strlen($data);
             },
-            CURLOPT_HEADERFUNCTION => function($ch, $headerLine) use (&$headerSize, &$contentLength, &$isFirstLine, $type, $fileName, $mimeType) {
-                $headerSize += strlen($headerLine);
-                
-                // 处理HTTP状态行
-                if ($isFirstLine && stripos($headerLine, 'HTTP/') === 0) {
-                    $isFirstLine = false;
-                    // 可以在这里设置状态码
-                    return strlen($headerLine);
-                }
-                
-                // 处理响应头
+            // 简化响应头处理，只转发必要的头，不转发Content-Length
+            CURLOPT_HEADERFUNCTION => function($ch, $headerLine) {
+                // 只处理Content-Type，忽略Content-Length让浏览器使用chunked传输
                 if (strpos($headerLine, ':') !== false) {
                     list($headerName, $headerValue) = explode(':', $headerLine, 2);
                     $headerName = strtolower(trim($headerName));
                     $headerValue = trim($headerValue);
                     
-                    // 记录Content-Length
-                    if ($headerName === 'content-length') {
-                        $contentLength = intval($headerValue);
-                    }
-                    
-                    // 转发Content-Type（如果存在）
+                    // 只转发Content-Type（如果我们需要）
                     if ($headerName === 'content-type' && !empty($headerValue)) {
-                        header('Content-Type: ' . $headerValue, false);
-                        return strlen($headerLine);
+                        // 使用我们自己的Content-Type和Content-Disposition
+                        // header('Content-Type: ' . $headerValue, false);
                     }
                     
-                    // 忽略Content-Disposition（使用我们自己的）
-                    if ($headerName === 'content-disposition') {
-                        return strlen($headerLine);
-                    }
-                    
-                    // 转发其他有用的头
-                    if (in_array($headerName, ['accept-ranges', 'content-range'])) {
-                        header($headerName . ': ' . $headerValue, false);
-                    }
+                    // 忽略Content-Length和Content-Disposition
+                    // 这样浏览器会使用chunked传输，立即开始下载
                 }
                 
                 return strlen($headerLine);
@@ -668,12 +663,9 @@ class Video extends BaseController
             header('Accept-Ranges: bytes', false);
         }
         
-        // 清除输出缓冲
-        if (ob_get_level()) {
-            ob_end_clean();
-        }
+        // 注意：输出缓冲已在方法开始处清除，这里不需要重复清除
         
-        // 执行下载
+        // 执行下载 - 立即开始流式传输，不等待Content-Length
         $result = curl_exec($ch);
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
