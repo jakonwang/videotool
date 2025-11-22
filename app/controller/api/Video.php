@@ -620,10 +620,33 @@ class Video extends BaseController
             ]);
             
         } catch (\Exception $e) {
-            \think\facade\Log::error('代理下载错误: ' . $e->getMessage());
+            // 详细记录错误信息
+            $errorInfo = [
+                'video_id' => $videoId ?? null,
+                'type' => $type ?? null,
+                'file_url' => $fileUrl ?? null,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => substr($e->getTraceAsString(), 0, 500), // 限制长度
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                'ip' => $this->getClientIP(),
+                'time' => date('Y-m-d H:i:s'),
+            ];
+            
+            \think\facade\Log::error('代理下载错误: ' . json_encode($errorInfo, JSON_UNESCAPED_UNICODE));
+            
+            // 对APP请求返回更详细的错误信息（便于调试）
+            $errorMsg = '下载失败：' . $e->getMessage();
+            if ($isAppRequest && (strpos($e->getMessage(), 'curl') !== false || strpos($e->getMessage(), 'HTTP') !== false)) {
+                $errorMsg .= ' (请检查七牛云文件是否可访问)';
+            }
+            
             return json([
                 'code' => 1,
-                'msg' => '下载失败：' . $e->getMessage()
+                'msg' => $errorMsg,
+                'error_code' => 'DOWNLOAD_ERROR',
+                'video_id' => $videoId ?? null,
             ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         }
     }
