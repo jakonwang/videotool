@@ -390,9 +390,12 @@ public class MainActivity extends AppCompatActivity {
                     .build();
             Request request = new Request.Builder()
                     .url(url)
-                    .header("Connection", "close")
+                    // 移除 Connection: close，保持长连接以提高稳定性
+                    //.header("Connection", "close") 
                     .header("Referer", DOWNLOAD_REFERER)
                     .header("User-Agent", DOWNLOAD_UA)
+                    // 明确接受所有编码，防止意外的 gzip 问题（虽然 OkHttp 会自动处理）
+                    .header("Accept-Encoding", "identity")
                     .build();
             
             Response response = client.newCall(request).execute();

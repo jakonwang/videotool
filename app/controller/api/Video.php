@@ -402,6 +402,10 @@ class Video extends BaseController
      */
     public function downloadProxy()
     {
+        // 防止脚本超时导致意外中断
+        set_time_limit(0);
+        ignore_user_abort(true);
+
         try {
             $videoId = $this->request->param('video_id');
             $type = $this->request->param('type', 'video'); // cover 或 video
@@ -724,24 +728,23 @@ class Video extends BaseController
                 }
                 return strlen($data);
             },
-            // 简化响应头处理，只转发必要的头，不转发Content-Length
+            // 简化响应头处理，只转发必要的头
             CURLOPT_HEADERFUNCTION => function($ch, $headerLine) {
-                // 只处理Content-Type，忽略Content-Length让浏览器使用chunked传输
                 if (strpos($headerLine, ':') !== false) {
                     list($headerName, $headerValue) = explode(':', $headerLine, 2);
                     $headerName = strtolower(trim($headerName));
                     $headerValue = trim($headerValue);
                     
-                    // 只转发Content-Type（如果我们需要）
-                    if ($headerName === 'content-type' && !empty($headerValue)) {
-                        // 使用我们自己的Content-Type和Content-Disposition
-                        // header('Content-Type: ' . $headerValue, false);
+                    // 转发 Content-Length，让前端知道文件大小
+                    if ($headerName === 'content-length') {
+                         header('Content-Length: ' . $headerValue);
                     }
                     
-                    // 忽略Content-Length和Content-Disposition
-                    // 这样浏览器会使用chunked传输，立即开始下载
+                    // 转发 Content-Type
+                    if ($headerName === 'content-type') {
+                         header('Content-Type: ' . $headerValue);
+                    }
                 }
-                
                 return strlen($headerLine);
             }
         ]);
