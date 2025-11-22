@@ -510,18 +510,45 @@ class Video extends BaseController
                            '://' . $_SERVER['HTTP_HOST'] . 
                            '/api/video/download?video_id=' . $videoId . '&type=' . $type;
                 
+                // 如果是七牛云资源且缓存不存在，先同步预缓存（确保100%成功）
+                $cachePrepared = false;
+                if ($cacheContext && empty($cacheContext['ready']) && $cacheWriteContext && $isCdnResource) {
+                    \think\facade\Log::info("APP请求：开始同步预缓存七牛云资源 - {$fileUrl}");
+                    $cachePath = $this->downloadRemoteToCache($fileUrl, $cacheWriteContext, [
+                        'video_id' => $video->id,
+                        'platform' => $video->platform_id ?? null,
+                        'title' => $video->title,
+                        'type' => $type,
+                        'file_name' => $downloadFileName,
+                        'source_url' => $fileUrl,
+                    ]);
+                    $this->releaseCacheLock($cacheWriteContext);
+                    
+                    // 如果缓存成功，更新状态
+                    if ($cachePath && file_exists($cachePath)) {
+                        $cacheContext['ready'] = true;
+                        $cachePrepared = true;
+                        \think\facade\Log::info("APP请求：七牛云资源预缓存成功 - {$fileUrl} -> {$cachePath}");
+                    } else {
+                        \think\facade\Log::warning("APP请求：七牛云资源预缓存失败，将使用流式代理 - {$fileUrl}");
+                    }
+                }
+                
+                // 关键优化：fallback_url也使用代理URL，避免直接访问七牛云被拦截
+                // 这样APP即使主链接失败，备用链接也是通过服务器代理，不会被防盗链拦截
                 return json([
                     'code' => 0,
-                    'msg' => '获取成功',
+                    'msg' => ($cachePrepared ? '缓存已就绪' : ($cacheContext && empty($cacheContext['ready']) ? '缓存准备中...' : '获取成功')),
                     'data' => [
                         'video_id' => $video->id,
                         'type' => $type,
                         'file_url' => $fileUrl,
-                        'direct_url' => $proxyUrl, // APP优先使用站内缓存/代理链接
-                        'fallback_url' => $fileUrl,
+                        'direct_url' => $proxyUrl, // 主链接：站内代理URL（强制走代理）
+                        'fallback_url' => $proxyUrl, // 备用链接：也使用代理URL（不使用七牛云直链，避免被拦截）
                         'file_name' => $downloadFileName,
                         'is_cdn' => $isCdnResource,
                         'cache_hit' => (bool)($cacheContext && !empty($cacheContext['ready'])),
+                        'cache_prepared' => $cachePrepared, // 标识是否刚完成预缓存
                         'file_size' => null,
                     ]
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
@@ -1272,6 +1299,76 @@ class Video extends BaseController
             }
         }
         return $type === 'cover' ? 'jpg' : 'mp4';
+    }
+    
+    /**
+     * 公共方法：为指定URL触发预缓存（可在后台上传成功后调用）
+     * @param string $url 要缓存的URL
+     * @param string $type 类型：'video' 或 'cover'
+     * @param array $meta 元数据（可选）
+     * @return bool 是否成功
+     */
+    public static function triggerPreCache(string $url, string $type = 'video', array $meta = []): bool
+    {
+        try {
+            $instance = new self();
+            
+            // 判断是否为本地文件
+            $parsedUrl = parse_url($url);
+            $isLocalFile = isset($parsedUrl['host']) && 
+                          ($parsedUrl['host'] === ($_SERVER['HTTP_HOST'] ?? '') ||
+                           $parsedUrl['host'] === 'localhost' ||
+                           $parsedUrl['host'] === '127.0.0.1');
+            
+            // 只缓存远程文件
+            if ($isLocalFile) {
+                return false;
+            }
+            
+            // 构建缓存上下文
+            $cacheContext = $instance->buildCacheContext($url, $type, $isLocalFile);
+            if (!$cacheContext) {
+                return false;
+            }
+            
+            // 如果已缓存，直接返回成功
+            if (!empty($cacheContext['ready']) && file_exists($cacheContext['path'])) {
+                \think\facade\Log::info("预缓存：文件已存在 - {$url}");
+                return true;
+            }
+            
+            // 尝试获取锁并下载
+            $cacheWriteContext = $instance->acquireCacheLock($cacheContext);
+            if (!$cacheWriteContext) {
+                // 可能其他进程正在下载，等待后检查
+                sleep(2);
+                if (file_exists($cacheContext['path']) && filesize($cacheContext['path']) > 0) {
+                    \think\facade\Log::info("预缓存：其他进程已缓存 - {$url}");
+                    return true;
+                }
+                return false;
+            }
+            
+            // 执行下载
+            $cachePath = $instance->downloadRemoteToCache($url, $cacheWriteContext, array_merge([
+                'type' => $type,
+                'source_url' => $url,
+                'file_name' => basename($url),
+            ], $meta));
+            
+            $instance->releaseCacheLock($cacheWriteContext);
+            
+            if ($cachePath && file_exists($cachePath)) {
+                \think\facade\Log::info("预缓存成功：{$url} -> {$cachePath}");
+                return true;
+            } else {
+                \think\facade\Log::warning("预缓存失败：{$url}");
+                return false;
+            }
+        } catch (\Exception $e) {
+            \think\facade\Log::error("预缓存异常：{$url} - " . $e->getMessage());
+            return false;
+        }
     }
 }
 

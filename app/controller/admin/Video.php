@@ -267,8 +267,78 @@ class Video extends BaseController
                     \think\facade\Log::warning('七牛云封面上传失败: ' . $qiniuResult['msg'] . ' | 视频ID: ' . $videoModel->id . ' | 使用本地URL，保留本地文件');
                 }
             }
+            
+            // 七牛云上传成功后，触发预缓存（异步，不阻塞）
+            // 这样用户下载时可以直接从服务器缓存读取，速度更快更稳定
+            if (!empty($videoModel->video_url) && $this->isCdnUrl($videoModel->video_url)) {
+                $this->triggerAsyncPreCache($videoModel, 'video');
+            }
+            if (!empty($videoModel->cover_url) && $this->isCdnUrl($videoModel->cover_url)) {
+                $this->triggerAsyncPreCache($videoModel, 'cover');
+            }
+            
         } catch (\Exception $e) {
             \think\facade\Log::error('七牛云异步上传异常: ' . $e->getMessage() . ' | 视频ID: ' . ($videoModel->id ?? '未知') . ' | 文件: ' . $e->getFile() . ' | 行号: ' . $e->getLine());
+        }
+    }
+    
+    /**
+     * 判断URL是否属于CDN域（用于判断是否需要预缓存）
+     */
+    private function isCdnUrl(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!$host) {
+            return false;
+        }
+        
+        $qiniuConfig = \think\facade\Config::get('qiniu');
+        if (!empty($qiniuConfig['domain'])) {
+            $cdnHost = parse_url($qiniuConfig['domain'], PHP_URL_HOST) ?: $qiniuConfig['domain'];
+            if ($host === $cdnHost) {
+                return true;
+            }
+        }
+        if (!empty($qiniuConfig['cdn_domains'])) {
+            $extraDomains = is_array($qiniuConfig['cdn_domains']) ? $qiniuConfig['cdn_domains'] : explode(',', $qiniuConfig['cdn_domains']);
+            foreach ($extraDomains as $domain) {
+                $domainHost = parse_url(trim($domain), PHP_URL_HOST) ?: trim($domain);
+                if ($host === $domainHost) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 触发预缓存（后台异步任务中调用，不阻塞用户）
+     */
+    private function triggerAsyncPreCache($videoModel, string $type)
+    {
+        try {
+            $url = $type === 'cover' ? $videoModel->cover_url : $videoModel->video_url;
+            if (empty($url)) {
+                return;
+            }
+            
+            // 直接调用同步预缓存（因为已经在异步任务中，不会阻塞用户）
+            // 预缓存会使用5重重试机制，确保成功率
+            $result = \app\controller\api\Video::triggerPreCache($url, $type, [
+                'video_id' => $videoModel->id,
+                'platform' => $videoModel->platform_id ?? null,
+                'title' => $videoModel->title,
+                'file_name' => basename($url),
+            ]);
+            
+            if ($result) {
+                \think\facade\Log::info("预缓存成功: 视频ID {$videoModel->id}, 类型 {$type}, URL: {$url}");
+            } else {
+                \think\facade\Log::warning("预缓存失败: 视频ID {$videoModel->id}, 类型 {$type}, URL: {$url}");
+            }
+            
+        } catch (\Exception $e) {
+            \think\facade\Log::error("预缓存异常: 视频ID {$videoModel->id}, 类型 {$type} - " . $e->getMessage());
         }
     }
     
