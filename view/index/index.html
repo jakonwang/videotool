@@ -500,12 +500,12 @@
                                 const cdnUrl = data.cdn_url || data.fallback_url || data.file_url || '';
                                 const finalName = data.file_name || fileName;
 
-                                let primary = proxyUrl;
-                                let backup = cdnUrl || proxyUrl;
+                                let primary = cdnUrl || proxyUrl;
+                                let backup = proxyUrl;
 
-                                if (!data.cache_hit && !data.cache_prepared && cdnUrl) {
-                                    primary = cdnUrl;
-                                    backup = proxyUrl;
+                                if (data.cache_hit || data.cache_prepared) {
+                                    primary = proxyUrl;
+                                    backup = cdnUrl || proxyUrl;
                                 }
                                 debugLog('准备开始下载:', {
                                     primary,

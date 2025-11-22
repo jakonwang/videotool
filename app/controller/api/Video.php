@@ -557,8 +557,6 @@ class Video extends BaseController
                     }
                 }
                 
-                // 关键优化：fallback_url也使用代理URL，避免直接访问七牛云被拦截
-                // 这样APP即使主链接失败，备用链接也是通过服务器代理，不会被防盗链拦截
                 return json([
                     'code' => 0,
                     'msg' => ($cachePrepared ? '缓存已就绪' : ($cacheContext && empty($cacheContext['ready']) ? '缓存准备中...' : '获取成功')),
@@ -566,8 +564,8 @@ class Video extends BaseController
                         'video_id' => $video->id,
                         'type' => $type,
                         'file_url' => $fileUrl,
-                        'direct_url' => $proxyUrl, // 向下兼容
-                        'fallback_url' => $cdnDownloadUrl, // APP备用使用CDN直链
+                        'direct_url' => $cdnDownloadUrl ?: $proxyUrl, // 前向兼容旧版本
+                        'fallback_url' => $proxyUrl,
                         'proxy_url' => $proxyUrl,
                         'cdn_url' => $cdnDownloadUrl,
                         'file_name' => $downloadFileName,
