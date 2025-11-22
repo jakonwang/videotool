@@ -1056,99 +1056,187 @@ class Video extends BaseController
         if (!is_dir($tempDir)) {
             $this->ensureDirectory($tempDir);
         }
-        $fp = @fopen($tempPath, 'wb');
-        if (!$fp) {
-            \think\facade\Log::error('无法创建临时缓存文件: ' . $tempPath);
-            return null;
-        }
-
+        
         $referer = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') .
             '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/';
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'VideoTool-Server-Proxy';
-
-        $ch = null;
-        $downloadSuccess = false;
-        try {
-            $ch = curl_init($url);
-            if ($ch === false) {
-                throw new \Exception('无法初始化cURL');
-            }
+        $userAgent = 'VideoTool-Server-Downloader/1.0 (PHP/' . PHP_VERSION . ')';
+        
+        // 多重下载策略：最多重试5次，每次使用不同的策略
+        $maxRetries = 5;
+        $retryDelay = 2; // 重试间隔（秒）
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $fp = null;
+            $ch = null;
             
-            curl_setopt_array($ch, [
-                CURLOPT_FILE => $fp,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS => 5,
-                CURLOPT_CONNECTTIMEOUT => 30,
-                CURLOPT_TIMEOUT => 0,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_REFERER => $referer,
-                CURLOPT_USERAGENT => $userAgent,
-                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                CURLOPT_BUFFERSIZE => 131072, // 128KB buffer
-            ]);
-
-            $success = curl_exec($ch);
-            $error = curl_error($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $downloadedSize = curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
-
-            if ($ch) {
-                curl_close($ch);
-                $ch = null;
-            }
-            if ($fp) {
-                fclose($fp);
-                $fp = null;
-            }
-
-            if ($success && $httpCode < 400 && file_exists($tempPath) && filesize($tempPath) > 0) {
-                // 检查文件大小是否合理（至少1KB，避免0字节文件）
-                if (filesize($tempPath) < 1024 && $downloadedSize > 1024) {
-                    throw new \Exception('下载的文件大小异常');
+            try {
+                // 每次重试前清理可能存在的临时文件
+                if ($attempt > 1 && file_exists($tempPath)) {
+                    @unlink($tempPath);
                 }
                 
-                @rename($tempPath, $targetPath);
-                if (!file_exists($targetPath)) {
+                // 如果上次下载部分失败，尝试断点续传
+                $resumeFrom = 0;
+                if (file_exists($tempPath)) {
+                    $resumeFrom = filesize($tempPath);
+                    if ($resumeFrom > 0) {
+                        $fp = @fopen($tempPath, 'ab'); // 追加模式
+                        \think\facade\Log::info("尝试断点续传: {$url} (从 {$resumeFrom} 字节继续)");
+                    }
+                }
+                
+                if (!$fp) {
+                    $fp = @fopen($tempPath, 'wb');
+                }
+                
+                if (!$fp) {
+                    throw new \Exception('无法创建/打开临时缓存文件: ' . $tempPath);
+                }
+                
+                $ch = curl_init($url);
+                if ($ch === false) {
+                    throw new \Exception('无法初始化cURL');
+                }
+                
+                // 动态调整超时时间：第一次30秒，后续递增
+                $connectTimeout = min(30 + ($attempt - 1) * 10, 60);
+                
+                $curlOptions = [
+                    CURLOPT_FILE => $fp,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 10, // 增加重定向次数
+                    CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+                    CURLOPT_TIMEOUT => 0, // 无总超时限制
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false,
+                    CURLOPT_REFERER => $referer,
+                    CURLOPT_USERAGENT => $userAgent,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_BUFFERSIZE => 262144, // 256KB buffer（增大缓冲区）
+                    CURLOPT_TCP_NODELAY => 1,
+                    CURLOPT_TCP_KEEPALIVE => 1,
+                    CURLOPT_ENCODING => '', // 自动处理压缩
+                    CURLOPT_HTTPHEADER => [
+                        'Accept: */*',
+                        'Accept-Encoding: identity', // 禁用压缩，避免解压问题
+                        'Connection: keep-alive',
+                    ],
+                ];
+                
+                // 断点续传
+                if ($resumeFrom > 0) {
+                    $curlOptions[CURLOPT_RANGE] = $resumeFrom . '-';
+                }
+                
+                curl_setopt_array($ch, $curlOptions);
+                
+                $startTime = microtime(true);
+                $success = curl_exec($ch);
+                $endTime = microtime(true);
+                
+                $error = curl_error($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $downloadedSize = curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
+                $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+                
+                if ($ch) {
+                    curl_close($ch);
+                    $ch = null;
+                }
+                if ($fp) {
+                    fclose($fp);
+                    $fp = null;
+                }
+                
+                // 验证下载结果
+                if (!$success || !empty($error)) {
+                    throw new \Exception("cURL执行失败 (尝试 {$attempt}/{$maxRetries}): " . ($error ?: '未知错误'));
+                }
+                
+                if ($httpCode >= 400) {
+                    throw new \Exception("HTTP错误 (尝试 {$attempt}/{$maxRetries}): HTTP {$httpCode}");
+                }
+                
+                if (!file_exists($tempPath)) {
+                    throw new \Exception("临时文件不存在 (尝试 {$attempt}/{$maxRetries})");
+                }
+                
+                $actualSize = filesize($tempPath);
+                if ($actualSize == 0) {
+                    throw new \Exception("下载的文件为空 (尝试 {$attempt}/{$maxRetries})");
+                }
+                
+                // 如果有Content-Length，验证文件大小
+                if ($contentLength > 0) {
+                    $expectedSize = $resumeFrom + $contentLength;
+                    // 允许5%的误差（考虑网络传输中的一些变化）
+                    if (abs($actualSize - $expectedSize) > ($expectedSize * 0.05)) {
+                        \think\facade\Log::warning("文件大小不匹配 (尝试 {$attempt}/{$maxRetries}): 期望 {$expectedSize}, 实际 {$actualSize}");
+                        // 如果误差太大且不是最后一次尝试，继续重试
+                        if ($attempt < $maxRetries) {
+                            @unlink($tempPath);
+                            sleep($retryDelay);
+                            continue;
+                        }
+                    }
+                }
+                
+                // 文件下载成功，重命名为最终文件名
+                if (@rename($tempPath, $targetPath)) {
+                    $finalSize = filesize($targetPath);
+                    
+                    // 保存元数据
+                    $metaPayload = [
+                        'hash' => $context['hash'] ?? null,
+                        'file_name' => $meta['file_name'] ?? basename($targetPath),
+                        'type' => $meta['type'] ?? 'video',
+                        'source_url' => $meta['source_url'] ?? $url,
+                        'video_id' => $meta['video_id'] ?? null,
+                        'platform' => $meta['platform'] ?? null,
+                        'title' => $meta['title'] ?? null,
+                        'size' => $finalSize,
+                        'cached_at' => time(),
+                        'download_time' => round($endTime - $startTime, 2),
+                        'attempts' => $attempt,
+                    ];
+                    if (!empty($context['meta_path'])) {
+                        @file_put_contents(
+                            $context['meta_path'],
+                            json_encode($metaPayload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                        );
+                    }
+                    
+                    \think\facade\Log::info("缓存远程文件成功 (尝试 {$attempt}/{$maxRetries}): {$url} -> {$targetPath} ({$finalSize} bytes, 耗时 " . round($endTime - $startTime, 2) . "秒)");
+                    return $targetPath;
+                } else {
                     throw new \Exception('重命名缓存文件失败');
                 }
                 
-                $metaPayload = [
-                    'hash' => $context['hash'] ?? null,
-                    'file_name' => $meta['file_name'] ?? basename($targetPath),
-                    'type' => $meta['type'] ?? 'video',
-                    'source_url' => $meta['source_url'] ?? $url,
-                    'video_id' => $meta['video_id'] ?? null,
-                    'platform' => $meta['platform'] ?? null,
-                    'title' => $meta['title'] ?? null,
-                    'size' => @filesize($targetPath),
-                    'cached_at' => time(),
-                ];
-                if (!empty($context['meta_path'])) {
-                    @file_put_contents(
-                        $context['meta_path'],
-                        json_encode($metaPayload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-                    );
+            } catch (\Exception $e) {
+                if ($ch) {
+                    @curl_close($ch);
                 }
-                $downloadSuccess = true;
-                \think\facade\Log::info('缓存远程文件成功: ' . $url . ' -> ' . $targetPath . ' (' . filesize($targetPath) . ' bytes)');
-                return $targetPath;
-            } else {
-                throw new \Exception('下载失败: ' . ($error ?: 'HTTP ' . $httpCode));
+                if ($fp) {
+                    @fclose($fp);
+                }
+                
+                $errorMsg = $e->getMessage();
+                \think\facade\Log::warning("缓存远程文件失败 (尝试 {$attempt}/{$maxRetries}): {$errorMsg} - {$url}");
+                
+                // 如果是最后一次尝试，删除临时文件
+                if ($attempt >= $maxRetries) {
+                    if (file_exists($tempPath)) {
+                        @unlink($tempPath);
+                    }
+                    return null;
+                }
+                
+                // 等待后重试
+                sleep($retryDelay * $attempt); // 指数退避
             }
-        } catch (\Exception $e) {
-            if ($ch) {
-                @curl_close($ch);
-            }
-            if ($fp) {
-                @fclose($fp);
-            }
-            if (file_exists($tempPath)) {
-                @unlink($tempPath);
-            }
-            \think\facade\Log::warning('缓存远程文件失败: ' . $e->getMessage() . ' - ' . $url);
-            return null;
         }
+        
+        return null;
     }
 
     private function isCacheValid(string $path, array $config): bool
