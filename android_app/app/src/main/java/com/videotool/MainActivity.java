@@ -35,12 +35,14 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import android.text.format.Formatter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -92,6 +94,8 @@ public class MainActivity extends AppCompatActivity {
     
     // 权限请求码
     private static final int PERMISSION_REQUEST_CODE = 1001;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 2001;
+    private static final int MAX_DOWNLOAD_RETRY = 3;
     
     // 待下载的文件信息
     private String pendingDownloadUrl;
@@ -133,6 +137,7 @@ public class MainActivity extends AppCompatActivity {
         
         // 检查并请求存储权限（Android 6.0+）
         checkStoragePermission();
+        checkNotificationPermission();
 
         // 创建通知渠道（Android 8.0+）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -176,6 +181,17 @@ public class MainActivity extends AppCompatActivity {
         }
         // Android 10-12不需要运行时权限（使用MediaStore API）
     }
+
+    private void checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        NOTIFICATION_PERMISSION_REQUEST);
+            }
+        }
+    }
     
     /**
      * 权限请求结果处理
@@ -204,6 +220,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             } else {
                 Toast.makeText(this, "需要存储权限才能保存到相册", Toast.LENGTH_LONG).show();
+            }
+        } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (!granted) {
+                Toast.makeText(this, "未授予通知权限，下载进度将无法显示", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -363,7 +384,7 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
-     * 执行具体的下载并保存到相册
+     * 执行具体的下载并保存到相册，支持断点续传与自动重试
      */
     private boolean attemptDownload(String url, String fileName, boolean showStartToast) {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -380,104 +401,168 @@ public class MainActivity extends AppCompatActivity {
             notificationManager.notify(notificationId, builder.build());
         }
 
-        try {
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .connectTimeout(20, TimeUnit.SECONDS)
-                    .readTimeout(5, TimeUnit.MINUTES)
-                    .writeTimeout(5, TimeUnit.MINUTES)
-                    .retryOnConnectionFailure(true)
-                    .protocols(Collections.singletonList(Protocol.HTTP_1_1))
-                    .build();
-            Request request = new Request.Builder()
-                    .url(url)
-                    // 移除 Connection: close，保持长连接以提高稳定性
-                    //.header("Connection", "close") 
-                    .header("Referer", DOWNLOAD_REFERER)
-                    .header("User-Agent", DOWNLOAD_UA)
-                    // 明确接受所有编码，防止意外的 gzip 问题（虽然 OkHttp 会自动处理）
-                    .header("Accept-Encoding", "identity")
-                    .build();
-            
-            Response response = client.newCall(request).execute();
-            if (!response.isSuccessful() || response.body() == null) {
-                final int httpCode = response.code();
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show());
-                if (notificationManager != null) notificationManager.cancel(notificationId);
-                response.close();
-                return false;
-            }
-            
-            if (showStartToast) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "开始下载: " + fileName, Toast.LENGTH_SHORT).show());
-            }
-            
-            String headerMime = response.header("Content-Type");
-            long contentLength = response.body().contentLength();
-            String mimeType = guessMimeType(fileName, headerMime);
-            boolean isVideo = mimeType != null && mimeType.toLowerCase(Locale.US).contains("video");
-            boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.US).contains("image");
-            
-            try (InputStream inputStream = response.body().byteStream()) {
-                Uri savedUri;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    savedUri = saveToMediaStore(fileName, mimeType, isVideo, isImage, inputStream, contentLength, notificationManager, notificationId, builder);
-                } else {
-                    savedUri = saveToLegacyStorage(fileName, mimeType, isVideo, isImage, inputStream, contentLength, notificationManager, notificationId, builder);
+        if (showStartToast) {
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "开始下载: " + fileName, Toast.LENGTH_SHORT).show());
+        }
+
+        File tempFile = getTempDownloadFile(fileName);
+        long downloadedBytes = tempFile.exists() ? tempFile.length() : 0;
+        String mimeType = guessMimeType(fileName, null);
+        boolean isVideo = mimeType != null && mimeType.toLowerCase(Locale.US).contains("video");
+        boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.US).contains("image");
+
+        OkHttpClient client = new OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.MINUTES)
+                .writeTimeout(5, TimeUnit.MINUTES)
+                .retryOnConnectionFailure(true)
+                .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build();
+
+        boolean downloadSuccess = false;
+        Exception lastException = null;
+        long totalBytes = -1;
+
+        for (int attempt = 0; attempt < MAX_DOWNLOAD_RETRY && !downloadSuccess; attempt++) {
+            try {
+                Request.Builder requestBuilder = new Request.Builder()
+                        .url(url)
+                        .header("Referer", DOWNLOAD_REFERER)
+                        .header("User-Agent", DOWNLOAD_UA)
+                        .header("Accept-Encoding", "identity");
+
+                if (downloadedBytes > 0) {
+                    requestBuilder.header("Range", "bytes=" + downloadedBytes + "-");
                 }
-                
-                if (savedUri != null) {
-                    final Uri finalUri = savedUri;
-                    final boolean finalIsVideo = isVideo;
-                    final boolean finalIsImage = isImage;
-                    final String finalMime = mimeType;
-                    
-                    if (notificationManager != null) {
-                        builder.setContentText("下载完成")
-                               .setProgress(0, 0, false)
-                               .setOngoing(false)
-                               .setSmallIcon(android.R.drawable.stat_sys_download_done);
-                        notificationManager.notify(notificationId, builder.build());
-                        // 延迟取消通知，让用户看到完成状态
-                        new Thread(() -> {
-                            try { Thread.sleep(3000); } catch (InterruptedException e) {}
-                            notificationManager.cancel(notificationId);
-                        }).start();
+
+                try (Response response = client.newCall(requestBuilder.build()).execute()) {
+                    if (response.code() == 416) {
+                        if (tempFile.exists()) {
+                            tempFile.delete();
+                        }
+                        downloadedBytes = 0;
+                        continue;
                     }
 
-                    runOnUiThread(() -> {
-                        if (finalIsVideo) {
-                            Toast.makeText(MainActivity.this, "视频已保存到相册", Toast.LENGTH_SHORT).show();
-                        } else if (finalIsImage) {
-                            Toast.makeText(MainActivity.this, "图片已保存到相册", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(MainActivity.this, "文件已保存", Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                    
-                    MediaScannerConnection.scanFile(this,
-                            new String[]{finalUri.toString()},
-                            new String[]{finalMime},
-                            (path, uri) -> {});
-                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, finalUri));
-                    response.close();
-                    return true;
-                } else {
-                    if (notificationManager != null) notificationManager.cancel(notificationId);
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "保存失败", Toast.LENGTH_LONG).show());
+                    if (!response.isSuccessful() || response.body() == null) {
+                        final int httpCode = response.code();
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show());
+                        if (notificationManager != null) notificationManager.cancel(notificationId);
+                        return false;
+                    }
+
+                    if (response.code() == 200 && downloadedBytes > 0 && tempFile.exists()) {
+                        tempFile.delete();
+                        downloadedBytes = 0;
+                    }
+
+                    String headerMime = response.header("Content-Type");
+                    if (headerMime != null) {
+                        mimeType = guessMimeType(fileName, headerMime);
+                        isVideo = mimeType != null && mimeType.toLowerCase(Locale.US).contains("video");
+                        isImage = mimeType != null && mimeType.toLowerCase(Locale.US).contains("image");
+                    }
+
+                    totalBytes = resolveTotalBytes(response, downloadedBytes);
+
+                    try (RandomAccessFile raf = new RandomAccessFile(tempFile, "rw");
+                         InputStream networkStream = response.body().byteStream()) {
+                        raf.seek(downloadedBytes);
+                        downloadedBytes = transferNetworkToTemp(networkStream, raf, downloadedBytes, totalBytes, notificationManager, notificationId, builder);
+                    }
+
+                    if (totalBytes <= 0 || downloadedBytes >= totalBytes) {
+                        downloadSuccess = true;
+                    }
                 }
-            } finally {
-                response.close();
+            } catch (Exception e) {
+                lastException = e;
+                try {
+                    Thread.sleep(800);
+                } catch (InterruptedException ignored) {}
+            }
+        }
+
+        if (!downloadSuccess) {
+            if (notificationManager != null) notificationManager.cancel(notificationId);
+            final String errorMsg = lastException != null && lastException.getMessage() != null
+                    ? lastException.getMessage()
+                    : "未知错误";
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: " + errorMsg, Toast.LENGTH_LONG).show());
+            return false;
+        }
+
+        if (notificationManager != null) {
+            builder.setContentText("保存到相册...")
+                   .setProgress(0, 0, true)
+                   .setOngoing(true);
+            notificationManager.notify(notificationId, builder.build());
+        }
+
+        Uri savedUri = null;
+        long fileLength = tempFile.length();
+
+        try (InputStream fileInput = new FileInputStream(tempFile)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                savedUri = saveToMediaStore(fileName, mimeType, isVideo, isImage, fileInput, fileLength, notificationManager, notificationId, builder);
+            } else {
+                savedUri = saveToLegacyStorage(fileName, mimeType, isVideo, isImage, fileInput, fileLength, notificationManager, notificationId, builder);
             }
         } catch (Exception e) {
             if (notificationManager != null) notificationManager.cancel(notificationId);
             final String errorMsg = e.getMessage();
-            runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: " + errorMsg, Toast.LENGTH_LONG).show());
-            e.printStackTrace();
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "保存失败: " + (errorMsg != null ? errorMsg : ""), Toast.LENGTH_LONG).show());
+            return false;
+        } finally {
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
         }
-        return false;
+
+        if (savedUri != null) {
+            final Uri finalUri = savedUri;
+            final boolean finalIsVideo = isVideo;
+            final boolean finalIsImage = isImage;
+            final String finalMime = mimeType;
+
+            if (notificationManager != null) {
+                builder.setContentText("下载完成")
+                       .setProgress(0, 0, false)
+                       .setOngoing(false)
+                       .setSmallIcon(android.R.drawable.stat_sys_download_done);
+                notificationManager.notify(notificationId, builder.build());
+                new Thread(() -> {
+                    try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
+                    notificationManager.cancel(notificationId);
+                }).start();
+            }
+
+            runOnUiThread(() -> {
+                if (finalIsVideo) {
+                    Toast.makeText(MainActivity.this, "视频已保存到相册", Toast.LENGTH_SHORT).show();
+                } else if (finalIsImage) {
+                    Toast.makeText(MainActivity.this, "图片已保存到相册", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(MainActivity.this, "文件已保存", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            MediaScannerConnection.scanFile(this,
+                    new String[]{finalUri.toString()},
+                    new String[]{finalMime},
+                    (path, uri) -> {});
+            sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, finalUri));
+            return true;
+        } else {
+            if (notificationManager != null) notificationManager.cancel(notificationId);
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "保存失败", Toast.LENGTH_LONG).show());
+            return false;
+        }
     }
     
-    private void copyStream(InputStream in, OutputStream out, long contentLength, NotificationManager nm, int notificationId, NotificationCompat.Builder builder) throws IOException {
+    private void copyStream(InputStream in, OutputStream out, long contentLength, NotificationManager nm, int notificationId, NotificationCompat.Builder builder, String stageLabel) throws IOException {
         byte[] buffer = new byte[8192];
         int bytesRead;
         long totalRead = 0;
@@ -489,21 +574,97 @@ public class MainActivity extends AppCompatActivity {
             
             long now = System.currentTimeMillis();
             if (nm != null && now - lastUpdate > 500) {
-                if (contentLength > 0) {
-                    int progress = (int) (totalRead * 100 / contentLength);
-                    builder.setProgress(100, progress, false);
-                    builder.setContentText("下载中 " + progress + "%");
-                } else {
-                    builder.setProgress(0, 0, true);
-                    builder.setContentText("下载中 " + (totalRead / 1024) + " KB");
-                }
-                nm.notify(notificationId, builder.build());
+                updateNotificationProgress(nm, builder, notificationId, totalRead, contentLength, stageLabel);
                 lastUpdate = now;
             }
         }
+        updateNotificationProgress(nm, builder, notificationId, totalRead, contentLength, stageLabel);
         out.flush();
     }
     
+    private File getTempDownloadFile(String fileName) {
+        File baseDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (baseDir == null) {
+            baseDir = getFilesDir();
+        }
+        File tempDir = new File(baseDir, "temp_downloads");
+        if (!tempDir.exists()) {
+            tempDir.mkdirs();
+        }
+        return new File(tempDir, sanitizeFileName(fileName) + ".part");
+    }
+
+    private String sanitizeFileName(String fileName) {
+        if (fileName == null) {
+            return "videotool_" + System.currentTimeMillis();
+        }
+        return fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private long resolveTotalBytes(Response response, long downloadedBytes) {
+        if (response == null) {
+            return -1;
+        }
+        String contentRange = response.header("Content-Range");
+        if (contentRange != null && contentRange.contains("/")) {
+            String totalPart = contentRange.substring(contentRange.lastIndexOf('/') + 1).trim();
+            try {
+                return Long.parseLong(totalPart);
+            } catch (NumberFormatException ignored) {}
+        }
+        String contentLength = response.header("Content-Length");
+        if (contentLength != null) {
+            try {
+                long length = Long.parseLong(contentLength);
+                if (response.code() == 206) {
+                    return downloadedBytes + length;
+                }
+                return length;
+            } catch (NumberFormatException ignored) {}
+        }
+        if (response.body() != null && response.body().contentLength() > 0) {
+            long bodyLength = response.body().contentLength();
+            return response.code() == 206 ? downloadedBytes + bodyLength : bodyLength;
+        }
+        return -1;
+    }
+
+    private long transferNetworkToTemp(InputStream in, RandomAccessFile raf, long downloaded, long totalBytes,
+                                      NotificationManager nm, int notificationId, NotificationCompat.Builder builder) throws IOException {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        long lastUpdate = 0;
+        while ((bytesRead = in.read(buffer)) != -1) {
+            raf.write(buffer, 0, bytesRead);
+            downloaded += bytesRead;
+            long now = System.currentTimeMillis();
+            if (now - lastUpdate > 400) {
+                updateNotificationProgress(nm, builder, notificationId, downloaded, totalBytes, "下载中");
+                lastUpdate = now;
+            }
+        }
+        updateNotificationProgress(nm, builder, notificationId, downloaded, totalBytes, "下载中");
+        return downloaded;
+    }
+
+    private void updateNotificationProgress(NotificationManager nm, NotificationCompat.Builder builder, int notificationId,
+                                            long downloaded, long totalBytes, String stageLabel) {
+        if (nm == null || builder == null) {
+            return;
+        }
+        if (totalBytes > 0) {
+            int progress = (int) Math.min(100, (downloaded * 100 / totalBytes));
+            builder.setProgress(100, progress, false);
+            builder.setContentText(stageLabel + " " + progress + "% (" +
+                    Formatter.formatFileSize(this, downloaded) + "/" +
+                    Formatter.formatFileSize(this, totalBytes) + ")");
+        } else {
+            builder.setProgress(0, 0, true);
+            builder.setContentText(stageLabel + " " + Formatter.formatFileSize(this, downloaded));
+        }
+        nm.notify(notificationId, builder.build());
+    }
+
     /**
      * 确保文件名包含扩展名
      */
@@ -665,7 +826,7 @@ public class MainActivity extends AppCompatActivity {
         if (uri != null) {
             OutputStream outputStream = resolver.openOutputStream(uri);
             if (outputStream != null) {
-                copyStream(inputStream, outputStream, contentLength, nm, notificationId, builder);
+                copyStream(inputStream, outputStream, contentLength, nm, notificationId, builder, "保存到相册");
                 outputStream.close();
                 return uri;
             }
@@ -691,7 +852,7 @@ public class MainActivity extends AppCompatActivity {
         File file = new File(dir, fileName);
         FileOutputStream outputStream = new FileOutputStream(file);
         
-        copyStream(inputStream, outputStream, contentLength, nm, notificationId, builder);
+        copyStream(inputStream, outputStream, contentLength, nm, notificationId, builder, "保存到相册");
         outputStream.close();
         
         return Uri.fromFile(file);

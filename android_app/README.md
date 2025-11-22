@@ -109,6 +109,11 @@ zipalign -v 4 app-release-unsigned.apk videotool-release.apk
 
 ## 更新日志
 
+### v1.0.7
+- 新增临时缓存文件 + 断点续传 + 自动重试 3 次，彻底解决 `unexpected end of stream`
+- 下载过程全程通知栏进度，Android 13+ 会请求通知权限确保有反馈
+- 后端代理增加无限超时与 Content-Length 透传，兼容千牛云长链大文件
+
 ### v1.0.6
 - 彻底弃用系统 DownloadManager，全量使用内置引擎下载，彻底解决系统下载空文件问题
 - 新增下拉通知栏进度条，实时显示下载进度与状态
