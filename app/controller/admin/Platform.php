@@ -31,7 +31,7 @@ class Platform extends BaseController
         }
         
         $list = $query->paginate([
-            'list_rows' => 15,
+            'list_rows' => 10,
             'query' => $this->request->param()
         ]);
         

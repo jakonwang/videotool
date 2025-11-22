@@ -38,7 +38,7 @@ class Device extends BaseController
         }
         
         $list = $query->paginate([
-            'list_rows' => 20,
+            'list_rows' => 10,
             'query' => $this->request->param()
         ]);
             

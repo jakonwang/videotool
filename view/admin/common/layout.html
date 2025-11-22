@@ -23,6 +23,10 @@
             --dash-border: rgba(29,36,78,0.12);
             --dash-danger: #ff6b8e;
             --dash-success: #28c7a5;
+            --dash-sidebar-bg: #11152c;
+            --dash-sidebar-bg2: #161c39;
+            --dash-sidebar-border: rgba(255,255,255,0.08);
+            --dash-sidebar-text: rgba(255,255,255,0.72);
         }
         body.dark-dashboard {
             background: radial-gradient(circle at 20% 20%, rgba(93,141,255,.18), transparent 50%),
@@ -65,25 +69,25 @@
             color: var(--dash-accent);
         }
         .dark-dashboard .main-sidebar {
-            background: linear-gradient(185deg, rgba(255,255,255,0.95), rgba(245,247,255,0.9));
-            border-right: 1px solid rgba(29,36,78,.08);
-            box-shadow: 15px 0 30px rgba(29,36,78,.04);
+            background: linear-gradient(180deg, var(--dash-sidebar-bg) 0%, var(--dash-sidebar-bg2) 100%);
+            border-right: 1px solid var(--dash-sidebar-border);
+            box-shadow: 20px 0 45px rgba(17,21,44,.55);
         }
         .dark-dashboard .brand-link {
-            background: transparent;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            color: var(--dash-text);
+            background: rgba(255,255,255,.02);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            color: #f3f6ff;
         }
         .dark-dashboard .nav-sidebar>.nav-item>.nav-link {
-            color: var(--dash-muted);
+            color: var(--dash-sidebar-text);
             transition: all .2s ease;
         }
         .dark-dashboard .nav-sidebar>.nav-item>.nav-link.active,
         .dark-dashboard .nav-sidebar>.nav-item>.nav-link:hover {
-            background: rgba(82,136,255,.1);
-            color: var(--dash-text);
+            background: rgba(85,112,255,.18);
+            color: #fff;
             border-left: 3px solid var(--dash-accent);
-            box-shadow: inset 0 0 12px rgba(82,136,255,.12);
+            box-shadow: inset 0 0 14px rgba(85,112,255,.25);
         }
         .dark-dashboard .content-wrapper {
             background: transparent;
