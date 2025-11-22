@@ -11,7 +11,7 @@
                     <h3 class="card-title">下载错误日志</h3>
                     <div class="card-tools">
                         <form method="get" class="form-inline">
-                            <input type="date" name="date" value="{$date|date='Y-m-d',###}" class="form-control form-control-sm mr-2" style="width: 150px;">
+                            <input type="date" name="date" value="{$date_formatted|default=''}" class="form-control form-control-sm mr-2" style="width: 150px;">
                             <input type="text" name="keyword" value="{$keyword}" placeholder="搜索错误信息..." class="form-control form-control-sm mr-2" style="width: 200px;">
                             <button type="submit" class="btn btn-primary btn-sm mr-2">
                                 <i class="fas fa-search"></i> 查询
@@ -83,7 +83,7 @@
                             <tbody>
                                 {volist name="errors" id="error"}
                                 <tr>
-                                    <td class="text-nowrap small">{$error.time|substr=0,16}</td>
+                                    <td class="text-nowrap small">{$error.time_display|default=$error.time|default=''}</td>
                                     <td>
                                         {if $error.video_id}
                                         <a href="/admin.php/video/edit/{$error.video_id}" target="_blank" class="badge badge-info">#{$error.video_id}</a>
@@ -131,7 +131,7 @@
                             <ul class="pagination">
                                 {if $page > 1}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={$page-1}&date={$date}&keyword={$keyword|urlencode}">上一页</a>
+                                    <a class="page-link" href="?page={$page-1}{$url_suffix}">上一页</a>
                                 </li>
                                 {/if}
                                 <li class="page-item active">
@@ -139,7 +139,7 @@
                                 </li>
                                 {if $page < $total_pages}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={$page+1}&date={$date}&keyword={$keyword|urlencode}">下一页</a>
+                                    <a class="page-link" href="?page={$page+1}{$url_suffix}">下一页</a>
                                 </li>
                                 {/if}
                             </ul>

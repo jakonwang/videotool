@@ -110,10 +110,35 @@ class DownloadLog extends BaseController
                     $error['video_title'] = $video->title;
                 }
             }
+            // 格式化时间显示（只显示前16个字符：YYYY-MM-DD HH:MM）
+            if (!empty($error['time']) && strlen($error['time']) > 16) {
+                $error['time_display'] = substr($error['time'], 0, 16);
+            } else {
+                $error['time_display'] = $error['time'] ?? '';
+            }
         }
         
         // 获取可用的日志日期
         $availableDates = $this->getAvailableLogDates();
+        
+        // 格式化日期用于显示
+        $dateFormatted = '';
+        if (strlen($date) == 8) {
+            $dateFormatted = substr($date, 0, 4) . '-' . substr($date, 4, 2) . '-' . substr($date, 6, 2);
+        } else {
+            $dateFormatted = date('Y-m-d');
+            $date = date('Ymd');
+        }
+        
+        // URL参数（用于分页链接）
+        $urlParams = [];
+        if ($date) {
+            $urlParams[] = 'date=' . $date;
+        }
+        if ($keyword) {
+            $urlParams[] = 'keyword=' . urlencode($keyword);
+        }
+        $urlSuffix = !empty($urlParams) ? '&' . implode('&', $urlParams) : '';
         
         return View::fetch('admin/download_log/index', [
             'errors' => $errors,
@@ -122,6 +147,8 @@ class DownloadLog extends BaseController
             'total_pages' => $totalPages,
             'keyword' => $keyword,
             'date' => $date,
+            'date_formatted' => $dateFormatted,
+            'url_suffix' => $urlSuffix,
             'available_dates' => $availableDates,
         ]);
     }
