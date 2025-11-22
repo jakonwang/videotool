@@ -103,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
         // 启用返回按钮
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("视频管理");
+            getSupportActionBar().setTitle(getString(R.string.app_name));
         }
         
         platformListView = findViewById(R.id.platform_list_view);
@@ -799,7 +799,7 @@ public class MainActivity extends AppCompatActivity {
                 webView.setVisibility(View.GONE);
                 platformListView.setVisibility(View.VISIBLE);
                 if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle("视频管理");
+                    getSupportActionBar().setTitle(getString(R.string.app_name));
                 }
             } else {
                 finish();
@@ -817,7 +817,7 @@ public class MainActivity extends AppCompatActivity {
             webView.setVisibility(View.GONE);
             platformListView.setVisibility(View.VISIBLE);
             if (getSupportActionBar() != null) {
-                getSupportActionBar().setTitle("视频管理");
+            getSupportActionBar().setTitle(getString(R.string.app_name));
             }
         } else {
             super.onBackPressed();
