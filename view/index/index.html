@@ -449,6 +449,14 @@
                 return /android/i.test(ua);
             }
             
+            // 检测是否存在原生下载桥
+            function hasAndroidBridge() {
+                return typeof window.Android !== 'undefined' && (
+                    typeof window.Android.downloadFileWithFallback === 'function' ||
+                    typeof window.Android.downloadFile === 'function'
+                );
+            }
+            
             // 下载文件 - 智能下载策略：APP使用原生下载，浏览器使用Web下载
             async function downloadFile(type) {
                 if (!currentVideo) return;
@@ -474,8 +482,10 @@
                         .replace(/[^\w\s-]/g, '')
                         .concat(ext);
                     
+                    const hasBridge = hasAndroidBridge();
+                    
                     // APP 环境：调用原生下载接口，并提供主备链接
-                    if (isAppEnvironment() && typeof window.Android !== 'undefined') {
+                    if (hasBridge) {
                         try {
                             const metaUrl = `${fallbackUrl}&format=json`;
                             debugLog('获取APP下载信息:', metaUrl);
@@ -487,26 +497,46 @@
                                 const backup = data.fallback_url || fallbackUrl;
                                 const finalName = data.file_name || fileName;
                                 
-                                if (window.Android.downloadFileWithFallback) {
+                                if (typeof window.Android.downloadFileWithFallback === 'function') {
                                     window.Android.downloadFileWithFallback(primary, backup, finalName);
                                 } else {
                                     window.Android.downloadFile(primary, finalName);
                                 }
+                                showToast('APP 已开始下载');
+                                setTimeout(() => {
+                                    buttons.forEach(btn => {
+                                        btn.disabled = false;
+                                        btn.classList.remove('btn-loading');
+                                    });
+                                }, 800);
+                                return;
                             } else {
                                 throw new Error(result.msg || '获取下载地址失败');
                             }
                         } catch (err) {
                             debugError('APP下载信息获取失败，使用备用地址:', err);
-                            window.Android.downloadFile(fallbackUrl, fileName);
+                            try {
+                                if (typeof window.Android.downloadFileWithFallback === 'function') {
+                                    window.Android.downloadFileWithFallback(fallbackUrl, '', fileName);
+                                } else if (typeof window.Android.downloadFile === 'function') {
+                                    window.Android.downloadFile(fallbackUrl, fileName);
+                                } else {
+                                    throw new Error('原生下载接口不可用');
+                                }
+                                showToast('APP 已开始下载');
+                                setTimeout(() => {
+                                    buttons.forEach(btn => {
+                                        btn.disabled = false;
+                                        btn.classList.remove('btn-loading');
+                                    });
+                                }, 800);
+                                return;
+                            } catch (nativeErr) {
+                                debugError('APP备用下载失败，将使用浏览器下载:', nativeErr);
+                            }
                         }
                         
-                        setTimeout(() => {
-                            buttons.forEach(btn => {
-                                btn.disabled = false;
-                                btn.classList.remove('btn-loading');
-                            });
-                        }, 600);
-                        return;
+                        // 如果原生下载失败，将继续走浏览器流程
                     }
                     
                     // 浏览器环境：优先尝试CDN直链
