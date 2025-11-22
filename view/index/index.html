@@ -457,7 +457,9 @@
                 );
             }
             
-            // 下载文件 - 智能下载策略：APP使用原生下载，浏览器使用Web下载
+            const ENABLE_NATIVE_DOWNLOAD = false; // 关闭APP原生下载，统一使用浏览器方式
+
+            // 下载文件 - 智能下载策略：可配置是否启用APP原生下载
             async function downloadFile(type) {
                 if (!currentVideo) return;
                 
@@ -486,9 +488,10 @@
                         : '';
                     
                     const hasBridge = hasAndroidBridge();
+                    const useNativeDownload = hasBridge && ENABLE_NATIVE_DOWNLOAD;
                     
                     // APP 环境：调用原生下载接口，并提供主备链接
-                    if (hasBridge) {
+                    if (useNativeDownload) {
                         try {
                             const metaUrl = `${downloadBaseUrl}&format=json`;
                             debugLog('获取APP下载信息:', metaUrl);
