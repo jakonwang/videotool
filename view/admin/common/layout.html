@@ -5,21 +5,24 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{block name="title"}后台管理{/block}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
     <style>
         :root {
-            --dash-bg: #f4f6fb;
-            --dash-panel: #ffffff;
-            --dash-panel-alt: #fdfdff;
-            --dash-accent: #5288ff;
-            --dash-accent-2: #34c6ae;
-            --dash-text: #1f2650;
-            --dash-muted: #6d779b;
-            --dash-border: rgba(23,32,66,0.12);
-            --dash-danger: #ff6e8c;
-            --dash-success: #2fbb9a;
+            --dash-bg: #f5f7ff;
+            --dash-panel: rgba(255,255,255,0.92);
+            --dash-panel-alt: rgba(255,255,255,0.8);
+            --dash-accent: #5570ff;
+            --dash-accent-2: #39d4c4;
+            --dash-text: #1d244e;
+            --dash-muted: #7a84a8;
+            --dash-border: rgba(29,36,78,0.12);
+            --dash-danger: #ff6b8e;
+            --dash-success: #28c7a5;
         }
         body.dark-dashboard {
             background: radial-gradient(circle at 20% 20%, rgba(93,141,255,.18), transparent 50%),
@@ -27,6 +30,7 @@
                         radial-gradient(circle at 50% 80%, rgba(255,140,180,.08), transparent 55%),
                         linear-gradient(120deg, #f6f8ff 0%, #eef3ff 60%, #f4f7ff 100%);
             color: var(--dash-text);
+            font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
         }
         body.dark-dashboard::before {
             content: "";
@@ -49,9 +53,10 @@
             font-weight: 600;
         }
         .dark-dashboard .main-header {
-            background: rgba(255,255,255,.8);
-            border-bottom: 1px solid var(--dash-border);
-            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,.82);
+            border-bottom: 1px solid rgba(29,36,78,.08);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 20px 40px rgba(29,36,78,.08);
         }
         .dark-dashboard .navbar-nav .nav-link {
             color: var(--dash-muted);
@@ -60,8 +65,9 @@
             color: var(--dash-accent);
         }
         .dark-dashboard .main-sidebar {
-            background: linear-gradient(180deg, #ffffff 0%, #f1f4ff 100%);
-            border-right: 1px solid var(--dash-border);
+            background: linear-gradient(185deg, rgba(255,255,255,0.95), rgba(245,247,255,0.9));
+            border-right: 1px solid rgba(29,36,78,.08);
+            box-shadow: 15px 0 30px rgba(29,36,78,.04);
         }
         .dark-dashboard .brand-link {
             background: transparent;
@@ -83,10 +89,11 @@
             background: transparent;
         }
         .dark-dashboard .card {
-            background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(255,255,255,0.95));
-            border: 1px solid rgba(23,32,66,0.08);
-            box-shadow: 0 25px 35px rgba(31,38,80,.08);
-            border-radius: 18px;
+            background: var(--dash-panel);
+            border: 1px solid rgba(29,36,78,.08);
+            box-shadow: 0 30px 60px rgba(29,36,78,.08);
+            border-radius: 20px;
+        }
         }
         .dark-dashboard .card-header,
         .dark-dashboard .card-footer {
@@ -94,9 +101,10 @@
             background: rgba(246,248,255,.8);
         }
         .dark-dashboard .main-footer {
-            background: rgba(10,16,28,.8);
-            border-top: 1px solid var(--dash-border);
+            background: rgba(255,255,255,.9);
+            border-top: 1px solid rgba(29,36,78,.08);
             color: var(--dash-muted);
+            box-shadow: 0 -10px 30px rgba(29,36,78,.05);
         }
         .dark-dashboard .btn-primary {
             background: linear-gradient(135deg, var(--dash-accent), var(--dash-accent-2));
@@ -105,7 +113,7 @@
         }
         .dark-dashboard .btn-outline-secondary {
             color: var(--dash-text);
-            border-color: rgba(23,32,66,0.25);
+            border-color: rgba(29,36,78,0.22);
         }
         .dark-dashboard .btn-outline-secondary:hover {
             background: rgba(23,32,66,0.08);
@@ -114,8 +122,8 @@
         .dark-dashboard .form-control,
         .dark-dashboard .form-control:focus,
         .dark-dashboard .custom-select {
-            background: rgba(255,255,255,.9);
-            border: 1px solid rgba(23,32,66,0.15);
+            background: rgba(255,255,255,0.95);
+            border: 1px solid rgba(29,36,78,0.1);
             color: var(--dash-text);
         }
         .dark-dashboard .form-control:focus {
@@ -130,7 +138,10 @@
         }
         .dark-dashboard .table td,
         .dark-dashboard .table th {
-            border-top: 1px solid rgba(23,32,66,0.08);
+            border-top: 1px solid rgba(29,36,78,0.06);
+        }
+        .dark-dashboard .table tbody tr:hover {
+            background: rgba(85,112,255,0.06);
         }
         .dark-dashboard .badge-success {
             background: rgba(47,187,154,.18);
@@ -162,8 +173,8 @@
             background: linear-gradient(140deg, rgba(255,120,140,.92), rgba(193,112,255,.85));
         }
         .dark-dashboard .pagination .page-link {
-            background: rgba(255,255,255,.85);
-            border: 1px solid rgba(23,32,66,.12);
+            background: rgba(255,255,255,.95);
+            border: 1px solid rgba(29,36,78,.12);
             color: var(--dash-muted);
         }
         .dark-dashboard .pagination .page-link:hover,
@@ -184,9 +195,10 @@
             pointer-events: auto;
         }
         .dark-dashboard .toast {
-            background: rgba(255,255,255,.95);
-            border: 1px solid rgba(23,32,66,.12);
+            background: rgba(255,255,255,.98);
+            border: 1px solid rgba(29,36,78,.1);
             color: var(--dash-text);
+            box-shadow: 0 15px 35px rgba(29,36,78,.12);
         }
         .dark-dashboard .modal-content {
             background: #fff;
