@@ -453,7 +453,6 @@
             async function downloadFile(type) {
                 if (!currentVideo) return;
                 
-                // 禁用所有下载按钮
                 const buttons = document.querySelectorAll('.btn-download');
                 buttons.forEach(btn => {
                     btn.disabled = true;
@@ -461,102 +460,90 @@
                 });
                 
                 try {
-                    showToast('正在下载...');
+                    showToast('正在准备下载...');
                     
                     const baseUrl = getBaseUrl();
+                    const fallbackUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
                     
-                    // 获取文件URL
-                    const fileUrl = type === 'cover' 
-                        ? toAbsoluteUrl(currentVideo.cover_url) 
+                    const rawUrl = type === 'cover'
+                        ? toAbsoluteUrl(currentVideo.cover_url)
                         : toAbsoluteUrl(currentVideo.video_url);
                     
-                    // 生成文件名
                     const ext = type === 'cover' ? '.jpg' : '.mp4';
-                    const fileName = currentVideo.title.replace(/[^\w\s-]/g, '') + ext;
+                    const fileName = (currentVideo.title || 'videotool')
+                        .replace(/[^\w\s-]/g, '')
+                        .concat(ext);
                     
-                    // 统一使用代理下载接口，确保立即开始下载（不等待文件大小计算）
-                    // 代理下载使用chunked传输，立即开始流式传输
-                    const downloadUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type;
-                    debugLog('使用代理下载（立即开始，不等待文件大小）:', downloadUrl);
-                    
-                    // APP环境：使用原生下载功能
-                    if (isAppEnvironment() && typeof window.Android !== 'undefined' && window.Android.downloadFile) {
-                        debugLog('使用APP原生下载:', downloadUrl);
-                        
-                        // 调用APP原生下载接口
-                        window.Android.downloadFile(downloadUrl, fileName);
-                        
-                        // 恢复按钮状态
-                        setTimeout(() => {
-                            buttons.forEach(btn => {
-                                btn.disabled = false;
-                                btn.classList.remove('btn-loading');
-                            });
-                        }, 1000);
-                    } else {
-                        // 浏览器环境：使用最优下载方式
-                        const link = document.createElement('a');
-                        link.href = downloadUrl;
-                        link.download = fileName; // 设置download属性，强制下载
-                        
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        link.click();
-                        
-                        // 延迟移除链接
-                        setTimeout(() => {
-                            if (link.parentNode) {
-                                document.body.removeChild(link);
+                    // APP 环境：调用原生下载接口，并提供主备链接
+                    if (isAppEnvironment() && typeof window.Android !== 'undefined') {
+                        try {
+                            const metaUrl = `${fallbackUrl}&format=json`;
+                            debugLog('获取APP下载信息:', metaUrl);
+                            const resp = await fetch(metaUrl);
+                            const result = await resp.json();
+                            if (result.code === 0 && result.data) {
+                                const data = result.data;
+                                const primary = data.direct_url || data.file_url || fallbackUrl;
+                                const backup = data.fallback_url || fallbackUrl;
+                                const finalName = data.file_name || fileName;
+                                
+                                if (window.Android.downloadFileWithFallback) {
+                                    window.Android.downloadFileWithFallback(primary, backup, finalName);
+                                } else {
+                                    window.Android.downloadFile(primary, finalName);
+                                }
+                            } else {
+                                throw new Error(result.msg || '获取下载地址失败');
                             }
-                        }, 100);
+                        } catch (err) {
+                            debugError('APP下载信息获取失败，使用备用地址:', err);
+                            window.Android.downloadFile(fallbackUrl, fileName);
+                        }
                         
-                        // 恢复按钮状态（下载已触发）
                         setTimeout(() => {
                             buttons.forEach(btn => {
                                 btn.disabled = false;
                                 btn.classList.remove('btn-loading');
                             });
-                        }, 500);
+                        }, 600);
+                        return;
                     }
                     
-                    // 标记视频为已下载（如果是视频）
+                    // 浏览器环境：优先尝试CDN直链
+                    const directUrl = isCdnUrl(rawUrl) ? appendAttname(rawUrl, fileName) : null;
+                    const targetUrl = directUrl || fallbackUrl;
+                    debugLog('浏览器下载地址:', targetUrl);
+                    
+                    triggerBrowserDownload(targetUrl, fileName);
+                    
+                    setTimeout(() => {
+                        buttons.forEach(btn => {
+                            btn.disabled = false;
+                            btn.classList.remove('btn-loading');
+                        });
+                    }, 500);
+                    
+                    // 标记下载
                     if (type === 'video') {
-                        // 延迟标记，确保下载开始
                         setTimeout(async () => {
                             try {
-                                await fetch(baseUrl + '/api/video/markDownloaded', {
+                                await fetch(`${baseUrl}/api/video/markDownloaded`, {
                                     method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                        video_id: currentVideo.id
-                                    })
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ video_id: currentVideo.id })
                                 });
                             } catch (e) {
                                 debugError('标记下载状态失败，但不影响下载:', e);
                             }
-                            
-                            // 浏览器环境已经恢复了按钮，这里不再重复
-                            // APP环境会在上面的代码中恢复按钮
-                            if (!isAppEnvironment() || typeof window.Android === 'undefined') {
-                                showToast('视频下载已开始');
-                                // 延迟后加载下一个视频
-                                setTimeout(() => {
-                                    loadVideo();
-                                }, 1500);
-                            }
+                            showToast('视频下载已开始');
+                            setTimeout(() => loadVideo(), 1500);
                         }, 500);
                     } else {
-                        // 封面下载，浏览器环境已经恢复了按钮
-                        if (!isAppEnvironment() || typeof window.Android === 'undefined') {
-                            showToast('封面下载已开始');
-                        }
+                        showToast('封面下载已开始');
                     }
                 } catch (error) {
                     debugError('下载失败:', error);
                     showToast('下载失败: ' + error.message);
-                    // 恢复按钮状态
                     buttons.forEach(btn => {
                         btn.disabled = false;
                         btn.classList.remove('btn-loading');
@@ -579,6 +566,45 @@
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
+            }
+            
+            const CDN_HOST_PATTERNS = [
+                /storage\.banono-us\.com/i,
+                /qiniucdn/i
+            ];
+            
+            function isCdnUrl(url) {
+                if (!url) return false;
+                try {
+                    const parsed = new URL(url, window.location.href);
+                    return CDN_HOST_PATTERNS.some(pattern => pattern.test(parsed.hostname));
+                } catch (e) {
+                    return false;
+                }
+            }
+            
+            function appendAttname(url, fileName) {
+                try {
+                    const parsed = new URL(url, window.location.href);
+                    parsed.searchParams.set('attname', fileName);
+                    return parsed.toString();
+                } catch (e) {
+                    return url;
+                }
+            }
+            
+            function triggerBrowserDownload(url, fileName) {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                setTimeout(() => {
+                    if (link.parentNode) {
+                        document.body.removeChild(link);
+                    }
+                }, 100);
             }
             
             // 将函数暴露到全局作用域

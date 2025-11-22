@@ -31,6 +31,84 @@ class Video extends BaseController
     }
     
     /**
+     * 生成规范的下载文件名
+     */
+    private function generateDownloadFileName(string $title, string $type): string
+    {
+        $ext = $type === 'cover' ? '.jpg' : '.mp4';
+        $sanitized = trim(preg_replace('/[^\w\s-]/u', '', $title));
+        if ($sanitized === '') {
+            $sanitized = 'videotool_' . time();
+        }
+        return $sanitized . $ext;
+    }
+    
+    /**
+     * 判断URL是否属于配置的CDN域
+     */
+    private function isCdnUrl(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!$host) {
+            return false;
+        }
+        
+        $cdnDomains = [];
+        $qiniuConfig = \think\facade\Config::get('qiniu');
+        if (!empty($qiniuConfig['domain'])) {
+            $cdnDomains[] = parse_url($qiniuConfig['domain'], PHP_URL_HOST) ?: $qiniuConfig['domain'];
+        }
+        if (!empty($qiniuConfig['cdn_domains'])) {
+            $extraDomains = is_array($qiniuConfig['cdn_domains'])
+                ? $qiniuConfig['cdn_domains']
+                : preg_split('/[,;\s]+/', (string) $qiniuConfig['cdn_domains'], -1, PREG_SPLIT_NO_EMPTY);
+            foreach ($extraDomains as $domain) {
+                $cdnDomains[] = parse_url($domain, PHP_URL_HOST) ?: $domain;
+            }
+        }
+        $cdnDomains = array_filter(array_unique($cdnDomains));
+        if (empty($cdnDomains)) {
+            return false;
+        }
+        
+        foreach ($cdnDomains as $cdnHost) {
+            if ($cdnHost && stripos($host, $cdnHost) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 为CDN直链追加下载文件名，便于浏览器直接保存
+     */
+    private function buildDirectDownloadUrl(string $url, string $fileName): string
+    {
+        $parsed = parse_url($url);
+        if (!$parsed) {
+            return $url;
+        }
+        
+        $query = $parsed['query'] ?? '';
+        parse_str($query, $params);
+        $params['attname'] = $fileName;
+        $newQuery = http_build_query($params);
+        
+        $rebuilt = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+        if (!empty($parsed['port'])) {
+            $rebuilt .= ':' . $parsed['port'];
+        }
+        $rebuilt .= $parsed['path'] ?? '';
+        if ($newQuery !== '') {
+            $rebuilt .= '?' . $newQuery;
+        }
+        if (!empty($parsed['fragment'])) {
+            $rebuilt .= '#' . $parsed['fragment'];
+        }
+        return $rebuilt;
+    }
+    
+    /**
      * 检测是否为APP客户端请求
      * 注意：要排除浏览器（浏览器User-Agent可能包含Android等关键词）
      */
@@ -401,16 +479,16 @@ class Video extends BaseController
                            (strpos($fileUrl, '/') === 0 ? '' : '/') . $fileUrl;
             }
             
-            // APP请求：返回JSON格式的下载URL
+            $downloadFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', $type);
+            $isCdnResource = $this->isCdnUrl($fileUrl);
+            $directUrl = $isCdnResource ? $this->buildDirectDownloadUrl($fileUrl, $downloadFileName) : $fileUrl;
+            
+            // APP请求：返回JSON格式的下载信息
             if ($isAppRequest) {
                 // 生成代理下载URL（APP可以使用这个URL直接下载）
                 $proxyUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
                            '://' . $_SERVER['HTTP_HOST'] . 
                            '/api/video/download?video_id=' . $videoId . '&type=' . $type;
-                
-                // 生成文件名
-                $ext = $type === 'cover' ? '.jpg' : '.mp4';
-                $fileName = preg_replace('/[^\w\s-]/', '', $video->title) . $ext;
                 
                 return json([
                     'code' => 0,
@@ -418,10 +496,12 @@ class Video extends BaseController
                     'data' => [
                         'video_id' => $video->id,
                         'type' => $type,
-                        'file_url' => $fileUrl, // 原始文件URL
-                        'download_url' => $proxyUrl, // 代理下载URL（推荐APP使用）
-                        'file_name' => $fileName,
-                        'file_size' => null, // 可选：文件大小
+                        'file_url' => $fileUrl,
+                        'direct_url' => $directUrl,
+                        'fallback_url' => $proxyUrl,
+                        'file_name' => $downloadFileName,
+                        'is_cdn' => $isCdnResource,
+                        'file_size' => null,
                     ]
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
             }
@@ -437,13 +517,20 @@ class Video extends BaseController
                 // 本地文件：直接读取并流式输出
                 $localPath = $this->urlToLocalPath($fileUrl);
                 if ($localPath && file_exists($localPath)) {
-                    return $this->streamLocalFile($localPath, $type, $video->title);
+                    return $this->streamLocalFile($localPath, $type, $downloadFileName);
                 }
             }
             
-            // 所有远程文件统一使用代理下载，确保浏览器强制下载而不是打开
-            // 使用chunked传输，立即开始下载，不等待文件大小计算
-            return $this->streamRemoteFile($fileUrl, $type, $video->title);
+            // CDN资源优先直接下载
+            if ($isCdnResource) {
+                header('Cache-Control: no-cache');
+                header('Pragma: no-cache');
+                header('Location: ' . $directUrl, true, 302);
+                exit;
+            }
+            
+            // 其他远程文件统一使用代理下载，确保浏览器强制下载而不是打开
+            return $this->streamRemoteFile($fileUrl, $type, $downloadFileName);
             
         } catch (\Exception $e) {
             \think\facade\Log::error('代理下载错误: ' . $e->getMessage());
@@ -484,7 +571,7 @@ class Video extends BaseController
     /**
      * 流式输出本地文件
      */
-    private function streamLocalFile($filePath, $type, $title)
+    private function streamLocalFile($filePath, $type, $fileNameHint)
     {
         if (!file_exists($filePath)) {
             return json(['code' => 1, 'msg' => '文件不存在'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
@@ -497,7 +584,11 @@ class Video extends BaseController
         // 如果没有扩展名，根据类型添加
         if (pathinfo($fileName, PATHINFO_EXTENSION) === '') {
             $ext = $type === 'cover' ? '.jpg' : '.mp4';
-            $fileName = preg_replace('/[^\w\s-]/', '', $title) . $ext;
+            $sanitized = trim(preg_replace('/[^\w\s-]/u', '', $fileNameHint));
+            if ($sanitized === '') {
+                $sanitized = 'videotool_' . time();
+            }
+            $fileName = $sanitized . $ext;
         }
         
         // 设置响应头
@@ -557,11 +648,8 @@ class Video extends BaseController
      * 流式输出远程文件（代理下载）
      * 优化：增加更大的缓冲区，提高传输速度，强制浏览器下载
      */
-    private function streamRemoteFile($url, $type, $title)
+    private function streamRemoteFile($url, $type, $fileName)
     {
-        // 获取文件名
-        $ext = $type === 'cover' ? '.jpg' : '.mp4';
-        $fileName = preg_replace('/[^\w\s-]/', '', $title) . $ext;
         $mimeType = $type === 'cover' ? 'image/jpeg' : 'video/mp4';
         
         // 清除所有输出缓冲，立即开始传输（关键：在设置响应头之前清除）
@@ -744,4 +832,5 @@ class Video extends BaseController
         }
     }
 }
+
 

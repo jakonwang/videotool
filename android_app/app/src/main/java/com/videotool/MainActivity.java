@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
@@ -77,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
     // 待下载的文件信息
     private String pendingDownloadUrl;
     private String pendingFileName;
+    private String pendingFallbackUrl;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -160,9 +162,13 @@ public class MainActivity extends AppCompatActivity {
             if (allGranted) {
                 // 权限已授予，如果有待下载的文件，继续下载
                 if (pendingDownloadUrl != null && pendingFileName != null) {
-                    downloadFileWithName(pendingDownloadUrl, pendingFileName);
+                    String primary = pendingDownloadUrl;
+                    String fallback = pendingFallbackUrl;
+                    String name = pendingFileName;
                     pendingDownloadUrl = null;
+                    pendingFallbackUrl = null;
                     pendingFileName = null;
+                    downloadWithFallback(primary, fallback, name);
                 }
             } else {
                 Toast.makeText(this, "需要存储权限才能保存到相册", Toast.LENGTH_LONG).show();
@@ -243,7 +249,14 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void downloadFile(String url, String fileName) {
             runOnUiThread(() -> {
-                downloadFileWithName(url, fileName);
+                downloadWithFallback(url, null, fileName);
+            });
+        }
+        
+        @JavascriptInterface
+        public void downloadFileWithFallback(String primaryUrl, String fallbackUrl, String fileName) {
+            runOnUiThread(() -> {
+                downloadWithFallback(primaryUrl, fallbackUrl, fileName);
             });
         }
         
@@ -256,141 +269,175 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
-     * 下载文件（带文件名，用于JavaScript接口调用）
-     * 保存到相册：图片保存到Pictures，视频保存到Movies
+     * 下载文件（兼容旧调用）
      */
     private void downloadFileWithName(String url, String fileName) {
-        // 检查权限
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        downloadWithFallback(url, null, fileName);
+    }
+    
+    /**
+     * 下载文件，支持主链 + 备用链
+     */
+    private void downloadWithFallback(String primaryUrl, String fallbackUrl, String fileName) {
+        if (primaryUrl == null || primaryUrl.isEmpty()) {
+            Toast.makeText(this, "无效的下载地址", Toast.LENGTH_LONG).show();
+            return;
+        }
+        
+        String normalizedFileName = ensureFileNameHasExtension(fileName, primaryUrl);
+        
+        // 权限检查
+        boolean requiresLegacyPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q;
+        boolean requiresMediaPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU;
+        if (requiresLegacyPermission) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
-                // 保存待下载信息，等待权限授予
-                pendingDownloadUrl = url;
-                pendingFileName = fileName;
+                pendingDownloadUrl = primaryUrl;
+                pendingFallbackUrl = fallbackUrl;
+                pendingFileName = normalizedFileName;
+                checkStoragePermission();
+                return;
+            }
+        } else if (requiresMediaPermission) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO)
+                    != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
+                    != PackageManager.PERMISSION_GRANTED) {
+                pendingDownloadUrl = primaryUrl;
+                pendingFallbackUrl = fallbackUrl;
+                pendingFileName = normalizedFileName;
                 checkStoragePermission();
                 return;
             }
         }
         
-        // 使用final副本变量，以便在lambda中使用
-        final String finalUrl = url;
-        final String finalFileName = fileName;
+        final String finalPrimaryUrl = primaryUrl;
+        final String finalFallbackUrl = fallbackUrl;
+        final String finalFileName = normalizedFileName;
         
         new Thread(() -> {
-            try {
-                // 从URL判断MIME类型
-                String mimeType = null;
-                boolean isVideo = false;
-                boolean isImage = false;
-                
-                if (finalUrl.contains(".mp4") || finalUrl.contains("video") || finalUrl.contains("/api/video/download?type=video")) {
-                    mimeType = "video/mp4";
-                    isVideo = true;
-                } else if (finalUrl.contains(".jpg") || finalUrl.contains(".jpeg") || finalUrl.contains("image") || finalUrl.contains("/api/video/download?type=cover")) {
-                    mimeType = "image/jpeg";
-                    isImage = true;
-                } else if (finalUrl.contains(".png")) {
-                    mimeType = "image/png";
-                    isImage = true;
-                }
-                
-                // 处理文件名（在lambda内部创建新变量，避免修改外部变量）
-                String processedFileName = finalFileName;
-                if (processedFileName != null && !processedFileName.isEmpty()) {
-                    if (!processedFileName.contains(".")) {
-                        if (mimeType != null) {
-                            if (mimeType.contains("video")) {
-                                processedFileName = processedFileName + ".mp4";
-                            } else if (mimeType.contains("image")) {
-                                processedFileName = processedFileName + ".jpg";
-                            }
-                        }
-                    }
-                } else {
-                    processedFileName = "videotool_" + System.currentTimeMillis();
-                    if (mimeType != null) {
-                        if (mimeType.contains("video")) {
-                            processedFileName = processedFileName + ".mp4";
-                        } else if (mimeType.contains("image")) {
-                            processedFileName = processedFileName + ".jpg";
-                        }
-                    }
-                }
-                
-                // 创建final副本用于lambda
-                final String finalProcessedFileName = processedFileName;
-                final String finalMimeType = mimeType;
-                final boolean finalIsVideo = isVideo;
-                final boolean finalIsImage = isImage;
-                
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "开始下载: " + finalProcessedFileName, Toast.LENGTH_SHORT).show();
-                });
-                
-                // 使用OkHttp下载文件
-                OkHttpClient client = new OkHttpClient();
-                Request request = new Request.Builder()
-                        .url(finalUrl)
-                        .build();
-                
-                Response response = client.newCall(request).execute();
-                if (!response.isSuccessful()) {
-                    final int httpCode = response.code();
-                    runOnUiThread(() -> {
-                        Toast.makeText(this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show();
-                    });
-                    return;
-                }
-                
-                InputStream inputStream = response.body().byteStream();
-                
-                // 保存到相册
-                Uri uri = null;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    // Android 10+ 使用MediaStore API
-                    uri = saveToMediaStore(finalProcessedFileName, finalMimeType, finalIsVideo, finalIsImage, inputStream);
-                } else {
-                    // Android 9及以下使用传统方式
-                    uri = saveToLegacyStorage(finalProcessedFileName, finalMimeType, finalIsVideo, finalIsImage, inputStream);
-                }
-                
-                inputStream.close();
-                
-                // 创建final副本用于lambda
-                final Uri finalUri = uri;
-                final boolean finalIsVideoForCallback = finalIsVideo;
-                
-                if (finalUri != null) {
-                    // 通知媒体库更新
-                    MediaScannerConnection.scanFile(this,
-                            new String[]{finalUri.toString()},
-                            new String[]{finalMimeType},
-                            (path, uri2) -> {
-                                runOnUiThread(() -> {
-                                    if (finalIsVideoForCallback) {
-                                        Toast.makeText(this, "视频已保存到相册", Toast.LENGTH_SHORT).show();
-                                    } else {
-                                        Toast.makeText(this, "图片已保存到相册", Toast.LENGTH_SHORT).show();
-                                    }
-                                });
-                            });
-                    
-                    // 通知相册刷新
-                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, finalUri));
-                } else {
-                    runOnUiThread(() -> {
-                        Toast.makeText(this, "保存失败", Toast.LENGTH_LONG).show();
-                    });
-                }
-                
-            } catch (Exception e) {
-                final String errorMsg = e.getMessage();
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "下载失败: " + errorMsg, Toast.LENGTH_LONG).show();
-                });
-                e.printStackTrace();
+            boolean success = attemptDownload(finalPrimaryUrl, finalFileName, true);
+            if (!success && finalFallbackUrl != null && !finalFallbackUrl.isEmpty() && !finalFallbackUrl.equals(finalPrimaryUrl)) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "主链接下载失败，尝试备用链接", Toast.LENGTH_SHORT).show());
+                attemptDownload(finalFallbackUrl, finalFileName, false);
             }
         }).start();
+    }
+    
+    /**
+     * 执行具体的下载并保存到相册
+     */
+    private boolean attemptDownload(String url, String fileName, boolean showStartToast) {
+        try {
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder()
+                    .url(url)
+                    .build();
+            
+            Response response = client.newCall(request).execute();
+            if (!response.isSuccessful() || response.body() == null) {
+                final int httpCode = response.code();
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show());
+                response.close();
+                return false;
+            }
+            
+            if (showStartToast) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "开始下载: " + fileName, Toast.LENGTH_SHORT).show());
+            }
+            
+            String headerMime = response.header("Content-Type");
+            String mimeType = guessMimeType(fileName, headerMime);
+            boolean isVideo = mimeType != null && mimeType.toLowerCase(Locale.US).contains("video");
+            boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.US).contains("image");
+            
+            try (InputStream inputStream = response.body().byteStream()) {
+                Uri savedUri;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    savedUri = saveToMediaStore(fileName, mimeType, isVideo, isImage, inputStream);
+                } else {
+                    savedUri = saveToLegacyStorage(fileName, mimeType, isVideo, isImage, inputStream);
+                }
+                
+                if (savedUri != null) {
+                    final Uri finalUri = savedUri;
+                    final boolean finalIsVideo = isVideo;
+                    final boolean finalIsImage = isImage;
+                    final String finalMime = mimeType;
+                    runOnUiThread(() -> {
+                        if (finalIsVideo) {
+                            Toast.makeText(MainActivity.this, "视频已保存到相册", Toast.LENGTH_SHORT).show();
+                        } else if (finalIsImage) {
+                            Toast.makeText(MainActivity.this, "图片已保存到相册", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(MainActivity.this, "文件已保存", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                    
+                    MediaScannerConnection.scanFile(this,
+                            new String[]{finalUri.toString()},
+                            new String[]{finalMime},
+                            (path, uri) -> {});
+                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, finalUri));
+                    response.close();
+                    return true;
+                } else {
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "保存失败", Toast.LENGTH_LONG).show());
+                }
+            } finally {
+                response.close();
+            }
+        } catch (Exception e) {
+            final String errorMsg = e.getMessage();
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: " + errorMsg, Toast.LENGTH_LONG).show());
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    /**
+     * 确保文件名包含扩展名
+     */
+    private String ensureFileNameHasExtension(String fileName, String referenceUrl) {
+        String name = (fileName == null || fileName.trim().isEmpty())
+                ? "videotool_" + System.currentTimeMillis()
+                : fileName.trim();
+        String lower = name.toLowerCase(Locale.US);
+        if (lower.endsWith(".mp4") || lower.endsWith(".mov")) {
+            return name;
+        }
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")) {
+            return name;
+        }
+        
+        String reference = referenceUrl != null ? referenceUrl.toLowerCase(Locale.US) : "";
+        if (reference.contains(".mp4") || reference.contains("type=video") || reference.contains("video")) {
+            return name + ".mp4";
+        }
+        if (reference.contains(".png")) {
+            return name + ".png";
+        }
+        return name + ".jpg";
+    }
+    
+    /**
+     * 根据文件名或Header猜测MimeType
+     */
+    private String guessMimeType(String fileName, String headerMime) {
+        if (headerMime != null && !headerMime.isEmpty()) {
+            return headerMime;
+        }
+        String lower = fileName.toLowerCase(Locale.US);
+        if (lower.endsWith(".mp4") || lower.endsWith(".mov")) {
+            return "video/mp4";
+        }
+        if (lower.endsWith(".png")) {
+            return "image/png";
+        }
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        return "application/octet-stream";
     }
     
     /**
