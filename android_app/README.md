@@ -109,6 +109,11 @@ zipalign -v 4 app-release-unsigned.apk videotool-release.apk
 
 ## 更新日志
 
+### v1.0.4
+- CDN 直链统一交由系统 DownloadManager 处理，失败后自动回退到应用内下载并提示错误原因
+- 新增 DownloadManager 任务追踪与媒体库刷新，确保视频/图片在下载完成后立即显示在相册
+- 扩展 CDN 域名识别范围，兼容千牛/七牛多个加速域
+
 ### v1.0.0
 - 初始版本
 - 支持平台分类展示
