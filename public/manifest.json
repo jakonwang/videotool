@@ -1,4 +1,21 @@
 {
+  "name": "社媒素材库",
+  "short_name": "素材库",
+  "description": "社媒素材库 - 视频素材下载工具",
+  "start_url": "/?from=pwa",
+  "display": "standalone",
+  "background_color": "#1f2353",
+  "theme_color": "#1f2353",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/pwa/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
+{
   "name": "视频管理",
   "short_name": "视频管理",
   "description": "视频管理平台，支持多平台视频浏览和下载",

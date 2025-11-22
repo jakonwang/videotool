@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok视频管理</title>
+    <meta name="theme-color" content="#1f2353">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/pwa/icon.svg">
     <style>
         * {
             margin: 0;
@@ -661,6 +664,14 @@
             // 页面加载时获取视频
             loadVideo();
         })();
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => {
+                    console.warn('ServiceWorker 注册失败:', err);
+                });
+            });
+        }
     </script>
 </body>
 </html>
