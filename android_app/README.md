@@ -109,6 +109,10 @@ zipalign -v 4 app-release-unsigned.apk videotool-release.apk
 
 ## 更新日志
 
+### v1.0.8
+- 与服务端缓存/后台缓存管理功能同步，默认 APK 版本号升级至 1.0.8，便于渠道区分
+- APP 下载链路沿用 v1.0.7 的断点续传、通知权限与本地缓存机制，如需灰度可直接通过版本号控制
+
 ### v1.0.7
 - 新增临时缓存文件 + 断点续传 + 自动重试 3 次，彻底解决 `unexpected end of stream`
 - 下载过程全程通知栏进度，Android 13+ 会请求通知权限确保有反馈
