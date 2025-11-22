@@ -485,7 +485,16 @@ class Video extends BaseController
             
             $downloadFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', $type);
             $isCdnResource = $this->isCdnUrl($fileUrl);
-            $directUrl = $isCdnResource ? $this->buildDirectDownloadUrl($fileUrl, $downloadFileName) : $fileUrl;
+
+            // 下载缓存上下文（仅针对远程文件）
+            $cacheContext = $this->buildCacheContext($fileUrl, $type, $isLocalFile);
+            if ($cacheContext && !empty($cacheContext['ready']) && file_exists($cacheContext['path'])) {
+                return $this->streamLocalFile($cacheContext['path'], $type, $downloadFileName);
+            }
+            $cacheWriteContext = null;
+            if ($cacheContext && empty($cacheContext['ready'])) {
+                $cacheWriteContext = $this->acquireCacheLock($cacheContext);
+            }
             
             // APP请求：返回JSON格式的下载信息
             if ($isAppRequest) {
@@ -501,10 +510,11 @@ class Video extends BaseController
                         'video_id' => $video->id,
                         'type' => $type,
                         'file_url' => $fileUrl,
-                        'direct_url' => $directUrl,
-                        'fallback_url' => $proxyUrl,
+                        'direct_url' => $proxyUrl, // APP优先使用站内缓存/代理链接
+                        'fallback_url' => $fileUrl,
                         'file_name' => $downloadFileName,
                         'is_cdn' => $isCdnResource,
+                        'cache_hit' => (bool)($cacheContext && !empty($cacheContext['ready'])),
                         'file_size' => null,
                     ]
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
@@ -524,17 +534,11 @@ class Video extends BaseController
                     return $this->streamLocalFile($localPath, $type, $downloadFileName);
                 }
             }
-            
-            // CDN资源优先直接下载
-            if ($isCdnResource) {
-                header('Cache-Control: no-cache');
-                header('Pragma: no-cache');
-                header('Location: ' . $directUrl, true, 302);
-                exit;
-            }
-            
-            // 其他远程文件统一使用代理下载，确保浏览器强制下载而不是打开
-            return $this->streamRemoteFile($fileUrl, $type, $downloadFileName);
+
+            // 远程文件统一通过代理下载，可选写入缓存
+            return $this->streamRemoteFile($fileUrl, $type, $downloadFileName, [
+                'cache' => $cacheWriteContext
+            ]);
             
         } catch (\Exception $e) {
             \think\facade\Log::error('代理下载错误: ' . $e->getMessage());
@@ -652,9 +656,14 @@ class Video extends BaseController
      * 流式输出远程文件（代理下载）
      * 优化：增加更大的缓冲区，提高传输速度，强制浏览器下载
      */
-    private function streamRemoteFile($url, $type, $fileName)
+    private function streamRemoteFile($url, $type, $fileName, array $options = [])
     {
         $mimeType = $type === 'cover' ? 'image/jpeg' : 'video/mp4';
+        $cacheContext = $options['cache'] ?? null;
+        $cacheTempResource = null;
+        $cacheLockHandle = $cacheContext['lock_handle'] ?? null;
+        $cacheConfig = $cacheContext['config'] ?? [];
+        $minCacheSize = $cacheConfig['min_file_size'] ?? 0;
         
         // 清除所有输出缓冲，立即开始传输（关键：在设置响应头之前清除）
         while (ob_get_level()) {
@@ -684,10 +693,32 @@ class Video extends BaseController
         // 刷新输出缓冲区，立即发送响应头（但不关闭连接）
         flush();
         
+        // 如果启用了缓存，准备临时文件
+        if ($cacheContext) {
+            $cacheDir = dirname($cacheContext['temp_path']);
+            if (!is_dir($cacheDir)) {
+                @mkdir($cacheDir, 0775, true);
+            }
+            $cacheTempResource = @fopen($cacheContext['temp_path'], 'wb');
+            if ($cacheTempResource === false) {
+                if ($cacheLockHandle) {
+                    flock($cacheLockHandle, LOCK_UN);
+                    fclose($cacheLockHandle);
+                }
+                $cacheContext = null;
+                $cacheTempResource = null;
+                $cacheLockHandle = null;
+            }
+        }
+
         // 初始化cURL
         $ch = curl_init($url);
         
         if ($ch === false) {
+            if ($cacheLockHandle) {
+                flock($cacheLockHandle, LOCK_UN);
+                fclose($cacheLockHandle);
+            }
             return json(['code' => 1, 'msg' => '无法初始化下载'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         }
         
@@ -711,7 +742,7 @@ class Video extends BaseController
             CURLOPT_TCP_KEEPALIVE => 1, // 启用TCP keepalive
             // 关键：立即开始写入数据，不等待完整响应
             // 优化：立即输出并刷新，确保浏览器立即开始下载
-            CURLOPT_WRITEFUNCTION => function($ch, $data) {
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$cacheTempResource) {
                 // 立即输出数据
                 echo $data;
                 // 立即刷新输出，确保浏览器立即开始下载
@@ -726,6 +757,9 @@ class Video extends BaseController
                     flush();
                     $buffer = '';
                 }
+                if ($cacheTempResource) {
+                    fwrite($cacheTempResource, $data);
+                }
                 return strlen($data);
             },
             // 简化响应头处理，只转发必要的头
@@ -735,14 +769,13 @@ class Video extends BaseController
                     $headerName = strtolower(trim($headerName));
                     $headerValue = trim($headerValue);
                     
-                    // 转发 Content-Length，让前端知道文件大小
                     if ($headerName === 'content-length') {
-                         header('Content-Length: ' . $headerValue);
+                        header('Content-Length: ' . $headerValue, true);
                     }
                     
                     // 转发 Content-Type
                     if ($headerName === 'content-type') {
-                         header('Content-Type: ' . $headerValue);
+                        header('Content-Type: ' . $headerValue, true);
                     }
                 }
                 return strlen($headerLine);
@@ -771,6 +804,24 @@ class Video extends BaseController
         flush();
         
         curl_close($ch);
+        
+        if ($cacheTempResource) {
+            fclose($cacheTempResource);
+        }
+        if ($cacheContext) {
+            if ($result !== false && empty($error) && $httpCode < 400) {
+                @rename($cacheContext['temp_path'], $cacheContext['path']);
+                if ($minCacheSize > 0 && file_exists($cacheContext['path']) && filesize($cacheContext['path']) < $minCacheSize) {
+                    @unlink($cacheContext['path']);
+                }
+            } else {
+                @unlink($cacheContext['temp_path']);
+            }
+        }
+        if ($cacheLockHandle) {
+            flock($cacheLockHandle, LOCK_UN);
+            fclose($cacheLockHandle);
+        }
         
         // 检查cURL执行结果
         if ($result === false || !empty($error)) {
@@ -835,6 +886,97 @@ class Video extends BaseController
             fclose($handle);
             exit;
         }
+    }
+
+    /**
+     * 构建缓存上下文
+     */
+    private function buildCacheContext(string $url, string $type, bool $isLocalFile): ?array
+    {
+        $config = \think\facade\Config::get('download_cache', []);
+        if (empty($config['enabled'])) {
+            return null;
+        }
+        if (!empty($config['remote_only']) && $isLocalFile) {
+            return null;
+        }
+        $root = rtrim($config['root'] ?? (runtime_path() . 'download_cache'), DIRECTORY_SEPARATOR);
+        if ($root === '') {
+            return null;
+        }
+        $hash = sha1($url);
+        $subDir = substr($hash, 0, 2) . DIRECTORY_SEPARATOR . substr($hash, 2, 2);
+        $dir = $root . DIRECTORY_SEPARATOR . $subDir;
+        $extension = $this->guessCacheExtension($url, $type);
+        $path = $dir . DIRECTORY_SEPARATOR . $hash . '.' . $extension;
+        $context = [
+            'config' => $config,
+            'dir' => $dir,
+            'path' => $path,
+            'temp_path' => $path . '.part',
+            'lock_path' => $dir . DIRECTORY_SEPARATOR . $hash . '.lock',
+        ];
+        if ($this->isCacheValid($path, $config)) {
+            $context['ready'] = true;
+        } elseif (file_exists($path)) {
+            @unlink($path);
+        }
+        return $context;
+    }
+
+    private function acquireCacheLock(array $context): ?array
+    {
+        if (!$this->ensureDirectory($context['dir'])) {
+            return null;
+        }
+        $lockHandle = @fopen($context['lock_path'], 'c');
+        if (!$lockHandle) {
+            return null;
+        }
+        if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            fclose($lockHandle);
+            return null;
+        }
+        if (isset($context['temp_path']) && file_exists($context['temp_path'])) {
+            @unlink($context['temp_path']);
+        }
+        $context['lock_handle'] = $lockHandle;
+        return $context;
+    }
+
+    private function isCacheValid(string $path, array $config): bool
+    {
+        if (!file_exists($path)) {
+            return false;
+        }
+        if (filesize($path) <= 0) {
+            return false;
+        }
+        $expire = (int)($config['expire_seconds'] ?? 0);
+        if ($expire > 0 && (time() - filemtime($path)) > $expire) {
+            return false;
+        }
+        return true;
+    }
+
+    private function ensureDirectory(string $dir): bool
+    {
+        if (is_dir($dir)) {
+            return true;
+        }
+        return @mkdir($dir, 0775, true);
+    }
+
+    private function guessCacheExtension(string $url, string $type): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if ($path) {
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if ($ext) {
+                return preg_replace('/[^a-z0-9]/i', '', $ext);
+            }
+        }
+        return $type === 'cover' ? 'jpg' : 'mp4';
     }
 }
 

@@ -473,10 +473,6 @@
                     const baseUrl = getBaseUrl();
                     const fallbackUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
                     
-                    const rawUrl = type === 'cover'
-                        ? toAbsoluteUrl(currentVideo.cover_url)
-                        : toAbsoluteUrl(currentVideo.video_url);
-                    
                     const ext = type === 'cover' ? '.jpg' : '.mp4';
                     const fileName = (currentVideo.title || 'videotool')
                         .replace(/[^\w\s-]/g, '')
@@ -493,8 +489,8 @@
                             const result = await resp.json();
                             if (result.code === 0 && result.data) {
                                 const data = result.data;
-                                const primary = data.direct_url || data.file_url || fallbackUrl;
-                                const backup = data.fallback_url || fallbackUrl;
+                                const primary = data.direct_url || fallbackUrl;
+                                const backup = data.fallback_url || data.file_url || fallbackUrl;
                                 const finalName = data.file_name || fileName;
                                 
                                 if (typeof window.Android.downloadFileWithFallback === 'function') {
@@ -539,12 +535,8 @@
                         // 如果原生下载失败，将继续走浏览器流程
                     }
                     
-                    // 浏览器环境：优先尝试CDN直链
-                    const directUrl = isCdnUrl(rawUrl) ? appendAttname(rawUrl, fileName) : null;
-                    const targetUrl = directUrl || fallbackUrl;
-                    debugLog('浏览器下载地址:', targetUrl);
-                    
-                    triggerBrowserDownload(targetUrl, fileName);
+                    // 浏览器环境：统一走站内代理（具备缓存与防盗链兼容能力）
+                    triggerBrowserDownload(fallbackUrl, fileName);
                     
                     setTimeout(() => {
                         buttons.forEach(btn => {
@@ -596,31 +588,6 @@
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
-            }
-            
-            const CDN_HOST_PATTERNS = [
-                /storage\.banono-us\.com/i,
-                /qiniucdn/i
-            ];
-            
-            function isCdnUrl(url) {
-                if (!url) return false;
-                try {
-                    const parsed = new URL(url, window.location.href);
-                    return CDN_HOST_PATTERNS.some(pattern => pattern.test(parsed.hostname));
-                } catch (e) {
-                    return false;
-                }
-            }
-            
-            function appendAttname(url, fileName) {
-                try {
-                    const parsed = new URL(url, window.location.href);
-                    parsed.searchParams.set('attname', fileName);
-                    return parsed.toString();
-                } catch (e) {
-                    return url;
-                }
             }
             
             function triggerBrowserDownload(url, fileName) {
