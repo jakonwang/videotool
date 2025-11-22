@@ -7,7 +7,7 @@
 - 📱 平台分类列表展示
 - 🎬 点击平台跳转到视频页面
 - 🚫 无广告干扰（使用 WebView 而非浏览器）
-- 📥 支持视频下载功能
+- 📥 内置 NativeDownloader，多线程断点续传与备用链自动重试
 - 🎨 简洁美观的界面
 
 ## 项目结构
@@ -111,7 +111,7 @@ zipalign -v 4 app-release-unsigned.apk videotool-release.apk
 
 ### v1.0.8
 - 与服务端缓存/后台缓存管理功能同步，默认 APK 版本号升级至 1.0.8，便于渠道区分
-- APP 下载链路沿用 v1.0.7 的断点续传、通知权限与本地缓存机制，如需灰度可直接通过版本号控制
+- APP 下载链路沿用 v1.0.7 的断点续传、通知权限与本地缓存机制，并彻底移除系统 DownloadManager 依赖，100% 走 NativeDownloader，兼容性更高
 
 ### v1.0.7
 - 新增临时缓存文件 + 断点续传 + 自动重试 3 次，彻底解决 `unexpected end of stream`
