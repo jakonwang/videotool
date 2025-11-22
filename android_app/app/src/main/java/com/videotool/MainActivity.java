@@ -3,6 +3,8 @@ package com.videotool;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.DownloadManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -31,6 +33,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import java.io.File;
 import java.io.FileInputStream;
@@ -130,6 +133,20 @@ public class MainActivity extends AppCompatActivity {
         
         // 检查并请求存储权限（Android 6.0+）
         checkStoragePermission();
+
+        // 创建通知渠道（Android 8.0+）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "download_channel",
+                    "下载通知",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("显示文件下载进度");
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
+        }
     }
     
     /**
@@ -334,20 +351,12 @@ public class MainActivity extends AppCompatActivity {
         boolean isPrimaryVideo = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("video");
         boolean isPrimaryImage = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("image");
 
-        if (isCdnUrl(finalPrimaryUrl)) {
-            if (downloadViaSystemManager(finalPrimaryUrl, normalizedFileName, primaryMime, isPrimaryVideo, isPrimaryImage, finalFallbackUrl)) {
-                return;
-            }
-        }
-
+        // 统一使用 OkHttp 下载并自行管理通知，确保 Referer/Header 正确传递
+        // 不再使用 DownloadManager，因为它在某些设备上对 Header 支持不佳且难以调试
         new Thread(() -> {
             boolean success = attemptDownload(finalPrimaryUrl, finalFileName, true);
             if (!success && finalFallbackUrl != null && !finalFallbackUrl.isEmpty() && !finalFallbackUrl.equals(finalPrimaryUrl)) {
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, "主链接下载失败，尝试备用链接", Toast.LENGTH_SHORT).show());
-                boolean fallbackCdn = isCdnUrl(finalFallbackUrl);
-                if (fallbackCdn && downloadViaSystemManager(finalFallbackUrl, finalFileName, primaryMime, isPrimaryVideo, isPrimaryImage, null)) {
-                    return;
-                }
                 attemptDownload(finalFallbackUrl, finalFileName, false);
             }
         }).start();
@@ -357,6 +366,20 @@ public class MainActivity extends AppCompatActivity {
      * 执行具体的下载并保存到相册
      */
     private boolean attemptDownload(String url, String fileName, boolean showStartToast) {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        int notificationId = (int) (System.currentTimeMillis() / 1000);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "download_channel")
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle(fileName)
+                .setContentText("准备下载...")
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true);
+
+        if (notificationManager != null) {
+            notificationManager.notify(notificationId, builder.build());
+        }
+
         try {
             OkHttpClient client = new OkHttpClient.Builder()
                     .connectTimeout(20, TimeUnit.SECONDS)
@@ -376,6 +399,7 @@ public class MainActivity extends AppCompatActivity {
             if (!response.isSuccessful() || response.body() == null) {
                 final int httpCode = response.code();
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show());
+                if (notificationManager != null) notificationManager.cancel(notificationId);
                 response.close();
                 return false;
             }
@@ -385,6 +409,7 @@ public class MainActivity extends AppCompatActivity {
             }
             
             String headerMime = response.header("Content-Type");
+            long contentLength = response.body().contentLength();
             String mimeType = guessMimeType(fileName, headerMime);
             boolean isVideo = mimeType != null && mimeType.toLowerCase(Locale.US).contains("video");
             boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.US).contains("image");
@@ -392,9 +417,9 @@ public class MainActivity extends AppCompatActivity {
             try (InputStream inputStream = response.body().byteStream()) {
                 Uri savedUri;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    savedUri = saveToMediaStore(fileName, mimeType, isVideo, isImage, inputStream);
+                    savedUri = saveToMediaStore(fileName, mimeType, isVideo, isImage, inputStream, contentLength, notificationManager, notificationId, builder);
                 } else {
-                    savedUri = saveToLegacyStorage(fileName, mimeType, isVideo, isImage, inputStream);
+                    savedUri = saveToLegacyStorage(fileName, mimeType, isVideo, isImage, inputStream, contentLength, notificationManager, notificationId, builder);
                 }
                 
                 if (savedUri != null) {
@@ -402,6 +427,20 @@ public class MainActivity extends AppCompatActivity {
                     final boolean finalIsVideo = isVideo;
                     final boolean finalIsImage = isImage;
                     final String finalMime = mimeType;
+                    
+                    if (notificationManager != null) {
+                        builder.setContentText("下载完成")
+                               .setProgress(0, 0, false)
+                               .setOngoing(false)
+                               .setSmallIcon(android.R.drawable.stat_sys_download_done);
+                        notificationManager.notify(notificationId, builder.build());
+                        // 延迟取消通知，让用户看到完成状态
+                        new Thread(() -> {
+                            try { Thread.sleep(3000); } catch (InterruptedException e) {}
+                            notificationManager.cancel(notificationId);
+                        }).start();
+                    }
+
                     runOnUiThread(() -> {
                         if (finalIsVideo) {
                             Toast.makeText(MainActivity.this, "视频已保存到相册", Toast.LENGTH_SHORT).show();
@@ -420,17 +459,46 @@ public class MainActivity extends AppCompatActivity {
                     response.close();
                     return true;
                 } else {
+                    if (notificationManager != null) notificationManager.cancel(notificationId);
                     runOnUiThread(() -> Toast.makeText(MainActivity.this, "保存失败", Toast.LENGTH_LONG).show());
                 }
             } finally {
                 response.close();
             }
         } catch (Exception e) {
+            if (notificationManager != null) notificationManager.cancel(notificationId);
             final String errorMsg = e.getMessage();
             runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: " + errorMsg, Toast.LENGTH_LONG).show());
             e.printStackTrace();
         }
         return false;
+    }
+    
+    private void copyStream(InputStream in, OutputStream out, long contentLength, NotificationManager nm, int notificationId, NotificationCompat.Builder builder) throws IOException {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        long totalRead = 0;
+        long lastUpdate = 0;
+
+        while ((bytesRead = in.read(buffer)) != -1) {
+            out.write(buffer, 0, bytesRead);
+            totalRead += bytesRead;
+            
+            long now = System.currentTimeMillis();
+            if (nm != null && now - lastUpdate > 500) {
+                if (contentLength > 0) {
+                    int progress = (int) (totalRead * 100 / contentLength);
+                    builder.setProgress(100, progress, false);
+                    builder.setContentText("下载中 " + progress + "%");
+                } else {
+                    builder.setProgress(0, 0, true);
+                    builder.setContentText("下载中 " + (totalRead / 1024) + " KB");
+                }
+                nm.notify(notificationId, builder.build());
+                lastUpdate = now;
+            }
+        }
+        out.flush();
     }
     
     /**
@@ -573,7 +641,7 @@ public class MainActivity extends AppCompatActivity {
      * 使用MediaStore API保存到相册（Android 10+）
      */
     @SuppressLint("InlinedApi")
-    private Uri saveToMediaStore(String fileName, String mimeType, boolean isVideo, boolean isImage, InputStream inputStream) throws IOException {
+    private Uri saveToMediaStore(String fileName, String mimeType, boolean isVideo, boolean isImage, InputStream inputStream, long contentLength, NotificationManager nm, int notificationId, NotificationCompat.Builder builder) throws IOException {
         ContentResolver resolver = getContentResolver();
         ContentValues contentValues = new ContentValues();
         
@@ -594,11 +662,7 @@ public class MainActivity extends AppCompatActivity {
         if (uri != null) {
             OutputStream outputStream = resolver.openOutputStream(uri);
             if (outputStream != null) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
+                copyStream(inputStream, outputStream, contentLength, nm, notificationId, builder);
                 outputStream.close();
                 return uri;
             }
@@ -609,7 +673,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 使用传统方式保存到相册（Android 9及以下）
      */
-    private Uri saveToLegacyStorage(String fileName, String mimeType, boolean isVideo, boolean isImage, InputStream inputStream) throws IOException {
+    private Uri saveToLegacyStorage(String fileName, String mimeType, boolean isVideo, boolean isImage, InputStream inputStream, long contentLength, NotificationManager nm, int notificationId, NotificationCompat.Builder builder) throws IOException {
         File dir;
         if (isVideo) {
             dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "VideoTool");
@@ -624,11 +688,7 @@ public class MainActivity extends AppCompatActivity {
         File file = new File(dir, fileName);
         FileOutputStream outputStream = new FileOutputStream(file);
         
-        byte[] buffer = new byte[8192];
-        int bytesRead;
-        while ((bytesRead = inputStream.read(buffer)) != -1) {
-            outputStream.write(buffer, 0, bytesRead);
-        }
+        copyStream(inputStream, outputStream, contentLength, nm, notificationId, builder);
         outputStream.close();
         
         return Uri.fromFile(file);

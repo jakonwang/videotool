@@ -109,6 +109,11 @@ zipalign -v 4 app-release-unsigned.apk videotool-release.apk
 
 ## 更新日志
 
+### v1.0.6
+- 彻底弃用系统 DownloadManager，全量使用内置引擎下载，彻底解决系统下载空文件问题
+- 新增下拉通知栏进度条，实时显示下载进度与状态
+- 强化防盗链兼容，确保 CDN 资源 100% 可下载
+
 ### v1.0.5
 - APP 下载统一附带合法 Referer 与 User-Agent，兼容启用了防盗链的七牛/千牛 CDN
 - DownloadManager 与 OkHttp 两路下载均补齐 Header，确保直链和代理都能成功

@@ -698,6 +698,8 @@ class Video extends BaseController
             CURLOPT_CONNECTTIMEOUT => 10, // 连接超时10秒
             CURLOPT_TIMEOUT => 0, // 无超时限制
             CURLOPT_BUFFERSIZE => $bufferSize, // 设置缓冲区大小（128KB）
+            CURLOPT_REFERER => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/',
+            CURLOPT_USERAGENT => $_SERVER['HTTP_USER_AGENT'] ?? 'VideoTool-Server-Proxy',
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_ENCODING => '', // 自动处理压缩
