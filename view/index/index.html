@@ -493,12 +493,35 @@
                                 const backup = data.fallback_url || data.file_url || fallbackUrl;
                                 const finalName = data.file_name || fileName;
                                 
+                                debugLog('准备开始下载:', {
+                                    primary: primary,
+                                    backup: backup,
+                                    fileName: finalName,
+                                    cacheHit: data.cache_hit,
+                                    cachePrepared: data.cache_prepared
+                                });
+                                
                                 if (typeof window.Android.downloadFileWithFallback === 'function') {
-                                    window.Android.downloadFileWithFallback(primary, backup, finalName);
+                                    debugLog('调用 downloadFileWithFallback');
+                                    try {
+                                        window.Android.downloadFileWithFallback(primary, backup, finalName);
+                                        showToast('APP 已开始下载');
+                                    } catch (e) {
+                                        debugError('调用 downloadFileWithFallback 失败:', e);
+                                        showToast('下载启动失败: ' + e.message);
+                                    }
+                                } else if (typeof window.Android.downloadFile === 'function') {
+                                    debugLog('调用 downloadFile');
+                                    try {
+                                        window.Android.downloadFile(primary, finalName);
+                                        showToast('APP 已开始下载');
+                                    } catch (e) {
+                                        debugError('调用 downloadFile 失败:', e);
+                                        showToast('下载启动失败: ' + e.message);
+                                    }
                                 } else {
-                                    window.Android.downloadFile(primary, finalName);
+                                    throw new Error('原生下载接口不可用');
                                 }
-                                showToast('APP 已开始下载');
                                 setTimeout(() => {
                                     buttons.forEach(btn => {
                                         btn.disabled = false;

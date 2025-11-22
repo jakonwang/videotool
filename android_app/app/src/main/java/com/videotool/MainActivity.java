@@ -301,6 +301,7 @@ public class MainActivity extends AppCompatActivity {
     public class WebAppInterface {
         @JavascriptInterface
         public void downloadFile(String url, String fileName) {
+            android.util.Log.d("WebAppInterface", "downloadFile 被JS调用 - url: " + url + ", fileName: " + fileName);
             runOnUiThread(() -> {
                 downloadWithFallback(url, null, fileName);
             });
@@ -308,7 +309,10 @@ public class MainActivity extends AppCompatActivity {
         
         @JavascriptInterface
         public void downloadFileWithFallback(String primaryUrl, String fallbackUrl, String fileName) {
+            android.util.Log.d("WebAppInterface", "downloadFileWithFallback 被JS调用 - primaryUrl: " + primaryUrl + ", fallbackUrl: " + fallbackUrl + ", fileName: " + fileName);
             runOnUiThread(() -> {
+                // 显示提示，确保用户知道下载已启动
+                Toast.makeText(MainActivity.this, "正在准备下载: " + fileName, Toast.LENGTH_SHORT).show();
                 downloadWithFallback(primaryUrl, fallbackUrl, fileName);
             });
         }
@@ -332,12 +336,16 @@ public class MainActivity extends AppCompatActivity {
      * 下载文件，支持主链 + 备用链
      */
     private void downloadWithFallback(String primaryUrl, String fallbackUrl, String fileName) {
+        android.util.Log.d("Download", "downloadWithFallback 被调用 - primaryUrl: " + primaryUrl + ", fileName: " + fileName);
+        
         if (primaryUrl == null || primaryUrl.isEmpty()) {
-            Toast.makeText(this, "无效的下载地址", Toast.LENGTH_LONG).show();
+            runOnUiThread(() -> Toast.makeText(this, "无效的下载地址", Toast.LENGTH_LONG).show());
+            android.util.Log.e("Download", "下载失败：URL为空");
             return;
         }
         
         String normalizedFileName = ensureFileNameHasExtension(fileName, primaryUrl);
+        android.util.Log.d("Download", "规范化文件名: " + normalizedFileName);
         
         // 权限检查
         boolean requiresLegacyPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q;
@@ -345,6 +353,7 @@ public class MainActivity extends AppCompatActivity {
         if (requiresLegacyPermission) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
+                android.util.Log.d("Download", "需要存储权限（旧版本），等待授权");
                 pendingDownloadUrl = primaryUrl;
                 pendingFallbackUrl = fallbackUrl;
                 pendingFileName = normalizedFileName;
@@ -356,6 +365,7 @@ public class MainActivity extends AppCompatActivity {
                     != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
                     != PackageManager.PERMISSION_GRANTED) {
+                android.util.Log.d("Download", "需要媒体权限，等待授权");
                 pendingDownloadUrl = primaryUrl;
                 pendingFallbackUrl = fallbackUrl;
                 pendingFileName = normalizedFileName;
@@ -372,13 +382,21 @@ public class MainActivity extends AppCompatActivity {
         boolean isPrimaryVideo = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("video");
         boolean isPrimaryImage = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("image");
 
+        android.util.Log.d("Download", "权限检查通过，启动下载线程");
+        
         // 统一使用 OkHttp 下载并自行管理通知，确保 Referer/Header 正确传递
         // 不再使用 DownloadManager，因为它在某些设备上对 Header 支持不佳且难以调试
         new Thread(() -> {
+            android.util.Log.d("Download", "下载线程已启动，开始下载: " + finalPrimaryUrl);
             boolean success = attemptDownload(finalPrimaryUrl, finalFileName, true);
+            android.util.Log.d("Download", "主链接下载结果: " + (success ? "成功" : "失败"));
             if (!success && finalFallbackUrl != null && !finalFallbackUrl.isEmpty() && !finalFallbackUrl.equals(finalPrimaryUrl)) {
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, "主链接下载失败，尝试备用链接", Toast.LENGTH_SHORT).show());
+                android.util.Log.d("Download", "尝试备用链接: " + finalFallbackUrl);
                 attemptDownload(finalFallbackUrl, finalFileName, false);
+            } else if (!success) {
+                android.util.Log.e("Download", "下载完全失败，无备用链接可用");
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败，请检查网络连接", Toast.LENGTH_LONG).show());
             }
         }).start();
     }
@@ -387,6 +405,8 @@ public class MainActivity extends AppCompatActivity {
      * 执行具体的下载并保存到相册，支持断点续传与自动重试
      */
     private boolean attemptDownload(String url, String fileName, boolean showStartToast) {
+        android.util.Log.d("Download", "attemptDownload 开始 - URL: " + url + ", fileName: " + fileName);
+        
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         int notificationId = (int) (System.currentTimeMillis() / 1000);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "download_channel")
@@ -399,6 +419,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (notificationManager != null) {
             notificationManager.notify(notificationId, builder.build());
+            android.util.Log.d("Download", "已创建下载通知: " + notificationId);
         }
 
         if (showStartToast) {
@@ -437,8 +458,14 @@ public class MainActivity extends AppCompatActivity {
                     requestBuilder.header("Range", "bytes=" + downloadedBytes + "-");
                 }
 
+                android.util.Log.d("Download", "发送HTTP请求: " + url + " (尝试 " + (attempt + 1) + "/" + MAX_DOWNLOAD_RETRY + ")");
+                
                 try (Response response = client.newCall(requestBuilder.build()).execute()) {
-                    if (response.code() == 416) {
+                    int httpCode = response.code();
+                    android.util.Log.d("Download", "收到HTTP响应: " + httpCode);
+                    
+                    if (httpCode == 416) {
+                        android.util.Log.d("Download", "收到416 Range Not Satisfiable，重新开始下载");
                         if (tempFile.exists()) {
                             tempFile.delete();
                         }
@@ -447,25 +474,46 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     if (!response.isSuccessful() || response.body() == null) {
-                        final int httpCode = response.code();
-                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode, Toast.LENGTH_LONG).show());
+                        final int finalHttpCode = httpCode;
+                        android.util.Log.e("Download", "HTTP请求失败: " + finalHttpCode);
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + finalHttpCode, Toast.LENGTH_LONG).show());
                         if (notificationManager != null) notificationManager.cancel(notificationId);
+                        
+                        // 如果是HTTP错误状态码，尝试读取错误信息（可能是JSON）
+                        if (response.body() != null) {
+                            try {
+                                String bodyStr = response.body().string();
+                                if (bodyStr.trim().startsWith("{")) {
+                                    org.json.JSONObject jsonObj = new org.json.JSONObject(bodyStr);
+                                    String errorMsg = jsonObj.optString("msg", "下载失败");
+                                    if (!errorMsg.isEmpty()) {
+                                        final String finalErrorMsg = errorMsg;
+                                        runOnUiThread(() -> Toast.makeText(MainActivity.this, finalErrorMsg, Toast.LENGTH_LONG).show());
+                                    }
+                                }
+                            } catch (Exception e) {
+                                android.util.Log.e("Download", "无法读取错误响应体", e);
+                            }
+                        }
                         return false;
                     }
 
                     if (response.code() == 200 && downloadedBytes > 0 && tempFile.exists()) {
+                        android.util.Log.d("Download", "检测到已存在的临时文件，删除后重新下载");
                         tempFile.delete();
                         downloadedBytes = 0;
                     }
 
                     String headerMime = response.header("Content-Type");
+                    android.util.Log.d("Download", "Content-Type: " + headerMime);
                     
                     // 关键：检查响应是否为JSON错误（服务器返回错误时会返回JSON）
                     if (headerMime != null && headerMime.toLowerCase(Locale.US).contains("application/json")) {
                         // 这是一个错误响应，读取JSON并显示错误信息
+                        android.util.Log.e("DownloadError", "收到JSON响应，这不是文件下载响应");
                         try {
                             String jsonBody = response.body().string();
-                            android.util.Log.e("DownloadError", "收到JSON错误响应: " + jsonBody);
+                            android.util.Log.e("DownloadError", "JSON错误响应内容: " + jsonBody);
                             
                             org.json.JSONObject jsonObj = new org.json.JSONObject(jsonBody);
                             String errorMsg = jsonObj.optString("msg", "下载失败");
@@ -479,12 +527,14 @@ public class MainActivity extends AppCompatActivity {
                             return false;
                         } catch (Exception jsonErr) {
                             android.util.Log.e("DownloadError", "解析JSON错误失败", jsonErr);
-                            final int httpCode = response.code();
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode + " (JSON错误)", Toast.LENGTH_LONG).show());
+                            final int finalHttpCode = httpCode;
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + finalHttpCode + " (JSON错误)", Toast.LENGTH_LONG).show());
                             if (notificationManager != null) notificationManager.cancel(notificationId);
                             return false;
                         }
                     }
+                    
+                    android.util.Log.d("Download", "开始下载文件流，Content-Type: " + headerMime);
                     
                     if (headerMime != null) {
                         mimeType = guessMimeType(fileName, headerMime);

@@ -773,48 +773,11 @@ class Video extends BaseController
         $minCacheSize = $cacheConfig['min_file_size'] ?? 0;
         $cacheWrittenBytes = 0;
         
-        // 关键：在发送响应头之前，先检查URL可访问性
-        // 如果URL不可访问，直接返回JSON错误，避免APP误将JSON当作文件保存
+        // 注意：URL预检查已移除，因为某些CDN对HEAD和GET请求的处理不一致
+        // 直接开始流式传输，如果失败会在传输过程中处理错误
+        // 这样即使URL预检查通过，实际下载时也可能失败，但至少不会因为预检查失败而阻止下载
         $referer = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/';
         $userAgent = 'VideoTool-Server-Proxy/1.0 (PHP/' . PHP_VERSION . ')';
-        
-        // 快速检查URL可访问性（HEAD请求，只获取响应头）
-        $testCh = curl_init($url);
-        if ($testCh) {
-            curl_setopt_array($testCh, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_NOBODY => true, // 只获取头部，不下载内容
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS => 5,
-                CURLOPT_CONNECTTIMEOUT => 10,
-                CURLOPT_TIMEOUT => 15,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_REFERER => $referer,
-                CURLOPT_USERAGENT => $userAgent,
-            ]);
-            curl_exec($testCh);
-            $testHttpCode = curl_getinfo($testCh, CURLINFO_HTTP_CODE);
-            $testError = curl_error($testCh);
-            curl_close($testCh);
-            
-            // 如果URL无法访问，直接返回错误（此时响应头还未发送）
-            if ($testHttpCode >= 400 || !empty($testError)) {
-                $this->releaseCacheLock($cacheContext);
-                \think\facade\Log::error("流式传输：URL不可访问 - {$url} - HTTP {$testHttpCode} - {$testError}");
-                
-                // 返回HTTP错误状态码，而不是200+JSON，这样APP能正确识别错误
-                http_response_code($testHttpCode >= 400 ? $testHttpCode : 502);
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode([
-                    'code' => 1,
-                    'msg' => '下载失败：' . ($testError ?: 'HTTP ' . $testHttpCode),
-                    'error_code' => 'URL_NOT_ACCESSIBLE',
-                    'http_code' => $testHttpCode,
-                ], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-        }
         
         // 清除所有输出缓冲，立即开始传输（关键：在设置响应头之前清除）
         while (ob_get_level()) {
