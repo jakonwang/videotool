@@ -471,6 +471,11 @@
                     showToast('正在准备下载...');
                     
                     const baseUrl = getBaseUrl();
+                    const ext = type === 'cover' ? '.jpg' : '.mp4';
+                    const fileName = (currentVideo.title || 'videotool')
+                        .replace(/[^\w\s-]/g, '')
+                        .concat(ext);
+                    
                     const downloadBaseUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
                     const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1`;
                     const baseCdnUrl = type === 'cover'
@@ -479,11 +484,6 @@
                     const originalCdnUrl = baseCdnUrl
                         ? `${baseCdnUrl}${baseCdnUrl.includes('?') ? '&' : '?'}attname=${encodeURIComponent(fileName)}`
                         : '';
-                    
-                    const ext = type === 'cover' ? '.jpg' : '.mp4';
-                    const fileName = (currentVideo.title || 'videotool')
-                        .replace(/[^\w\s-]/g, '')
-                        .concat(ext);
                     
                     const hasBridge = hasAndroidBridge();
                     
