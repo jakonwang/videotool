@@ -516,6 +516,7 @@ class Video extends BaseController
                                 '://' . $_SERVER['HTTP_HOST'] .
                                 '/api/video/download?video_id=' . $videoId . '&type=' . $type;
                 $proxyUrl = $proxyBaseUrl . '&force_download=1';
+                $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
                 
                 // 如果是七牛云资源且缓存不存在，先同步预缓存（确保100%成功）
                 $cachePrepared = false;
@@ -565,8 +566,10 @@ class Video extends BaseController
                         'video_id' => $video->id,
                         'type' => $type,
                         'file_url' => $fileUrl,
-                        'direct_url' => $proxyUrl, // 主链接：站内代理URL（强制走代理）
-                        'fallback_url' => $proxyUrl, // 备用链接：也使用代理URL（不使用七牛云直链，避免被拦截）
+                        'direct_url' => $proxyUrl, // 向下兼容
+                        'fallback_url' => $cdnDownloadUrl, // APP备用使用CDN直链
+                        'proxy_url' => $proxyUrl,
+                        'cdn_url' => $cdnDownloadUrl,
                         'file_name' => $downloadFileName,
                         'is_cdn' => $isCdnResource,
                         'cache_hit' => (bool)($cacheContext && !empty($cacheContext['ready'])),

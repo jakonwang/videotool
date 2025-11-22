@@ -473,6 +473,12 @@
                     const baseUrl = getBaseUrl();
                     const downloadBaseUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
                     const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1`;
+                    const baseCdnUrl = type === 'cover'
+                        ? toAbsoluteUrl(currentVideo.cover_url)
+                        : toAbsoluteUrl(currentVideo.video_url);
+                    const originalCdnUrl = baseCdnUrl
+                        ? `${baseCdnUrl}${baseCdnUrl.includes('?') ? '&' : '?'}attname=${encodeURIComponent(fileName)}`
+                        : '';
                     
                     const ext = type === 'cover' ? '.jpg' : '.mp4';
                     const fileName = (currentVideo.title || 'videotool')
@@ -490,18 +496,27 @@
                             const result = await resp.json();
                             if (result.code === 0 && result.data) {
                                 const data = result.data;
-                                const primary = data.direct_url || forcedDownloadUrl;
-                                const backup = data.fallback_url || data.file_url || forcedDownloadUrl;
+                                const proxyUrl = data.proxy_url || data.direct_url || forcedDownloadUrl;
+                                const cdnUrl = data.cdn_url || data.fallback_url || data.file_url || '';
                                 const finalName = data.file_name || fileName;
-                                
+
+                                let primary = proxyUrl;
+                                let backup = cdnUrl || proxyUrl;
+
+                                if (!data.cache_hit && !data.cache_prepared && cdnUrl) {
+                                    primary = cdnUrl;
+                                    backup = proxyUrl;
+                                }
                                 debugLog('准备开始下载:', {
-                                    primary: primary,
-                                    backup: backup,
+                                    primary,
+                                    backup,
                                     fileName: finalName,
                                     cacheHit: data.cache_hit,
-                                    cachePrepared: data.cache_prepared
+                                    cachePrepared: data.cache_prepared,
+                                    proxyUrl,
+                                    cdnUrl
                                 });
-                                
+
                                 if (typeof window.Android.downloadFileWithFallback === 'function') {
                                     debugLog('调用 downloadFileWithFallback');
                                     try {
@@ -536,10 +551,11 @@
                         } catch (err) {
                             debugError('APP下载信息获取失败，使用备用地址:', err);
                             try {
+                                const cdnUrl = originalCdnUrl;
                                 if (typeof window.Android.downloadFileWithFallback === 'function') {
-                                    window.Android.downloadFileWithFallback(forcedDownloadUrl, '', fileName);
+                                    window.Android.downloadFileWithFallback(cdnUrl || forcedDownloadUrl, forcedDownloadUrl, fileName);
                                 } else if (typeof window.Android.downloadFile === 'function') {
-                                    window.Android.downloadFile(forcedDownloadUrl, fileName);
+                                    window.Android.downloadFile(cdnUrl || forcedDownloadUrl, fileName);
                                 } else {
                                     throw new Error('原生下载接口不可用');
                                 }
