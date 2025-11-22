@@ -67,6 +67,8 @@ public class MainActivity extends AppCompatActivity {
     
     // 修改为你的服务器地址
     private static final String BASE_URL = "https://videotool.banono-us.com";
+    private static final String DOWNLOAD_REFERER = BASE_URL + "/";
+    private static final String DOWNLOAD_UA = "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 (KHTML, like Gecko) VideotoolApp";
     
     private RecyclerView recyclerView;
     private PlatformAdapter adapter;
@@ -366,6 +368,8 @@ public class MainActivity extends AppCompatActivity {
             Request request = new Request.Builder()
                     .url(url)
                     .header("Connection", "close")
+                    .header("Referer", DOWNLOAD_REFERER)
+                    .header("User-Agent", DOWNLOAD_UA)
                     .build();
             
             Response response = client.newCall(request).execute();
@@ -537,6 +541,9 @@ public class MainActivity extends AppCompatActivity {
             request.setDescription("社媒素材库正在下载");
             request.setMimeType(mimeType != null ? mimeType : "*/*");
             request.addRequestHeader("Connection", "close");
+            request.addRequestHeader("Referer", DOWNLOAD_REFERER);
+            request.addRequestHeader("User-Agent", DOWNLOAD_UA);
+            request.addRequestHeader("Accept", "*/*");
 
             String targetDir = isVideo ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_PICTURES;
             String subDir = "VideoTool";

@@ -109,6 +109,10 @@ zipalign -v 4 app-release-unsigned.apk videotool-release.apk
 
 ## 更新日志
 
+### v1.0.5
+- APP 下载统一附带合法 Referer 与 User-Agent，兼容启用了防盗链的七牛/千牛 CDN
+- DownloadManager 与 OkHttp 两路下载均补齐 Header，确保直链和代理都能成功
+
 ### v1.0.4
 - CDN 直链统一交由系统 DownloadManager 处理，失败后自动回退到应用内下载并提示错误原因
 - 新增 DownloadManager 任务追踪与媒体库刷新，确保视频/图片在下载完成后立即显示在相册
