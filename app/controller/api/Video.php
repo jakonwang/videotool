@@ -602,14 +602,19 @@ class Video extends BaseController
             }
 
             // 远程文件统一通过代理下载，可选写入缓存
+            // 注意：即使预缓存失败（$cacheWriteContext为null），也要允许流式传输
+            // 尝试获取缓存锁（如果之前没有获取过）
             $streamCacheContext = null;
-            if ($cacheContext && !$cacheWriteContext) {
+            if ($cacheContext && !$cacheWriteContext && empty($cacheContext['ready'])) {
+                // 尝试获取锁，如果失败也不影响流式传输（说明其他进程正在缓存）
                 $streamCacheContext = $this->acquireCacheLock($cacheContext);
             }
+            
+            // 确保即使缓存不存在，也能正常流式传输
             return $this->streamRemoteFile($fileUrl, $type, $downloadFileName, [
                 'cache' => $streamCacheContext,
                 'cache_meta' => [
-                    'hash' => $streamCacheContext['hash'] ?? null,
+                    'hash' => $streamCacheContext['hash'] ?? ($cacheContext['hash'] ?? null),
                     'video_id' => $video->id,
                     'platform' => $video->platform_id ?? null,
                     'title' => $video->title,
@@ -810,7 +815,40 @@ class Video extends BaseController
             }
         }
 
-        // 初始化cURL
+        // 先测试URL可访问性（不发送响应头），避免响应头已发送后才发现错误
+        $testCh = curl_init($url);
+        if ($testCh) {
+            curl_setopt_array($testCh, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_NOBODY => true, // 只获取头部
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_REFERER => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/',
+                CURLOPT_USERAGENT => 'VideoTool-Server-Proxy/1.0 (PHP/' . PHP_VERSION . ')',
+            ]);
+            curl_exec($testCh);
+            $testHttpCode = curl_getinfo($testCh, CURLINFO_HTTP_CODE);
+            $testError = curl_error($testCh);
+            curl_close($testCh);
+            
+            // 如果URL无法访问，直接返回错误（此时响应头还未发送）
+            if ($testHttpCode >= 400 || !empty($testError)) {
+                $this->releaseCacheLock($cacheContext);
+                \think\facade\Log::error("流式传输：URL不可访问 - {$url} - HTTP {$testHttpCode} - {$testError}");
+                return json([
+                    'code' => 1,
+                    'msg' => '下载失败：' . ($testError ?: 'HTTP ' . $testHttpCode),
+                    'error_code' => 'URL_NOT_ACCESSIBLE',
+                    'http_code' => $testHttpCode,
+                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+        }
+        
+        // 初始化cURL进行实际下载
         $ch = curl_init($url);
         
         if ($ch === false) {
@@ -945,20 +983,24 @@ class Video extends BaseController
         $this->releaseCacheLock($cacheContext);
         
         // 检查cURL执行结果
+        // 注意：此时响应头已发送，不能返回JSON，只能记录日志
         if ($result === false || !empty($error)) {
-            return json([
-                'code' => 1,
-                'msg' => '下载失败：' . ($error ?: 'HTTP ' . $httpCode)
-            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            $this->releaseCacheLock($cacheContext);
+            \think\facade\Log::error("流式传输失败：{$url} - {$error} - HTTP {$httpCode}");
+            // 响应头已发送，不能返回JSON，只能输出错误信息并退出
+            echo "\n<!-- 下载失败: " . htmlspecialchars($error ?: 'HTTP ' . $httpCode) . " -->\n";
+            exit;
         }
         
         if ($httpCode >= 400) {
-            return json([
-                'code' => 1,
-                'msg' => '下载失败：HTTP ' . $httpCode
-            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            $this->releaseCacheLock($cacheContext);
+            \think\facade\Log::error("流式传输失败：{$url} - HTTP {$httpCode}");
+            // 响应头已发送，不能返回JSON，只能输出错误信息并退出
+            echo "\n<!-- 下载失败: HTTP {$httpCode} -->\n";
+            exit;
         }
         
+        // 下载成功，正常退出
         exit;
     }
     
