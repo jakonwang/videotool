@@ -50,11 +50,14 @@ import java.io.OutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.Response;
 
@@ -329,9 +332,16 @@ public class MainActivity extends AppCompatActivity {
      */
     private boolean attemptDownload(String url, String fileName, boolean showStartToast) {
         try {
-            OkHttpClient client = new OkHttpClient();
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .connectTimeout(20, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.MINUTES)
+                    .writeTimeout(5, TimeUnit.MINUTES)
+                    .retryOnConnectionFailure(true)
+                    .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+                    .build();
             Request request = new Request.Builder()
                     .url(url)
+                    .header("Connection", "close")
                     .build();
             
             Response response = client.newCall(request).execute();
