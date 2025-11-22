@@ -471,7 +471,8 @@
                     showToast('正在准备下载...');
                     
                     const baseUrl = getBaseUrl();
-                    const fallbackUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
+                    const downloadBaseUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
+                    const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1`;
                     
                     const ext = type === 'cover' ? '.jpg' : '.mp4';
                     const fileName = (currentVideo.title || 'videotool')
@@ -483,14 +484,14 @@
                     // APP 环境：调用原生下载接口，并提供主备链接
                     if (hasBridge) {
                         try {
-                            const metaUrl = `${fallbackUrl}&format=json`;
+                            const metaUrl = `${downloadBaseUrl}&format=json`;
                             debugLog('获取APP下载信息:', metaUrl);
                             const resp = await fetch(metaUrl);
                             const result = await resp.json();
                             if (result.code === 0 && result.data) {
                                 const data = result.data;
-                                const primary = data.direct_url || fallbackUrl;
-                                const backup = data.fallback_url || data.file_url || fallbackUrl;
+                                const primary = data.direct_url || forcedDownloadUrl;
+                                const backup = data.fallback_url || data.file_url || forcedDownloadUrl;
                                 const finalName = data.file_name || fileName;
                                 
                                 debugLog('准备开始下载:', {
@@ -536,9 +537,9 @@
                             debugError('APP下载信息获取失败，使用备用地址:', err);
                             try {
                                 if (typeof window.Android.downloadFileWithFallback === 'function') {
-                                    window.Android.downloadFileWithFallback(fallbackUrl, '', fileName);
+                                    window.Android.downloadFileWithFallback(forcedDownloadUrl, '', fileName);
                                 } else if (typeof window.Android.downloadFile === 'function') {
-                                    window.Android.downloadFile(fallbackUrl, fileName);
+                                    window.Android.downloadFile(forcedDownloadUrl, fileName);
                                 } else {
                                     throw new Error('原生下载接口不可用');
                                 }
@@ -559,7 +560,7 @@
                     }
                     
                     // 浏览器环境：统一走站内代理（具备缓存与防盗链兼容能力）
-                    triggerBrowserDownload(fallbackUrl, fileName);
+                    triggerBrowserDownload(forcedDownloadUrl, fileName);
                     
                     setTimeout(() => {
                         buttons.forEach(btn => {

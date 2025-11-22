@@ -410,6 +410,7 @@ class Video extends BaseController
             $videoId = $this->request->param('video_id');
             $type = $this->request->param('type', 'video'); // cover 或 video
             $format = $this->request->param('format', ''); // json 或空（流式下载/重定向）
+            $forceDownload = (int)$this->request->param('force_download', 0); // 1 表示强制返回文件流（APP原生下载）
             
             // 检测是否为APP请求（通过参数或User-Agent）
             // 优先检查format参数（最可靠），然后检查app参数，最后检查User-Agent
@@ -427,6 +428,11 @@ class Video extends BaseController
             // 方式3：通过User-Agent判断（保守策略，避免误判浏览器）
             elseif ($this->isAppClient()) {
                 $isAppRequest = true;
+            }
+
+            // 如果明确要求强制下载文件（force_download=1），则不以APP模式返回JSON
+            if ($forceDownload === 1 && $format !== 'json') {
+                $isAppRequest = false;
             }
             
             // 默认：浏览器请求，返回文件流
@@ -506,9 +512,10 @@ class Video extends BaseController
             // APP请求：返回JSON格式的下载信息
             if ($isAppRequest) {
                 // 生成代理下载URL（APP可以使用这个URL直接下载）
-                $proxyUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
-                           '://' . $_SERVER['HTTP_HOST'] . 
-                           '/api/video/download?video_id=' . $videoId . '&type=' . $type;
+                $proxyBaseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') .
+                                '://' . $_SERVER['HTTP_HOST'] .
+                                '/api/video/download?video_id=' . $videoId . '&type=' . $type;
+                $proxyUrl = $proxyBaseUrl . '&force_download=1';
                 
                 // 如果是七牛云资源且缓存不存在，先同步预缓存（确保100%成功）
                 $cachePrepared = false;
