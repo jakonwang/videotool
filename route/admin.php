@@ -35,5 +35,11 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('video/batchEdit', 'app\controller\admin\Video@batchEdit');
     Route::post('video/batchEdit', 'app\controller\admin\Video@batchEdit');
     Route::get('video', 'app\controller\admin\Video@index');
+
+    // 缓存管理
+    Route::get('cache', 'app\controller\admin\Cache@index');
+    Route::post('cache/delete/<hash>', 'app\controller\admin\Cache@delete');
+    Route::post('cache/clear', 'app\controller\admin\Cache@clear');
+    Route::get('cache/download/<hash>', 'app\controller\admin\Cache@download');
 }
 

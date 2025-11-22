@@ -1,0 +1,221 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}缓存管理 - 社媒素材库{/block}
+{block name="page_title"}缓存管理{/block}
+{block name="breadcrumb"}缓存管理 &raquo; 下载缓存{/block}
+{block name="page_actions"}
+<button class="btn btn-outline-secondary mr-2" onclick="location.reload()">
+    <i class="fas fa-sync mr-1"></i>刷新
+</button>
+<button class="btn btn-danger" id="btnClearCache">
+    <i class="fas fa-trash-alt mr-1"></i>清空全部缓存
+</button>
+{/block}
+
+{block name="style"}
+<style>
+    .cache-path-display {
+        font-size: 1rem;
+        font-weight: 600;
+        word-break: break-all;
+        line-height: 1.4;
+    }
+</style>
+{/block}
+
+{block name="content"}
+    {if !$is_enabled}
+    <div class="alert alert-warning border-warning">
+        <i class="fas fa-exclamation-triangle mr-2"></i>
+        下载缓存尚未启用，请在 <code>config/download_cache.php</code> 或环境变量中开启 <code>download_cache.enabled</code>。
+    </div>
+    {/if}
+
+    <div class="row">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="small-box bg-info">
+                <div class="inner">
+                    <h3>{$stats.total_files|default=0}</h3>
+                    <p>缓存文件数</p>
+                </div>
+                <div class="icon"><i class="fas fa-folder"></i></div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="small-box bg-success">
+                <div class="inner">
+                    <h3>{$stats.total_size_human|default='0 B'}</h3>
+                    <p>占用空间</p>
+                </div>
+                <div class="icon"><i class="fas fa-hdd"></i></div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="small-box bg-warning">
+                <div class="inner">
+                    {if !empty($stats.expire_seconds)}
+                    <h3>{:round($stats.expire_seconds / 3600, 1)} h</h3>
+                    {else}
+                    <h3>无限制</h3>
+                    {/if}
+                    <p>缓存有效期</p>
+                </div>
+                <div class="icon"><i class="fas fa-hourglass-half"></i></div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="small-box bg-danger">
+                <div class="inner">
+                    <div class="cache-path-display text-monospace">{$stats.root|default='-'}</div>
+                    <p class="mb-0" style="font-size:13px;">缓存目录</p>
+                </div>
+                <div class="icon"><i class="fas fa-map-marker-alt"></i></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <form class="form-inline" method="get">
+                <div class="input-group mr-2" style="width:250px;">
+                    <input type="text" class="form-control" name="keyword" placeholder="搜索文件名或来源URL" value="{$keyword|htmlentities}">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                {if $keyword !== ''}
+                <a href="/admin.php/cache" class="btn btn-link text-muted">清除筛选</a>
+                {/if}
+            </form>
+        </div>
+        <div class="card-body table-responsive p-0">
+            {if empty($items)}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-box-open fa-3x mb-3"></i>
+                <div>暂无缓存记录</div>
+            </div>
+            {else}
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>哈希</th>
+                        <th>文件名</th>
+                        <th>类型</th>
+                        <th>大小</th>
+                        <th>缓存时间</th>
+                        <th>来源</th>
+                        <th class="text-right pr-3">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {foreach $items as $item}
+                    <tr>
+                        <td><code>{$item.hash|substr=0,10}...</code></td>
+                        <td>
+                            <div class="font-weight-bold">{$item.file_name|default='-'}</div>
+                            {if $item.video_id}
+                            <small class="text-muted">视频ID：{$item.video_id}</small>
+                            {/if}
+                        </td>
+                        <td>{$item.type|default='video'}</td>
+                        <td>{$item.size_human}</td>
+                        <td>
+                            {$item.cached_at_text}
+                        </td>
+                        <td style="max-width:240px;">
+                            <div class="text-truncate" title="{$item.source_url}">{$item.source_url}</div>
+                        </td>
+                        <td class="text-right pr-3">
+                            <div class="btn-group btn-group-sm">
+                                <a class="btn btn-outline-primary" href="/admin.php/cache/download/{$item.hash}" target="_blank">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                <button class="btn btn-outline-secondary btn-copy-url" data-url="{$item.source_url}" title="复制来源链接">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-delete-cache" data-hash="{$item.hash}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {/foreach}
+                </tbody>
+            </table>
+            {/if}
+        </div>
+        {if !empty($items)}
+        <div class="card-footer d-flex justify-content-between align-items-center flex-wrap">
+            <div class="text-muted mb-2 mb-sm-0">
+                共 {$total} 条记录，当前第 {$page}/{$total_pages} 页
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {for start="1" end="$total_pages+1"}
+                    {if $i == $page}
+                    <li class="page-item active"><span class="page-link">{$i}</span></li>
+                    {else}
+                    <li class="page-item">
+                        <a class="page-link" href="/admin.php/cache?page={$i}&keyword={$keyword|urlencode}">{$i}</a>
+                    </li>
+                    {/if}
+                    {/for}
+                </ul>
+            </nav>
+        </div>
+        {/if}
+    </div>
+{/block}
+
+{block name="script"}
+<script>
+$(function () {
+    $('.btn-delete-cache').on('click', function () {
+        const hash = $(this).data('hash');
+        if (!hash) return;
+        AdminUI.confirm('确认删除该缓存文件？', function () {
+            $.post(`/admin.php/cache/delete/${hash}`, function (res) {
+                if (res.code === 0) {
+                    AdminUI.showToast('success', res.msg || '删除成功');
+                    setTimeout(() => location.reload(), 600);
+                } else {
+                    AdminUI.showToast('error', res.msg || '删除失败');
+                }
+            }).fail(function () {
+                AdminUI.showToast('error', '请求失败，请稍后再试');
+            });
+        });
+    });
+
+    $('#btnClearCache').on('click', function () {
+        AdminUI.confirm('确认清空所有缓存？该操作无法恢复！', function () {
+            $.post('/admin.php/cache/clear', function (res) {
+                if (res.code === 0) {
+                    AdminUI.showToast('success', res.msg || '已清空缓存');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    AdminUI.showToast('error', res.msg || '清空失败');
+                }
+            }).fail(function () {
+                AdminUI.showToast('error', '请求失败，请稍后再试');
+            });
+        });
+    });
+
+    $('.btn-copy-url').on('click', function () {
+        const url = $(this).data('url');
+        if (!url) return;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(() => {
+                AdminUI.showToast('success', '来源链接已复制');
+            }).catch(() => {
+                AdminUI.showToast('error', '复制失败');
+            });
+        } else {
+            AdminUI.showToast('error', '当前环境不支持复制');
+        }
+    });
+});
+</script>
+{/block}
+
