@@ -1,7 +1,7 @@
 <?php
 return [
     // 是否启用下载缓存
-    'enabled' => env('download_cache.enabled', true),
+    'enabled' => env('download_cache.enabled', false),
 
     // 缓存根目录，默认 runtime/download_cache
     'root' => env('download_cache.root', rtrim(runtime_path(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'download_cache'),
