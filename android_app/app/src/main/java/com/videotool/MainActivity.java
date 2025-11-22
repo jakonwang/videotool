@@ -459,6 +459,33 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     String headerMime = response.header("Content-Type");
+                    
+                    // 关键：检查响应是否为JSON错误（服务器返回错误时会返回JSON）
+                    if (headerMime != null && headerMime.toLowerCase(Locale.US).contains("application/json")) {
+                        // 这是一个错误响应，读取JSON并显示错误信息
+                        try {
+                            String jsonBody = response.body().string();
+                            android.util.Log.e("DownloadError", "收到JSON错误响应: " + jsonBody);
+                            
+                            org.json.JSONObject jsonObj = new org.json.JSONObject(jsonBody);
+                            String errorMsg = jsonObj.optString("msg", "下载失败");
+                            if (errorMsg.isEmpty()) {
+                                errorMsg = "下载失败: HTTP " + response.code();
+                            }
+                            
+                            final String finalErrorMsg = errorMsg;
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, finalErrorMsg, Toast.LENGTH_LONG).show());
+                            if (notificationManager != null) notificationManager.cancel(notificationId);
+                            return false;
+                        } catch (Exception jsonErr) {
+                            android.util.Log.e("DownloadError", "解析JSON错误失败", jsonErr);
+                            final int httpCode = response.code();
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败: HTTP " + httpCode + " (JSON错误)", Toast.LENGTH_LONG).show());
+                            if (notificationManager != null) notificationManager.cancel(notificationId);
+                            return false;
+                        }
+                    }
+                    
                     if (headerMime != null) {
                         mimeType = guessMimeType(fileName, headerMime);
                         isVideo = mimeType != null && mimeType.toLowerCase(Locale.US).contains("video");
