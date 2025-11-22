@@ -74,6 +74,13 @@ public class MainActivity extends AppCompatActivity {
     private View platformListView;
     private DownloadManager downloadManager;
     private long downloadId;
+    private static final String[] CDN_HOST_KEYWORDS = {
+            "storage.banono-us.com",
+            "qiniucdn",
+            "qiniudn",
+            "qnssl",
+            "qiniu"
+    };
     
     // 权限请求码
     private static final int PERMISSION_REQUEST_CODE = 1001;
@@ -318,10 +325,24 @@ public class MainActivity extends AppCompatActivity {
         final String finalFallbackUrl = fallbackUrl;
         final String finalFileName = normalizedFileName;
         
+        String primaryMime = guessMimeType(normalizedFileName, null);
+        boolean isPrimaryVideo = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("video");
+        boolean isPrimaryImage = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("image");
+
+        if (isCdnUrl(finalPrimaryUrl)) {
+            if (downloadViaSystemManager(finalPrimaryUrl, normalizedFileName, primaryMime, isPrimaryVideo, isPrimaryImage)) {
+                return;
+            }
+        }
+
         new Thread(() -> {
             boolean success = attemptDownload(finalPrimaryUrl, finalFileName, true);
             if (!success && finalFallbackUrl != null && !finalFallbackUrl.isEmpty() && !finalFallbackUrl.equals(finalPrimaryUrl)) {
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, "主链接下载失败，尝试备用链接", Toast.LENGTH_SHORT).show());
+                boolean fallbackCdn = isCdnUrl(finalFallbackUrl);
+                if (fallbackCdn && downloadViaSystemManager(finalFallbackUrl, finalFileName, primaryMime, isPrimaryVideo, isPrimaryImage)) {
+                    return;
+                }
                 attemptDownload(finalFallbackUrl, finalFileName, false);
             }
         }).start();
@@ -449,6 +470,53 @@ public class MainActivity extends AppCompatActivity {
         }
         return "application/octet-stream";
     }
+
+    private boolean isCdnUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
+        try {
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+            if (host == null) {
+                return false;
+            }
+            for (String keyword : CDN_HOST_KEYWORDS) {
+                if (host.contains(keyword)) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private boolean downloadViaSystemManager(String url, String fileName, String mimeType, boolean isVideo, boolean isImage) {
+        try {
+            Uri uri = Uri.parse(url);
+            DownloadManager.Request request = new DownloadManager.Request(uri);
+            request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setVisibleInDownloadsUi(true);
+            request.setTitle(fileName);
+            request.setDescription("社媒素材库正在下载");
+            request.setMimeType(mimeType != null ? mimeType : "*/*");
+            request.addRequestHeader("Connection", "close");
+
+            String targetDir = isVideo ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_PICTURES;
+            String subDir = "VideoTool";
+            request.setDestinationInExternalPublicDir(targetDir, subDir + "/" + fileName);
+
+            downloadId = downloadManager.enqueue(request);
+            registerDownloadReceiver();
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "已交由系统下载管理器处理", Toast.LENGTH_SHORT).show());
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "系统下载失败，尝试备用方案", Toast.LENGTH_SHORT).show());
+            return false;
+        }
+    }
     
     /**
      * 使用MediaStore API保存到相册（Android 10+）
@@ -570,7 +638,7 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
                         cursor.close();
-                        unregisterReceiver(this);
+                        MainActivity.this.unregisterReceiver(this);
                     }
                 }
             }
