@@ -514,23 +514,38 @@ class Video extends BaseController
                 $cachePrepared = false;
                 if ($cacheContext && empty($cacheContext['ready']) && $cacheWriteContext && $isCdnResource) {
                     \think\facade\Log::info("APP请求：开始同步预缓存七牛云资源 - {$fileUrl}");
-                    $cachePath = $this->downloadRemoteToCache($fileUrl, $cacheWriteContext, [
-                        'video_id' => $video->id,
-                        'platform' => $video->platform_id ?? null,
-                        'title' => $video->title,
-                        'type' => $type,
-                        'file_name' => $downloadFileName,
-                        'source_url' => $fileUrl,
-                    ]);
-                    $this->releaseCacheLock($cacheWriteContext);
-                    
-                    // 如果缓存成功，更新状态
-                    if ($cachePath && file_exists($cachePath)) {
-                        $cacheContext['ready'] = true;
-                        $cachePrepared = true;
-                        \think\facade\Log::info("APP请求：七牛云资源预缓存成功 - {$fileUrl} -> {$cachePath}");
-                    } else {
-                        \think\facade\Log::warning("APP请求：七牛云资源预缓存失败，将使用流式代理 - {$fileUrl}");
+                    try {
+                        $cachePath = $this->downloadRemoteToCache($fileUrl, $cacheWriteContext, [
+                            'video_id' => $video->id,
+                            'platform' => $video->platform_id ?? null,
+                            'title' => $video->title,
+                            'type' => $type,
+                            'file_name' => $downloadFileName,
+                            'source_url' => $fileUrl,
+                        ]);
+                        
+                        // 如果缓存成功，更新状态
+                        if ($cachePath && file_exists($cachePath) && filesize($cachePath) > 0) {
+                            $cacheContext['ready'] = true;
+                            $cachePrepared = true;
+                            \think\facade\Log::info("APP请求：七牛云资源预缓存成功 - {$fileUrl} -> {$cachePath} (" . filesize($cachePath) . " bytes)");
+                        } else {
+                            // 预缓存失败，清理可能的临时文件
+                            if (isset($cacheContext['temp_path']) && file_exists($cacheContext['temp_path'])) {
+                                @unlink($cacheContext['temp_path']);
+                            }
+                            \think\facade\Log::warning("APP请求：七牛云资源预缓存失败（文件不存在或为空），将使用流式代理 - {$fileUrl}");
+                        }
+                    } catch (\Exception $e) {
+                        // 异常时也清理临时文件
+                        if (isset($cacheContext['temp_path']) && file_exists($cacheContext['temp_path'])) {
+                            @unlink($cacheContext['temp_path']);
+                        }
+                        \think\facade\Log::error("APP请求：七牛云资源预缓存异常 - {$fileUrl} - " . $e->getMessage() . " | 文件: " . $e->getFile() . " | 行号: " . $e->getLine());
+                    } finally {
+                        // 确保释放锁
+                        $this->releaseCacheLock($cacheWriteContext);
+                        $cacheWriteContext = null; // 标记已处理，避免后续重复处理
                     }
                 }
                 
@@ -784,20 +799,25 @@ class Video extends BaseController
         $bufferSize = 131072; // 128KB buffer（增大缓冲区，减少系统调用次数）
         
         // 设置cURL选项 - 关键：立即开始传输，不等待完整响应头，优化传输速度
+        // 重要：使用正确的Referer和User-Agent，避免七牛云防盗链拦截
+        $referer = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/';
+        $userAgent = 'VideoTool-Server-Proxy/1.0 (PHP/' . PHP_VERSION . ')';
+        
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 5,
-            CURLOPT_CONNECTTIMEOUT => 10, // 连接超时10秒
-            CURLOPT_TIMEOUT => 0, // 无超时限制
+            CURLOPT_MAXREDIRS => 10, // 增加重定向次数
+            CURLOPT_CONNECTTIMEOUT => 30, // 连接超时30秒（增加超时时间）
+            CURLOPT_TIMEOUT => 0, // 无总超时限制
             CURLOPT_BUFFERSIZE => $bufferSize, // 设置缓冲区大小（128KB）
-            CURLOPT_REFERER => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/',
-            CURLOPT_USERAGENT => $_SERVER['HTTP_USER_AGENT'] ?? 'VideoTool-Server-Proxy',
+            CURLOPT_REFERER => $referer,
+            CURLOPT_USERAGENT => $userAgent,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_ENCODING => '', // 自动处理压缩
             CURLOPT_TCP_NODELAY => 1, // 禁用Nagle算法，立即发送数据
             CURLOPT_TCP_KEEPALIVE => 1, // 启用TCP keepalive
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1, // 强制使用HTTP/1.1，避免HTTP/2问题
             // 关键：立即开始写入数据，不等待完整响应
             // 优化：立即输出并刷新，确保浏览器立即开始下载
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$cacheTempResource, &$cacheWrittenBytes) {
