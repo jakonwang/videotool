@@ -233,6 +233,27 @@
         .toast.show {
             opacity: 1;
         }
+        
+        .pwa-install {
+            position: fixed;
+            right: 16px;
+            bottom: 90px;
+            padding: 12px 18px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            box-shadow: 0 12px 30px rgba(102,126,234,0.35);
+            display: none;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            z-index: 1000;
+            cursor: pointer;
+        }
+        
+        .pwa-install i {
+            font-style: normal;
+        }
     </style>
 </head>
 <body>
@@ -249,6 +270,10 @@
     </div>
     
     <div class="toast" id="toast"></div>
+    <div class="pwa-install" id="pwaInstallBtn">
+        <i>📲</i>
+        <span>安装到桌面</span>
+    </div>
     
     <script>
         (function() {
@@ -484,7 +509,7 @@
                     const downloadBaseUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
                     const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1`;
                     const baseCdnUrl = type === 'cover'
-                        ? toAbsoluteUrl(currentVideo.cover_url)
+                        ? toAbsoluteUrl(currentVideo.cover_url) 
                         : toAbsoluteUrl(currentVideo.video_url);
                     const originalCdnUrl = baseCdnUrl
                         ? `${baseCdnUrl}${baseCdnUrl.includes('?') ? '&' : '?'}attname=${encodeURIComponent(fileName)}`
@@ -588,7 +613,7 @@
                     // 浏览器环境：统一走站内代理（具备缓存与防盗链兼容能力）
                     triggerBrowserDownload(forcedDownloadUrl, fileName);
                     
-                    setTimeout(() => {
+                        setTimeout(() => {
                         buttons.forEach(btn => {
                             btn.disabled = false;
                             btn.classList.remove('btn-loading');
@@ -665,12 +690,37 @@
             loadVideo();
         })();
         
+        let deferredPrompt = null;
+        const pwaBtn = document.getElementById('pwaInstallBtn');
+
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(err => {
-                    console.warn('ServiceWorker 注册失败:', err);
-                });
+            navigator.serviceWorker.register('/sw.js').catch(err => {
+                console.warn('ServiceWorker 注册失败:', err);
             });
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (pwaBtn) {
+                    pwaBtn.style.display = 'flex';
+                }
+            });
+
+            if (pwaBtn) {
+                pwaBtn.addEventListener('click', async () => {
+                    if (!deferredPrompt) {
+                        window.open(window.location.href, '_blank');
+                        return;
+                    }
+                    pwaBtn.style.display = 'none';
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        showToast('感谢安装！');
+                    }
+                    deferredPrompt = null;
+                });
+            }
         }
     </script>
 </body>
