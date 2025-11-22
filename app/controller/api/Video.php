@@ -498,9 +498,6 @@ class Video extends BaseController
             $cacheWriteContext = null;
             if (!$isLocalFile) {
                 $cacheContext = $this->buildCacheContext($fileUrl, $type, $isLocalFile);
-                if ($cacheContext && !empty($cacheContext['ready']) && file_exists($cacheContext['path'])) {
-                    return $this->streamLocalFile($cacheContext['path'], $type, $downloadFileName);
-                }
                 if ($cacheContext && empty($cacheContext['ready'])) {
                     $cacheWriteContext = $this->acquireCacheLock($cacheContext);
                 }
@@ -538,11 +535,39 @@ class Video extends BaseController
                 }
             }
 
+            $localCachePath = null;
+            if ($cacheContext) {
+                if (!empty($cacheContext['ready']) && file_exists($cacheContext['path'])) {
+                    $localCachePath = $cacheContext['path'];
+                } elseif ($cacheWriteContext) {
+                    $localCachePath = $this->downloadRemoteToCache($fileUrl, $cacheWriteContext, [
+                        'video_id' => $video->id,
+                        'platform' => $video->platform_id ?? null,
+                        'title' => $video->title,
+                        'type' => $type,
+                        'file_name' => $downloadFileName,
+                        'source_url' => $fileUrl,
+                    ]);
+                    $this->releaseCacheLock($cacheWriteContext);
+                    if (!$localCachePath && file_exists($cacheContext['path'])) {
+                        $localCachePath = $cacheContext['path'];
+                    }
+                }
+            }
+
+            if ($localCachePath && file_exists($localCachePath)) {
+                return $this->streamLocalFile($localCachePath, $type, $downloadFileName);
+            }
+
             // 远程文件统一通过代理下载，可选写入缓存
+            $streamCacheContext = null;
+            if ($cacheContext && !$cacheWriteContext) {
+                $streamCacheContext = $this->acquireCacheLock($cacheContext);
+            }
             return $this->streamRemoteFile($fileUrl, $type, $downloadFileName, [
-                'cache' => $cacheWriteContext,
+                'cache' => $streamCacheContext,
                 'cache_meta' => [
-                    'hash' => $cacheWriteContext['hash'] ?? null,
+                    'hash' => $streamCacheContext['hash'] ?? null,
                     'video_id' => $video->id,
                     'platform' => $video->platform_id ?? null,
                     'title' => $video->title,
@@ -674,7 +699,6 @@ class Video extends BaseController
         $cacheContext = $options['cache'] ?? null;
         $cacheMeta = $options['cache_meta'] ?? [];
         $cacheTempResource = null;
-        $cacheLockHandle = $cacheContext['lock_handle'] ?? null;
         $cacheConfig = $cacheContext['config'] ?? [];
         $minCacheSize = $cacheConfig['min_file_size'] ?? 0;
         $cacheWrittenBytes = 0;
@@ -715,13 +739,9 @@ class Video extends BaseController
             }
             $cacheTempResource = @fopen($cacheContext['temp_path'], 'wb');
             if ($cacheTempResource === false) {
-                if ($cacheLockHandle) {
-                    flock($cacheLockHandle, LOCK_UN);
-                    fclose($cacheLockHandle);
-                }
+                $this->releaseCacheLock($cacheContext);
                 $cacheContext = null;
                 $cacheTempResource = null;
-                $cacheLockHandle = null;
             }
         }
 
@@ -729,10 +749,7 @@ class Video extends BaseController
         $ch = curl_init($url);
         
         if ($ch === false) {
-            if ($cacheLockHandle) {
-                flock($cacheLockHandle, LOCK_UN);
-                fclose($cacheLockHandle);
-            }
+            $this->releaseCacheLock($cacheContext);
             return json(['code' => 1, 'msg' => '无法初始化下载'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         }
         
@@ -855,10 +872,7 @@ class Video extends BaseController
                 );
             }
         }
-        if ($cacheLockHandle) {
-            flock($cacheLockHandle, LOCK_UN);
-            fclose($cacheLockHandle);
-        }
+        $this->releaseCacheLock($cacheContext);
         
         // 检查cURL执行结果
         if ($result === false || !empty($error)) {
@@ -987,6 +1001,81 @@ class Video extends BaseController
         }
         $context['lock_handle'] = $lockHandle;
         return $context;
+    }
+
+    private function releaseCacheLock(?array $context): void
+    {
+        if (!empty($context['lock_handle'])) {
+            @flock($context['lock_handle'], LOCK_UN);
+            @fclose($context['lock_handle']);
+        }
+    }
+
+    private function downloadRemoteToCache(string $url, array $context, array $meta): ?string
+    {
+        if (empty($context['temp_path']) || empty($context['path'])) {
+            return null;
+        }
+        $tempPath = $context['temp_path'];
+        $targetPath = $context['path'];
+        $tempDir = dirname($tempPath);
+        if (!is_dir($tempDir)) {
+            $this->ensureDirectory($tempDir);
+        }
+        $fp = @fopen($tempPath, 'wb');
+        if (!$fp) {
+            return null;
+        }
+
+        $referer = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') .
+            '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/';
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'VideoTool-Server-Proxy';
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $fp,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_REFERER => $referer,
+            CURLOPT_USERAGENT => $userAgent,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        ]);
+
+        $success = curl_exec($ch);
+        $error = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        fclose($fp);
+
+        if ($success && $httpCode < 400 && file_exists($tempPath)) {
+            @rename($tempPath, $targetPath);
+            $metaPayload = [
+                'hash' => $context['hash'] ?? null,
+                'file_name' => $meta['file_name'] ?? basename($targetPath),
+                'type' => $meta['type'] ?? 'video',
+                'source_url' => $meta['source_url'] ?? $url,
+                'video_id' => $meta['video_id'] ?? null,
+                'platform' => $meta['platform'] ?? null,
+                'title' => $meta['title'] ?? null,
+                'size' => @filesize($targetPath),
+                'cached_at' => time(),
+            ];
+            if (!empty($context['meta_path'])) {
+                @file_put_contents(
+                    $context['meta_path'],
+                    json_encode($metaPayload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                );
+            }
+            return $targetPath;
+        }
+
+        @unlink($tempPath);
+        \think\facade\Log::warning('缓存远程文件失败: ' . ($error ?: 'HTTP ' . $httpCode) . ' - ' . $url);
+        return null;
     }
 
     private function isCacheValid(string $path, array $config): bool
