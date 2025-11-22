@@ -2,16 +2,13 @@ package com.videotool;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.DownloadManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.ProgressDialog;
-import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -23,9 +20,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.MenuItem;
 import android.view.View;
-import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
-import android.webkit.URLUtil;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -39,9 +34,6 @@ import android.text.format.Formatter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -61,8 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import okhttp3.Call;
-import okhttp3.Callback;
+import com.videotool.download.NativeDownloader;
 import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import okhttp3.Request;
@@ -81,16 +72,7 @@ public class MainActivity extends AppCompatActivity {
     private ProgressDialog progressDialog;
     private WebView webView;
     private View platformListView;
-    private DownloadManager downloadManager;
-    private long downloadId;
-    private final Map<Long, DownloadTaskMeta> downloadTaskMap = new ConcurrentHashMap<>();
-    private static final String[] CDN_HOST_KEYWORDS = {
-            "storage.banono-us.com",
-            "qiniucdn",
-            "qiniudn",
-            "qnssl",
-            "qiniu"
-    };
+    private NativeDownloader nativeDownloader;
     
     // 权限请求码
     private static final int PERMISSION_REQUEST_CODE = 1001;
@@ -116,6 +98,7 @@ public class MainActivity extends AppCompatActivity {
         platformListView = findViewById(R.id.platform_list_view);
         recyclerView = findViewById(R.id.recycler_view);
         webView = findViewById(R.id.web_view);
+        nativeDownloader = new NativeDownloader(this);
         
         // 初始化平台列表
         platformList = new ArrayList<>();
@@ -374,31 +357,14 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         
-        final String finalPrimaryUrl = primaryUrl;
-        final String finalFallbackUrl = fallbackUrl;
-        final String finalFileName = normalizedFileName;
-        
-        String primaryMime = guessMimeType(normalizedFileName, null);
-        boolean isPrimaryVideo = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("video");
-        boolean isPrimaryImage = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("image");
-
-        android.util.Log.d("Download", "权限检查通过，启动下载线程");
-        
-        // 统一使用 OkHttp 下载并自行管理通知，确保 Referer/Header 正确传递
-        // 不再使用 DownloadManager，因为它在某些设备上对 Header 支持不佳且难以调试
-        new Thread(() -> {
-            android.util.Log.d("Download", "下载线程已启动，开始下载: " + finalPrimaryUrl);
-            boolean success = attemptDownload(finalPrimaryUrl, finalFileName, true);
-            android.util.Log.d("Download", "主链接下载结果: " + (success ? "成功" : "失败"));
-            if (!success && finalFallbackUrl != null && !finalFallbackUrl.isEmpty() && !finalFallbackUrl.equals(finalPrimaryUrl)) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "主链接下载失败，尝试备用链接", Toast.LENGTH_SHORT).show());
-                android.util.Log.d("Download", "尝试备用链接: " + finalFallbackUrl);
-                attemptDownload(finalFallbackUrl, finalFileName, false);
-            } else if (!success) {
-                android.util.Log.e("Download", "下载完全失败，无备用链接可用");
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "下载失败，请检查网络连接", Toast.LENGTH_LONG).show());
-            }
-        }).start();
+        if (nativeDownloader == null) {
+            nativeDownloader = new NativeDownloader(this);
+        }
+        nativeDownloader.enqueueDownload(normalizedFileName, primaryUrl, fallbackUrl, (success, msg) -> {
+            runOnUiThread(() -> {
+                showToast(msg != null ? msg : (success ? "下载完成" : "下载失败"));
+            });
+        });
     }
     
     /**
