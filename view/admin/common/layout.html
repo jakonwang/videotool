@@ -14,6 +14,10 @@
             font-weight: 600;
         }
         .toast-container {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            top: auto;
             z-index: 1090;
             pointer-events: none;
         }
@@ -108,7 +112,7 @@
         </footer>
     </div>
 
-    <div class="toast-container position-fixed top-0 right-0 p-3" style="right:0; top:0;">
+    <div class="toast-container position-fixed p-3" style="right:0;">
         <div id="globalToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="2500">
             <div class="toast-header">
                 <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">提示</span></strong>
