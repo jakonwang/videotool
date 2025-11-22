@@ -568,6 +568,7 @@ class Video extends BaseController
                         'fallback_url' => $proxyUrl,
                         'proxy_url' => $proxyUrl,
                         'cdn_url' => $cdnDownloadUrl,
+                        'attname_file_name' => rawurlencode($downloadFileName),
                         'file_name' => $downloadFileName,
                         'is_cdn' => $isCdnResource,
                         'cache_hit' => (bool)($cacheContext && !empty($cacheContext['ready'])),

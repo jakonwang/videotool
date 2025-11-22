@@ -499,13 +499,17 @@
                                 const proxyUrl = data.proxy_url || data.direct_url || forcedDownloadUrl;
                                 const cdnUrl = data.cdn_url || data.fallback_url || data.file_url || '';
                                 const finalName = data.file_name || fileName;
+                                const encodedFileName = data.attname_file_name || encodeURIComponent(finalName);
+                                const cdnUrlWithName = cdnUrl
+                                    ? `${cdnUrl}${cdnUrl.includes('?') ? '&' : '?'}attname=${encodedFileName}`
+                                    : '';
 
-                                let primary = cdnUrl || proxyUrl;
+                                let primary = cdnUrlWithName || proxyUrl;
                                 let backup = proxyUrl;
 
                                 if (data.cache_hit || data.cache_prepared) {
                                     primary = proxyUrl;
-                                    backup = cdnUrl || proxyUrl;
+                                    backup = cdnUrlWithName || proxyUrl;
                                 }
                                 debugLog('准备开始下载:', {
                                     primary,
