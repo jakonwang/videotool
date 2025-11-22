@@ -960,13 +960,24 @@ class Video extends BaseController
         $dir = $root . DIRECTORY_SEPARATOR . $subDir;
         $extension = $this->guessCacheExtension($url, $type);
         $path = $dir . DIRECTORY_SEPARATOR . $hash . '.' . $extension;
+        $lockPath = $dir . DIRECTORY_SEPARATOR . $hash . '.lock';
+        
+        // 清理过期锁文件（超过5分钟或0字节）
+        if (file_exists($lockPath)) {
+            $lockAge = time() - filemtime($lockPath);
+            $lockSize = filesize($lockPath);
+            if ($lockAge > 300 || $lockSize == 0) {
+                @unlink($lockPath);
+            }
+        }
+        
         $context = [
             'config' => $config,
             'hash' => $hash,
             'dir' => $dir,
             'path' => $path,
             'temp_path' => $path . '.part',
-            'lock_path' => $dir . DIRECTORY_SEPARATOR . $hash . '.lock',
+            'lock_path' => $lockPath,
             'meta_path' => $dir . DIRECTORY_SEPARATOR . $hash . '.json',
         ];
         if ($this->isCacheValid($path, $config)) {
@@ -985,7 +996,15 @@ class Video extends BaseController
         if (!$this->ensureDirectory($context['dir'])) {
             return null;
         }
-        $lockHandle = @fopen($context['lock_path'], 'c');
+        // 检查是否有过期锁（超过5分钟）
+        if (file_exists($context['lock_path'])) {
+            $lockAge = time() - filemtime($context['lock_path']);
+            if ($lockAge > 300) { // 5分钟
+                @unlink($context['lock_path']);
+            }
+        }
+        
+        $lockHandle = @fopen($context['lock_path'], 'c+');
         if (!$lockHandle) {
             return null;
         }
@@ -993,6 +1012,17 @@ class Video extends BaseController
             fclose($lockHandle);
             return null;
         }
+        
+        // 写入锁信息（进程ID、时间戳）
+        $lockInfo = [
+            'pid' => getmypid(),
+            'time' => time(),
+        ];
+        ftruncate($lockHandle, 0);
+        rewind($lockHandle);
+        fwrite($lockHandle, json_encode($lockInfo));
+        fflush($lockHandle);
+        
         if (isset($context['temp_path']) && file_exists($context['temp_path'])) {
             @unlink($context['temp_path']);
         }
@@ -1009,6 +1039,10 @@ class Video extends BaseController
             @flock($context['lock_handle'], LOCK_UN);
             @fclose($context['lock_handle']);
         }
+        // 释放锁后删除锁文件
+        if (!empty($context['lock_path']) && file_exists($context['lock_path'])) {
+            @unlink($context['lock_path']);
+        }
     }
 
     private function downloadRemoteToCache(string $url, array $context, array $meta): ?string
@@ -1024,6 +1058,7 @@ class Video extends BaseController
         }
         $fp = @fopen($tempPath, 'wb');
         if (!$fp) {
+            \think\facade\Log::error('无法创建临时缓存文件: ' . $tempPath);
             return null;
         }
 
@@ -1031,51 +1066,89 @@ class Video extends BaseController
             '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/';
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'VideoTool-Server-Proxy';
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_FILE => $fp,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 5,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_REFERER => $referer,
-            CURLOPT_USERAGENT => $userAgent,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        ]);
-
-        $success = curl_exec($ch);
-        $error = curl_error($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        fclose($fp);
-
-        if ($success && $httpCode < 400 && file_exists($tempPath)) {
-            @rename($tempPath, $targetPath);
-            $metaPayload = [
-                'hash' => $context['hash'] ?? null,
-                'file_name' => $meta['file_name'] ?? basename($targetPath),
-                'type' => $meta['type'] ?? 'video',
-                'source_url' => $meta['source_url'] ?? $url,
-                'video_id' => $meta['video_id'] ?? null,
-                'platform' => $meta['platform'] ?? null,
-                'title' => $meta['title'] ?? null,
-                'size' => @filesize($targetPath),
-                'cached_at' => time(),
-            ];
-            if (!empty($context['meta_path'])) {
-                @file_put_contents(
-                    $context['meta_path'],
-                    json_encode($metaPayload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-                );
+        $ch = null;
+        $downloadSuccess = false;
+        try {
+            $ch = curl_init($url);
+            if ($ch === false) {
+                throw new \Exception('无法初始化cURL');
             }
-            return $targetPath;
-        }
+            
+            curl_setopt_array($ch, [
+                CURLOPT_FILE => $fp,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_CONNECTTIMEOUT => 30,
+                CURLOPT_TIMEOUT => 0,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_REFERER => $referer,
+                CURLOPT_USERAGENT => $userAgent,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_BUFFERSIZE => 131072, // 128KB buffer
+            ]);
 
-        @unlink($tempPath);
-        \think\facade\Log::warning('缓存远程文件失败: ' . ($error ?: 'HTTP ' . $httpCode) . ' - ' . $url);
-        return null;
+            $success = curl_exec($ch);
+            $error = curl_error($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $downloadedSize = curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
+
+            if ($ch) {
+                curl_close($ch);
+                $ch = null;
+            }
+            if ($fp) {
+                fclose($fp);
+                $fp = null;
+            }
+
+            if ($success && $httpCode < 400 && file_exists($tempPath) && filesize($tempPath) > 0) {
+                // 检查文件大小是否合理（至少1KB，避免0字节文件）
+                if (filesize($tempPath) < 1024 && $downloadedSize > 1024) {
+                    throw new \Exception('下载的文件大小异常');
+                }
+                
+                @rename($tempPath, $targetPath);
+                if (!file_exists($targetPath)) {
+                    throw new \Exception('重命名缓存文件失败');
+                }
+                
+                $metaPayload = [
+                    'hash' => $context['hash'] ?? null,
+                    'file_name' => $meta['file_name'] ?? basename($targetPath),
+                    'type' => $meta['type'] ?? 'video',
+                    'source_url' => $meta['source_url'] ?? $url,
+                    'video_id' => $meta['video_id'] ?? null,
+                    'platform' => $meta['platform'] ?? null,
+                    'title' => $meta['title'] ?? null,
+                    'size' => @filesize($targetPath),
+                    'cached_at' => time(),
+                ];
+                if (!empty($context['meta_path'])) {
+                    @file_put_contents(
+                        $context['meta_path'],
+                        json_encode($metaPayload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                    );
+                }
+                $downloadSuccess = true;
+                \think\facade\Log::info('缓存远程文件成功: ' . $url . ' -> ' . $targetPath . ' (' . filesize($targetPath) . ' bytes)');
+                return $targetPath;
+            } else {
+                throw new \Exception('下载失败: ' . ($error ?: 'HTTP ' . $httpCode));
+            }
+        } catch (\Exception $e) {
+            if ($ch) {
+                @curl_close($ch);
+            }
+            if ($fp) {
+                @fclose($fp);
+            }
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+            \think\facade\Log::warning('缓存远程文件失败: ' . $e->getMessage() . ' - ' . $url);
+            return null;
+        }
     }
 
     private function isCacheValid(string $path, array $config): bool
