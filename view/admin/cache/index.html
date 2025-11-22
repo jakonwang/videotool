@@ -15,10 +15,24 @@
 {block name="style"}
 <style>
     .cache-path-display {
-        font-size: 1rem;
+        font-size: 0.95rem;
         font-weight: 600;
         word-break: break-all;
         line-height: 1.4;
+        color: #fff;
+    }
+    .cache-copy-btn {
+        border: 1px solid rgba(255,255,255,.5);
+        color: #fff;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 20px;
+        background: transparent;
+        transition: background .2s;
+    }
+    .cache-copy-btn:hover {
+        background: rgba(255,255,255,.15);
+        color: #fff;
     }
 </style>
 {/block}
@@ -66,8 +80,15 @@
         <div class="col-md-3 col-sm-6 mb-3">
             <div class="small-box bg-danger">
                 <div class="inner">
-                    <div class="cache-path-display text-monospace">{$stats.root|default='-'}</div>
-                    <p class="mb-0" style="font-size:13px;">缓存目录</p>
+                    <div class="d-flex align-items-start">
+                        <div class="cache-path-display text-monospace flex-grow-1" id="cacheRootPath">{$stats.root|default='-'}</div>
+                        {if $stats.root}
+                        <button type="button" class="cache-copy-btn ml-2" data-path="{$stats.root}">
+                            <i class="fas fa-copy"></i> 复制
+                        </button>
+                        {/if}
+                    </div>
+                    <p class="mb-0 mt-2" style="font-size:13px;">缓存目录</p>
                 </div>
                 <div class="icon"><i class="fas fa-map-marker-alt"></i></div>
             </div>
@@ -205,16 +226,26 @@ $(function () {
     $('.btn-copy-url').on('click', function () {
         const url = $(this).data('url');
         if (!url) return;
+        copyText(url, '来源链接已复制');
+    });
+
+    $('.cache-copy-btn').on('click', function () {
+        const path = $(this).data('path');
+        if (!path) return;
+        copyText(path, '缓存目录已复制');
+    });
+
+    function copyText(text, successMsg) {
         if (navigator.clipboard) {
-            navigator.clipboard.writeText(url).then(() => {
-                AdminUI.showToast('success', '来源链接已复制');
+            navigator.clipboard.writeText(text).then(() => {
+                AdminUI.showToast('success', successMsg || '复制成功');
             }).catch(() => {
                 AdminUI.showToast('error', '复制失败');
             });
         } else {
             AdminUI.showToast('error', '当前环境不支持复制');
         }
-    });
+    }
 });
 </script>
 {/block}
