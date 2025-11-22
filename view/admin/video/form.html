@@ -1,22 +1,23 @@
 {extend name="admin/common/layout" /}
 
 {block name="title"}编辑视频{/block}
+{block name="page_title"}编辑视频{/block}
+{block name="breadcrumb"}<a href="/admin.php/video" class="text-muted">视频管理</a> / 编辑{/block}
+{block name="page_actions"}
+<a href="/admin.php/video" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left mr-1"></i> 返回列表
+</a>
+{/block}
 
 {block name="content"}
-<section class="content-header">
-    <div class="container-fluid">
-        <h1>编辑视频</h1>
-    </div>
-</section>
-
-<section class="content">
-    <div class="container-fluid">
-        <div class="card">
+<div class="row">
+    <div class="col-lg-8 col-xl-7">
+        <div class="card shadow-sm">
             <div class="card-body">
-                <form id="form" enctype="multipart/form-data">
+                <form id="video-form" enctype="multipart/form-data">
                     <input type="hidden" name="id" value="{$info.id}">
                     <div class="form-group">
-                        <label>平台 <span class="text-danger">*</span></label>
+                        <label for="platform_id">所属平台 <span class="text-danger">*</span></label>
                         <select name="platform_id" id="platform_id" class="form-control" required>
                             {volist name="platforms" id="platform"}
                             <option value="{$platform.id}" {if $info.platform_id == $platform.id}selected{/if}>{$platform.name}</option>
@@ -24,7 +25,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>设备 <span class="text-danger">*</span></label>
+                        <label for="device_id">设备 <span class="text-danger">*</span></label>
                         <select name="device_id" id="device_id" class="form-control" required>
                             {volist name="devices" id="device"}
                             <option value="{$device.id}" {if $info.device_id == $device.id}selected{/if}>{$device.device_name}</option>
@@ -32,121 +33,107 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>标题 <span class="text-danger">*</span></label>
-                        <textarea name="title" class="form-control" rows="3" required placeholder="视频标题">{$info.title}</textarea>
+                        <label for="title">标题 <span class="text-danger">*</span></label>
+                        <textarea name="title" id="title" class="form-control" rows="3" required placeholder="视频标题">{$info.title}</textarea>
                     </div>
                     <div class="form-group">
-                        <label>封面URL</label>
-                        <input type="text" name="cover_url" class="form-control" value="{$info.cover_url}" placeholder="封面图片URL">
-                        <small class="form-text text-muted">或上传新封面（上传后会覆盖URL）</small>
+                        <label for="cover_url">封面地址</label>
+                        <input type="text" name="cover_url" id="cover_url" class="form-control" value="{$info.cover_url}" placeholder="封面图片 URL">
+                        <small class="form-text text-muted">可上传新封面覆盖当前 URL。</small>
                         <input type="file" name="cover" class="form-control mt-2" accept="image/*">
                         {if $info.cover_url}
                         <div class="mt-2">
-                            <img src="{$info.cover_url}" style="max-width:200px; border-radius:5px;" onerror="this.style.display='none'">
+                            <img src="{$info.cover_url}" alt="封面" class="img-thumbnail" style="max-width:200px; object-fit:cover;" onerror="this.style.display='none'">
                         </div>
                         {/if}
                     </div>
                     <div class="form-group">
-                        <label>视频URL</label>
-                        <input type="text" name="video_url" class="form-control" value="{$info.video_url}" placeholder="视频文件URL">
-                        <small class="form-text text-muted">或上传新视频（上传后会覆盖URL）</small>
+                        <label for="video_url">视频地址</label>
+                        <input type="text" name="video_url" id="video_url" class="form-control" value="{$info.video_url}" placeholder="视频文件 URL">
+                        <small class="form-text text-muted">可上传新视频覆盖当前 URL。</small>
                         <input type="file" name="video" class="form-control mt-2" accept="video/*">
                     </div>
-                    <div class="form-group">
-                        <label>排序</label>
-                        <input type="number" name="sort_order" class="form-control" value="{$info.sort_order}" placeholder="数字越小越靠前">
-                        <small class="form-text text-muted">用于控制视频显示顺序，数字越小越靠前</small>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="sort_order">排序值</label>
+                            <input type="number" name="sort_order" id="sort_order" class="form-control" value="{$info.sort_order}" placeholder="数字越小越靠前">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="is_downloaded">下载状态</label>
+                            <select name="is_downloaded" id="is_downloaded" class="form-control">
+                                <option value="0" {if $info.is_downloaded == 0}selected{/if}>未下载</option>
+                                <option value="1" {if $info.is_downloaded == 1}selected{/if}>已下载</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>下载状态</label>
-                        <select name="is_downloaded" class="form-control">
-                            <option value="0" {if $info.is_downloaded == 0}selected{/if}>未下载</option>
-                            <option value="1" {if $info.is_downloaded == 1}selected{/if}>已下载</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存</button>
-                        <a href="/admin.php/video" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> 返回</a>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-1"></i> 保存
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-</section>
+</div>
 {/block}
 
 {block name="script"}
 <script>
-    $('#platform_id').change(function() {
-        const platformId = $(this).val();
-        if (platformId) {
-            $.get('/admin.php/device/getByPlatform', {platform_id: platformId}, function(res) {
-                const select = $('#device_id');
-                select.html('<option value="">请选择</option>');
-                if (res.code === 0 && res.data) {
-                    res.data.forEach(function(device) {
-                        select.append(`<option value="${device.id}">${device.device_name || device.ip_address}</option>`);
-                    });
-                }
-            });
+    function refreshDevices(platformId) {
+        if (!platformId) {
+            $('#device_id').html('<option value="">请选择</option>');
+            return;
         }
-    });
-    
-    $('#form').submit(function(e) {
-        e.preventDefault();
-        
-        // 前端验证
-        const platformId = $('#platform_id').val();
-        const deviceId = $('#device_id').val();
-        const title = $('textarea[name="title"]').val().trim();
-        
-        if (!platformId || !deviceId || !title) {
-            alert('请填写所有必填项（平台、设备、标题）');
-            return false;
-        }
-        
-        const formData = new FormData(this);
-        
-        const btn = $(this).find('button[type="submit"]');
-        const originalText = btn.html();
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 保存中...');
-        
-        $.ajax({
-            url: '/admin.php/video/edit/{$info.id}',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            dataType: 'json',
-            success: function(res) {
-                if (res && res.code === 0) {
-                    alert(res.msg || '保存成功');
-                    location.href = '/admin.php/video';
-                } else {
-                    alert(res.msg || '保存失败');
-                    btn.prop('disabled', false).html(originalText);
-                }
-            },
-            error: function(xhr, status, error) {
-                let errorMsg = '保存失败，请重试';
-                if (xhr.responseJSON && xhr.responseJSON.msg) {
-                    errorMsg = xhr.responseJSON.msg;
-                } else if (xhr.responseText) {
-                    try {
-                        const res = JSON.parse(xhr.responseText);
-                        if (res.msg) {
-                            errorMsg = res.msg;
-                        }
-                    } catch (e) {
-                        // 如果不是JSON，尝试直接显示响应文本
-                        if (xhr.responseText && xhr.responseText.length < 200) {
-                            errorMsg = xhr.responseText;
-                        }
-                    }
-                }
-                alert(errorMsg);
-                btn.prop('disabled', false).html(originalText);
+        $.get('/admin.php/device/getByPlatform', { platform_id: platformId }, function (res) {
+            const select = $('#device_id');
+            select.html('<option value="">请选择</option>');
+            if (res.code === 0 && Array.isArray(res.data)) {
+                res.data.forEach(function (device) {
+                    select.append(`<option value="${device.id}">${device.device_name || device.ip_address}</option>`);
+                });
             }
+        });
+    }
+
+    $(function () {
+        $('#platform_id').on('change', function () {
+            refreshDevices($(this).val());
+        });
+
+        $('#video-form').on('submit', function (event) {
+            event.preventDefault();
+            const $form = $(this);
+            const submitBtn = $form.find('button[type="submit"]');
+            const originalHtml = submitBtn.html();
+
+            if (!$('#platform_id').val() || !$('#device_id').val() || !$('#title').val().trim()) {
+                AdminUI.showToast('warning', '请填写平台、设备和标题');
+                return;
+            }
+
+            const formData = new FormData(this);
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1" role="status"></span>保存中');
+
+            $.ajax({
+                url: '/admin.php/video/edit/{$info.id}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json'
+            }).done(function (res) {
+                if (res && res.code === 0) {
+                    AdminUI.showToast('success', res.msg || '保存成功');
+                    setTimeout(() => window.location.href = '/admin.php/video', 1000);
+                } else {
+                    AdminUI.showToast('error', res.msg || '保存失败');
+                    submitBtn.prop('disabled', false).html(originalHtml);
+                }
+            }).fail(function () {
+                AdminUI.showToast('error', '保存失败，请稍后再试');
+                submitBtn.prop('disabled', false).html(originalHtml);
+            });
         });
     });
 </script>

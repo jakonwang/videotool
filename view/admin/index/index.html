@@ -1,66 +1,56 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}后台管理 - 首页{/block}
-
+{block name="title"}后台概览{/block}
+{block name="page_title"}后台概览{/block}
 {block name="content"}
-<section class="content-header">
-    <div class="container-fluid">
-        <h1>首页</h1>
-    </div>
-</section>
-
-<section class="content">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-3 col-6">
-                <div class="small-box bg-info">
-                    <div class="inner">
-                        <h3>{$stats.platforms}</h3>
-                        <p>平台数量</p>
-                    </div>
-                    <div class="icon">
-                        <i class="fas fa-th"></i>
-                    </div>
-                    <a href="/admin.php/platform" class="small-box-footer">更多 <i class="fas fa-arrow-circle-right"></i></a>
-                </div>
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-info">
+            <div class="inner">
+                <h3>{$stats.platforms}</h3>
+                <p>平台数量</p>
             </div>
-            <div class="col-lg-3 col-6">
-                <div class="small-box bg-success">
-                    <div class="inner">
-                        <h3>{$stats.devices}</h3>
-                        <p>设备数量</p>
-                    </div>
-                    <div class="icon">
-                        <i class="fas fa-mobile-alt"></i>
-                    </div>
-                    <a href="/admin.php/device" class="small-box-footer">更多 <i class="fas fa-arrow-circle-right"></i></a>
-                </div>
+            <div class="icon">
+                <i class="fas fa-layer-group"></i>
             </div>
-            <div class="col-lg-3 col-6">
-                <div class="small-box bg-warning">
-                    <div class="inner">
-                        <h3>{$stats.videos}</h3>
-                        <p>视频总数</p>
-                    </div>
-                    <div class="icon">
-                        <i class="fas fa-video"></i>
-                    </div>
-                    <a href="/admin.php/video" class="small-box-footer">更多 <i class="fas fa-arrow-circle-right"></i></a>
-                </div>
-            </div>
-            <div class="col-lg-3 col-6">
-                <div class="small-box bg-danger">
-                    <div class="inner">
-                        <h3>{$stats.undownloaded}</h3>
-                        <p>未下载视频</p>
-                    </div>
-                    <div class="icon">
-                        <i class="fas fa-download"></i>
-                    </div>
-                    <a href="/admin.php/video?is_downloaded=0" class="small-box-footer">更多 <i class="fas fa-arrow-circle-right"></i></a>
-                </div>
-            </div>
+            <a href="/admin.php/platform" class="small-box-footer">查看更多 <i class="fas fa-arrow-circle-right"></i></a>
         </div>
     </div>
-</section>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-success">
+            <div class="inner">
+                <h3>{$stats.devices}</h3>
+                <p>设备数量</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-mobile-alt"></i>
+            </div>
+            <a href="/admin.php/device" class="small-box-footer">查看更多 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-warning">
+            <div class="inner">
+                <h3>{$stats.videos}</h3>
+                <p>视频总数</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-video"></i>
+            </div>
+            <a href="/admin.php/video" class="small-box-footer">查看更多 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-danger">
+            <div class="inner">
+                <h3>{$stats.undownloaded}</h3>
+                <p>未下载视频</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-download"></i>
+            </div>
+            <a href="/admin.php/video?is_downloaded=0" class="small-box-footer">处理下载 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+</div>
 {/block}

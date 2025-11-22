@@ -14,7 +14,26 @@ class Platform extends BaseController
 {
     public function index()
     {
-        $list = PlatformModel::order('id', 'desc')->select();
+        $keyword = trim((string)$this->request->param('keyword', ''));
+        $status = $this->request->param('status', '');
+        
+        $query = PlatformModel::order('id', 'desc');
+        
+        if ($keyword !== '') {
+            $query->where(function ($sub) use ($keyword) {
+                $sub->whereLike('name', '%' . $keyword . '%')
+                    ->whereOr('code', 'like', '%' . $keyword . '%');
+            });
+        }
+        
+        if ($status !== '' && $status !== null) {
+            $query->where('status', (int)$status);
+        }
+        
+        $list = $query->paginate([
+            'list_rows' => 15,
+            'query' => $this->request->param()
+        ]);
         
         // 生成前台访问的基础URL
         $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
@@ -32,7 +51,9 @@ class Platform extends BaseController
         
         return View::fetch('admin/platform/index', [
             'list' => $list,
-            'base_url' => $baseUrl
+            'base_url' => $baseUrl,
+            'keyword' => $keyword,
+            'status' => $status
         ]);
     }
     

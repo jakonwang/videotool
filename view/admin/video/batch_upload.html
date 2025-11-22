@@ -1,6 +1,12 @@
 {extend name="admin/common/layout" /}
 
 {block name="title"}批量上传视频{/block}
+{block name="page_title"}批量上传视频{/block}
+{block name="page_actions"}
+<a href="/admin.php/video" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left mr-1"></i> 返回视频列表
+</a>
+{/block}
 
 {block name="style"}
 <style>
@@ -26,20 +32,13 @@
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 15px;
-        background: white;
+        background: #fff;
     }
     .video-preview {
         max-width: 200px;
         max-height: 150px;
         border-radius: 5px;
     }
-    
-    /* 统一按钮样式 */
-    .card-body .btn {
-        margin-right: 10px;
-        min-width: 120px;
-    }
-    
     .video-item .btn {
         min-width: 80px;
     }
@@ -47,58 +46,48 @@
 {/block}
 
 {block name="content"}
-<section class="content-header">
-    <div class="container-fluid">
-        <h1>批量上传视频</h1>
-    </div>
-</section>
-
-<section class="content">
-    <div class="container-fluid">
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div class="card">
-                <div class="card-body">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label>选择平台 <span class="text-danger">*</span></label>
-                            <select name="platform_id" id="platform_id" class="form-control" required>
-                                <option value="">请选择</option>
-                                {volist name="platforms" id="platform"}
-                                <option value="{$platform.id}">{$platform.name}</option>
-                                {/volist}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label>选择设备 <span class="text-danger">*</span></label>
-                            <select name="device_id" id="device_id" class="form-control" required>
-                                <option value="">请先选择平台</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="upload-area" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-primary"></i>
-                        <h5>点击或拖拽文件到此处上传</h5>
-                        <p class="text-muted">支持批量上传视频文件（MP4、AVI、MOV等格式）</p>
-                        <p class="text-warning"><small>⚠️ 单个文件建议不超过200MB，系统会自动优化上传方式。如果上传慢，请检查服务器网络和配置</small></p>
-                        <input type="file" id="videoFiles" name="videos[]" multiple accept="video/*" style="display:none">
-                    </div>
-                    
-                    <div id="videoList" class="mt-4"></div>
-                    
-                    <div class="mt-3">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-upload"></i> 开始上传
-                        </button>
-                        <a href="/admin.php/video" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> 返回
-                        </a>
-                    </div>
+<form id="uploadForm" enctype="multipart/form-data">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>选择平台 <span class="text-danger">*</span></label>
+                    <select name="platform_id" id="platform_id" class="form-control" required>
+                        <option value="">请选择</option>
+                        {volist name="platforms" id="platform"}
+                        <option value="{$platform.id}">{$platform.name}</option>
+                        {/volist}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label>选择设备 <span class="text-danger">*</span></label>
+                    <select name="device_id" id="device_id" class="form-control" required>
+                        <option value="">请先选择平台</option>
+                    </select>
                 </div>
             </div>
-        </form>
+
+            <div class="upload-area" id="uploadArea">
+                <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-primary"></i>
+                <h5>点击或拖拽文件到此处上传</h5>
+                <p class="text-muted mb-2">支持批量上传视频文件（MP4、AVI、MOV 等格式）</p>
+                <p class="text-warning small mb-0">⚠️ 单个文件建议不超过 200MB，若上传缓慢请检查服务器带宽与配置。</p>
+                <input type="file" id="videoFiles" name="videos[]" multiple accept="video/*" style="display:none">
+            </div>
+
+            <div id="videoList" class="mt-4"></div>
+
+            <div class="mt-3 d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary mr-2">
+                    <i class="fas fa-upload mr-1"></i> 开始上传
+                </button>
+                <button type="button" id="btnClear" class="btn btn-outline-secondary">
+                    <i class="fas fa-trash mr-1"></i> 清空列表
+                </button>
+            </div>
+        </div>
     </div>
-</section>
+</form>
 {/block}
 
 {block name="script"}
@@ -199,7 +188,22 @@
                 }
             }, false);
         }
-    
+
+        $('#btnClear').on('click', function () {
+            if (!videoFiles.length) {
+                AdminUI.showToast('info', '当前列表为空');
+                return;
+            }
+            AdminUI.confirm(`确定要清空 ${videoFiles.length} 个待上传视频吗？`, function () {
+                $('.video-item').remove();
+                videoFiles = [];
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+                AdminUI.showToast('success', '上传列表已清空');
+            });
+        });
+ 
         // 处理文件
         function handleFiles(files) {
             if (isProcessing || !files || files.length === 0) {
@@ -238,7 +242,7 @@
                 
                 // 显示错误提示
                 if (errors.length > 0) {
-                    alert('以下文件无法上传：\n' + errors.join('\n'));
+                    AdminUI.showToast('warning', '以下文件无法上传：' + errors.join('；'));
                 }
                 
                 // 再添加到数组和DOM
@@ -248,7 +252,7 @@
                 });
             } catch (error) {
                 console.error('处理文件时出错:', error);
-                alert('处理文件时出错，请重试');
+                AdminUI.showToast('error', '处理文件时出错，请重试');
             } finally {
                 // 延迟重置，确保所有操作完成
                 setTimeout(function() {
@@ -517,7 +521,7 @@
             e.stopPropagation();
             
             if (videoFiles.length === 0) {
-                alert('请选择视频文件');
+                AdminUI.showToast('warning', '请选择视频文件');
                 return false;
             }
             
@@ -526,7 +530,7 @@
             const deviceId = $('#device_id').val();
             
             if (!platformId || !deviceId) {
-                alert('请选择平台和设备');
+                AdminUI.showToast('warning', '请选择平台和设备');
                 return false;
             }
             
@@ -717,12 +721,12 @@
                     });
                     
                     if (successCount > 0) {
-                        alert('成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
+                        AdminUI.showToast('success', '成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
                         setTimeout(function() {
                             location.href = '/admin.php/video';
                         }, 500);
                     } else {
-                        alert('上传失败：\n' + errors.join('\n'));
+                        AdminUI.showToast('error', '上传失败：\n' + errors.join('\n'));
                         btn.prop('disabled', false).html(originalText);
                     }
                 }
@@ -858,12 +862,12 @@
                     });
                     
                     if (successCount > 0) {
-                        alert('成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
+                        AdminUI.showToast('success', '成功上传 ' + successCount + ' 个视频' + (errors.length > 0 ? '\n\n部分文件上传失败：\n' + errors.join('\n') : ''));
                         setTimeout(function() {
                             location.href = '/admin.php/video';
                         }, 500);
                     } else {
-                        alert('上传失败：\n' + errors.join('\n'));
+                        AdminUI.showToast('error', '上传失败：\n' + errors.join('\n'));
                         btn.prop('disabled', false).html(originalText);
                     }
                 }

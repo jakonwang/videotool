@@ -1,217 +1,151 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>平台管理</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
-</head>
-<body class="hold-transition sidebar-mini">
-    <div class="wrapper">
-        <nav class="main-header navbar navbar-expand navbar-white navbar-light">
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
-                </li>
-            </ul>
-            <ul class="navbar-nav ml-auto">
-                <li class="nav-item">
-                    <span class="nav-link">视频管理系统</span>
-                </li>
-            </ul>
-        </nav>
+{extend name="admin/common/layout" /}
 
-        <aside class="main-sidebar sidebar-dark-primary elevation-4">
-            <a href="/admin.php" class="brand-link">
-                <span class="brand-text font-weight-light">视频管理系统</span>
-            </a>
-            <div class="sidebar">
-                <nav class="mt-2">
-                    <ul class="nav nav-pills nav-sidebar flex-column">
-                        <li class="nav-item">
-                            <a href="/admin.php" class="nav-link">
-                                <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>首页</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/platform" class="nav-link active">
-                                <i class="nav-icon fas fa-th"></i>
-                                <p>平台管理</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/device" class="nav-link">
-                                <i class="nav-icon fas fa-mobile-alt"></i>
-                                <p>设备管理</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/video" class="nav-link">
-                                <i class="nav-icon fas fa-video"></i>
-                                <p>视频管理</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/video/batchUpload" class="nav-link">
-                                <i class="nav-icon fas fa-upload"></i>
-                                <p>批量上传</p>
-                            </a>
-                        </li>
-                    </ul>
-                </nav>
-            </div>
-        </aside>
+{block name="title"}平台管理{/block}
+{block name="page_title"}平台管理{/block}
+{block name="page_actions"}
+<a href="/admin.php/platform/add" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus mr-1"></i> 添加平台
+</a>
+{/block}
 
-        <div class="content-wrapper">
-            <section class="content-header">
-                <div class="container-fluid">
-                    <h1>平台管理 <a href="/admin.php/platform/add" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 添加平台</a></h1>
-                </div>
-            </section>
-            
-            <section class="content">
-                <div class="container-fluid">
-                    <div class="card">
-                        <div class="card-body">
-                            <table class="table table-bordered table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>平台名称</th>
-                                        <th>平台代码</th>
-                                        <th>图标</th>
-                                        <th>访问链接</th>
-                                        <th>状态</th>
-                                        <th>创建时间</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {volist name="list" id="item"}
-                                    <tr>
-                                        <td>{$item.id}</td>
-                                        <td>{$item.name}</td>
-                                        <td><code>{$item.code}</code></td>
-                                        <td>{$item.icon|raw}</td>
-                                        <td>
-                                            <div class="input-group input-group-sm" style="max-width: 350px;">
-                                                <input type="text" class="form-control platform-link" 
-                                                       value="{$base_url}?platform={$item.code}" 
-                                                       readonly 
-                                                       id="link_{$item.id}"
-                                                       style="font-size: 12px;">
-                                                <div class="input-group-append">
-                                                    <button class="btn btn-outline-secondary btn-sm" 
-                                                            type="button" 
-                                                            onclick="copyLink({$item.id})"
-                                                            title="复制链接"
-                                                            data-toggle="tooltip">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
-                                                    <a href="{$base_url}?platform={$item.code}" 
-                                                       target="_blank" 
-                                                       class="btn btn-outline-primary btn-sm"
-                                                       title="打开链接"
-                                                       data-toggle="tooltip">
-                                                        <i class="fas fa-external-link-alt"></i>
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            {if $item.status == 1}
-                                            <span class="badge badge-success">启用</span>
-                                            {else}
-                                            <span class="badge badge-danger">禁用</span>
-                                            {/if}
-                                        </td>
-                                        <td>{$item.created_at}</td>
-                                        <td>
-                                            <a href="/admin.php/platform/edit/{$item.id}" class="btn btn-sm btn-info"><i class="fas fa-edit"></i> 编辑</a>
-                                            <button onclick="deleteItem({$item.id})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> 删除</button>
-                                        </td>
-                                    </tr>
-                                    {/volist}
-                                </tbody>
-                            </table>
-                        </div>
+{block name="content"}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="get" class="form-row align-items-center mb-3">
+            <div class="col-md-4 mb-2">
+                <div class="input-group input-group-sm">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
                     </div>
+                    <input type="text" id="keyword" name="keyword" value="{$keyword|default=''}" class="form-control" placeholder="搜索名称或代码">
                 </div>
-            </section>
-        </div>
-
-        <footer class="main-footer">
-            <div class="float-right d-none d-sm-block">
-                <b>Version</b> 1.0.0
             </div>
-            <strong>Copyright &copy; 2024 视频管理系统.</strong> All rights reserved.
-        </footer>
+            <div class="col-md-3 mb-2">
+                <select name="status" id="status" class="form-control form-control-sm">
+                    <option value="">全部状态</option>
+                    <option value="1" {if $status==='1'}selected{/if}>启用</option>
+                    <option value="0" {if $status==='0'}selected{/if}>禁用</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-6 mb-2">
+                <button type="submit" class="btn btn-primary btn-sm btn-block">
+                    <i class="fas fa-filter mr-1"></i>筛选
+                </button>
+            </div>
+            <div class="col-md-2 col-6 mb-2">
+                <a href="/admin.php/platform" class="btn btn-outline-secondary btn-sm btn-block">
+                    <i class="fas fa-undo mr-1"></i>重置
+                </a>
+            </div>
+        </form>
+
+        {if count($list)}
+        <div class="table-responsive">
+            <table class="table table-hover table-striped text-nowrap">
+                <thead class="thead-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>平台名称</th>
+                        <th>平台代码</th>
+                        <th>图标</th>
+                        <th>访问链接</th>
+                        <th class="text-center">状态</th>
+                        <th>创建时间</th>
+                        <th class="text-right">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {volist name="list" id="item"}
+                    <tr>
+                        <td>{$item.id}</td>
+                        <td class="font-weight-bold">{$item.name}</td>
+                        <td><code>{$item.code}</code></td>
+                        <td>{$item.icon|raw|default='<span class="text-muted">—</span>'}</td>
+                        <td style="min-width:280px;">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control platform-link" value="{$base_url}?platform={$item.code}" readonly data-id="{$item.id}">
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm js-copy-link" data-link="{$base_url}?platform={$item.code}">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <a href="{$base_url}?platform={$item.code}" target="_blank" class="btn btn-outline-primary btn-sm" title="新窗口打开">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {if $item.status == 1}
+                            <span class="badge badge-success">启用</span>
+                            {else}
+                            <span class="badge badge-secondary">禁用</span>
+                            {/if}
+                        </td>
+                        <td>{$item.created_at|default='—'}</td>
+                        <td class="text-right">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/admin.php/platform/edit/{$item.id}" class="btn btn-outline-info">
+                                    <i class="fas fa-edit"></i> 编辑
+                                </a>
+                                <button type="button"
+                                        class="btn btn-outline-danger js-delete"
+                                        data-id="{$item.id}"
+                                        data-name="{$item.name}">
+                                    <i class="fas fa-trash-alt"></i> 删除
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {/volist}
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            {$list|raw}
+        </div>
+        {else /}
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-box-open fa-2x mb-3"></i>
+            <p class="mb-1">暂无平台数据</p>
+            <p class="small">点击右上角“添加平台”创建第一条记录。</p>
+        </div>
+        {/if}
     </div>
-    
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
-    <script>
-        // 初始化工具提示
-        $(function () {
-            $('[data-toggle="tooltip"]').tooltip();
-        });
-        
-        function deleteItem(id) {
-            if (confirm('确定要删除吗？删除后该平台下的所有设备和视频也会被删除！')) {
-                $.post('/admin.php/platform/delete/' + id, {}, function(res) {
-                    if (res.code === 0) {
-                        alert(res.msg);
-                        location.reload();
-                    } else {
-                        alert(res.msg);
-                    }
-                }).fail(function() {
-                    alert('删除失败，请重试');
+</div>
+{/block}
+
+{block name="script"}
+<script>
+    $(function () {
+        $('.js-copy-link').on('click', function () {
+            const link = $(this).data('link');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(link).then(() => {
+                    AdminUI.showToast('success', '链接已复制');
+                }).catch(() => {
+                    AdminUI.showToast('error', '复制失败，请手动复制');
                 });
+            } else {
+                AdminUI.showToast('warning', '浏览器不支持剪贴板，请手动复制');
             }
-        }
-        
-        // 复制链接
-        function copyLink(id) {
-            const input = document.getElementById('link_' + id);
-            if (!input) return;
-            
-            input.select();
-            input.setSelectionRange(0, 99999); // 移动端兼容
-            
-            try {
-                document.execCommand('copy');
-                
-                // 显示提示
-                const btn = $(input).closest('.input-group').find('button');
-                const originalHtml = btn.html();
-                btn.html('<i class="fas fa-check"></i>').removeClass('btn-outline-secondary').addClass('btn-success');
-                
-                setTimeout(function() {
-                    btn.html(originalHtml).removeClass('btn-success').addClass('btn-outline-secondary');
-                }, 2000);
-            } catch (err) {
-                // 如果 execCommand 失败，尝试使用 Clipboard API
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(input.value).then(function() {
-                        const btn = $(input).closest('.input-group').find('button');
-                        const originalHtml = btn.html();
-                        btn.html('<i class="fas fa-check"></i>').removeClass('btn-outline-secondary').addClass('btn-success');
-                        
-                        setTimeout(function() {
-                            btn.html(originalHtml).removeClass('btn-success').addClass('btn-outline-secondary');
-                        }, 2000);
-                    }).catch(function() {
-                        alert('复制失败，请手动复制');
-                    });
-                } else {
-                    alert('浏览器不支持复制，请手动复制');
-                }
-            }
-        }
-    </script>
-</body>
-</html>
+        });
+
+        $('.js-delete').on('click', function () {
+            const id = $(this).data('id');
+            const name = $(this).data('name');
+            AdminUI.confirm(`确定要删除平台「${name}」吗？删除后关联的设备与视频将一并移除。`, function () {
+                $.post(`/admin.php/platform/delete/${id}`, {}, function (res) {
+                    if (res.code === 0) {
+                        AdminUI.showToast('success', res.msg || '删除成功');
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        AdminUI.showToast('error', res.msg || '删除失败');
+                    }
+                }).fail(function () {
+                    AdminUI.showToast('error', '删除失败，请稍后再试');
+                });
+            });
+        });
+    });
+</script>
+{/block}

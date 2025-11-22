@@ -17,25 +17,39 @@ class Device extends BaseController
     public function index()
     {
         $platformId = $this->request->param('platform_id', 0);
-        $where = [];
+        $keyword = trim((string)$this->request->param('keyword', ''));
+        $status = $this->request->param('status', '');
+        
+        $query = DeviceModel::with('platform')->order('id', 'desc');
+        
         if ($platformId) {
-            $where[] = ['platform_id', '=', $platformId];
+            $query->where('platform_id', '=', $platformId);
         }
         
-        $list = DeviceModel::where($where)
-            ->with('platform')
-            ->order('id', 'desc')
-            ->paginate([
-                'list_rows' => 20,
-                'query' => $this->request->param()
-            ]);
+        if ($status !== '' && $status !== null) {
+            $query->where('status', (int)$status);
+        }
+        
+        if ($keyword !== '') {
+            $query->where(function ($sub) use ($keyword) {
+                $sub->whereLike('device_name', '%' . $keyword . '%')
+                    ->whereOr('ip_address', 'like', '%' . $keyword . '%');
+            });
+        }
+        
+        $list = $query->paginate([
+            'list_rows' => 20,
+            'query' => $this->request->param()
+        ]);
             
         $platforms = PlatformModel::select();
         
         return View::fetch('admin/device/index', [
             'list' => $list,
             'platforms' => $platforms,
-            'platform_id' => $platformId
+            'platform_id' => $platformId,
+            'keyword' => $keyword,
+            'status' => $status
         ]);
     }
     

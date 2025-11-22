@@ -22,19 +22,23 @@ class Video extends BaseController
         $platformId = $this->request->param('platform_id', 0);
         $deviceId = $this->request->param('device_id', 0);
         $isDownloaded = $this->request->param('is_downloaded', -1);
+        $keyword = trim((string)$this->request->param('keyword', ''));
         
-        $where = [];
-        if ($platformId) $where[] = ['platform_id', '=', $platformId];
-        if ($deviceId) $where[] = ['device_id', '=', $deviceId];
-        if ($isDownloaded >= 0) $where[] = ['is_downloaded', '=', $isDownloaded];
+        $query = VideoModel::with(['platform', 'device'])->order('id', 'desc');
+        if ($platformId) $query->where('platform_id', '=', $platformId);
+        if ($deviceId) $query->where('device_id', '=', $deviceId);
+        if ($isDownloaded >= 0) $query->where('is_downloaded', '=', $isDownloaded);
+        if ($keyword !== '') {
+            $query->where(function ($sub) use ($keyword) {
+                $sub->whereLike('title', '%' . $keyword . '%')
+                    ->whereOr('video_url', 'like', '%' . $keyword . '%');
+            });
+        }
         
-        $list = VideoModel::where($where)
-            ->with(['platform', 'device'])
-            ->order('id', 'desc')
-            ->paginate([
-                'list_rows' => 20,
-                'query' => $this->request->param()
-            ]);
+        $list = $query->paginate([
+            'list_rows' => 20,
+            'query' => $this->request->param()
+        ]);
             
         $platforms = PlatformModel::select();
         $devices = DeviceModel::select();
@@ -45,7 +49,8 @@ class Video extends BaseController
             'devices' => $devices,
             'platform_id' => $platformId,
             'device_id' => $deviceId,
-            'is_downloaded' => $isDownloaded
+            'is_downloaded' => $isDownloaded,
+            'keyword' => $keyword
         ]);
     }
     

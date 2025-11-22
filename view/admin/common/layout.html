@@ -1,31 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{block name="title"}后台管理{/block}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <style>
+        .content-header .page-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .toast-container {
+            z-index: 1090;
+            pointer-events: none;
+        }
+        .toast-container .toast {
+            pointer-events: auto;
+        }
+    </style>
     {block name="style"}{/block}
 </head>
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
-        <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+        <nav class="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
             <ul class="navbar-nav">
                 <li class="nav-item">
                     <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
                 </li>
             </ul>
             <ul class="navbar-nav ml-auto">
-                <li class="nav-item">
-                    <span class="nav-link">视频管理系统</span>
+                <li class="nav-item d-none d-sm-inline">
+                    <span class="nav-link text-muted"><i class="fas fa-film mr-1"></i>视频管理后台</span>
                 </li>
             </ul>
         </nav>
 
         <aside class="main-sidebar sidebar-dark-primary elevation-4">
-            <a href="/admin.php" class="brand-link">
-                <span class="brand-text font-weight-light">视频管理系统</span>
+            <a href="/admin.php" class="brand-link text-center">
+                <span class="brand-text font-weight-light"><i class="fas fa-video mr-1"></i>视频管理系统</span>
             </a>
             <div class="sidebar">
                 <nav class="mt-2">
@@ -33,12 +48,12 @@
                         <li class="nav-item">
                             <a href="/admin.php" class="nav-link {if $Request.controller == 'Index'}active{/if}">
                                 <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>首页</p>
+                                <p>仪表盘</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a href="/admin.php/platform" class="nav-link {if $Request.controller == 'Platform'}active{/if}">
-                                <i class="nav-icon fas fa-th"></i>
+                                <i class="nav-icon fas fa-layer-group"></i>
                                 <p>平台管理</p>
                             </a>
                         </li>
@@ -49,14 +64,14 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="/admin.php/video" class="nav-link {if $Request.controller == 'Video'}active{/if}">
+                            <a href="/admin.php/video" class="nav-link {if $Request.controller == 'Video' && $Request.action != 'batchUpload'}active{/if}">
                                 <i class="nav-icon fas fa-video"></i>
-                                <p>视频管理</p>
+                                <p>视频列表</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="/admin.php/video/batchUpload" class="nav-link {if $Request.action == 'batchUpload'}active{/if}">
-                                <i class="nav-icon fas fa-upload"></i>
+                            <a href="/admin.php/video/batchUpload" class="nav-link {if $Request.controller == 'Video' && $Request.action == 'batchUpload'}active{/if}">
+                                <i class="nav-icon fas fa-cloud-upload-alt"></i>
                                 <p>批量上传</p>
                             </a>
                         </li>
@@ -66,20 +81,105 @@
         </aside>
 
         <div class="content-wrapper">
-            {block name="content"}{/block}
+            <section class="content-header">
+                <div class="container-fluid d-flex align-items-center justify-content-between flex-wrap">
+                    <div>
+                        <h1 class="page-title mb-0">{block name="page_title"}后台管理{/block}</h1>
+                        <small class="text-muted">{block name="breadcrumb"}{/block}</small>
+                    </div>
+                    <div class="mt-2 mt-sm-0">
+                        {block name="page_actions"}{/block}
+                    </div>
+                </div>
+            </section>
+
+            <section class="content">
+                <div class="container-fluid">
+                    {block name="content"}{/block}
+                </div>
+            </section>
         </div>
 
         <footer class="main-footer">
-            <div class="float-right d-none d-sm-block">
-                <b>Version</b> 1.0.0
+            <div class="float-right d-none d-sm-inline">
+                <strong>Version</strong> {$Think.config.app.version|default='1.0.2'}
             </div>
             <strong>Copyright &copy; 2024 视频管理系统.</strong> All rights reserved.
         </footer>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="toast-container position-fixed top-0 right-0 p-3" style="right:0; top:0;">
+        <div id="globalToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="2500">
+            <div class="toast-header">
+                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">提示</span></strong>
+                <small class="text-muted">现在</small>
+                <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="toast-body" id="toastBody">操作成功</div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-labelledby="confirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmTitle">请确认</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="confirmMessage">确认执行该操作吗？</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmOkBtn">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+    <script>
+        window.AdminUI = (function () {
+            const toastEl = $('#globalToast');
+            const toastTitle = $('#toastTitle');
+            const toastBody = $('#toastBody');
+            const confirmModal = $('#confirmModal');
+            const confirmMessage = $('#confirmMessage');
+            const confirmOkBtn = $('#confirmOkBtn');
+            let confirmCallback = null;
+
+            confirmOkBtn.on('click', function () {
+                confirmModal.modal('hide');
+                if (typeof confirmCallback === 'function') {
+                    confirmCallback();
+                }
+            });
+
+            return {
+                showToast(type, message, title) {
+                    const typeMap = {
+                        success: {icon: 'fa-check-circle', title: title || '成功'},
+                        error: {icon: 'fa-times-circle', title: title || '错误'},
+                        warning: {icon: 'fa-exclamation-triangle', title: title || '提醒'},
+                        info: {icon: 'fa-info-circle', title: title || '提示'}
+                    };
+                    const meta = typeMap[type] || typeMap.info;
+                    toastTitle.html(`<i class="fas ${meta.icon} mr-1"></i>${meta.title}`);
+                    toastBody.text(message);
+                    toastEl.toast('show');
+                },
+                confirm(message, onOk) {
+                    confirmMessage.text(message || '确认执行该操作吗？');
+                    confirmCallback = onOk;
+                    confirmModal.modal('show');
+                }
+            };
+        })();
+    </script>
     {block name="script"}{/block}
 </body>
 </html>
