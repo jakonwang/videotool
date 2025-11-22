@@ -9,11 +9,171 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
     <style>
+        :root {
+            --dash-bg: #1a2035;
+            --dash-panel: #232b48;
+            --dash-panel-alt: #2c3555;
+            --dash-accent: #5d8dff;
+            --dash-accent-2: #54d7c4;
+            --dash-text: #f4f7ff;
+            --dash-muted: #a8b6de;
+            --dash-border: rgba(255,255,255,0.18);
+            --dash-danger: #ff7b9c;
+            --dash-success: #49e2b7;
+        }
+        body.dark-dashboard {
+            background: radial-gradient(circle at 20% 20%, rgba(93,141,255,.18), transparent 50%),
+                        radial-gradient(circle at 80% 0%, rgba(84,215,196,.16), transparent 45%),
+                        radial-gradient(circle at 50% 80%, rgba(255,140,180,.12), transparent 55%),
+                        linear-gradient(120deg, #1a2035 0%, #1f2c45 60%, #1b243d 100%);
+            color: var(--dash-text);
+        }
+        body.dark-dashboard::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 20% 20%, rgba(93,141,255,.12), transparent 45%),
+                        radial-gradient(circle at 80% 0%, rgba(59,228,215,.12), transparent 45%),
+                        radial-gradient(circle at 50% 80%, rgba(255,140,180,.08), transparent 55%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .wrapper,
+        .content-wrapper,
+        .main-sidebar,
+        .main-header,
+        .main-footer {
+            z-index: 1;
+        }
         .content-header .page-title {
             font-size: 1.5rem;
             font-weight: 600;
         }
-        .toast-container {
+        .dark-dashboard .main-header {
+            background: rgba(26,33,52,.85);
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            backdrop-filter: blur(8px);
+        }
+        .dark-dashboard .navbar-nav .nav-link {
+            color: var(--dash-muted);
+        }
+        .dark-dashboard .navbar-nav .nav-link:hover {
+            color: var(--dash-accent);
+        }
+        .dark-dashboard .main-sidebar {
+            background: linear-gradient(180deg, #0c1424 0%, #0b111d 100%);
+            border-right: 1px solid rgba(255,255,255,0.05);
+        }
+        .dark-dashboard .brand-link {
+            background: transparent;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: var(--dash-text);
+        }
+        .dark-dashboard .nav-sidebar>.nav-item>.nav-link {
+            color: var(--dash-muted);
+            transition: all .2s ease;
+        }
+        .dark-dashboard .nav-sidebar>.nav-item>.nav-link.active,
+        .dark-dashboard .nav-sidebar>.nav-item>.nav-link:hover {
+            background: rgba(93,141,255,.2);
+            color: var(--dash-text);
+            border-left: 3px solid var(--dash-accent);
+            box-shadow: inset 0 0 12px rgba(93,141,255,.2);
+        }
+        .dark-dashboard .content-wrapper {
+            background: transparent;
+        }
+        .dark-dashboard .card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            border: 1px solid var(--dash-border);
+            box-shadow: 0 20px 45px rgba(12,16,28,.55);
+            border-radius: 18px;
+        }
+        .dark-dashboard .card-header,
+        .dark-dashboard .card-footer {
+            border-color: var(--dash-border);
+            background: rgba(255,255,255,0.01);
+        }
+        .dark-dashboard .main-footer {
+            background: rgba(10,16,28,.8);
+            border-top: 1px solid var(--dash-border);
+            color: var(--dash-muted);
+        }
+        .dark-dashboard .btn-primary {
+            background: linear-gradient(135deg, var(--dash-accent), var(--dash-accent-2));
+            border: none;
+            box-shadow: 0 8px 20px rgba(61,126,255,.35);
+        }
+        .dark-dashboard .btn-outline-secondary {
+            color: var(--dash-text);
+            border-color: rgba(255,255,255,.2);
+        }
+        .dark-dashboard .btn-outline-secondary:hover {
+            background: rgba(255,255,255,.08);
+            color: var(--dash-text);
+        }
+        .dark-dashboard .form-control,
+        .dark-dashboard .form-control:focus,
+        .dark-dashboard .custom-select {
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.08);
+            color: var(--dash-text);
+        }
+        .dark-dashboard .form-control:focus {
+            box-shadow: 0 0 0 0.2rem rgba(61,126,255,.15);
+        }
+        .dark-dashboard .table {
+            color: var(--dash-text);
+        }
+        .dark-dashboard .table thead th {
+            border-bottom: 1px solid var(--dash-border);
+            color: var(--dash-muted);
+        }
+        .dark-dashboard .table td,
+        .dark-dashboard .table th {
+            border-top: 1px solid rgba(255,255,255,.05);
+        }
+        .dark-dashboard .badge-success {
+            background: rgba(25,211,166,.2);
+            color: var(--dash-success);
+        }
+        .dark-dashboard .badge-warning {
+            background: rgba(255,184,0,.15);
+            color: #ffcd4d;
+        }
+        .dark-dashboard .badge-secondary {
+            background: rgba(255,255,255,.1);
+            color: var(--dash-muted);
+        }
+        .dark-dashboard .small-box {
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,.05);
+            box-shadow: 0 12px 30px rgba(0,0,0,.35);
+        }
+        .dark-dashboard .small-box.bg-info {
+            background: linear-gradient(140deg, rgba(61,126,255,.95), rgba(119,92,246,.9));
+        }
+        .dark-dashboard .small-box.bg-success {
+            background: linear-gradient(140deg, rgba(34,211,238,.9), rgba(72,199,161,.9));
+        }
+        .dark-dashboard .small-box.bg-warning {
+            background: linear-gradient(140deg, rgba(255,165,0,.9), rgba(255,107,107,.9));
+        }
+        .dark-dashboard .small-box.bg-danger {
+            background: linear-gradient(140deg, rgba(244,63,94,.95), rgba(168,85,247,.9));
+        }
+        .dark-dashboard .pagination .page-link {
+            background: rgba(255,255,255,.05);
+            border: 1px solid rgba(255,255,255,.08);
+            color: var(--dash-muted);
+        }
+        .dark-dashboard .pagination .page-link:hover,
+        .dark-dashboard .pagination .page-item.active .page-link {
+            background: var(--dash-accent);
+            border-color: var(--dash-accent);
+            color: #fff;
+        }
+        .dark-dashboard .toast-container {
             position: fixed;
             right: 1rem;
             bottom: 1rem;
@@ -24,10 +184,24 @@
         .toast-container .toast {
             pointer-events: auto;
         }
+        .dark-dashboard .toast {
+            background: rgba(15,23,42,.95);
+            border: 1px solid rgba(255,255,255,.08);
+            color: var(--dash-text);
+        }
+        .dark-dashboard .modal-content {
+            background: var(--dash-panel);
+            color: var(--dash-text);
+            border: 1px solid var(--dash-border);
+        }
+        .dark-dashboard .modal-header,
+        .dark-dashboard .modal-footer {
+            border-color: var(--dash-border);
+        }
     </style>
     {block name="style"}{/block}
 </head>
-<body class="hold-transition sidebar-mini layout-fixed">
+<body class="hold-transition sidebar-mini layout-fixed dark-dashboard">
     <div class="wrapper">
         <nav class="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
             <ul class="navbar-nav">
@@ -99,7 +273,7 @@
 
             <section class="content">
                 <div class="container-fluid">
-                    {block name="content"}{/block}
+            {block name="content"}{/block}
                 </div>
             </section>
         </div>
