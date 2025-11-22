@@ -53,6 +53,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -74,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
     private View platformListView;
     private DownloadManager downloadManager;
     private long downloadId;
+    private final Map<Long, DownloadTaskMeta> downloadTaskMap = new ConcurrentHashMap<>();
     private static final String[] CDN_HOST_KEYWORDS = {
             "storage.banono-us.com",
             "qiniucdn",
@@ -330,7 +333,7 @@ public class MainActivity extends AppCompatActivity {
         boolean isPrimaryImage = primaryMime != null && primaryMime.toLowerCase(Locale.US).contains("image");
 
         if (isCdnUrl(finalPrimaryUrl)) {
-            if (downloadViaSystemManager(finalPrimaryUrl, normalizedFileName, primaryMime, isPrimaryVideo, isPrimaryImage)) {
+            if (downloadViaSystemManager(finalPrimaryUrl, normalizedFileName, primaryMime, isPrimaryVideo, isPrimaryImage, finalFallbackUrl)) {
                 return;
             }
         }
@@ -340,7 +343,7 @@ public class MainActivity extends AppCompatActivity {
             if (!success && finalFallbackUrl != null && !finalFallbackUrl.isEmpty() && !finalFallbackUrl.equals(finalPrimaryUrl)) {
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, "主链接下载失败，尝试备用链接", Toast.LENGTH_SHORT).show());
                 boolean fallbackCdn = isCdnUrl(finalFallbackUrl);
-                if (fallbackCdn && downloadViaSystemManager(finalFallbackUrl, finalFileName, primaryMime, isPrimaryVideo, isPrimaryImage)) {
+                if (fallbackCdn && downloadViaSystemManager(finalFallbackUrl, finalFileName, primaryMime, isPrimaryVideo, isPrimaryImage, null)) {
                     return;
                 }
                 attemptDownload(finalFallbackUrl, finalFileName, false);
@@ -471,6 +474,38 @@ public class MainActivity extends AppCompatActivity {
         return "application/octet-stream";
     }
 
+    private static class DownloadTaskMeta {
+        String originalUrl;
+        String fallbackUrl;
+        String fileName;
+        boolean isVideo;
+        boolean isImage;
+    }
+
+    private String translateDmReason(int reason) {
+        switch (reason) {
+            case DownloadManager.ERROR_DEVICE_NOT_FOUND:
+                return "存储设备不可用";
+            case DownloadManager.ERROR_FILE_ALREADY_EXISTS:
+                return "文件已存在";
+            case DownloadManager.ERROR_FILE_ERROR:
+                return "文件读写错误";
+            case DownloadManager.ERROR_HTTP_DATA_ERROR:
+                return "网络数据错误";
+            case DownloadManager.ERROR_INSUFFICIENT_SPACE:
+                return "存储空间不足";
+            case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
+                return "重定向过多";
+            case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
+                return "HTTP响应异常";
+            case DownloadManager.ERROR_CANNOT_RESUME:
+                return "无法恢复下载";
+            case DownloadManager.ERROR_UNKNOWN:
+            default:
+                return "未知错误";
+        }
+    }
+
     private boolean isCdnUrl(String url) {
         if (url == null || url.isEmpty()) {
             return false;
@@ -491,7 +526,7 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    private boolean downloadViaSystemManager(String url, String fileName, String mimeType, boolean isVideo, boolean isImage) {
+    private boolean downloadViaSystemManager(String url, String fileName, String mimeType, boolean isVideo, boolean isImage, String fallbackUrl) {
         try {
             Uri uri = Uri.parse(url);
             DownloadManager.Request request = new DownloadManager.Request(uri);
@@ -508,6 +543,15 @@ public class MainActivity extends AppCompatActivity {
             request.setDestinationInExternalPublicDir(targetDir, subDir + "/" + fileName);
 
             downloadId = downloadManager.enqueue(request);
+
+            DownloadTaskMeta meta = new DownloadTaskMeta();
+            meta.originalUrl = url;
+            meta.fallbackUrl = fallbackUrl;
+            meta.fileName = fileName;
+            meta.isVideo = isVideo;
+            meta.isImage = isImage;
+            downloadTaskMap.put(downloadId, meta);
+
             registerDownloadReceiver();
             runOnUiThread(() -> Toast.makeText(MainActivity.this, "已交由系统下载管理器处理", Toast.LENGTH_SHORT).show());
             return true;
@@ -622,19 +666,34 @@ public class MainActivity extends AppCompatActivity {
                         query.setFilterById(id);
                         Cursor cursor = downloadManager.query(query);
                         
+                        DownloadTaskMeta meta = downloadTaskMap.remove(downloadId);
                         if (cursor.moveToFirst()) {
                             int statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
                             int status = cursor.getInt(statusIndex);
                             
                             if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                                String fileName = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME));
+                                String localUri = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                                 runOnUiThread(() -> {
-                                    Toast.makeText(MainActivity.this, "下载完成: " + fileName, Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(MainActivity.this, "系统下载完成", Toast.LENGTH_SHORT).show();
                                 });
+                                if (localUri != null) {
+                                    MediaScannerConnection.scanFile(MainActivity.this,
+                                            new String[]{Uri.parse(localUri).getPath()},
+                                            null,
+                                            null);
+                                }
                             } else if (status == DownloadManager.STATUS_FAILED) {
-                                runOnUiThread(() -> {
-                                    Toast.makeText(MainActivity.this, "下载失败", Toast.LENGTH_SHORT).show();
-                                });
+                                int reasonIndex = cursor.getColumnIndex(DownloadManager.COLUMN_REASON);
+                                final int reason = reasonIndex >= 0 ? cursor.getInt(reasonIndex) : -1;
+                                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                                        "系统下载失败: " + translateDmReason(reason), Toast.LENGTH_SHORT).show());
+                                if (meta != null) {
+                                    final String nextUrl = meta.fallbackUrl != null && !meta.fallbackUrl.isEmpty()
+                                            ? meta.fallbackUrl : meta.originalUrl;
+                                    if (nextUrl != null && !nextUrl.isEmpty()) {
+                                        new Thread(() -> attemptDownload(nextUrl, meta.fileName, false)).start();
+                                    }
+                                }
                             }
                         }
                         cursor.close();
