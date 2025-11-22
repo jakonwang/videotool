@@ -41,5 +41,9 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('cache/delete/<hash>', 'app\controller\admin\Cache@delete');
     Route::post('cache/clear', 'app\controller\admin\Cache@clear');
     Route::get('cache/download/<hash>', 'app\controller\admin\Cache@download');
+    
+    // 下载错误监控
+    Route::get('downloadLog', 'app\controller\admin\DownloadLog@index');
+    Route::post('downloadLog/clear', 'app\controller\admin\DownloadLog@clear');
 }
 
