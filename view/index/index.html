@@ -547,14 +547,17 @@
                             const result = await resp.json();
                             if (result.code === 0 && result.data) {
                                 const data = result.data;
-                                const proxyUrl = data.proxy_url || data.direct_url || forcedDownloadUrl;
                                 // 优先使用CDN链接（七牛云等），直接下载，速度快
                                 const cdnUrl = data.cdn_url || data.file_url || '';
+                                const proxyUrl = data.proxy_url || data.direct_url || forcedDownloadUrl;
+                                // 备用链接确保带prefer_cdn参数，后端会自动302到CDN
+                                const backupUrl = proxyUrl.includes('prefer_cdn=') ? proxyUrl : proxyUrl + (proxyUrl.includes('?') ? '&' : '?') + 'prefer_cdn=1';
                                 const finalName = data.file_name || fileName;
                                 
                                 // CDN链接优先，不做任何修改，直接使用
-                                let primary = cdnUrl || proxyUrl;
-                                let backup = proxyUrl;
+                                // 如果没有CDN链接，使用代理链接（带prefer_cdn=1会302到CDN）
+                                let primary = cdnUrl || backupUrl;
+                                let backup = backupUrl;
                                 
                                 // 如果CDN链接存在，优先使用CDN（DownloadManager会直接下载）
                                 if (cdnUrl) {

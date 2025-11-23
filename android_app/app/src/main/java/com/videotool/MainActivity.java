@@ -341,13 +341,14 @@ public class MainActivity extends AppCompatActivity {
         
         android.util.Log.d("Download", "开始下载任务 - 文件名: " + normalizedFileName + ", URL: " + primaryUrl);
         
-        nativeDownloader.enqueueDownload(normalizedFileName, primaryUrl, fallbackUrl, (success, msg) -> {
+        // 使用简化的DownloadManager下载方式
+        nativeDownloader.downloadWithFallback(normalizedFileName, primaryUrl, fallbackUrl, (success, msg) -> {
             android.util.Log.d("Download", "下载回调 - success: " + success + ", msg: " + msg);
-            String toastMsg = msg != null ? msg : (success ? "下载完成" : "下载失败");
+            String toastMsg = msg != null ? msg : (success ? "下载已开始" : "下载失败");
             runOnUiThread(() -> Toast.makeText(MainActivity.this, toastMsg, Toast.LENGTH_SHORT).show());
         });
         
-        android.util.Log.d("Download", "下载任务已提交到队列");
+        android.util.Log.d("Download", "下载任务已提交");
     }
     
     /**

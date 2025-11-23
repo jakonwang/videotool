@@ -1,744 +1,145 @@
 package com.videotool.download;
 
 import android.app.DownloadManager;
-import android.app.NotificationManager;
-import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Environment;
-import android.provider.MediaStore;
-import android.media.MediaScannerConnection;
-import android.widget.Toast;
-import androidx.core.app.NotificationCompat;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.util.Locale;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import okhttp3.OkHttpClient;
-import okhttp3.Protocol;
-import okhttp3.Request;
-import okhttp3.Response;
+import android.util.Log;
 
+/**
+ * 简化版下载器 - 只使用Android DownloadManager
+ * 这是Android系统级的标准下载方式，所有主流APP都在使用
+ * 
+ * 优势：
+ * 1. 系统级下载，自动断点续传
+ * 2. 后台下载，应用退出后仍可继续
+ * 3. 省电优化，系统统一管理
+ * 4. 自动处理网络切换、重定向
+ * 5. 无需复杂逻辑，稳定可靠
+ */
 public class NativeDownloader {
     public interface DownloadListener {
         void onComplete(boolean success, String message);
     }
 
-    private static final int THREAD_COUNT = 4;
-    private static final int CONNECT_TIMEOUT = 15;
-    private static final int READ_TIMEOUT = 120;
-    private static final int WRITE_TIMEOUT = 120;
-    private static final String CHANNEL_ID = "download_channel";
-
     private final Context context;
-    private final OkHttpClient httpClient;
-    private final ExecutorService executorService;
 
     public NativeDownloader(Context context) {
         this.context = context.getApplicationContext();
-        this.httpClient = new OkHttpClient.Builder()
-                .connectTimeout(CONNECT_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(READ_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS)
-                .writeTimeout(WRITE_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS)
-                .retryOnConnectionFailure(true)
-                .protocols(java.util.Collections.singletonList(Protocol.HTTP_1_1))
-                .build();
-        this.executorService = Executors.newFixedThreadPool(THREAD_COUNT);
-    }
-
-    public void enqueueDownload(String fileName, String primaryUrl, String fallbackUrl, DownloadListener listener) {
-        new Thread(() -> {
-            boolean success = downloadWithUrl(fileName, primaryUrl, listener);
-            if (!success && fallbackUrl != null && !fallbackUrl.isEmpty() && !fallbackUrl.equals(primaryUrl)) {
-                downloadWithUrl(fileName, fallbackUrl, listener);
-            }
-        }).start();
-    }
-
-    private boolean downloadWithUrl(String fileName, String url, DownloadListener listener) {
-        // 如果是CDN链接（七牛云等），优先使用DownloadManager下载（最快最可靠）
-        // DownloadManager优势：系统级下载、多线程、断点续传、后台下载、省电
-        // 如果DownloadManager失败（防盗链、私有空间、权限不足等），会自动回退到OkHttp下载
-        if (isCdnUrl(url)) {
-            android.util.Log.d("NativeDownloader", "检测到CDN链接，优先使用DownloadManager下载: " + url);
-            return downloadWithDownloadManager(fileName, url, listener);
-        }
-        
-        // 否则使用原有的OkHttp下载方式
-        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        int notificationId = (int) (System.currentTimeMillis() / 1000);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(fileName)
-                .setContentText("准备下载...")
-                .setOnlyAlertOnce(true)
-                .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW);
-        if (nm != null) nm.notify(notificationId, builder.build());
-
-        try {
-            android.util.Log.d("NativeDownloader", "开始下载: " + fileName + " - " + url);
-            long fileSize = fetchContentLength(url);
-            android.util.Log.d("NativeDownloader", "获取文件大小结果: " + fileSize + " bytes");
-            
-            File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
-            
-            // 如果无法获取文件大小，使用单线程流式下载
-            if (fileSize <= 0) {
-                android.util.Log.i("NativeDownloader", "文件大小未知，切换到流式下载模式: " + url);
-                builder.setContentText("正在准备下载...");
-                if (nm != null) nm.notify(notificationId, builder.build());
-                return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
-            }
-            
-            // 获取到文件大小时，使用多线程分片下载
-            RandomAccessFile raf = new RandomAccessFile(tempFile, "rw");
-            raf.setLength(fileSize);
-            raf.close();
-
-            AtomicLong downloadedBytes = new AtomicLong(0);
-            AtomicBoolean hasError = new AtomicBoolean(false);
-            CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
-            long chunkSize = (long) Math.ceil(fileSize * 1.0 / THREAD_COUNT);
-
-            for (int i = 0; i < THREAD_COUNT; i++) {
-                long start = i * chunkSize;
-                long end = Math.min(fileSize - 1, (i + 1) * chunkSize - 1);
-                executorService.execute(new SegmentTask(url, tempFile, start, end, downloadedBytes, fileSize, latch, hasError, nm, notificationId, builder));
-            }
-
-            latch.await();
-
-            if (hasError.get()) {
-                tempFile.delete();
-                if (listener != null) listener.onComplete(false, "下载失败，已自动重试备用链接");
-                if (nm != null) nm.cancel(notificationId);
-                return false;
-            }
-
-            if (saveToGallery(tempFile, fileName)) {
-                if (listener != null) listener.onComplete(true, "下载完成");
-                if (nm != null) {
-                    builder.setContentText("下载完成")
-                            .setOngoing(false)
-                            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                            .setProgress(0, 0, false);
-                    nm.notify(notificationId, builder.build());
-                    new Thread(() -> {
-                        try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
-                        nm.cancel(notificationId);
-                    }).start();
-                }
-                tempFile.delete();
-                return true;
-            } else {
-                tempFile.delete();
-                if (listener != null) listener.onComplete(false, "保存失败");
-                if (nm != null) nm.cancel(notificationId);
-                return false;
-            }
-        } catch (Exception e) {
-            android.util.Log.e("NativeDownloader", "下载过程发生异常: " + e.getMessage(), e);
-            String errorMsg = e.getMessage();
-            // 如果错误消息包含"无法获取文件大小"，说明是旧版本代码，尝试流式下载
-            if (errorMsg != null && errorMsg.contains("无法获取文件大小")) {
-                android.util.Log.w("NativeDownloader", "检测到旧版本错误消息，尝试流式下载");
-                try {
-                    File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
-                    return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
-                } catch (Exception ex) {
-                    android.util.Log.e("NativeDownloader", "流式下载也失败: " + ex.getMessage(), ex);
-                    if (listener != null) listener.onComplete(false, "下载失败，请检查网络连接");
-                    if (nm != null) nm.cancel(notificationId);
-                    return false;
-                }
-            }
-            // 其他异常，显示更友好的错误消息
-            if (listener != null) {
-                String friendlyMsg = errorMsg != null && errorMsg.contains("HTTP") 
-                    ? "下载失败：" + errorMsg 
-                    : "下载失败，请重试";
-                listener.onComplete(false, friendlyMsg);
-            }
-            if (nm != null) nm.cancel(notificationId);
-            return false;
-        }
     }
 
     /**
-     * 判断是否为CDN链接（七牛云等）
-     * 重要：排除代理URL（如 /api/video/download），只有真正的CDN直接链接才返回true
-     */
-    private boolean isCdnUrl(String url) {
-        if (url == null || url.isEmpty()) {
-            return false;
-        }
-        String lowerUrl = url.toLowerCase();
-        
-        // 排除代理URL（API接口URL不是CDN链接）
-        if (lowerUrl.contains("/api/") || lowerUrl.contains("/download") || lowerUrl.contains("video_id=")) {
-            android.util.Log.d("NativeDownloader", "URL是代理接口，不是CDN链接: " + url);
-            return false;
-        }
-        
-        // 七牛云CDN域名（但不包含代理路径）
-        boolean isQiniuCdn = lowerUrl.contains("qiniucdn.com") || 
-                             lowerUrl.contains("qbox.me") || 
-                             lowerUrl.contains("qnssl.com") ||
-                             // 存储域名（如 storage.banono-us.com）
-                             (lowerUrl.contains("storage") && lowerUrl.contains("banono-us.com")) ||
-                             // 其他OSS/CDN域名
-                             (lowerUrl.contains("oss") && !lowerUrl.contains("/api/")) ||
-                             (lowerUrl.contains("cdn") && !lowerUrl.contains("/api/"));
-        
-        if (isQiniuCdn) {
-            android.util.Log.d("NativeDownloader", "检测到CDN链接: " + url);
-        } else {
-            android.util.Log.d("NativeDownloader", "不是CDN链接，将使用OkHttp下载: " + url);
-        }
-        
-        return isQiniuCdn;
-    }
-    
-    /**
-     * 使用系统DownloadManager下载（最快、最可靠的方式）
-     * 适用于CDN链接直接下载
+     * 下载文件 - 统一使用DownloadManager（最简单可靠的方式）
      * 
-     * 注意：如果七牛云设置了防盗链或私有空间，DownloadManager可能失败
-     * 此时应该回退到OkHttp下载
+     * @param fileName 文件名
+     * @param url 下载URL（可以是CDN链接或代理链接，DownloadManager会自动处理重定向）
+     * @param listener 下载结果回调
      */
-    private boolean downloadWithDownloadManager(String fileName, String url, DownloadListener listener) {
+    public void download(String fileName, String url, DownloadListener listener) {
         try {
             DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
             if (downloadManager == null) {
-                android.util.Log.e("NativeDownloader", "DownloadManager服务不可用，将回退到OkHttp下载");
-                // 回退到OkHttp下载
-                return downloadWithOkHttpFallback(fileName, url, listener);
+                Log.e("NativeDownloader", "DownloadManager服务不可用");
+                if (listener != null) {
+                    listener.onComplete(false, "下载服务不可用");
+                }
+                return;
             }
 
-            // 直接使用DownloadManager，不预先测试URL（减少延迟）
-            // DownloadManager本身会处理失败情况，如果失败会自动在下载列表中显示错误
-            // 为了更好的用户体验，我们直接提交下载，不等待测试结果
-            android.util.Log.d("NativeDownloader", "直接使用DownloadManager下载CDN链接（跳过URL测试以提升速度）");
+            Log.d("NativeDownloader", "开始下载: " + fileName + " - " + url);
 
             // 创建下载请求
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             
-            // 判断是视频还是图片
+            // 判断文件类型
             boolean isVideo = fileName.toLowerCase().endsWith(".mp4") || 
                              fileName.toLowerCase().endsWith(".mov") ||
-                             fileName.toLowerCase().endsWith(".avi");
+                             fileName.toLowerCase().endsWith(".avi") ||
+                             fileName.toLowerCase().endsWith(".mkv") ||
+                             fileName.toLowerCase().endsWith(".flv");
             
-            // 设置下载目录（视频保存到Movies目录，图片保存到Pictures目录）
+            // 设置下载目录
             if (isVideo) {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, "VideoTool/" + fileName);
+                request.setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_MOVIES, 
+                    "VideoTool/" + fileName
+                );
             } else {
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_PICTURES, "VideoTool/" + fileName);
+                request.setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_PICTURES, 
+                    "VideoTool/" + fileName
+                );
             }
             
-            // 设置标题和描述
+            // 基本设置
             request.setTitle(fileName);
             request.setDescription("VideoTool下载");
             
-            // 设置通知可见性（下载完成后显示通知）
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            // 通知设置 - 下载完成后显示通知
+            request.setNotificationVisibility(
+                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+            );
             
-            // 允许移动网络下载
+            // 允许移动网络和漫游下载
             request.setAllowedOverMetered(true);
-            
-            // 允许Roaming下载
             request.setAllowedOverRoaming(true);
             
-            // 设置MIME类型
+            // 设置MIME类型（帮助系统识别文件类型）
             if (isVideo) {
                 request.setMimeType("video/mp4");
             } else {
                 request.setMimeType("image/jpeg");
             }
             
-            // 设置Referer和User-Agent（重要：七牛云防盗链需要）
+            // 添加请求头（如果需要防盗链验证）
             request.addRequestHeader("Referer", "https://videotool.banono-us.com/");
-            request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp");
+            request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android) VideoToolApp");
             
             // 提交下载请求
             long downloadId = downloadManager.enqueue(request);
             
-            android.util.Log.i("NativeDownloader", "DownloadManager下载已提交: " + fileName + " - ID: " + downloadId + " - URL: " + url);
+            Log.i("NativeDownloader", "下载已提交到DownloadManager - ID: " + downloadId + " - URL: " + url);
             
+            // 立即返回成功（DownloadManager会在后台处理）
+            // DownloadManager会自动处理：
+            // 1. 302重定向到CDN
+            // 2. 断点续传
+            // 3. 网络切换
+            // 4. 下载进度和通知
             if (listener != null) {
-                listener.onComplete(true, "下载已添加到下载列表，请在通知栏查看进度");
+                listener.onComplete(true, "下载已开始，请在通知栏查看进度");
             }
             
-            return true;
-            
-        } catch (SecurityException e) {
-            // 权限不足，回退到OkHttp下载
-            android.util.Log.w("NativeDownloader", "DownloadManager权限不足（存储权限），回退到OkHttp下载: " + e.getMessage());
-            return downloadWithOkHttpFallback(fileName, url, listener);
         } catch (Exception e) {
-            android.util.Log.e("NativeDownloader", "DownloadManager下载失败，回退到OkHttp下载: " + e.getMessage(), e);
-            return downloadWithOkHttpFallback(fileName, url, listener);
-        }
-    }
-    
-    /**
-     * 使用OkHttp下载（备用方案）
-     * 当DownloadManager失败时使用
-     */
-    private boolean downloadWithOkHttpFallback(String fileName, String url, DownloadListener listener) {
-        android.util.Log.i("NativeDownloader", "使用OkHttp备用下载方案: " + fileName + " - " + url);
-        
-        // 使用原有的OkHttp下载逻辑
-        // 这里可以调用 downloadWithUrl 方法，但需要去掉CDN检查，避免递归
-        // 或者直接使用流式下载
-        
-        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        int notificationId = (int) (System.currentTimeMillis() / 1000);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(fileName)
-                .setContentText("准备下载...")
-                .setOnlyAlertOnce(true)
-                .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW);
-        if (nm != null) nm.notify(notificationId, builder.build());
-        
-        try {
-            File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
-            builder.setContentText("正在准备下载...");
-            if (nm != null) nm.notify(notificationId, builder.build());
-            
-            // 直接使用流式下载（不检查CDN）
-            return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
-        } catch (Exception e) {
-            android.util.Log.e("NativeDownloader", "OkHttp备用下载失败: " + e.getMessage(), e);
-            if (listener != null) listener.onComplete(false, "下载失败：" + e.getMessage());
-            if (nm != null) nm.cancel(notificationId);
-            return false;
+            Log.e("NativeDownloader", "下载失败: " + e.getMessage(), e);
+            if (listener != null) {
+                listener.onComplete(false, "下载失败: " + e.getMessage());
+            }
         }
     }
 
     /**
-     * 获取文件大小（HEAD请求）
-     * 如果无法获取，返回-1，不抛出异常
+     * 下载文件（支持主备链接）
+     * 优先使用主链接，如果主链接为空则使用备用链接
+     * 
+     * @param fileName 文件名
+     * @param primaryUrl 主链接（优先使用）
+     * @param fallbackUrl 备用链接（主链接为空时使用）
+     * @param listener 下载结果回调
      */
-    private long fetchContentLength(String url) {
-        try {
-        Request req = new Request.Builder()
-                .url(url)
-                .head()
-                .header("Referer", "https://videotool.banono-us.com/")
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
-                .build();
-            
-        try (Response response = httpClient.newCall(req).execute()) {
-            if (!response.isSuccessful()) {
-                    android.util.Log.w("NativeDownloader", "HEAD请求失败: HTTP " + response.code() + " - " + url);
-                    // 不抛出异常，返回-1以触发流式下载
-                    return -1;
-                }
-                
-                long contentLength = response.body() != null ? response.body().contentLength() : -1;
-                if (contentLength <= 0) {
-                    android.util.Log.w("NativeDownloader", "HEAD请求成功但无Content-Length: " + url);
-                    return -1;
-                } else {
-                    android.util.Log.d("NativeDownloader", "获取到文件大小: " + contentLength + " bytes - " + url);
-                    return contentLength;
-                }
-            }
-        } catch (IOException e) {
-            android.util.Log.w("NativeDownloader", "HEAD请求IOException: " + e.getMessage() + " - " + url, e);
-            return -1;
-        } catch (Exception e) {
-            android.util.Log.w("NativeDownloader", "HEAD请求异常: " + e.getMessage() + " - " + url, e);
-            // 任何异常都返回-1，触发流式下载
-            return -1;
-        }
-    }
-
-    private boolean saveToGallery(File tempFile, String fileName) {
-        try {
-            String mime = guessMimeType(fileName);
-            boolean isVideo = mime.contains("video");
-            Uri uri;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                ContentValues values = new ContentValues();
-                values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-                values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
-                values.put(MediaStore.MediaColumns.RELATIVE_PATH, isVideo ? "Movies/VideoTool" : "Pictures/VideoTool");
-                Uri external = isVideo ? MediaStore.Video.Media.EXTERNAL_CONTENT_URI : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-                uri = context.getContentResolver().insert(external, values);
-                if (uri == null) throw new FileNotFoundException("Cannot create media entry");
-                try (InputStream in = new java.io.FileInputStream(tempFile);
-                     java.io.OutputStream out = context.getContentResolver().openOutputStream(uri)) {
-                    if (out == null) throw new FileNotFoundException("输出流为空");
-                    byte[] buf = new byte[8192];
-                    int len;
-                    while ((len = in.read(buf)) != -1) {
-                        out.write(buf, 0, len);
-                    }
-                }
-            } else {
-                File downloads = isVideo
-                        ? new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MOVIES), "VideoTool")
-                        : new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "VideoTool");
-                if (!downloads.exists()) downloads.mkdirs();
-                File dest = new File(downloads, fileName);
-                try (InputStream in = new java.io.FileInputStream(tempFile);
-                     FileOutputStream out = new FileOutputStream(dest)) {
-                    byte[] buf = new byte[8192];
-                    int len;
-                    while ((len = in.read(buf)) != -1) {
-                        out.write(buf, 0, len);
-                    }
-                }
-                uri = Uri.fromFile(dest);
-            }
-
-            android.media.MediaScannerConnection.scanFile(context,
-                    new String[]{uri.toString()},
-                    new String[]{mime},
-                    (path, scannedUri) -> {});
-            return true;
-        } catch (Exception e) {
-            Toast.makeText(context, "保存失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            return false;
-        }
-    }
-
-    private String guessMimeType(String fileName) {
-        String lower = fileName.toLowerCase(Locale.US);
-        if (lower.endsWith(".mp4")) return "video/mp4";
-        if (lower.endsWith(".mov")) return "video/quicktime";
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-        if (lower.endsWith(".png")) return "image/png";
-        return "application/octet-stream";
-    }
-
-    private class SegmentTask implements Runnable {
-        private final String url;
-        private final File tempFile;
-        private final long start;
-        private final long end;
-        private final AtomicLong downloaded;
-        private final long totalSize;
-        private final CountDownLatch latch;
-        private final AtomicBoolean hasError;
-        private final NotificationManager nm;
-        private final int notificationId;
-        private final NotificationCompat.Builder builder;
-
-        SegmentTask(String url, File tempFile, long start, long end,
-                    AtomicLong downloaded, long totalSize, CountDownLatch latch,
-                    AtomicBoolean hasError, NotificationManager nm, int notificationId,
-                    NotificationCompat.Builder builder) {
-            this.url = url;
-            this.tempFile = tempFile;
-            this.start = start;
-            this.end = end;
-            this.downloaded = downloaded;
-            this.totalSize = totalSize;
-            this.latch = latch;
-            this.hasError = hasError;
-            this.nm = nm;
-            this.notificationId = notificationId;
-            this.builder = builder;
-        }
-
-        @Override
-        public void run() {
-            if (hasError.get()) {
-                latch.countDown();
-                return;
-            }
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("Referer", "https://videotool.banono-us.com/")
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
-                    .header("Accept-Encoding", "identity")
-                    .header("Range", "bytes=" + start + "-" + end)
-                    .build();
-            try (Response response = httpClient.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null) {
-                    hasError.set(true);
-                    latch.countDown();
-                    return;
-                }
-                InputStream in = response.body().byteStream();
-                RandomAccessFile raf = new RandomAccessFile(tempFile, "rw");
-                raf.seek(start);
-                // 增大缓冲区到128KB，提升多线程下载速度（原来是8KB，IO操作太频繁）
-                byte[] buffer = new byte[131072]; // 128KB = 128 * 1024
-                long totalRead = 0;
-                long lastUpdate = 0;
-                int len;
-                while ((len = in.read(buffer)) != -1) {
-                    raf.write(buffer, 0, len);
-                    totalRead += len;
-                    long downloadedNow = downloaded.addAndGet(len);
-                    long now = System.currentTimeMillis();
-                    if (nm != null && now - lastUpdate > 500) {
-                        int progress = (int) (downloadedNow * 100 / totalSize);
-                        builder.setProgress(100, progress, false)
-                                .setContentText("下载中... " + progress + "%");
-                        nm.notify(notificationId, builder.build());
-                        lastUpdate = now;
-                    }
-                }
-                raf.close();
-                in.close();
-            } catch (IOException e) {
-                hasError.set(true);
-            } finally {
-                latch.countDown();
+    public void downloadWithFallback(String fileName, String primaryUrl, String fallbackUrl, DownloadListener listener) {
+        // 优先使用主链接
+        if (primaryUrl != null && !primaryUrl.isEmpty()) {
+            Log.d("NativeDownloader", "使用主链接下载: " + primaryUrl);
+            download(fileName, primaryUrl, listener);
+        } else if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
+            Log.d("NativeDownloader", "主链接为空，使用备用链接: " + fallbackUrl);
+            download(fileName, fallbackUrl, listener);
+        } else {
+            Log.e("NativeDownloader", "所有下载链接都为空");
+            if (listener != null) {
+                listener.onComplete(false, "下载地址无效");
             }
         }
-    }
-    
-    /**
-     * 流式下载（当无法获取文件大小时使用）
-     * 支持自动重试和断点续传
-     */
-    private boolean downloadStreaming(String url, File tempFile, String fileName,
-                                      NotificationManager nm, int notificationId,
-                                      NotificationCompat.Builder builder, DownloadListener listener) {
-        int maxRetries = 3;
-        int retryDelay = 2000; // 2秒
-        
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                long resumeFrom = 0;
-                boolean appendMode = false;
-                
-                // 检查是否有部分下载的文件，支持断点续传
-                if (tempFile.exists() && tempFile.length() > 0) {
-                    resumeFrom = tempFile.length();
-                    appendMode = true;
-                    android.util.Log.i("NativeDownloader", "检测到部分下载文件，从 " + resumeFrom + " 字节继续下载 (尝试 " + attempt + "/" + maxRetries + ")");
-                } else if (attempt > 1) {
-                    android.util.Log.i("NativeDownloader", "重试下载 (尝试 " + attempt + "/" + maxRetries + ")");
-                }
-                
-                Request.Builder requestBuilder = new Request.Builder()
-                        .url(url)
-                        .header("Referer", "https://videotool.banono-us.com/")
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
-                        .header("Accept-Encoding", "identity");
-                
-                // 如果是从中间继续，添加Range头
-                if (resumeFrom > 0) {
-                    requestBuilder.header("Range", "bytes=" + resumeFrom + "-");
-                }
-                
-                Request request = requestBuilder.build();
-                
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (!response.isSuccessful() || response.body() == null) {
-                        android.util.Log.e("NativeDownloader", "流式下载失败: HTTP " + (response.code()));
-                        if (attempt < maxRetries) {
-                            android.util.Log.i("NativeDownloader", "等待 " + retryDelay + " 毫秒后重试...");
-                            try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                            continue;
-                        }
-                        if (listener != null) listener.onComplete(false, "HTTP " + response.code());
-                        if (nm != null) nm.cancel(notificationId);
-                        return false;
-                    }
-                    
-                    // 检查是否支持断点续传（206状态码）
-                    int code = response.code();
-                    boolean isPartial = (code == 206); // Partial Content
-                    if (resumeFrom > 0 && !isPartial) {
-                        android.util.Log.w("NativeDownloader", "服务器不支持断点续传，重新下载");
-                        tempFile.delete();
-                        resumeFrom = 0;
-                        appendMode = false;
-                    }
-                    
-                    InputStream in = response.body().byteStream();
-                    java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile, appendMode);
-                    
-                    // 增大缓冲区到128KB，提升下载速度（原来是8KB，IO操作太频繁）
-                    byte[] buffer = new byte[131072]; // 128KB = 128 * 1024
-                    long totalRead = resumeFrom;
-                    long lastUpdate = 0;
-                    int len;
-                    
-                    if (attempt == 1) {
-                        builder.setContentText("正在下载...")
-                                .setProgress(0, 0, true); // 不确定进度
-                        if (nm != null) nm.notify(notificationId, builder.build());
-                    }
-                    
-                    while ((len = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, len);
-                        totalRead += len;
-                        
-                        long now = System.currentTimeMillis();
-                        if (nm != null && now - lastUpdate > 1000) { // 每秒更新一次
-                            builder.setContentText("正在下载... " + (totalRead / 1024 / 1024) + " MB" + 
-                                    (attempt > 1 ? " (重试" + attempt + ")" : ""));
-                            nm.notify(notificationId, builder.build());
-                            lastUpdate = now;
-                        }
-                    }
-                    
-                    out.close();
-                    in.close();
-                    response.close();
-                    
-                    // 下载完成，检查文件
-                    if (tempFile.length() == 0) {
-                        android.util.Log.e("NativeDownloader", "流式下载失败: 文件为空 (尝试 " + attempt + "/" + maxRetries + ")");
-                        if (attempt < maxRetries) {
-                            tempFile.delete();
-                            android.util.Log.i("NativeDownloader", "等待 " + retryDelay + " 毫秒后重试...");
-                            try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                            continue;
-                        }
-                        tempFile.delete();
-                        if (listener != null) listener.onComplete(false, "下载失败：文件为空");
-                        if (nm != null) nm.cancel(notificationId);
-                        return false;
-                    }
-                    
-                    android.util.Log.i("NativeDownloader", "流式下载完成: " + totalRead + " bytes");
-                    
-                    // 保存到相册
-                    if (saveToGallery(tempFile, fileName)) {
-                        if (listener != null) listener.onComplete(true, "下载完成");
-                        if (nm != null) {
-                            builder.setContentText("下载完成")
-                                    .setOngoing(false)
-                                    .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                                    .setProgress(0, 0, false);
-                            nm.notify(notificationId, builder.build());
-                            new Thread(() -> {
-                                try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
-                                nm.cancel(notificationId);
-                            }).start();
-                        }
-                        tempFile.delete();
-                        return true;
-                    } else {
-                        tempFile.delete();
-                        if (listener != null) listener.onComplete(false, "保存失败");
-                        if (nm != null) nm.cancel(notificationId);
-                        return false;
-                    }
-                }
-            } catch (java.net.UnknownHostException e) {
-                // DNS解析失败，网络问题，可以重试（必须在其他网络异常之前）
-                android.util.Log.w("NativeDownloader", "流式下载DNS解析失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
-                if (attempt < maxRetries) {
-                    // DNS解析失败时，等待更长时间（网络可能需要恢复）
-                    int dnsRetryDelay = retryDelay * 2; // DNS问题等待时间加倍
-                    android.util.Log.i("NativeDownloader", "DNS解析失败，等待 " + dnsRetryDelay + " 毫秒后重试...");
-                    try { Thread.sleep(dnsRetryDelay); } catch (InterruptedException ignored) {}
-                    retryDelay *= 2; // 指数退避
-                    continue;
-                }
-                // 最后一次尝试失败
-                android.util.Log.e("NativeDownloader", "DNS解析失败，已重试 " + maxRetries + " 次: " + e.getMessage());
-                if (listener != null) listener.onComplete(false, "下载失败：网络连接失败，请检查网络设置");
-                if (nm != null) nm.cancel(notificationId);
-                return false;
-            } catch (java.net.ConnectException | java.net.SocketTimeoutException e) {
-                // 连接超时或连接拒绝，可以重试（必须在SocketException之前，因为ConnectException是SocketException的子类）
-                android.util.Log.w("NativeDownloader", "流式下载连接失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
-                if (attempt < maxRetries) {
-                    android.util.Log.i("NativeDownloader", "连接失败，等待 " + retryDelay + " 毫秒后重试...");
-                    try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                    retryDelay *= 2; // 指数退避
-                    continue;
-                }
-                // 最后一次尝试失败
-                android.util.Log.e("NativeDownloader", "连接失败，已重试 " + maxRetries + " 次: " + e.getMessage());
-                if (listener != null) listener.onComplete(false, "下载失败：无法连接到服务器（已重试" + maxRetries + "次）");
-                if (nm != null) nm.cancel(notificationId);
-                return false;
-            } catch (java.net.SocketException | javax.net.ssl.SSLException e) {
-                // 连接中断错误，可以重试（必须在最后，因为它会捕获其他SocketException子类）
-                android.util.Log.w("NativeDownloader", "流式下载连接中断 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
-                if (attempt < maxRetries) {
-                    // 保留已下载的部分，下次从断点继续
-                    android.util.Log.i("NativeDownloader", "已下载 " + (tempFile.exists() ? tempFile.length() : 0) + " 字节，等待 " + retryDelay + " 毫秒后继续...");
-                    try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                    retryDelay *= 2; // 指数退避：2秒、4秒、8秒
-                    continue;
-                }
-                // 最后一次尝试失败
-                android.util.Log.e("NativeDownloader", "流式下载失败，已重试 " + maxRetries + " 次: " + e.getMessage());
-                if (listener != null) listener.onComplete(false, "下载失败：网络连接中断（已重试" + maxRetries + "次）");
-                if (nm != null) nm.cancel(notificationId);
-                // 保留部分下载的文件，下次可以继续
-                return false;
-            } catch (Exception e) {
-                // 其他异常
-                android.util.Log.e("NativeDownloader", "流式下载异常 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage(), e);
-                String errorMsg = e.getMessage();
-                boolean isRetryable = false;
-                
-                // 判断是否为可重试的网络错误
-                if (errorMsg != null) {
-                    String lowerMsg = errorMsg.toLowerCase();
-                    isRetryable = lowerMsg.contains("connection") || 
-                                 lowerMsg.contains("timeout") ||
-                                 lowerMsg.contains("network") ||
-                                 lowerMsg.contains("host") ||
-                                 lowerMsg.contains("resolve") ||
-                                 lowerMsg.contains("unable to resolve");
-                }
-                
-                if (attempt < maxRetries && isRetryable) {
-                    // 网络相关错误，可以重试
-                    android.util.Log.i("NativeDownloader", "网络错误，等待 " + retryDelay + " 毫秒后重试...");
-                    try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                    retryDelay *= 2; // 指数退避
-                    continue;
-                }
-                // 不可重试的错误或已达最大重试次数
-                if (tempFile.exists()) {
-                    // 对于连接中断，保留部分文件
-                    if (e.getMessage() != null && (e.getMessage().contains("abort") || e.getMessage().contains("connection"))) {
-                        android.util.Log.i("NativeDownloader", "保留部分下载文件，下次可继续下载");
-                    } else {
-                        tempFile.delete();
-                    }
-                }
-                if (listener != null) {
-                    String finalErrorMsg = errorMsg;
-                    if (finalErrorMsg != null && finalErrorMsg.contains("abort")) {
-                        finalErrorMsg = "下载失败：连接中断（已尝试" + attempt + "次）";
-                    } else if (finalErrorMsg != null && (finalErrorMsg.contains("unable to resolve") || finalErrorMsg.contains("no address"))) {
-                        finalErrorMsg = "下载失败：网络连接失败，请检查网络设置";
-                    } else if (finalErrorMsg == null || finalErrorMsg.isEmpty()) {
-                        finalErrorMsg = "下载失败：未知错误";
-                    }
-                    listener.onComplete(false, finalErrorMsg);
-                }
-                if (nm != null) nm.cancel(notificationId);
-                return false;
-            }
-        }
-        
-        // 所有重试都失败
-        android.util.Log.e("NativeDownloader", "流式下载失败，已重试 " + maxRetries + " 次");
-        if (listener != null) listener.onComplete(false, "下载失败（已重试" + maxRetries + "次）");
-        if (nm != null) nm.cancel(notificationId);
-        return false;
     }
 }
-
