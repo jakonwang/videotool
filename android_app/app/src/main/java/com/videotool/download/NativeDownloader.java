@@ -79,10 +79,15 @@ public class NativeDownloader {
 
         try {
             long fileSize = fetchContentLength(url);
-            if (fileSize <= 0) {
-                throw new IOException("无法获取文件大小");
-            }
             File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
+            
+            // 如果无法获取文件大小，使用单线程流式下载
+            if (fileSize <= 0) {
+                android.util.Log.w("NativeDownloader", "无法获取文件大小，使用流式下载: " + url);
+                return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
+            }
+            
+            // 获取到文件大小时，使用多线程分片下载
             RandomAccessFile raf = new RandomAccessFile(tempFile, "rw");
             raf.setLength(fileSize);
             raf.close();
@@ -144,9 +149,21 @@ public class NativeDownloader {
                 .build();
         try (Response response = httpClient.newCall(req).execute()) {
             if (!response.isSuccessful()) {
-                throw new IOException("HTTP " + response.code());
+                android.util.Log.w("NativeDownloader", "HEAD请求失败: HTTP " + response.code() + " - " + url);
+                // 不抛出异常，返回-1以触发流式下载
+                return -1;
             }
-            return response.body() != null ? response.body().contentLength() : -1;
+            long contentLength = response.body() != null ? response.body().contentLength() : -1;
+            if (contentLength <= 0) {
+                android.util.Log.w("NativeDownloader", "HEAD请求成功但无Content-Length: " + url);
+            } else {
+                android.util.Log.d("NativeDownloader", "获取到文件大小: " + contentLength + " bytes - " + url);
+            }
+            return contentLength;
+        } catch (Exception e) {
+            android.util.Log.w("NativeDownloader", "HEAD请求异常: " + e.getMessage() + " - " + url);
+            // 异常时返回-1，触发流式下载
+            return -1;
         }
     }
 
@@ -285,6 +302,97 @@ public class NativeDownloader {
             } finally {
                 latch.countDown();
             }
+        }
+    }
+    
+    /**
+     * 流式下载（当无法获取文件大小时使用）
+     */
+    private boolean downloadStreaming(String url, File tempFile, String fileName,
+                                      NotificationManager nm, int notificationId,
+                                      NotificationCompat.Builder builder, DownloadListener listener) {
+        try {
+            Request request = new Request.Builder()
+                    .url(url)
+                    .header("Referer", "https://videotool.banono-us.com/")
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
+                    .header("Accept-Encoding", "identity")
+                    .build();
+            
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    android.util.Log.e("NativeDownloader", "流式下载失败: HTTP " + (response.code()));
+                    if (listener != null) listener.onComplete(false, "HTTP " + response.code());
+                    if (nm != null) nm.cancel(notificationId);
+                    return false;
+                }
+                
+                InputStream in = response.body().byteStream();
+                java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile);
+                
+                byte[] buffer = new byte[8192];
+                long totalRead = 0;
+                long lastUpdate = 0;
+                int len;
+                
+                builder.setContentText("正在下载...")
+                        .setProgress(0, 0, true); // 不确定进度
+                if (nm != null) nm.notify(notificationId, builder.build());
+                
+                while ((len = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, len);
+                    totalRead += len;
+                    
+                    long now = System.currentTimeMillis();
+                    if (nm != null && now - lastUpdate > 1000) { // 每秒更新一次
+                        builder.setContentText("正在下载... " + (totalRead / 1024 / 1024) + " MB");
+                        nm.notify(notificationId, builder.build());
+                        lastUpdate = now;
+                    }
+                }
+                
+                out.close();
+                in.close();
+                
+                if (tempFile.length() == 0) {
+                    android.util.Log.e("NativeDownloader", "流式下载失败: 文件为空");
+                    tempFile.delete();
+                    if (listener != null) listener.onComplete(false, "下载失败：文件为空");
+                    if (nm != null) nm.cancel(notificationId);
+                    return false;
+                }
+                
+                // 保存到相册
+                if (saveToGallery(tempFile, fileName)) {
+                    if (listener != null) listener.onComplete(true, "下载完成");
+                    if (nm != null) {
+                        builder.setContentText("下载完成")
+                                .setOngoing(false)
+                                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                                .setProgress(0, 0, false);
+                        nm.notify(notificationId, builder.build());
+                        new Thread(() -> {
+                            try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
+                            nm.cancel(notificationId);
+                        }).start();
+                    }
+                    tempFile.delete();
+                    return true;
+                } else {
+                    tempFile.delete();
+                    if (listener != null) listener.onComplete(false, "保存失败");
+                    if (nm != null) nm.cancel(notificationId);
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("NativeDownloader", "流式下载异常: " + e.getMessage(), e);
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+            if (listener != null) listener.onComplete(false, e.getMessage());
+            if (nm != null) nm.cancel(notificationId);
+            return false;
         }
     }
 }

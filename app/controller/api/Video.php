@@ -715,17 +715,34 @@ class Video extends BaseController
         ];
 
         $fileSize = null;
-        if ($isLocalFile) {
-            $localPath = $this->urlToLocalPath($fileUrl);
-            if ($localPath && file_exists($localPath)) {
-                $fileSize = @filesize($localPath);
+        try {
+            if ($isLocalFile) {
+                $localPath = $this->urlToLocalPath($fileUrl);
+                if ($localPath && file_exists($localPath)) {
+                    $fileSize = @filesize($localPath);
+                    if (!$fileSize || $fileSize <= 0) {
+                        \think\facade\Log::warning("本地文件大小获取失败: {$localPath}");
+                    }
+                } else {
+                    \think\facade\Log::warning("本地文件不存在: {$localPath} (URL: {$fileUrl})");
+                }
+            } else {
+                $fileSize = $this->getRemoteFileSize($fileUrl);
+                if (!$fileSize || $fileSize <= 0) {
+                    \think\facade\Log::warning("远程文件大小获取失败: {$fileUrl} (将使用流式传输，不设置Content-Length)");
+                }
             }
-        } else {
-            $fileSize = $this->getRemoteFileSize($fileUrl);
-        }
 
-        if (is_numeric($fileSize) && $fileSize > 0) {
-            $headers['Content-Length'] = (string)$fileSize;
+            if (is_numeric($fileSize) && $fileSize > 0) {
+                $headers['Content-Length'] = (string)$fileSize;
+            } else {
+                // 无法获取文件大小时，使用Transfer-Encoding: chunked（不设置Content-Length）
+                // 这样客户端仍可以下载，只是无法提前知道文件大小
+                \think\facade\Log::info("HEAD请求：无法获取文件大小，将使用chunked传输 - {$fileUrl}");
+            }
+        } catch (\Exception $e) {
+            \think\facade\Log::error("构建HEAD响应头异常: {$fileUrl} - " . $e->getMessage());
+            // 异常时仍然返回基础响应头，允许流式下载
         }
 
         return $headers;
@@ -1031,6 +1048,7 @@ class Video extends BaseController
     {
         $ch = curl_init($url);
         if ($ch === false) {
+            \think\facade\Log::warning("无法初始化cURL获取文件大小: {$url}");
             return null;
         }
 
@@ -1051,20 +1069,29 @@ class Video extends BaseController
         ]);
 
         $result = curl_exec($ch);
-        if ($result === false) {
-            curl_close($ch);
-            return null;
-        }
-
+        $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $length = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
         curl_close($ch);
 
-        if ($httpCode >= 200 && $httpCode < 400 && $length >= 0) {
-            return (int)$length;
+        if ($result === false) {
+            \think\facade\Log::warning("cURL执行失败获取文件大小: {$url} - {$error}");
+            return null;
         }
 
-        return null;
+        if ($httpCode >= 200 && $httpCode < 400) {
+            if ($length > 0) {
+                \think\facade\Log::info("成功获取远程文件大小: {$url} - {$length} bytes");
+                return (int)$length;
+            } else {
+                // HTTP状态码正常，但没有Content-Length头（可能服务器不支持或文件是动态生成的）
+                \think\facade\Log::warning("远程文件HEAD响应正常但无Content-Length: {$url} (HTTP {$httpCode})");
+                return null;
+            }
+        } else {
+            \think\facade\Log::warning("远程文件HEAD请求失败: {$url} - HTTP {$httpCode}");
+            return null;
+        }
     }
     
     /**
