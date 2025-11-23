@@ -211,11 +211,10 @@ public class NativeDownloader {
                 return downloadWithOkHttpFallback(fileName, url, listener);
             }
 
-            // 先测试URL是否可访问（HEAD请求）
-            if (!testUrlAccessible(url)) {
-                android.util.Log.w("NativeDownloader", "CDN链接无法访问（可能是防盗链或私有空间），回退到OkHttp下载");
-                return downloadWithOkHttpFallback(fileName, url, listener);
-            }
+            // 直接使用DownloadManager，不预先测试URL（减少延迟）
+            // DownloadManager本身会处理失败情况，如果失败会自动在下载列表中显示错误
+            // 为了更好的用户体验，我们直接提交下载，不等待测试结果
+            android.util.Log.d("NativeDownloader", "直接使用DownloadManager下载CDN链接（跳过URL测试以提升速度）");
 
             // 创建下载请求
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
@@ -491,7 +490,8 @@ public class NativeDownloader {
                 InputStream in = response.body().byteStream();
                 RandomAccessFile raf = new RandomAccessFile(tempFile, "rw");
                 raf.seek(start);
-                byte[] buffer = new byte[8192];
+                // 增大缓冲区到128KB，提升多线程下载速度（原来是8KB，IO操作太频繁）
+                byte[] buffer = new byte[131072]; // 128KB = 128 * 1024
                 long totalRead = 0;
                 long lastUpdate = 0;
                 int len;
@@ -581,7 +581,8 @@ public class NativeDownloader {
                     InputStream in = response.body().byteStream();
                     java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile, appendMode);
                     
-                    byte[] buffer = new byte[8192];
+                    // 增大缓冲区到128KB，提升下载速度（原来是8KB，IO操作太频繁）
+                    byte[] buffer = new byte[131072]; // 128KB = 128 * 1024
                     long totalRead = resumeFrom;
                     long lastUpdate = 0;
                     int len;
