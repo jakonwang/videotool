@@ -358,21 +358,30 @@ public class MainActivity extends AppCompatActivity {
                 ? "videotool_" + System.currentTimeMillis()
                 : fileName.trim();
         
-        // 尝试URL解码文件名（处理URL编码的越南语等字符）
+        android.util.Log.d("Download", "原始文件名: " + name);
+        
+        // 先进行URL解码（必须在检查扩展名之前）
         try {
             // 检查是否包含URL编码字符（%）
             if (name.contains("%")) {
                 String decoded = java.net.URLDecoder.decode(name, "UTF-8");
                 android.util.Log.d("Download", "文件名URL解码: " + name + " -> " + decoded);
                 name = decoded;
+                android.util.Log.d("Download", "解码后文件名: " + name);
+            } else {
+                android.util.Log.d("Download", "文件名无需解码（不包含%）");
             }
+        } catch (IllegalArgumentException e) {
+            android.util.Log.w("Download", "文件名URL解码失败（非法字符）: " + e.getMessage());
+            // 如果解码失败（可能是已经解码过的），使用原始文件名
         } catch (Exception e) {
-            android.util.Log.w("Download", "文件名URL解码失败: " + e.getMessage() + ", 使用原始文件名");
+            android.util.Log.w("Download", "文件名URL解码异常: " + e.getMessage() + ", 使用原始文件名");
             // 解码失败时使用原始文件名
         }
         
         String lower = name.toLowerCase(Locale.US);
         if (lower.endsWith(".mp4") || lower.endsWith(".mov")) {
+            android.util.Log.d("Download", "文件名已包含视频扩展名，直接返回: " + name);
             return name;
         }
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")) {
