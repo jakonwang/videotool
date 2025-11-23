@@ -9,7 +9,7 @@ Route::group('api', function() {
     Route::group('video', function() {
         Route::get('getVideo', 'app\controller\api\Video@getVideo');
         Route::post('markDownloaded', 'app\controller\api\Video@markDownloaded');
-        Route::get('download', 'app\controller\api\Video@downloadProxy'); // 代理下载接口
+        Route::rule('download', 'app\controller\api\Video@downloadProxy', 'GET|HEAD'); // 代理下载接口，兼容HEAD获取文件信息
     });
 });
 

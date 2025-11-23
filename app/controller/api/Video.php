@@ -411,6 +411,7 @@ class Video extends BaseController
             $type = $this->request->param('type', 'video'); // cover 或 video
             $format = $this->request->param('format', ''); // json 或空（流式下载/重定向）
             $forceDownload = (int)$this->request->param('force_download', 0); // 1 表示强制返回文件流（APP原生下载）
+            $isHeadRequest = $this->request->isHead();
             
             // 检测是否为APP请求（通过参数或User-Agent）
             // 优先检查format参数（最可靠），然后检查app参数，最后检查User-Agent
@@ -498,6 +499,12 @@ class Video extends BaseController
                           ($parsedUrl['host'] === $_SERVER['HTTP_HOST'] || 
                            $parsedUrl['host'] === 'localhost' ||
                            $parsedUrl['host'] === '127.0.0.1');
+
+            // HEAD 请求仅需返回文件信息，避免实际流式传输
+            if ($isHeadRequest) {
+                $headHeaders = $this->buildDownloadHeadHeaders($fileUrl, $type, $downloadFileName, $isLocalFile);
+                return response('', 200, $headHeaders);
+            }
             
             // 下载缓存上下文（仅针对远程文件）
             $cacheContext = null;
@@ -690,6 +697,38 @@ class Video extends BaseController
         }
         
         return $localPath;
+    }
+
+    /**
+     * 构建HEAD请求需要的响应头
+     */
+    private function buildDownloadHeadHeaders(string $fileUrl, string $type, string $fileName, bool $isLocalFile): array
+    {
+        $headers = [
+            'Content-Type' => $type === 'cover' ? 'image/jpeg' : 'video/mp4',
+            'Content-Disposition' => 'attachment; filename="' . rawurlencode($fileName) . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'Accept-Ranges' => 'bytes',
+            'X-Download-Source' => $isLocalFile ? 'local' : 'remote',
+        ];
+
+        $fileSize = null;
+        if ($isLocalFile) {
+            $localPath = $this->urlToLocalPath($fileUrl);
+            if ($localPath && file_exists($localPath)) {
+                $fileSize = @filesize($localPath);
+            }
+        } else {
+            $fileSize = $this->getRemoteFileSize($fileUrl);
+        }
+
+        if (is_numeric($fileSize) && $fileSize > 0) {
+            $headers['Content-Length'] = (string)$fileSize;
+        }
+
+        return $headers;
     }
     
     /**
@@ -983,6 +1022,49 @@ class Video extends BaseController
         
         // 下载成功，正常退出
         exit;
+    }
+
+    /**
+     * 获取远程文件大小（用于HEAD请求）
+     */
+    private function getRemoteFileSize(string $url): ?int
+    {
+        $ch = curl_init($url);
+        if ($ch === false) {
+            return null;
+        }
+
+        $referer = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') .
+            '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/';
+
+        curl_setopt_array($ch, [
+            CURLOPT_NOBODY => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_REFERER => $referer,
+            CURLOPT_USERAGENT => 'VideoTool-Server-Proxy/1.0 (PHP/' . PHP_VERSION . ')',
+        ]);
+
+        $result = curl_exec($ch);
+        if ($result === false) {
+            curl_close($ch);
+            return null;
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $length = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+        curl_close($ch);
+
+        if ($httpCode >= 200 && $httpCode < 400 && $length >= 0) {
+            return (int)$length;
+        }
+
+        return null;
     }
     
     /**
