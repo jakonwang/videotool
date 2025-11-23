@@ -33,13 +33,31 @@ class Video extends BaseController
     /**
      * 生成规范的下载文件名
      */
+    /**
+     * 生成下载文件名（使用纯英文，避免非ASCII字符问题）
+     */
     private function generateDownloadFileName(string $title, string $type): string
     {
         $ext = $type === 'cover' ? '.jpg' : '.mp4';
-        $sanitized = trim(preg_replace('/[^\w\s-]/u', '', $title));
-        if ($sanitized === '') {
+        
+        // 只保留英文字母、数字、空格、连字符和下划线
+        $sanitized = preg_replace('/[^a-zA-Z0-9\s\-_]/', '', $title);
+        $sanitized = trim($sanitized);
+        
+        // 将多个空格替换为单个空格，然后将空格替换为下划线
+        $sanitized = preg_replace('/\s+/', ' ', $sanitized);
+        $sanitized = str_replace(' ', '_', $sanitized);
+        
+        // 限制文件名长度（避免文件名过长）
+        if (strlen($sanitized) > 100) {
+            $sanitized = substr($sanitized, 0, 100);
+        }
+        
+        // 如果清理后为空或只包含非ASCII字符，使用默认英文名称
+        if (empty($sanitized) || !preg_match('/[a-zA-Z0-9]/', $sanitized)) {
             $sanitized = 'videotool_' . time();
         }
+        
         return $sanitized . $ext;
     }
     
