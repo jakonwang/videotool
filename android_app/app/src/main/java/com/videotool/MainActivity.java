@@ -530,20 +530,38 @@ public class MainActivity extends AppCompatActivity {
     }
     
     @Override
+    @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (webView.getVisibility() == View.VISIBLE && webView.canGoBack()) {
-            webView.goBack();
-        } else if (webView.getVisibility() == View.VISIBLE) {
-            webView.setVisibility(View.GONE);
-            platformListView.setVisibility(View.VISIBLE);
-            if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(getString(R.string.app_name));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ 使用新的处理方式
+            if (webView.getVisibility() == View.VISIBLE && webView.canGoBack()) {
+                webView.goBack();
+            } else if (webView.getVisibility() == View.VISIBLE) {
+                webView.setVisibility(View.GONE);
+                platformListView.setVisibility(View.VISIBLE);
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().setTitle(getString(R.string.app_name));
+                }
+            } else {
+                super.onBackPressed();
             }
         } else {
-            super.onBackPressed();
+            // Android 12 及以下
+            if (webView.getVisibility() == View.VISIBLE && webView.canGoBack()) {
+                webView.goBack();
+            } else if (webView.getVisibility() == View.VISIBLE) {
+                webView.setVisibility(View.GONE);
+                platformListView.setVisibility(View.VISIBLE);
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().setTitle(getString(R.string.app_name));
+                }
+            } else {
+                super.onBackPressed();
+            }
         }
     }
     
+    @SuppressWarnings("deprecation")
     private void showProgress(String message) {
         if (progressDialog == null) {
             progressDialog = new ProgressDialog(this);

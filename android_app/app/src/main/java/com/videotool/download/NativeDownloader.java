@@ -4,7 +4,6 @@ import android.app.DownloadManager;
 import android.app.NotificationManager;
 import android.content.ContentValues;
 import android.content.Context;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -273,33 +272,6 @@ public class NativeDownloader {
         } catch (Exception e) {
             android.util.Log.e("NativeDownloader", "DownloadManager下载失败，回退到OkHttp下载: " + e.getMessage(), e);
             return downloadWithOkHttpFallback(fileName, url, listener);
-        }
-    }
-    
-    /**
-     * 测试URL是否可访问（HEAD请求）
-     * 用于判断CDN链接是否需要签名或是否设置了防盗链
-     */
-    private boolean testUrlAccessible(String url) {
-        try {
-            Request req = new Request.Builder()
-                    .url(url)
-                    .head()
-                    .header("Referer", "https://videotool.banono-us.com/")
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
-                    .build();
-            
-            try (Response response = httpClient.newCall(req).execute()) {
-                int code = response.code();
-                // 200-299 或 302-307（重定向）都认为可访问
-                boolean accessible = (code >= 200 && code < 300) || (code >= 302 && code < 308);
-                android.util.Log.d("NativeDownloader", "URL可访问性测试: " + url + " - HTTP " + code + " - 可访问: " + accessible);
-                return accessible;
-            }
-        } catch (Exception e) {
-            android.util.Log.w("NativeDownloader", "URL可访问性测试失败: " + url + " - " + e.getMessage());
-            // 测试失败，认为不可访问，回退到OkHttp
-            return false;
         }
     }
     
