@@ -549,6 +549,29 @@ class Video extends BaseController
                 $isCdnResource = $this->isCdnUrl($fileUrl);
                 if ($isCdnResource) {
                     \think\facade\Log::info("APP请求：绝对路径已识别为CDN链接 - URL: {$fileUrl}");
+                } else {
+                    // 如果是本站域名（或非CDN域）但路径位于uploads目录，依然尝试构造CDN链接
+                    $parsedAbsolute = parse_url($fileUrl);
+                    $absolutePath = $parsedAbsolute['path'] ?? '';
+                    $absoluteHost = $parsedAbsolute['host'] ?? '';
+                    $qiniuConfig = \think\facade\Config::get('qiniu');
+                    if (!empty($absolutePath) &&
+                        preg_match('#/uploads/(videos|covers)/#', $absolutePath) &&
+                        !empty($qiniuConfig['domain']) &&
+                        !empty($qiniuConfig['enabled'])) {
+                        $key = ltrim($absolutePath, '/');
+                        if (strpos($key, 'uploads/') === 0) {
+                            $key = substr($key, 8);
+                        }
+                        $potentialCdnUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
+                        if ($this->isCdnUrl($potentialCdnUrl)) {
+                            \think\facade\Log::info("APP请求：绝对路径来自本站uploads目录，转换为CDN链接 - {$fileUrl} -> {$potentialCdnUrl}");
+                            $fileUrl = $potentialCdnUrl;
+                            $isCdnResource = true;
+                        } else {
+                            \think\facade\Log::info("APP请求：绝对路径位于uploads但转换CDN失败 - {$fileUrl}");
+                        }
+                    }
                 }
             }
             
