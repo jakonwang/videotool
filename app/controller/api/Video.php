@@ -1123,14 +1123,84 @@ class Video extends BaseController
                 \think\facade\Log::info("成功获取远程文件大小: {$url} - {$length} bytes");
                 return (int)$length;
             } else {
-                // HTTP状态码正常，但没有Content-Length头（可能服务器不支持或文件是动态生成的）
-                \think\facade\Log::warning("远程文件HEAD响应正常但无Content-Length: {$url} (HTTP {$httpCode})");
-                return null;
+                // HTTP状态码正常，但没有Content-Length头，尝试使用Range请求获取文件大小
+                \think\facade\Log::info("HEAD请求无Content-Length，尝试Range请求获取文件大小: {$url}");
+                return $this->getRemoteFileSizeByRange($url, $referer);
             }
         } else {
             \think\facade\Log::warning("远程文件HEAD请求失败: {$url} - HTTP {$httpCode}");
             return null;
         }
+    }
+    
+    /**
+     * 通过Range请求获取远程文件大小（当HEAD请求没有Content-Length时使用）
+     */
+    private function getRemoteFileSizeByRange(string $url, string $referer): ?int
+    {
+        $ch = curl_init($url);
+        if ($ch === false) {
+            return null;
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_REFERER => $referer,
+            CURLOPT_USERAGENT => 'VideoTool-Server-Proxy/1.0 (PHP/' . PHP_VERSION . ')',
+            CURLOPT_RANGE => '0-0', // 只请求第一个字节
+            CURLOPT_HEADER => true, // 需要响应头
+            CURLOPT_NOBODY => false,
+        ]);
+
+        $result = curl_exec($ch);
+        $error = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        
+        if ($result === false || !empty($error)) {
+            curl_close($ch);
+            \think\facade\Log::warning("Range请求获取文件大小失败: {$url} - {$error}");
+            return null;
+        }
+
+        // 解析响应头，查找Content-Range
+        if ($httpCode == 206) { // Partial Content
+            // 解析响应头
+            $headers = substr($result, 0, $headerSize);
+            
+            // 查找Content-Range头
+            if (preg_match('/Content-Range:\s*bytes\s+0-0\/(\d+)/i', $headers, $matches)) {
+                $fileSize = (int)$matches[1];
+                \think\facade\Log::info("通过Range请求获取文件大小: {$url} - {$fileSize} bytes");
+                return $fileSize;
+            }
+            
+            // 也尝试匹配其他格式的Content-Range
+            if (preg_match('/Content-Range:\s*bytes\s+\d+-\d+\/(\d+)/i', $headers, $matches)) {
+                $fileSize = (int)$matches[1];
+                \think\facade\Log::info("通过Range请求获取文件大小: {$url} - {$fileSize} bytes");
+                return $fileSize;
+            }
+        } elseif ($httpCode == 200) {
+            // 如果返回200而不是206，说明服务器不支持Range，但可能有Content-Length
+            $headers = substr($result, 0, $headerSize);
+            
+            if (preg_match('/Content-Length:\s*(\d+)/i', $headers, $matches)) {
+                $fileSize = (int)$matches[1];
+                \think\facade\Log::info("通过Range请求的响应头获取文件大小: {$url} - {$fileSize} bytes");
+                return $fileSize;
+            }
+        }
+
+        curl_close($ch);
+        \think\facade\Log::warning("Range请求无法获取文件大小: {$url} (HTTP {$httpCode})");
+        return null;
     }
     
     /**
