@@ -601,7 +601,7 @@ class Video extends BaseController
                 $proxyUrl = $proxyBaseUrl . '&force_download=1';
                 
                 // 构建CDN下载链接
-                // 重要：只要fileUrl是CDN链接（包含storage.banono-us.com等），就返回CDN链接
+                // 重要：优先返回CDN链接，因为文件已上传到七牛云
                 $cdnDownloadUrl = '';
                 
                 // 再次确认fileUrl是否是CDN链接（防止判断错误）
@@ -612,17 +612,21 @@ class Video extends BaseController
                     $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
                     \think\facade\Log::info("APP请求：返回CDN直接下载链接 - 原始URL: {$originalFileUrl}, 转换后URL: {$fileUrl}, CDN链接: {$cdnDownloadUrl}");
                 } else {
-                    // 如果不是CDN资源，尝试从原始URL判断（可能是相对路径但实际是CDN资源）
-                    if (preg_match('#/uploads/(videos|covers)/#', $originalFileUrl)) {
-                        // 如果是相对路径格式（/uploads/videos/...），尝试构建CDN链接
+                    // 如果判断不是CDN链接，但原始URL是相对路径（/uploads/videos/...），
+                    // 说明可能是上传到七牛云但数据库还没更新，尝试构建CDN链接
+                    if (preg_match('#^/uploads/(videos|covers)/#', $originalFileUrl)) {
                         $qiniuConfig = \think\facade\Config::get('qiniu');
-                        if (!empty($qiniuConfig['domain'])) {
+                        if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
+                            // 构建七牛云CDN链接：/uploads/videos/xxx.mp4 -> https://storage.banono-us.com/videos/xxx.mp4
                             $key = ltrim($originalFileUrl, '/');
+                            if (strpos($key, 'uploads/') === 0) {
+                                $key = substr($key, 8); // 去掉"uploads/"
+                            }
                             $potentialCdnUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
                             // 检查构建的URL是否确实是CDN链接
                             if ($this->isCdnUrl($potentialCdnUrl)) {
                                 $cdnDownloadUrl = $this->buildDirectDownloadUrl($potentialCdnUrl, $downloadFileName);
-                                \think\facade\Log::info("APP请求：从相对路径构建CDN链接 - 原始URL: {$originalFileUrl}, CDN链接: {$cdnDownloadUrl}");
+                                \think\facade\Log::info("APP请求：从相对路径构建CDN链接（七牛云已启用） - 原始URL: {$originalFileUrl}, CDN链接: {$cdnDownloadUrl}");
                             }
                         }
                     }
