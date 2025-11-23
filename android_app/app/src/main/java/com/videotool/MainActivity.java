@@ -354,11 +354,14 @@ public class MainActivity extends AppCompatActivity {
      * 确保文件名包含扩展名
      */
     private String ensureFileNameHasExtension(String fileName, String referenceUrl) {
+        android.util.Log.d("Download", "========== ensureFileNameHasExtension 被调用 ==========");
+        android.util.Log.d("Download", "输入参数 - fileName: " + fileName + ", referenceUrl: " + referenceUrl);
+        
         String name = (fileName == null || fileName.trim().isEmpty())
                 ? "videotool_" + System.currentTimeMillis()
                 : fileName.trim();
         
-        android.util.Log.d("Download", "原始文件名: " + name);
+        android.util.Log.d("Download", "原始文件名（trim后）: " + name);
         
         // 先进行URL解码（必须在检查扩展名之前）
         try {
@@ -379,23 +382,33 @@ public class MainActivity extends AppCompatActivity {
             // 解码失败时使用原始文件名
         }
         
+        android.util.Log.d("Download", "URL解码处理完成，当前文件名: " + name);
+        
         String lower = name.toLowerCase(Locale.US);
         if (lower.endsWith(".mp4") || lower.endsWith(".mov")) {
             android.util.Log.d("Download", "文件名已包含视频扩展名，直接返回: " + name);
+            android.util.Log.d("Download", "========== ensureFileNameHasExtension 返回 ==========");
             return name;
         }
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")) {
+            android.util.Log.d("Download", "文件名已包含图片扩展名，直接返回: " + name);
+            android.util.Log.d("Download", "========== ensureFileNameHasExtension 返回 ==========");
             return name;
         }
         
         String reference = referenceUrl != null ? referenceUrl.toLowerCase(Locale.US) : "";
+        String finalName;
         if (reference.contains(".mp4") || reference.contains("type=video") || reference.contains("video")) {
-            return name + ".mp4";
+            finalName = name + ".mp4";
+        } else if (reference.contains(".png")) {
+            finalName = name + ".png";
+        } else {
+            finalName = name + ".jpg";
         }
-        if (reference.contains(".png")) {
-            return name + ".png";
-        }
-        return name + ".jpg";
+        
+        android.util.Log.d("Download", "根据URL添加扩展名，最终文件名: " + finalName);
+        android.util.Log.d("Download", "========== ensureFileNameHasExtension 返回 ==========");
+        return finalName;
     }
     
     /**
