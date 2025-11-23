@@ -493,8 +493,8 @@ class Video extends BaseController
             }
             
             // 获取文件URL
-            $fileUrl = $type === 'cover' ? $video->cover_url : $video->video_url;
-            if (empty($fileUrl)) {
+            $originalFileUrl = $type === 'cover' ? $video->cover_url : $video->video_url;
+            if (empty($originalFileUrl)) {
                 if ($isAppRequest) {
                     return json([
                         'code' => 1,
@@ -507,15 +507,42 @@ class Video extends BaseController
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
             }
             
+            // 先判断原始URL是否是CDN链接（在转换为绝对路径之前）
+            $isCdnResource = $this->isCdnUrl($originalFileUrl);
+            
             // 确保URL是绝对路径
+            $fileUrl = $originalFileUrl;
             if (!preg_match('/^https?:\/\//', $fileUrl)) {
-                $fileUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
-                           '://' . $_SERVER['HTTP_HOST'] . 
-                           (strpos($fileUrl, '/') === 0 ? '' : '/') . $fileUrl;
+                // 相对路径：如果是CDN资源，尝试构建CDN链接
+                // 否则转换为当前服务器的绝对URL
+                if ($isCdnResource) {
+                    // 如果是CDN资源但URL是相对路径，说明可能是key格式，构建CDN链接
+                    $qiniuConfig = \think\facade\Config::get('qiniu');
+                    if (!empty($qiniuConfig['domain'])) {
+                        $key = ltrim($fileUrl, '/');
+                        $fileUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
+                        \think\facade\Log::info("相对路径CDN资源转换为CDN链接: {$originalFileUrl} -> {$fileUrl}");
+                    } else {
+                        // 七牛云未配置，转换为服务器URL
+                        $fileUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
+                                   '://' . $_SERVER['HTTP_HOST'] . 
+                                   (strpos($originalFileUrl, '/') === 0 ? '' : '/') . $originalFileUrl;
+                        $isCdnResource = false; // 不是真正的CDN资源
+                    }
+                } else {
+                    // 不是CDN资源，转换为服务器URL
+                    $fileUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
+                               '://' . $_SERVER['HTTP_HOST'] . 
+                               (strpos($originalFileUrl, '/') === 0 ? '' : '/') . $originalFileUrl;
+                }
+            }
+            
+            // 重新判断转换后的URL是否是CDN链接（因为可能已经转换）
+            if (!$isCdnResource) {
+                $isCdnResource = $this->isCdnUrl($fileUrl);
             }
             
             $downloadFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', $type);
-            $isCdnResource = $this->isCdnUrl($fileUrl);
             
             // 判断是本地文件还是远程文件
             $parsedUrl = parse_url($fileUrl);
