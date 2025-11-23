@@ -502,6 +502,21 @@ class Video extends BaseController
 
             // HEAD 请求仅需返回文件信息，避免实际流式传输
             if ($isHeadRequest) {
+                // 对于远程文件，先检查缓存，如果缓存存在，可以从缓存获取文件大小
+                if (!$isLocalFile) {
+                    $cacheContext = $this->buildCacheContext($fileUrl, $type, $isLocalFile);
+                    // 如果缓存存在且有效，使用缓存文件的大小
+                    if ($cacheContext && !empty($cacheContext['ready']) && file_exists($cacheContext['path'])) {
+                        $cacheSize = @filesize($cacheContext['path']);
+                        if ($cacheSize > 0) {
+                            \think\facade\Log::info("HEAD请求：从缓存获取文件大小 - {$fileUrl} -> {$cacheSize} bytes");
+                            $headHeaders = $this->buildDownloadHeadHeaders($fileUrl, $type, $downloadFileName, $isLocalFile);
+                            // 覆盖文件大小（使用缓存文件的实际大小）
+                            $headHeaders['Content-Length'] = (string)$cacheSize;
+                            return response('', 200, $headHeaders);
+                        }
+                    }
+                }
                 $headHeaders = $this->buildDownloadHeadHeaders($fileUrl, $type, $downloadFileName, $isLocalFile);
                 return response('', 200, $headHeaders);
             }
