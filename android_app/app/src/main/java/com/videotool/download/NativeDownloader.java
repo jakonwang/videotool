@@ -68,9 +68,11 @@ public class NativeDownloader {
     }
 
     private boolean downloadWithUrl(String fileName, String url, DownloadListener listener) {
-        // 如果是CDN链接（七牛云等），直接使用DownloadManager下载（最快最可靠）
+        // 如果是CDN链接（七牛云等），优先使用DownloadManager下载（最快最可靠）
+        // DownloadManager优势：系统级下载、多线程、断点续传、后台下载、省电
+        // 如果DownloadManager失败（防盗链、私有空间、权限不足等），会自动回退到OkHttp下载
         if (isCdnUrl(url)) {
-            android.util.Log.d("NativeDownloader", "检测到CDN链接，使用DownloadManager下载: " + url);
+            android.util.Log.d("NativeDownloader", "检测到CDN链接，优先使用DownloadManager下载: " + url);
             return downloadWithDownloadManager(fileName, url, listener);
         }
         
@@ -196,14 +198,23 @@ public class NativeDownloader {
     /**
      * 使用系统DownloadManager下载（最快、最可靠的方式）
      * 适用于CDN链接直接下载
+     * 
+     * 注意：如果七牛云设置了防盗链或私有空间，DownloadManager可能失败
+     * 此时应该回退到OkHttp下载
      */
     private boolean downloadWithDownloadManager(String fileName, String url, DownloadListener listener) {
         try {
             DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
             if (downloadManager == null) {
-                android.util.Log.e("NativeDownloader", "DownloadManager服务不可用");
-                if (listener != null) listener.onComplete(false, "下载服务不可用");
-                return false;
+                android.util.Log.e("NativeDownloader", "DownloadManager服务不可用，将回退到OkHttp下载");
+                // 回退到OkHttp下载
+                return downloadWithOkHttpFallback(fileName, url, listener);
+            }
+
+            // 先测试URL是否可访问（HEAD请求）
+            if (!testUrlAccessible(url)) {
+                android.util.Log.w("NativeDownloader", "CDN链接无法访问（可能是防盗链或私有空间），回退到OkHttp下载");
+                return downloadWithOkHttpFallback(fileName, url, listener);
             }
 
             // 创建下载请求
@@ -241,7 +252,7 @@ public class NativeDownloader {
                 request.setMimeType("image/jpeg");
             }
             
-            // 设置Referer和User-Agent（如果CDN需要）
+            // 设置Referer和User-Agent（重要：七牛云防盗链需要）
             request.addRequestHeader("Referer", "https://videotool.banono-us.com/");
             request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp");
             
@@ -256,12 +267,76 @@ public class NativeDownloader {
             
             return true;
             
+        } catch (SecurityException e) {
+            // 权限不足，回退到OkHttp下载
+            android.util.Log.w("NativeDownloader", "DownloadManager权限不足（存储权限），回退到OkHttp下载: " + e.getMessage());
+            return downloadWithOkHttpFallback(fileName, url, listener);
         } catch (Exception e) {
-            android.util.Log.e("NativeDownloader", "DownloadManager下载失败: " + e.getMessage(), e);
-            if (listener != null) {
-                String errorMsg = "下载失败：" + (e.getMessage() != null ? e.getMessage() : "未知错误");
-                listener.onComplete(false, errorMsg);
+            android.util.Log.e("NativeDownloader", "DownloadManager下载失败，回退到OkHttp下载: " + e.getMessage(), e);
+            return downloadWithOkHttpFallback(fileName, url, listener);
+        }
+    }
+    
+    /**
+     * 测试URL是否可访问（HEAD请求）
+     * 用于判断CDN链接是否需要签名或是否设置了防盗链
+     */
+    private boolean testUrlAccessible(String url) {
+        try {
+            Request req = new Request.Builder()
+                    .url(url)
+                    .head()
+                    .header("Referer", "https://videotool.banono-us.com/")
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
+                    .build();
+            
+            try (Response response = httpClient.newCall(req).execute()) {
+                int code = response.code();
+                // 200-299 或 302-307（重定向）都认为可访问
+                boolean accessible = (code >= 200 && code < 300) || (code >= 302 && code < 308);
+                android.util.Log.d("NativeDownloader", "URL可访问性测试: " + url + " - HTTP " + code + " - 可访问: " + accessible);
+                return accessible;
             }
+        } catch (Exception e) {
+            android.util.Log.w("NativeDownloader", "URL可访问性测试失败: " + url + " - " + e.getMessage());
+            // 测试失败，认为不可访问，回退到OkHttp
+            return false;
+        }
+    }
+    
+    /**
+     * 使用OkHttp下载（备用方案）
+     * 当DownloadManager失败时使用
+     */
+    private boolean downloadWithOkHttpFallback(String fileName, String url, DownloadListener listener) {
+        android.util.Log.i("NativeDownloader", "使用OkHttp备用下载方案: " + fileName + " - " + url);
+        
+        // 使用原有的OkHttp下载逻辑
+        // 这里可以调用 downloadWithUrl 方法，但需要去掉CDN检查，避免递归
+        // 或者直接使用流式下载
+        
+        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        int notificationId = (int) (System.currentTimeMillis() / 1000);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle(fileName)
+                .setContentText("准备下载...")
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW);
+        if (nm != null) nm.notify(notificationId, builder.build());
+        
+        try {
+            File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
+            builder.setContentText("正在准备下载...");
+            if (nm != null) nm.notify(notificationId, builder.build());
+            
+            // 直接使用流式下载（不检查CDN）
+            return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
+        } catch (Exception e) {
+            android.util.Log.e("NativeDownloader", "OkHttp备用下载失败: " + e.getMessage(), e);
+            if (listener != null) listener.onComplete(false, "下载失败：" + e.getMessage());
+            if (nm != null) nm.cancel(notificationId);
             return false;
         }
     }
@@ -272,15 +347,15 @@ public class NativeDownloader {
      */
     private long fetchContentLength(String url) {
         try {
-            Request req = new Request.Builder()
-                    .url(url)
-                    .head()
-                    .header("Referer", "https://videotool.banono-us.com/")
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
-                    .build();
+        Request req = new Request.Builder()
+                .url(url)
+                .head()
+                .header("Referer", "https://videotool.banono-us.com/")
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
+                .build();
             
-            try (Response response = httpClient.newCall(req).execute()) {
-                if (!response.isSuccessful()) {
+        try (Response response = httpClient.newCall(req).execute()) {
+            if (!response.isSuccessful()) {
                     android.util.Log.w("NativeDownloader", "HEAD请求失败: HTTP " + response.code() + " - " + url);
                     // 不抛出异常，返回-1以触发流式下载
                     return -1;
