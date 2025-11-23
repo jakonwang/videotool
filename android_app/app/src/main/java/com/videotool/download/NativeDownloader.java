@@ -178,20 +178,37 @@ public class NativeDownloader {
 
     /**
      * 判断是否为CDN链接（七牛云等）
+     * 重要：排除代理URL（如 /api/video/download），只有真正的CDN直接链接才返回true
      */
     private boolean isCdnUrl(String url) {
         if (url == null || url.isEmpty()) {
             return false;
         }
         String lowerUrl = url.toLowerCase();
-        // 七牛云域名
-        return lowerUrl.contains("qiniucdn.com") || 
-               lowerUrl.contains("qbox.me") || 
-               lowerUrl.contains("banono-us.com") ||
-               lowerUrl.contains("qnssl.com") ||
-               // 其他常见的CDN域名
-               lowerUrl.contains("oss") ||
-               lowerUrl.contains("cdn");
+        
+        // 排除代理URL（API接口URL不是CDN链接）
+        if (lowerUrl.contains("/api/") || lowerUrl.contains("/download") || lowerUrl.contains("video_id=")) {
+            android.util.Log.d("NativeDownloader", "URL是代理接口，不是CDN链接: " + url);
+            return false;
+        }
+        
+        // 七牛云CDN域名（但不包含代理路径）
+        boolean isQiniuCdn = lowerUrl.contains("qiniucdn.com") || 
+                             lowerUrl.contains("qbox.me") || 
+                             lowerUrl.contains("qnssl.com") ||
+                             // 存储域名（如 storage.banono-us.com）
+                             (lowerUrl.contains("storage") && lowerUrl.contains("banono-us.com")) ||
+                             // 其他OSS/CDN域名
+                             (lowerUrl.contains("oss") && !lowerUrl.contains("/api/")) ||
+                             (lowerUrl.contains("cdn") && !lowerUrl.contains("/api/"));
+        
+        if (isQiniuCdn) {
+            android.util.Log.d("NativeDownloader", "检测到CDN链接: " + url);
+        } else {
+            android.util.Log.d("NativeDownloader", "不是CDN链接，将使用OkHttp下载: " + url);
+        }
+        
+        return isQiniuCdn;
     }
     
     /**
