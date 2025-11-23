@@ -527,7 +527,7 @@
                     }
                     
                     const downloadBaseUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
-                    const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1`;
+                    const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1&prefer_cdn=1`;
                     const baseCdnUrl = type === 'cover'
                         ? toAbsoluteUrl(currentVideo.cover_url) 
                         : toAbsoluteUrl(currentVideo.video_url);

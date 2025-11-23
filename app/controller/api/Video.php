@@ -675,12 +675,15 @@ class Video extends BaseController
             
             // 非APP请求，但检测到APP客户端（如DownloadManager fallback）且拥有CDN直链时，直接302到CDN
             $preferCdn = (int)$this->request->param('prefer_cdn', 0);
-            if ($cdnDownloadUrl && !$isLocalFile && ($preferCdn === 1 || $this->isAppClient())) {
-                \think\facade\Log::info("非APP请求：检测到APP客户端或prefer_cdn=1，直接302跳转到CDN - 视频ID {$videoId}, CDN: {$cdnDownloadUrl}");
+            $isClientApp = $this->isAppClient();
+            if ($cdnDownloadUrl && !$isLocalFile && ($preferCdn === 1 || $isClientApp)) {
+                \think\facade\Log::info("非APP请求：检测到APP客户端或prefer_cdn=1，直接302跳转到CDN - 视频ID {$videoId}, CDN: {$cdnDownloadUrl}, prefer={$preferCdn}, userAgent=" . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
                 return response('', 302, [
                     'Location' => $cdnDownloadUrl,
                     'Cache-Control' => 'private, max-age=0',
                 ]);
+            } else {
+                \think\facade\Log::info("非APP请求：未触发CDN 302 - 视频ID {$videoId}, hasCdn=" . ($cdnDownloadUrl ? 'yes' : 'no') . ", prefer={$preferCdn}, isAppClient=" . ($isClientApp ? 'yes' : 'no') . ", userAgent=" . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
             }
             
             if ($isLocalFile) {
