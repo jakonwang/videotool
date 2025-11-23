@@ -338,10 +338,16 @@ public class MainActivity extends AppCompatActivity {
         if (nativeDownloader == null) {
             nativeDownloader = new NativeDownloader(this);
         }
+        
+        android.util.Log.d("Download", "开始下载任务 - 文件名: " + normalizedFileName + ", URL: " + primaryUrl);
+        
         nativeDownloader.enqueueDownload(normalizedFileName, primaryUrl, fallbackUrl, (success, msg) -> {
+            android.util.Log.d("Download", "下载回调 - success: " + success + ", msg: " + msg);
             String toastMsg = msg != null ? msg : (success ? "下载完成" : "下载失败");
             runOnUiThread(() -> Toast.makeText(MainActivity.this, toastMsg, Toast.LENGTH_SHORT).show());
         });
+        
+        android.util.Log.d("Download", "下载任务已提交到队列");
     }
     
     /**
@@ -351,6 +357,20 @@ public class MainActivity extends AppCompatActivity {
         String name = (fileName == null || fileName.trim().isEmpty())
                 ? "videotool_" + System.currentTimeMillis()
                 : fileName.trim();
+        
+        // 尝试URL解码文件名（处理URL编码的越南语等字符）
+        try {
+            // 检查是否包含URL编码字符（%）
+            if (name.contains("%")) {
+                String decoded = java.net.URLDecoder.decode(name, "UTF-8");
+                android.util.Log.d("Download", "文件名URL解码: " + name + " -> " + decoded);
+                name = decoded;
+            }
+        } catch (Exception e) {
+            android.util.Log.w("Download", "文件名URL解码失败: " + e.getMessage() + ", 使用原始文件名");
+            // 解码失败时使用原始文件名
+        }
+        
         String lower = name.toLowerCase(Locale.US);
         if (lower.endsWith(".mp4") || lower.endsWith(".mov")) {
             return name;
