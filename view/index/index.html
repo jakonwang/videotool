@@ -548,28 +548,27 @@
                             if (result.code === 0 && result.data) {
                                 const data = result.data;
                                 const proxyUrl = data.proxy_url || data.direct_url || forcedDownloadUrl;
-                                const cdnUrl = data.cdn_url || data.fallback_url || data.file_url || '';
+                                // 优先使用CDN链接（七牛云等），直接下载，速度快
+                                const cdnUrl = data.cdn_url || data.file_url || '';
                                 const finalName = data.file_name || fileName;
-                                const encodedFileName = data.attname_file_name || encodeURIComponent(finalName);
-                                const cdnUrlWithName = cdnUrl
-                                    ? `${cdnUrl}${cdnUrl.includes('?') ? '&' : '?'}attname=${encodedFileName}`
-                                    : '';
-
-                                let primary = cdnUrlWithName || proxyUrl;
+                                
+                                // CDN链接优先，不做任何修改，直接使用
+                                let primary = cdnUrl || proxyUrl;
                                 let backup = proxyUrl;
-
-                                if (data.cache_hit || data.cache_prepared) {
-                                    primary = proxyUrl;
-                                    backup = cdnUrlWithName || proxyUrl;
+                                
+                                // 如果CDN链接存在，优先使用CDN（DownloadManager会直接下载）
+                                if (cdnUrl) {
+                                    debugLog('优先使用CDN直接下载（DownloadManager）:', cdnUrl);
+                                } else {
+                                    debugLog('CDN链接不存在，使用代理下载:', proxyUrl);
                                 }
+                                
                                 debugLog('准备开始下载:', {
                                     primary,
                                     backup,
                                     fileName: finalName,
-                                    cacheHit: data.cache_hit,
-                                    cachePrepared: data.cache_prepared,
-                                    proxyUrl,
-                                    cdnUrl
+                                    isCdn: !!cdnUrl,
+                                    proxyUrl
                                 });
 
                                 if (typeof window.Android.downloadFileWithFallback === 'function') {

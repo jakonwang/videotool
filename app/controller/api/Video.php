@@ -564,48 +564,13 @@ class Video extends BaseController
                 $proxyUrl = $proxyBaseUrl . '&force_download=1';
                 $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
                 
-                // 如果是七牛云资源且缓存不存在，先同步预缓存（确保100%成功）
-                $cachePrepared = false;
-                if ($cacheContext && empty($cacheContext['ready']) && $cacheWriteContext && $isCdnResource) {
-                    \think\facade\Log::info("APP请求：开始同步预缓存七牛云资源 - {$fileUrl}");
-                    try {
-                        $cachePath = $this->downloadRemoteToCache($fileUrl, $cacheWriteContext, [
-                            'video_id' => $video->id,
-                            'platform' => $video->platform_id ?? null,
-                            'title' => $video->title,
-                            'type' => $type,
-                            'file_name' => $downloadFileName,
-                            'source_url' => $fileUrl,
-                        ]);
-                        
-                        // 如果缓存成功，更新状态
-                        if ($cachePath && file_exists($cachePath) && filesize($cachePath) > 0) {
-                            $cacheContext['ready'] = true;
-                            $cachePrepared = true;
-                            \think\facade\Log::info("APP请求：七牛云资源预缓存成功 - {$fileUrl} -> {$cachePath} (" . filesize($cachePath) . " bytes)");
-                        } else {
-                            // 预缓存失败，清理可能的临时文件
-                            if (isset($cacheContext['temp_path']) && file_exists($cacheContext['temp_path'])) {
-                                @unlink($cacheContext['temp_path']);
-                            }
-                            \think\facade\Log::warning("APP请求：七牛云资源预缓存失败（文件不存在或为空），将使用流式代理 - {$fileUrl}");
-                        }
-                    } catch (\Exception $e) {
-                        // 异常时也清理临时文件
-                        if (isset($cacheContext['temp_path']) && file_exists($cacheContext['temp_path'])) {
-                            @unlink($cacheContext['temp_path']);
-                        }
-                        \think\facade\Log::error("APP请求：七牛云资源预缓存异常 - {$fileUrl} - " . $e->getMessage() . " | 文件: " . $e->getFile() . " | 行号: " . $e->getLine());
-                    } finally {
-                        // 确保释放锁
-                        $this->releaseCacheLock($cacheWriteContext);
-                        $cacheWriteContext = null; // 标记已处理，避免后续重复处理
-                    }
-                }
+                // APP使用DownloadManager直接下载CDN链接，无需预缓存
+                // 移除预缓存逻辑，让APP直接下载CDN链接，速度最快
+                \think\facade\Log::info("APP请求：返回CDN直接下载链接 - {$fileUrl} -> {$cdnDownloadUrl}");
                 
                 return json([
                     'code' => 0,
-                    'msg' => ($cachePrepared ? '缓存已就绪' : ($cacheContext && empty($cacheContext['ready']) ? '缓存准备中...' : '获取成功')),
+                    'msg' => '获取成功（直接下载CDN链接）',
                     'data' => [
                         'video_id' => $video->id,
                         'type' => $type,
@@ -613,12 +578,10 @@ class Video extends BaseController
                         'direct_url' => $cdnDownloadUrl ?: $proxyUrl, // 前向兼容旧版本
                         'fallback_url' => $proxyUrl,
                         'proxy_url' => $proxyUrl,
-                        'cdn_url' => $cdnDownloadUrl,
+                        'cdn_url' => $cdnDownloadUrl, // 优先使用CDN链接
                         'attname_file_name' => rawurlencode($downloadFileName),
                         'file_name' => $downloadFileName,
                         'is_cdn' => $isCdnResource,
-                        'cache_hit' => (bool)($cacheContext && !empty($cacheContext['ready'])),
-                        'cache_prepared' => $cachePrepared, // 标识是否刚完成预缓存
                         'file_size' => null,
                     ]
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);

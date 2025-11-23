@@ -1,8 +1,10 @@
 package com.videotool.download;
 
+import android.app.DownloadManager;
 import android.app.NotificationManager;
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -66,6 +68,13 @@ public class NativeDownloader {
     }
 
     private boolean downloadWithUrl(String fileName, String url, DownloadListener listener) {
+        // 如果是CDN链接（七牛云等），直接使用DownloadManager下载（最快最可靠）
+        if (isCdnUrl(url)) {
+            android.util.Log.d("NativeDownloader", "检测到CDN链接，使用DownloadManager下载: " + url);
+            return downloadWithDownloadManager(fileName, url, listener);
+        }
+        
+        // 否则使用原有的OkHttp下载方式
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         int notificationId = (int) (System.currentTimeMillis() / 1000);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
@@ -162,6 +171,97 @@ public class NativeDownloader {
                 listener.onComplete(false, friendlyMsg);
             }
             if (nm != null) nm.cancel(notificationId);
+            return false;
+        }
+    }
+
+    /**
+     * 判断是否为CDN链接（七牛云等）
+     */
+    private boolean isCdnUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
+        String lowerUrl = url.toLowerCase();
+        // 七牛云域名
+        return lowerUrl.contains("qiniucdn.com") || 
+               lowerUrl.contains("qbox.me") || 
+               lowerUrl.contains("banono-us.com") ||
+               lowerUrl.contains("qnssl.com") ||
+               // 其他常见的CDN域名
+               lowerUrl.contains("oss") ||
+               lowerUrl.contains("cdn");
+    }
+    
+    /**
+     * 使用系统DownloadManager下载（最快、最可靠的方式）
+     * 适用于CDN链接直接下载
+     */
+    private boolean downloadWithDownloadManager(String fileName, String url, DownloadListener listener) {
+        try {
+            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (downloadManager == null) {
+                android.util.Log.e("NativeDownloader", "DownloadManager服务不可用");
+                if (listener != null) listener.onComplete(false, "下载服务不可用");
+                return false;
+            }
+
+            // 创建下载请求
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            
+            // 判断是视频还是图片
+            boolean isVideo = fileName.toLowerCase().endsWith(".mp4") || 
+                             fileName.toLowerCase().endsWith(".mov") ||
+                             fileName.toLowerCase().endsWith(".avi");
+            
+            // 设置下载目录（视频保存到Movies目录，图片保存到Pictures目录）
+            if (isVideo) {
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, "VideoTool/" + fileName);
+            } else {
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_PICTURES, "VideoTool/" + fileName);
+            }
+            
+            // 设置标题和描述
+            request.setTitle(fileName);
+            request.setDescription("VideoTool下载");
+            
+            // 设置通知可见性（下载完成后显示通知）
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            
+            // 允许移动网络下载
+            request.setAllowedOverMetered(true);
+            
+            // 允许Roaming下载
+            request.setAllowedOverRoaming(true);
+            
+            // 设置MIME类型
+            if (isVideo) {
+                request.setMimeType("video/mp4");
+            } else {
+                request.setMimeType("image/jpeg");
+            }
+            
+            // 设置Referer和User-Agent（如果CDN需要）
+            request.addRequestHeader("Referer", "https://videotool.banono-us.com/");
+            request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp");
+            
+            // 提交下载请求
+            long downloadId = downloadManager.enqueue(request);
+            
+            android.util.Log.i("NativeDownloader", "DownloadManager下载已提交: " + fileName + " - ID: " + downloadId + " - URL: " + url);
+            
+            if (listener != null) {
+                listener.onComplete(true, "下载已添加到下载列表，请在通知栏查看进度");
+            }
+            
+            return true;
+            
+        } catch (Exception e) {
+            android.util.Log.e("NativeDownloader", "DownloadManager下载失败: " + e.getMessage(), e);
+            if (listener != null) {
+                String errorMsg = "下载失败：" + (e.getMessage() != null ? e.getMessage() : "未知错误");
+                listener.onComplete(false, errorMsg);
+            }
             return false;
         }
     }
