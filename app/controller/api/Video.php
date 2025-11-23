@@ -517,41 +517,39 @@ class Video extends BaseController
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
             }
             
-            // 先判断原始URL是否是CDN链接（在转换为绝对路径之前）
+            // 判断原始URL是否是CDN链接（在转换为绝对路径之前）
             $isCdnResource = $this->isCdnUrl($originalFileUrl);
             \think\facade\Log::info("APP请求：原始URL判断 - URL: {$originalFileUrl}, isCdnResource: " . ($isCdnResource ? 'true' : 'false'));
             
             // 确保URL是绝对路径
             $fileUrl = $originalFileUrl;
             if (!preg_match('/^https?:\/\//', $fileUrl)) {
-                // 相对路径：如果是CDN资源，尝试构建CDN链接
-                // 否则转换为当前服务器的绝对URL
-                if ($isCdnResource) {
-                    // 如果是CDN资源但URL是相对路径，说明可能是key格式，构建CDN链接
-                    $qiniuConfig = \think\facade\Config::get('qiniu');
-                    if (!empty($qiniuConfig['domain'])) {
-                        $key = ltrim($fileUrl, '/');
-                        $fileUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
-                        \think\facade\Log::info("相对路径CDN资源转换为CDN链接: {$originalFileUrl} -> {$fileUrl}");
-                    } else {
-                        // 七牛云未配置，转换为服务器URL
-                        $fileUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
-                                   '://' . $_SERVER['HTTP_HOST'] . 
-                                   (strpos($originalFileUrl, '/') === 0 ? '' : '/') . $originalFileUrl;
-                        $isCdnResource = false; // 不是真正的CDN资源
+                // 相对路径：检查是否是七牛云的相对路径（uploads/videos/...或videos/...）
+                $qiniuConfig = \think\facade\Config::get('qiniu');
+                if (!empty($qiniuConfig['domain']) && preg_match('#^(uploads/)?(videos|covers)/#', ltrim($fileUrl, '/'))) {
+                    // 如果是相对路径格式（/uploads/videos/...或/uploads/covers/...），尝试构建CDN链接
+                    $key = ltrim($fileUrl, '/');
+                    // 如果key包含uploads/，去掉它（七牛云key格式是videos/...或covers/...）
+                    if (strpos($key, 'uploads/') === 0) {
+                        $key = substr($key, 8); // 去掉"uploads/"
                     }
+                    $fileUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
+                    $isCdnResource = true; // 标记为CDN资源
+                    \think\facade\Log::info("APP请求：相对路径转换为CDN链接 - 原始URL: {$originalFileUrl}, CDN链接: {$fileUrl}");
                 } else {
-                    // 不是CDN资源，转换为服务器URL
+                    // 不是CDN资源格式，转换为服务器URL
                     $fileUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
                                '://' . $_SERVER['HTTP_HOST'] . 
                                (strpos($originalFileUrl, '/') === 0 ? '' : '/') . $originalFileUrl;
+                    $isCdnResource = false;
+                    \think\facade\Log::info("APP请求：相对路径转换为服务器URL - 原始URL: {$originalFileUrl}, 服务器URL: {$fileUrl}");
                 }
-            }
-            
-            // 重新判断转换后的URL是否是CDN链接（因为可能已经转换）
-            if (!$isCdnResource) {
+            } else {
+                // 已经是绝对路径，重新判断是否是CDN链接（确保判断准确）
                 $isCdnResource = $this->isCdnUrl($fileUrl);
-                \think\facade\Log::info("APP请求：转换后URL判断 - URL: {$fileUrl}, isCdnResource: " . ($isCdnResource ? 'true' : 'false'));
+                if ($isCdnResource) {
+                    \think\facade\Log::info("APP请求：绝对路径已识别为CDN链接 - URL: {$fileUrl}");
+                }
             }
             
             $downloadFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', $type);
