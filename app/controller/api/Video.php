@@ -68,32 +68,42 @@ class Video extends BaseController
     {
         $host = parse_url($url, PHP_URL_HOST);
         if (!$host) {
+            \think\facade\Log::debug("isCdnUrl判断：URL无法解析host - {$url}");
             return false;
         }
         
         $cdnDomains = [];
         $qiniuConfig = \think\facade\Config::get('qiniu');
         if (!empty($qiniuConfig['domain'])) {
-            $cdnDomains[] = parse_url($qiniuConfig['domain'], PHP_URL_HOST) ?: $qiniuConfig['domain'];
+            $parsedDomain = parse_url($qiniuConfig['domain'], PHP_URL_HOST);
+            $cdnHost = $parsedDomain ?: $qiniuConfig['domain'];
+            $cdnDomains[] = $cdnHost;
+            \think\facade\Log::debug("isCdnUrl判断：添加七牛云域名 - {$cdnHost}");
         }
         if (!empty($qiniuConfig['cdn_domains'])) {
             $extraDomains = is_array($qiniuConfig['cdn_domains'])
                 ? $qiniuConfig['cdn_domains']
                 : preg_split('/[,;\s]+/', (string) $qiniuConfig['cdn_domains'], -1, PREG_SPLIT_NO_EMPTY);
             foreach ($extraDomains as $domain) {
-                $cdnDomains[] = parse_url($domain, PHP_URL_HOST) ?: $domain;
+                $domainHost = parse_url($domain, PHP_URL_HOST) ?: $domain;
+                $cdnDomains[] = $domainHost;
+                \think\facade\Log::debug("isCdnUrl判断：添加额外CDN域名 - {$domainHost}");
             }
         }
         $cdnDomains = array_filter(array_unique($cdnDomains));
         if (empty($cdnDomains)) {
+            \think\facade\Log::warning("isCdnUrl判断：未配置CDN域名 - URL: {$url}");
             return false;
         }
         
         foreach ($cdnDomains as $cdnHost) {
             if ($cdnHost && stripos($host, $cdnHost) !== false) {
+                \think\facade\Log::info("isCdnUrl判断：识别为CDN链接 - URL: {$url}, host: {$host}, 匹配域名: {$cdnHost}");
                 return true;
             }
         }
+        
+        \think\facade\Log::debug("isCdnUrl判断：不是CDN链接 - URL: {$url}, host: {$host}, 配置的CDN域名: " . implode(', ', $cdnDomains));
         return false;
     }
     
@@ -509,6 +519,7 @@ class Video extends BaseController
             
             // 先判断原始URL是否是CDN链接（在转换为绝对路径之前）
             $isCdnResource = $this->isCdnUrl($originalFileUrl);
+            \think\facade\Log::info("APP请求：原始URL判断 - URL: {$originalFileUrl}, isCdnResource: " . ($isCdnResource ? 'true' : 'false'));
             
             // 确保URL是绝对路径
             $fileUrl = $originalFileUrl;
@@ -540,6 +551,7 @@ class Video extends BaseController
             // 重新判断转换后的URL是否是CDN链接（因为可能已经转换）
             if (!$isCdnResource) {
                 $isCdnResource = $this->isCdnUrl($fileUrl);
+                \think\facade\Log::info("APP请求：转换后URL判断 - URL: {$fileUrl}, isCdnResource: " . ($isCdnResource ? 'true' : 'false'));
             }
             
             $downloadFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', $type);
@@ -595,9 +607,9 @@ class Video extends BaseController
                 if ($isCdnResource && !$isLocalFile) {
                     // 如果是CDN链接，直接返回CDN链接（添加attname参数便于浏览器下载）
                     $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
-                    \think\facade\Log::info("APP请求：返回CDN直接下载链接 - {$fileUrl} -> {$cdnDownloadUrl}");
+                    \think\facade\Log::info("APP请求：返回CDN直接下载链接 - 原始URL: {$originalFileUrl}, 转换后URL: {$fileUrl}, CDN链接: {$cdnDownloadUrl}");
                 } else {
-                    \think\facade\Log::info("APP请求：不是CDN资源，使用代理下载 - {$fileUrl} (isCdn: {$isCdnResource}, isLocal: " . ($isLocalFile ? 'true' : 'false') . ")");
+                    \think\facade\Log::warning("APP请求：不是CDN资源，使用代理下载 - 原始URL: {$originalFileUrl}, 转换后URL: {$fileUrl}, isCdn: " . ($isCdnResource ? 'true' : 'false') . ", isLocal: " . ($isLocalFile ? 'true' : 'false'));
                 }
                 
                 return json([
@@ -952,9 +964,20 @@ class Video extends BaseController
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1, // 强制使用HTTP/1.1，避免HTTP/2问题
             // 关键：立即开始写入数据，不等待完整响应
             // 优化：立即输出并刷新，确保浏览器立即开始下载
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$cacheTempResource, &$cacheWrittenBytes) {
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$cacheTempResource, &$cacheWrittenBytes, $url) {
+                // 检查连接状态，如果客户端断开，停止传输
+                if (connection_status() !== CONNECTION_NORMAL) {
+                    \think\facade\Log::warning("流式传输：客户端连接已断开 - {$url}");
+                    return -1; // 返回-1会停止cURL传输
+                }
+                
                 // 立即输出数据
-                echo $data;
+                $bytesWritten = @echo $data;
+                if ($bytesWritten === false) {
+                    \think\facade\Log::warning("流式传输：输出数据失败 - {$url}");
+                    return -1; // 输出失败，停止传输
+                }
+                
                 // 立即刷新输出，确保浏览器立即开始下载
                 // 每64KB刷新一次，平衡性能和及时性
                 static $buffer = '';
@@ -962,17 +985,21 @@ class Video extends BaseController
                 $buffer .= $data;
                 if (strlen($buffer) >= $flushSize) {
                     if (ob_get_level()) {
-                        ob_flush();
+                        @ob_flush();
                     }
-                    flush();
+                    @flush();
                     $buffer = '';
                 }
+                
                 if ($cacheTempResource) {
-                    $written = fwrite($cacheTempResource, $data);
+                    $written = @fwrite($cacheTempResource, $data);
                     if ($written !== false) {
                         $cacheWrittenBytes += $written;
+                    } else {
+                        \think\facade\Log::warning("流式传输：缓存写入失败 - {$url}");
                     }
                 }
+                
                 return strlen($data);
             },
             // 简化响应头处理，只转发必要的头
