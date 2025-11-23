@@ -490,14 +490,58 @@ public class NativeDownloader {
                 if (nm != null) nm.cancel(notificationId);
                 // 保留部分下载的文件，下次可以继续
                 return false;
+            } catch (java.net.UnknownHostException e) {
+                // DNS解析失败，网络问题，可以重试
+                android.util.Log.w("NativeDownloader", "流式下载DNS解析失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
+                if (attempt < maxRetries) {
+                    // DNS解析失败时，等待更长时间（网络可能需要恢复）
+                    int dnsRetryDelay = retryDelay * 2; // DNS问题等待时间加倍
+                    android.util.Log.i("NativeDownloader", "DNS解析失败，等待 " + dnsRetryDelay + " 毫秒后重试...");
+                    try { Thread.sleep(dnsRetryDelay); } catch (InterruptedException ignored) {}
+                    retryDelay *= 2; // 指数退避
+                    continue;
+                }
+                // 最后一次尝试失败
+                android.util.Log.e("NativeDownloader", "DNS解析失败，已重试 " + maxRetries + " 次: " + e.getMessage());
+                if (listener != null) listener.onComplete(false, "下载失败：网络连接失败，请检查网络设置");
+                if (nm != null) nm.cancel(notificationId);
+                return false;
+            } catch (java.net.ConnectException | java.net.SocketTimeoutException e) {
+                // 连接超时或连接拒绝，可以重试
+                android.util.Log.w("NativeDownloader", "流式下载连接失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
+                if (attempt < maxRetries) {
+                    android.util.Log.i("NativeDownloader", "连接失败，等待 " + retryDelay + " 毫秒后重试...");
+                    try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
+                    retryDelay *= 2; // 指数退避
+                    continue;
+                }
+                // 最后一次尝试失败
+                android.util.Log.e("NativeDownloader", "连接失败，已重试 " + maxRetries + " 次: " + e.getMessage());
+                if (listener != null) listener.onComplete(false, "下载失败：无法连接到服务器（已重试" + maxRetries + "次）");
+                if (nm != null) nm.cancel(notificationId);
+                return false;
             } catch (Exception e) {
                 // 其他异常
                 android.util.Log.e("NativeDownloader", "流式下载异常 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage(), e);
-                if (attempt < maxRetries && (e.getMessage() == null || e.getMessage().contains("connection") || e.getMessage().contains("timeout"))) {
-                    // 连接相关错误，可以重试
-                    android.util.Log.i("NativeDownloader", "等待 " + retryDelay + " 毫秒后重试...");
+                String errorMsg = e.getMessage();
+                boolean isRetryable = false;
+                
+                // 判断是否为可重试的网络错误
+                if (errorMsg != null) {
+                    String lowerMsg = errorMsg.toLowerCase();
+                    isRetryable = lowerMsg.contains("connection") || 
+                                 lowerMsg.contains("timeout") ||
+                                 lowerMsg.contains("network") ||
+                                 lowerMsg.contains("host") ||
+                                 lowerMsg.contains("resolve") ||
+                                 lowerMsg.contains("unable to resolve");
+                }
+                
+                if (attempt < maxRetries && isRetryable) {
+                    // 网络相关错误，可以重试
+                    android.util.Log.i("NativeDownloader", "网络错误，等待 " + retryDelay + " 毫秒后重试...");
                     try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                    retryDelay *= 2;
+                    retryDelay *= 2; // 指数退避
                     continue;
                 }
                 // 不可重试的错误或已达最大重试次数
@@ -510,11 +554,15 @@ public class NativeDownloader {
                     }
                 }
                 if (listener != null) {
-                    String errorMsg = e.getMessage();
-                    if (errorMsg != null && errorMsg.contains("abort")) {
-                        errorMsg = "下载失败：连接中断（已尝试" + attempt + "次）";
+                    String finalErrorMsg = errorMsg;
+                    if (finalErrorMsg != null && finalErrorMsg.contains("abort")) {
+                        finalErrorMsg = "下载失败：连接中断（已尝试" + attempt + "次）";
+                    } else if (finalErrorMsg != null && (finalErrorMsg.contains("unable to resolve") || finalErrorMsg.contains("no address"))) {
+                        finalErrorMsg = "下载失败：网络连接失败，请检查网络设置";
+                    } else if (finalErrorMsg == null || finalErrorMsg.isEmpty()) {
+                        finalErrorMsg = "下载失败：未知错误";
                     }
-                    listener.onComplete(false, errorMsg);
+                    listener.onComplete(false, finalErrorMsg);
                 }
                 if (nm != null) nm.cancel(notificationId);
                 return false;
