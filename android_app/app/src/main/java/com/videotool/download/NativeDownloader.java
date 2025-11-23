@@ -78,12 +78,17 @@ public class NativeDownloader {
         if (nm != null) nm.notify(notificationId, builder.build());
 
         try {
+            android.util.Log.d("NativeDownloader", "开始下载: " + fileName + " - " + url);
             long fileSize = fetchContentLength(url);
+            android.util.Log.d("NativeDownloader", "获取文件大小结果: " + fileSize + " bytes");
+            
             File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
             
             // 如果无法获取文件大小，使用单线程流式下载
             if (fileSize <= 0) {
-                android.util.Log.w("NativeDownloader", "无法获取文件大小，使用流式下载: " + url);
+                android.util.Log.i("NativeDownloader", "文件大小未知，切换到流式下载模式: " + url);
+                builder.setContentText("正在准备下载...");
+                if (nm != null) nm.notify(notificationId, builder.build());
                 return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
             }
             
@@ -134,35 +139,68 @@ public class NativeDownloader {
                 return false;
             }
         } catch (Exception e) {
-            if (listener != null) listener.onComplete(false, e.getMessage());
+            android.util.Log.e("NativeDownloader", "下载过程发生异常: " + e.getMessage(), e);
+            String errorMsg = e.getMessage();
+            // 如果错误消息包含"无法获取文件大小"，说明是旧版本代码，尝试流式下载
+            if (errorMsg != null && errorMsg.contains("无法获取文件大小")) {
+                android.util.Log.w("NativeDownloader", "检测到旧版本错误消息，尝试流式下载");
+                try {
+                    File tempFile = File.createTempFile("native_dl_", ".part", context.getCacheDir());
+                    return downloadStreaming(url, tempFile, fileName, nm, notificationId, builder, listener);
+                } catch (Exception ex) {
+                    android.util.Log.e("NativeDownloader", "流式下载也失败: " + ex.getMessage(), ex);
+                    if (listener != null) listener.onComplete(false, "下载失败，请检查网络连接");
+                    if (nm != null) nm.cancel(notificationId);
+                    return false;
+                }
+            }
+            // 其他异常，显示更友好的错误消息
+            if (listener != null) {
+                String friendlyMsg = errorMsg != null && errorMsg.contains("HTTP") 
+                    ? "下载失败：" + errorMsg 
+                    : "下载失败，请重试";
+                listener.onComplete(false, friendlyMsg);
+            }
             if (nm != null) nm.cancel(notificationId);
             return false;
         }
     }
 
-    private long fetchContentLength(String url) throws IOException {
-        Request req = new Request.Builder()
-                .url(url)
-                .head()
-                .header("Referer", "https://videotool.banono-us.com/")
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
-                .build();
-        try (Response response = httpClient.newCall(req).execute()) {
-            if (!response.isSuccessful()) {
-                android.util.Log.w("NativeDownloader", "HEAD请求失败: HTTP " + response.code() + " - " + url);
-                // 不抛出异常，返回-1以触发流式下载
-                return -1;
+    /**
+     * 获取文件大小（HEAD请求）
+     * 如果无法获取，返回-1，不抛出异常
+     */
+    private long fetchContentLength(String url) {
+        try {
+            Request req = new Request.Builder()
+                    .url(url)
+                    .head()
+                    .header("Referer", "https://videotool.banono-us.com/")
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android) VideotoolApp")
+                    .build();
+            
+            try (Response response = httpClient.newCall(req).execute()) {
+                if (!response.isSuccessful()) {
+                    android.util.Log.w("NativeDownloader", "HEAD请求失败: HTTP " + response.code() + " - " + url);
+                    // 不抛出异常，返回-1以触发流式下载
+                    return -1;
+                }
+                
+                long contentLength = response.body() != null ? response.body().contentLength() : -1;
+                if (contentLength <= 0) {
+                    android.util.Log.w("NativeDownloader", "HEAD请求成功但无Content-Length: " + url);
+                    return -1;
+                } else {
+                    android.util.Log.d("NativeDownloader", "获取到文件大小: " + contentLength + " bytes - " + url);
+                    return contentLength;
+                }
             }
-            long contentLength = response.body() != null ? response.body().contentLength() : -1;
-            if (contentLength <= 0) {
-                android.util.Log.w("NativeDownloader", "HEAD请求成功但无Content-Length: " + url);
-            } else {
-                android.util.Log.d("NativeDownloader", "获取到文件大小: " + contentLength + " bytes - " + url);
-            }
-            return contentLength;
+        } catch (IOException e) {
+            android.util.Log.w("NativeDownloader", "HEAD请求IOException: " + e.getMessage() + " - " + url, e);
+            return -1;
         } catch (Exception e) {
-            android.util.Log.w("NativeDownloader", "HEAD请求异常: " + e.getMessage() + " - " + url);
-            // 异常时返回-1，触发流式下载
+            android.util.Log.w("NativeDownloader", "HEAD请求异常: " + e.getMessage() + " - " + url, e);
+            // 任何异常都返回-1，触发流式下载
             return -1;
         }
     }
