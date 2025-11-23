@@ -583,6 +583,31 @@ class Video extends BaseController
                           ($parsedUrl['host'] === $_SERVER['HTTP_HOST'] || 
                            $parsedUrl['host'] === 'localhost' ||
                            $parsedUrl['host'] === '127.0.0.1');
+            
+            // 统一计算CDN直链（供APP JSON和非APP 302复用）
+            $cdnDownloadUrl = '';
+            $finalIsCdn = $this->isCdnUrl($fileUrl);
+            if ($finalIsCdn && !$isLocalFile) {
+                $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
+                \think\facade\Log::info("CDN解析：识别为CDN链接 - {$fileUrl}");
+            } else {
+                // 如果判断不是CDN链接，但原始URL是相对路径（/uploads/videos/...），尝试构建CDN链接
+                if (preg_match('#^/uploads/(videos|covers)/#', $originalFileUrl)) {
+                    $qiniuConfig = \think\facade\Config::get('qiniu');
+                    if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
+                        $key = ltrim($originalFileUrl, '/');
+                        if (strpos($key, 'uploads/') === 0) {
+                            $key = substr($key, 8);
+                        }
+                        $potentialCdnUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
+                        if ($this->isCdnUrl($potentialCdnUrl)) {
+                            $cdnDownloadUrl = $this->buildDirectDownloadUrl($potentialCdnUrl, $downloadFileName);
+                            $finalIsCdn = true;
+                            \think\facade\Log::info("CDN解析：相对路径构建CDN链接 - {$originalFileUrl} -> {$cdnDownloadUrl}");
+                        }
+                    }
+                }
+            }
 
             // HEAD 请求仅需返回文件信息，避免实际流式传输
             if ($isHeadRequest) {
@@ -623,40 +648,10 @@ class Video extends BaseController
                                 '/api/video/download?video_id=' . $videoId . '&type=' . $type;
                 $proxyUrl = $proxyBaseUrl . '&force_download=1';
                 
-                // 构建CDN下载链接
-                // 重要：优先返回CDN链接，因为文件已上传到七牛云
-                $cdnDownloadUrl = '';
-                
-                // 再次确认fileUrl是否是CDN链接（防止判断错误）
-                $finalIsCdn = $this->isCdnUrl($fileUrl);
-                
-                if ($finalIsCdn && !$isLocalFile) {
-                    // 如果是CDN链接，直接返回CDN链接（添加attname参数便于浏览器下载）
-                    $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
+                if ($cdnDownloadUrl) {
                     \think\facade\Log::info("APP请求：返回CDN直接下载链接 - 原始URL: {$originalFileUrl}, 转换后URL: {$fileUrl}, CDN链接: {$cdnDownloadUrl}");
                 } else {
-                    // 如果判断不是CDN链接，但原始URL是相对路径（/uploads/videos/...），
-                    // 说明可能是上传到七牛云但数据库还没更新，尝试构建CDN链接
-                    if (preg_match('#^/uploads/(videos|covers)/#', $originalFileUrl)) {
-                        $qiniuConfig = \think\facade\Config::get('qiniu');
-                        if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
-                            // 构建七牛云CDN链接：/uploads/videos/xxx.mp4 -> https://storage.banono-us.com/videos/xxx.mp4
-                            $key = ltrim($originalFileUrl, '/');
-                            if (strpos($key, 'uploads/') === 0) {
-                                $key = substr($key, 8); // 去掉"uploads/"
-                            }
-                            $potentialCdnUrl = rtrim($qiniuConfig['domain'], '/') . '/' . $key;
-                            // 检查构建的URL是否确实是CDN链接
-                            if ($this->isCdnUrl($potentialCdnUrl)) {
-                                $cdnDownloadUrl = $this->buildDirectDownloadUrl($potentialCdnUrl, $downloadFileName);
-                                \think\facade\Log::info("APP请求：从相对路径构建CDN链接（七牛云已启用） - 原始URL: {$originalFileUrl}, CDN链接: {$cdnDownloadUrl}");
-                            }
-                        }
-                    }
-                    
-                    if (empty($cdnDownloadUrl)) {
-                        \think\facade\Log::warning("APP请求：不是CDN资源，使用代理下载 - 原始URL: {$originalFileUrl}, 转换后URL: {$fileUrl}, isCdn: " . ($finalIsCdn ? 'true' : 'false') . ", isLocal: " . ($isLocalFile ? 'true' : 'false'));
-                    }
+                    \think\facade\Log::warning("APP请求：CDN链接为空，使用代理下载 - 原始URL: {$originalFileUrl}, 转换后URL: {$fileUrl}, isCdn: " . ($finalIsCdn ? 'true' : 'false') . ", isLocal: " . ($isLocalFile ? 'true' : 'false'));
                 }
                 
                 return json([
@@ -676,6 +671,16 @@ class Video extends BaseController
                         'file_size' => null,
                     ]
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+            
+            // 非APP请求，但检测到APP客户端（如DownloadManager fallback）且拥有CDN直链时，直接302到CDN
+            $preferCdn = (int)$this->request->param('prefer_cdn', 0);
+            if ($cdnDownloadUrl && !$isLocalFile && ($preferCdn === 1 || $this->isAppClient())) {
+                \think\facade\Log::info("非APP请求：检测到APP客户端或prefer_cdn=1，直接302跳转到CDN - 视频ID {$videoId}, CDN: {$cdnDownloadUrl}");
+                return response('', 302, [
+                    'Location' => $cdnDownloadUrl,
+                    'Cache-Control' => 'private, max-age=0',
+                ]);
             }
             
             if ($isLocalFile) {
