@@ -622,24 +622,8 @@ public class NativeDownloader {
                         return false;
                     }
                 }
-            } catch (java.net.SocketException | javax.net.ssl.SSLException e) {
-                // 连接中断错误，可以重试
-                android.util.Log.w("NativeDownloader", "流式下载连接中断 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
-                if (attempt < maxRetries) {
-                    // 保留已下载的部分，下次从断点继续
-                    android.util.Log.i("NativeDownloader", "已下载 " + (tempFile.exists() ? tempFile.length() : 0) + " 字节，等待 " + retryDelay + " 毫秒后继续...");
-                    try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
-                    retryDelay *= 2; // 指数退避：2秒、4秒、8秒
-                    continue;
-                }
-                // 最后一次尝试失败
-                android.util.Log.e("NativeDownloader", "流式下载失败，已重试 " + maxRetries + " 次: " + e.getMessage());
-                if (listener != null) listener.onComplete(false, "下载失败：网络连接中断（已重试" + maxRetries + "次）");
-                if (nm != null) nm.cancel(notificationId);
-                // 保留部分下载的文件，下次可以继续
-                return false;
             } catch (java.net.UnknownHostException e) {
-                // DNS解析失败，网络问题，可以重试
+                // DNS解析失败，网络问题，可以重试（必须在其他网络异常之前）
                 android.util.Log.w("NativeDownloader", "流式下载DNS解析失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
                 if (attempt < maxRetries) {
                     // DNS解析失败时，等待更长时间（网络可能需要恢复）
@@ -655,7 +639,7 @@ public class NativeDownloader {
                 if (nm != null) nm.cancel(notificationId);
                 return false;
             } catch (java.net.ConnectException | java.net.SocketTimeoutException e) {
-                // 连接超时或连接拒绝，可以重试
+                // 连接超时或连接拒绝，可以重试（必须在SocketException之前，因为ConnectException是SocketException的子类）
                 android.util.Log.w("NativeDownloader", "流式下载连接失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
                 if (attempt < maxRetries) {
                     android.util.Log.i("NativeDownloader", "连接失败，等待 " + retryDelay + " 毫秒后重试...");
@@ -667,6 +651,22 @@ public class NativeDownloader {
                 android.util.Log.e("NativeDownloader", "连接失败，已重试 " + maxRetries + " 次: " + e.getMessage());
                 if (listener != null) listener.onComplete(false, "下载失败：无法连接到服务器（已重试" + maxRetries + "次）");
                 if (nm != null) nm.cancel(notificationId);
+                return false;
+            } catch (java.net.SocketException | javax.net.ssl.SSLException e) {
+                // 连接中断错误，可以重试（必须在最后，因为它会捕获其他SocketException子类）
+                android.util.Log.w("NativeDownloader", "流式下载连接中断 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
+                if (attempt < maxRetries) {
+                    // 保留已下载的部分，下次从断点继续
+                    android.util.Log.i("NativeDownloader", "已下载 " + (tempFile.exists() ? tempFile.length() : 0) + " 字节，等待 " + retryDelay + " 毫秒后继续...");
+                    try { Thread.sleep(retryDelay); } catch (InterruptedException ignored) {}
+                    retryDelay *= 2; // 指数退避：2秒、4秒、8秒
+                    continue;
+                }
+                // 最后一次尝试失败
+                android.util.Log.e("NativeDownloader", "流式下载失败，已重试 " + maxRetries + " 次: " + e.getMessage());
+                if (listener != null) listener.onComplete(false, "下载失败：网络连接中断（已重试" + maxRetries + "次）");
+                if (nm != null) nm.cancel(notificationId);
+                // 保留部分下载的文件，下次可以继续
                 return false;
             } catch (Exception e) {
                 // 其他异常
