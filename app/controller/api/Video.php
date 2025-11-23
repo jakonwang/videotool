@@ -562,11 +562,16 @@ class Video extends BaseController
                                 '://' . $_SERVER['HTTP_HOST'] .
                                 '/api/video/download?video_id=' . $videoId . '&type=' . $type;
                 $proxyUrl = $proxyBaseUrl . '&force_download=1';
-                $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
                 
-                // APP使用DownloadManager直接下载CDN链接，无需预缓存
-                // 移除预缓存逻辑，让APP直接下载CDN链接，速度最快
-                \think\facade\Log::info("APP请求：返回CDN直接下载链接 - {$fileUrl} -> {$cdnDownloadUrl}");
+                // 只有真正的CDN资源才返回CDN链接，否则返回空（前端会使用代理URL）
+                $cdnDownloadUrl = '';
+                if ($isCdnResource && !$isLocalFile) {
+                    // 如果是CDN链接，直接返回CDN链接（添加attname参数便于浏览器下载）
+                    $cdnDownloadUrl = $this->buildDirectDownloadUrl($fileUrl, $downloadFileName);
+                    \think\facade\Log::info("APP请求：返回CDN直接下载链接 - {$fileUrl} -> {$cdnDownloadUrl}");
+                } else {
+                    \think\facade\Log::info("APP请求：不是CDN资源，使用代理下载 - {$fileUrl} (isCdn: {$isCdnResource}, isLocal: " . ($isLocalFile ? 'true' : 'false') . ")");
+                }
                 
                 return json([
                     'code' => 0,
