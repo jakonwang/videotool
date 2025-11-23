@@ -249,6 +249,10 @@ class Video extends BaseController
                            (strpos($videoUrl, '/') === 0 ? '' : '/') . $videoUrl;
             }
             
+            // 生成英文下载文件名（供APP使用）
+            $videoFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', 'video');
+            $coverFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', 'cover');
+            
             return json([
                 'code' => 0,
                 'data' => [
@@ -256,6 +260,8 @@ class Video extends BaseController
                     'title' => $video->title,
                     'cover_url' => $coverUrl,
                     'video_url' => $videoUrl,
+                    'video_file_name' => $videoFileName,  // 英文视频文件名
+                    'cover_file_name' => $coverFileName,  // 英文封面文件名
                 ]
             ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         } catch (\Exception $e) {

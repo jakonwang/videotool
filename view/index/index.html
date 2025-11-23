@@ -502,9 +502,29 @@
                     
                     const baseUrl = getBaseUrl();
                     const ext = type === 'cover' ? '.jpg' : '.mp4';
-                    const fileName = (currentVideo.title || 'videotool')
-                        .replace(/[^\w\s-]/g, '')
-                        .concat(ext);
+                    
+                    // 优先使用后端返回的英文文件名（如果存在）
+                    let fileName;
+                    if (type === 'cover' && currentVideo.cover_file_name) {
+                        fileName = currentVideo.cover_file_name;
+                    } else if (type === 'video' && currentVideo.video_file_name) {
+                        fileName = currentVideo.video_file_name;
+                    } else {
+                        // 如果没有后端文件名，生成纯英文文件名（只保留英文字母、数字、空格、连字符和下划线）
+                        let name = (currentVideo.title || 'videotool')
+                            .replace(/[^a-zA-Z0-9\s\-_]/g, '')  // 只保留英文、数字、空格、连字符、下划线
+                            .trim();
+                        // 将多个空格替换为单个空格，然后替换为下划线
+                        name = name.replace(/\s+/g, ' ').replace(/\s/g, '_');
+                        // 限制长度
+                        if (name.length > 100) {
+                            name = name.substring(0, 100);
+                        }
+                        if (!name || name === '') {
+                            name = 'videotool_' + Date.now();
+                        }
+                        fileName = name + ext;
+                    }
                     
                     const downloadBaseUrl = `${baseUrl}/api/video/download?video_id=${currentVideo.id}&type=${type}`;
                     const forcedDownloadUrl = `${downloadBaseUrl}&force_download=1`;
