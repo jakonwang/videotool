@@ -105,6 +105,21 @@
     background: #fff;
   }
   .upload-dialog .el-dialog__body { padding: 0 !important; }
+
+  /* 移动端：操作按钮/表格/弹窗更易用 */
+  .admin-table-scroll { width: 100%; overflow-x: auto; }
+  .admin-table-scroll .el-table { min-width: 980px; }
+  @media (max-width: 768px) {
+    .page-container { padding: 12px; }
+    .modern-card { padding: 16px; }
+    .breadcrumb { margin-bottom: 10px; }
+    .action-buttons { flex-wrap: wrap; gap: 10px; }
+    .action-buttons .el-button { flex: 1 1 auto; }
+    .filter-buttons { margin-left: 0; }
+
+    .upload-dialog .el-dialog { width: calc(100vw - 24px) !important; margin: 10px auto 0 !important; }
+    .upload-iframe { height: 78vh; border-radius: 10px; }
+  }
 </style>
 {/block}
 {block name="page_actions"}{/block}
@@ -116,6 +131,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -139,6 +155,9 @@
   {literal}
   const { createApp, reactive, ref, onMounted, computed } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   function toSort(order) {
     if (order === 'ascending') return 'asc';
@@ -193,7 +212,7 @@
           tableData.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '加载失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         } finally {
           loading.value = false;
         }
@@ -369,17 +388,17 @@
         PLATFORM_OPTIONS, DEVICE_OPTIONS, PRODUCT_OPTIONS,
         uploadVisible, uploadIframeSrc, uploadFrame, onUploadIframeLoad, onUploadDialogClose,
         tableRef, fetchList, onSortChange, onSearch, onReset, onSelectionChange, invertSelection,
-        goEdit, doDelete, doBatchDelete, copyText, openUpload,
+        goEdit, doDelete, doBatchDelete, copyText, openUpload, tt,
       };
     },
     template: `
       <div class="page-container">
         <div class="modern-card">
           <div class="header-actions">
-            <div class="breadcrumb">首页 / 素材 / 视频管理</div>
+            <div class="breadcrumb">${lang==='en'?'Home / Library / Videos':'首页 / 素材 / 视频管理'}</div>
             <div class="action-buttons">
-              <el-button type="primary" class="btn-primary" @click="openUpload">上传</el-button>
-              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">批量删除</el-button>
+              <el-button type="primary" class="btn-primary" @click="openUpload">${lang==='en'?'Upload':'上传'}</el-button>
+              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">${lang==='en'?'Batch delete':'批量删除'}</el-button>
               <span v-if="selectedCount" style="font-size:12px; color:#6b7280; margin-left:6px;">已选择 {{selectedCount}} 条</span>
             </div>
           </div>
@@ -387,52 +406,53 @@
           <div class="filter-section">
             <el-form :inline="true" class="custom-form" @submit.prevent>
               <el-form-item>
-                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="平台" style="width: 140px;">
+                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Platform':'平台'" style="width: 140px;">
                   <el-option v-for="o in PLATFORM_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="设备" style="width: 140px;">
+                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Device':'设备'" style="width: 140px;">
                   <el-option v-for="o in DEVICE_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="商品" style="width: 140px;">
+                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Product':'商品'" style="width: 140px;">
                   <el-option v-for="o in PRODUCT_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags placeholder="下载状态" style="width: 140px;">
-                  <el-option label="未下载" :value="0" />
-                  <el-option label="已下载" :value="1" />
+                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags :placeholder="lang==='en'?'Download status':'下载状态'" style="width: 140px;">
+                  <el-option :label="lang==='en'?'Not downloaded':'未下载'" :value="0" />
+                  <el-option :label="lang==='en'?'Downloaded':'已下载'" :value="1" />
                 </el-select>
               </el-form-item>
               <el-form-item class="search-input-item">
-                <el-input v-model="filters.keyword" placeholder="搜索标题或视频链接" style="width: 240px;" @keyup.enter="onSearch" />
+                <el-input v-model="filters.keyword" :placeholder="lang==='en'?'Search title or URL':'搜索标题或视频链接'" style="width: 240px;" @keyup.enter="onSearch" />
               </el-form-item>
               <el-form-item class="filter-buttons">
-                <el-button type="primary" plain @click="onSearch">筛选</el-button>
-                <el-button @click="onReset">重置</el-button>
+                <el-button type="primary" plain @click="onSearch">{{ tt('common.filter') }}</el-button>
+                <el-button @click="onReset">{{ tt('common.reset') }}</el-button>
               </el-form-item>
             </el-form>
           </div>
 
-          <el-table
-            :data="tableData"
-            style="width: 100%"
-            stripe
-            v-loading="loading"
-            ref="tableRef"
-            row-key="id"
-            :default-sort="{ prop: 'created_at', order: 'descending' }"
-            @selection-change="onSelectionChange"
-            @sort-change="onSortChange"
-            :header-cell-style="{ backgroundColor: '#f9fafb', color: '#6b7280', height: '54px', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }"
-            :cell-style="{ padding: '10px 0', borderBottom: '1px solid #f3f4f6' }"
-          >
-            <el-table-column type="selection" width="55" />
+          <div class="admin-table-scroll">
+            <el-table
+              :data="tableData"
+              style="width: 100%"
+              stripe
+              v-loading="loading"
+              ref="tableRef"
+              row-key="id"
+              :default-sort="{ prop: 'created_at', order: 'descending' }"
+              @selection-change="onSelectionChange"
+              @sort-change="onSortChange"
+              :header-cell-style="{ backgroundColor: '#f9fafb', color: '#6b7280', height: '54px', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }"
+              :cell-style="{ padding: '10px 0', borderBottom: '1px solid #f3f4f6' }"
+            >
+              <el-table-column type="selection" width="55" />
 
-            <el-table-column label="封面" width="100">
+            <el-table-column :label="lang==='en'?'Cover':'封面'" width="100">
               <template #default="scope">
                 <el-image class="cover-image" :src="scope.row.cover_url || scope.row.video_url || '/static/default-cover.svg'" fit="cover">
                   <template #error>
@@ -442,7 +462,7 @@
               </template>
             </el-table-column>
 
-            <el-table-column label="标题 / ID" min-width="200">
+            <el-table-column :label="lang==='en'?'Title / ID':'标题 / ID'" min-width="200">
               <template #default="scope">
                 <div class="title-column">
                   <span class="main-title">{{ scope.row.title || '—' }}</span>
@@ -451,9 +471,9 @@
               </template>
             </el-table-column>
 
-            <el-table-column prop="created_at" label="时间" sortable="custom" min-width="180" />
+            <el-table-column prop="created_at" :label="lang==='en'?'Time':'时间'" sortable="custom" min-width="180" />
 
-            <el-table-column label="平台" width="120">
+            <el-table-column :label="lang==='en'?'Platform':'平台'" width="120">
               <template #default="scope">
                 <el-tag type="info" effect="light" class="custom-tag">
                   {{ (scope.row.platform && scope.row.platform.name) || '—' }}
@@ -461,22 +481,22 @@
               </template>
             </el-table-column>
 
-            <el-table-column label="状态" width="120">
+            <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
               <template #default="scope">
-                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">已下载</el-tag>
-                <el-tag v-else type="warning" effect="light" class="custom-tag">未下载</el-tag>
+                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">{{ lang==='en'?'Downloaded':'已下载' }}</el-tag>
+                <el-tag v-else type="warning" effect="light" class="custom-tag">{{ lang==='en'?'Not downloaded':'未下载' }}</el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column :label="lang==='en'?'Actions':'操作'" width="100" fixed="right">
               <template #default="scope">
                 <el-dropdown trigger="click">
-                  <el-button type="primary" link class="action-link">操作</el-button>
+                  <el-button type="primary" link class="action-link">{{ lang==='en'?'Actions':'操作' }}</el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item @click="copyText(scope.row.video_url)">复制链接</el-dropdown-item>
-                      <el-dropdown-item @click="goEdit(scope.row)">编辑</el-dropdown-item>
-                      <el-dropdown-item divided @click="doDelete(scope.row)">删除</el-dropdown-item>
+                      <el-dropdown-item @click="copyText(scope.row.video_url)">{{ lang==='en'?'Copy URL':'复制链接' }}</el-dropdown-item>
+                      <el-dropdown-item @click="goEdit(scope.row)">{{ tt('common.edit') }}</el-dropdown-item>
+                      <el-dropdown-item divided @click="doDelete(scope.row)">{{ tt('common.delete') }}</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
@@ -484,11 +504,10 @@
             </el-table-column>
 
             <template #empty>
-              <div style="padding: 28px 0; text-align:center; color:#6b7280;">
-                暂无视频数据
-              </div>
+              <div style="padding: 28px 0; text-align:center; color:#6b7280;">{{ lang==='en'?'No videos':'暂无视频数据' }}</div>
             </template>
-          </el-table>
+            </el-table>
+          </div>
 
           <div class="footer-pagination">
             <el-button @click="invertSelection" :disabled="!tableData.length">反选</el-button>
@@ -507,7 +526,7 @@
           <el-dialog
             class="upload-dialog"
             v-model="uploadVisible"
-            title="上传视频"
+            :title="lang==='en'?'Upload':'上传视频'"
             width="920px"
             :destroy-on-close="true"
             @closed="onUploadDialogClose"

@@ -10,6 +10,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // 后台认证
     Route::get('auth/login', 'app\controller\admin\Auth@login');
     Route::post('auth/login', 'app\controller\admin\Auth@login');
+    Route::get('auth/logout', 'app\controller\admin\Auth@logoutPage');
     Route::post('auth/logout', 'app\controller\admin\Auth@logout');
 
     // 仪表盘统计（只读 JSON）

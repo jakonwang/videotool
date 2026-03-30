@@ -74,6 +74,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -82,6 +83,9 @@
   const { createApp, reactive, ref, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const { Plus, Search, Edit, Key, Delete } = ElementPlusIconsVue;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   const headerCellStyle = {
     backgroundColor: '#F9FAFB',
@@ -129,12 +133,12 @@
           if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
           const res = await fetch('/admin.php/user/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
           me.value = (json.data && json.data.me) ? json.data.me : { id: 0, username: '' };
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '加载失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         } finally {
           loading.value = false;
         }
@@ -167,14 +171,14 @@
       async function submitDialog() {
         const username = String(dialog.form.username || '').trim();
         if (!username) {
-          ElMessage.warning('请输入用户名');
+          ElMessage.warning(lang === 'en' ? 'Please enter username' : '请输入用户名');
           return;
         }
 
         if (dialog.mode === 'create') {
           const password = String(dialog.form.password || '');
           if (password.length < 6) {
-            ElMessage.warning('密码至少 6 位');
+            ElMessage.warning(lang === 'en' ? 'Password must be at least 6 characters' : '密码至少 6 位');
             return;
           }
           await postForm('/admin.php/user/create', {
@@ -204,7 +208,7 @@
       async function submitResetPwd() {
         const p = String(pwdDialog.password || '');
         if (p.length < 6) {
-          ElMessage.warning('密码至少 6 位');
+          ElMessage.warning(lang === 'en' ? 'Password must be at least 6 characters' : '密码至少 6 位');
           return;
         }
         await postForm('/admin.php/user/resetPassword', {
@@ -216,7 +220,7 @@
 
       async function doToggle(row) {
         if (me.value && Number(me.value.id) === Number(row.id)) {
-          ElMessage.warning('不能禁用当前登录账号');
+          ElMessage.warning(lang === 'en' ? 'Cannot disable current account' : '不能禁用当前登录账号');
           return;
         }
         await postForm('/admin.php/user/toggle', { id: String(row.id) }, '已更新');
@@ -225,13 +229,16 @@
 
       async function doDelete(row) {
         if (me.value && Number(me.value.id) === Number(row.id)) {
-          ElMessage.warning('不能删除当前登录账号');
+          ElMessage.warning(lang === 'en' ? 'Cannot delete current account' : '不能删除当前登录账号');
           return;
         }
-        await ElMessageBox.confirm(`确认删除用户「${row.username}」？`, '删除确认', {
+        await ElMessageBox.confirm(
+          lang === 'en' ? `Delete user "${row.username}"?` : `确认删除用户「${row.username}」？`,
+          lang === 'en' ? 'Confirm' : '删除确认',
+          {
           type: 'warning',
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
+          confirmButtonText: tt('common.delete'),
+          cancelButtonText: tt('common.cancel'),
         });
         await postForm('/admin.php/user/delete', { id: String(row.id) }, '已删除');
         const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
@@ -250,7 +257,7 @@
         });
         const json = await resp.json();
         if (!json || json.code !== 0) {
-          throw new Error((json && json.msg) || '操作失败');
+          throw new Error((json && json.msg) || (lang === 'en' ? 'Operation failed' : '操作失败'));
         }
         ElMessage.success(successMsg || (json.msg || '成功'));
       }
@@ -275,6 +282,7 @@
         Edit,
         Key,
         Delete,
+        tt,
         onSearch,
         onReset,
         openCreate,
@@ -291,11 +299,11 @@
       <div class="admin-user-card">
         <div class="admin-user-header">
           <div>
-            <div class="admin-user-breadcrumb">系统 / 用户</div>
-            <div class="admin-user-title">用户</div>
+            <div class="admin-user-breadcrumb">${tt('page.user.breadcrumb')}</div>
+            <div class="admin-user-title">${tt('page.user.title')}</div>
           </div>
           <div class="admin-user-actions">
-            <el-button size="default" type="primary" :icon="Plus" @click="openCreate">+ 添加用户</el-button>
+            <el-button size="default" type="primary" :icon="Plus" @click="openCreate">${tt('page.user.add')}</el-button>
           </div>
         </div>
 
@@ -304,19 +312,19 @@
             v-model="query.keyword"
             size="default"
             clearable
-            placeholder="搜索用户名"
+            :placeholder="tt('page.user.searchUser')"
             :prefix-icon="Search"
             style="width:260px; flex:0 0 auto;"
             @keyup.enter="onSearch"
           />
-          <el-select v-model="query.status" size="default" clearable placeholder="全部状态" style="width:140px; flex:0 0 auto;">
-            <el-option label="启用" value="1" />
-            <el-option label="禁用" value="0" />
+          <el-select v-model="query.status" size="default" clearable :placeholder="tt('common.statusAll')" style="width:140px; flex:0 0 auto;">
+            <el-option :label="tt('common.statusEnabled')" value="1" />
+            <el-option :label="tt('common.statusDisabled')" value="0" />
           </el-select>
 
           <div class="admin-user-filter-actions">
-            <el-button size="default" type="primary" @click="onSearch">筛选</el-button>
-            <el-button size="default" @click="onReset">重置</el-button>
+            <el-button size="default" type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
+            <el-button size="default" @click="onReset">{{ tt('common.reset') }}</el-button>
           </div>
         </div>
 
@@ -329,27 +337,27 @@
           :cell-style="cellStyle"
         >
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column label="用户名" min-width="180">
+          <el-table-column :label="lang==='en'?'Username':'用户名'" min-width="180">
             <template #default="{ row }">
               <span class="name-cell">{{ row.username }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="120">
+          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
-                {{ String(row.status) === '1' ? '启用' : '禁用' }}
+                {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="last_login_at" label="最后登录" min-width="180" />
+          <el-table-column prop="last_login_at" :label="lang==='en'?'Last login':'最后登录'" min-width="180" />
           <el-table-column prop="last_login_ip" label="IP" width="160" show-overflow-tooltip />
-          <el-table-column prop="created_at" label="创建时间" min-width="180" />
-          <el-table-column label="操作" width="240" fixed="right">
+          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="240" fixed="right">
             <template #default="{ row }">
-              <el-button size="default" link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
-              <el-button size="default" link type="primary" :icon="Key" @click="openResetPwd(row)">重置密码</el-button>
-              <el-button size="default" link type="primary" @click="doToggle(row)">启停</el-button>
-              <el-button size="default" link type="danger" :icon="Delete" @click="doDelete(row)">删除</el-button>
+              <el-button size="default" link type="primary" :icon="Edit" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button size="default" link type="primary" :icon="Key" @click="openResetPwd(row)">{{ lang==='en'?'Reset password':'重置密码' }}</el-button>
+              <el-button size="default" link type="primary" @click="doToggle(row)">{{ lang==='en'?'Toggle':'启停' }}</el-button>
+              <el-button size="default" link type="danger" :icon="Delete" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -367,39 +375,39 @@
           />
         </div>
 
-        <el-dialog v-model="dialog.visible" :title="dialog.mode === 'create' ? '添加用户' : '编辑用户'" width="520px">
+        <el-dialog v-model="dialog.visible" :title="dialog.mode === 'create' ? (lang==='en'?'Add user':'添加用户') : (lang==='en'?'Edit user':'编辑用户')" width="520px">
           <el-form label-width="92px">
-            <el-form-item label="用户名">
-              <el-input v-model="dialog.form.username" size="default" placeholder="请输入用户名" />
+            <el-form-item :label="lang==='en'?'Username':'用户名'">
+              <el-input v-model="dialog.form.username" size="default" :placeholder="lang==='en'?'Enter username':'请输入用户名'" />
             </el-form-item>
-            <el-form-item v-if="dialog.mode === 'create'" label="密码">
-              <el-input v-model="dialog.form.password" size="default" placeholder="至少 6 位" show-password />
+            <el-form-item v-if="dialog.mode === 'create'" :label="lang==='en'?'Password':'密码'">
+              <el-input v-model="dialog.form.password" size="default" :placeholder="lang==='en'?'At least 6 characters':'至少 6 位'" show-password />
             </el-form-item>
-            <el-form-item label="状态">
+            <el-form-item :label="lang==='en'?'Status':'状态'">
               <el-select v-model="dialog.form.status" size="default" style="width:140px">
-                <el-option label="启用" :value="1" />
-                <el-option label="禁用" :value="0" />
+                <el-option :label="tt('common.statusEnabled')" :value="1" />
+                <el-option :label="tt('common.statusDisabled')" :value="0" />
               </el-select>
             </el-form-item>
           </el-form>
           <template #footer>
-            <el-button size="default" @click="dialog.visible=false">取消</el-button>
-            <el-button size="default" type="primary" @click="submitDialog">保存</el-button>
+            <el-button size="default" @click="dialog.visible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button size="default" type="primary" @click="submitDialog">{{ tt('common.save') }}</el-button>
           </template>
         </el-dialog>
 
-        <el-dialog v-model="pwdDialog.visible" title="重置密码" width="520px">
+        <el-dialog v-model="pwdDialog.visible" :title="lang==='en'?'Reset password':'重置密码'" width="520px">
           <el-form label-width="92px">
-            <el-form-item label="用户">
+            <el-form-item :label="lang==='en'?'User':'用户'">
               <el-input :model-value="pwdDialog.username" size="default" disabled />
             </el-form-item>
-            <el-form-item label="新密码">
-              <el-input v-model="pwdDialog.password" size="default" placeholder="至少 6 位" show-password @keyup.enter="submitResetPwd" />
+            <el-form-item :label="lang==='en'?'New password':'新密码'">
+              <el-input v-model="pwdDialog.password" size="default" :placeholder="lang==='en'?'At least 6 characters':'至少 6 位'" show-password @keyup.enter="submitResetPwd" />
             </el-form-item>
           </el-form>
           <template #footer>
-            <el-button size="default" @click="pwdDialog.visible=false">取消</el-button>
-            <el-button size="default" type="primary" @click="submitResetPwd">确定</el-button>
+            <el-button size="default" @click="pwdDialog.visible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button size="default" type="primary" @click="submitResetPwd">{{ tt('common.ok') }}</el-button>
           </template>
         </el-dialog>
       </div>

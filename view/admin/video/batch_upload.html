@@ -42,6 +42,23 @@
     .video-item .btn {
         min-width: 80px;
     }
+
+    /* 移动端适配：更紧凑、更好点按 */
+    @media (max-width: 768px) {
+        .card-body { padding: 14px; }
+        .upload-area { padding: 18px; border-radius: 12px; }
+        .upload-area h5 { font-size: 15px; margin-bottom: 6px; }
+        .upload-area i { font-size: 40px; }
+        .video-item { padding: 12px; }
+        .video-preview { max-width: 100%; width: 100%; max-height: 220px; }
+        .video-item .row { flex-direction: column; }
+        .video-item .col-md-3, .video-item .col-md-9 { max-width: 100%; flex: 0 0 100%; }
+        .video-item .btn-remove-video { width: 100%; }
+        #videoList { margin-top: 14px !important; }
+        .mt-3.d-flex.justify-content-end { flex-direction: column; gap: 10px; }
+        .mt-3.d-flex.justify-content-end .btn { width: 100%; margin-right: 0 !important; }
+        select.form-control, input.form-control, textarea.form-control { font-size: 16px; } /* iOS 避免自动放大 */
+    }
 </style>
 {/block}
 

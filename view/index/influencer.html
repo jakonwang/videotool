@@ -1,104 +1,247 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>达人取片</title>
-    <meta name="theme-color" content="#1f2353">
+    <title>Creator Download</title>
+    <meta name="theme-color" content="#111827">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
-            min-height: 100vh;
+        :root{
+            --bg: #F4F5F9;
+            --card: #FFFFFF;
+            --ink: #111827;
+            --muted: #6B7280;
+            --line: #E5E7EB;
+            --soft: #F9FAFB;
+            --brand: #059669;
+            --shadow: 0 10px 40px rgba(0,0,0,0.08);
+        }
+        *{ margin:0; padding:0; box-sizing:border-box; }
+        html, body{ height:100%; }
+        body{
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+            background:
+                radial-gradient(900px 520px at 20% 20%, rgba(99,102,241,0.07), transparent 60%),
+                radial-gradient(760px 520px at 80% 10%, rgba(16,185,129,0.06), transparent 60%),
+                radial-gradient(680px 520px at 50% 90%, rgba(56,189,248,0.07), transparent 62%),
+                var(--bg);
+            color: var(--ink);
+        }
+        .page{
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding: 20px;
+        }
+        .card{
+            width:100%;
+            max-width:420px;
+            background: var(--card);
+            border-radius: 24px;
+            border: 1px solid rgba(17,24,39,0.06);
+            box-shadow: var(--shadow);
+            overflow:hidden;
+        }
+        .header{
+            padding: 18px 18px 14px;
+            display:flex;
+            align-items:flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            border-bottom: 1px solid #EEF2F7;
+        }
+        .headerLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
+        .appIcon{
+            width: 36px; height: 36px;
+            border-radius: 12px;
+            display:flex; align-items:center; justify-content:center;
+            background: rgba(17,24,39,0.04);
+            border: 1px solid rgba(17,24,39,0.08);
+            color: var(--ink);
+            flex: 0 0 auto;
+        }
+        .headText{ min-width:0; }
+        .hTitle{
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--ink);
+            letter-spacing: -0.01em;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow:hidden;
+            text-overflow: ellipsis;
+        }
+        .hSub{
+            margin-top: 6px;
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow:hidden;
+            text-overflow: ellipsis;
+        }
+        .seg{
+            position: relative;
+            display:grid;
+            grid-template-columns: 1fr 1fr;
+            padding:2px;
+            border-radius: 999px;
+            background: #F3F4F6;
+            border: 1px solid rgba(17,24,39,0.08);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+            flex: 0 0 auto;
+            min-width: 156px;
+        }
+        .segBtn{
+            position:relative;
+            z-index:2;
+            height: 28px;
+            border:0;
+            background: transparent;
+            font-size: 12px;
+            font-weight: 800;
+            color: rgba(17,24,39,0.65);
+            cursor:pointer;
+            border-radius: 999px;
+        }
+        .segBtn.active{ color: var(--ink); }
+        .segThumb{
+            position:absolute;
+            inset:2px;
+            width: calc(50% - 2px);
+            border-radius: 999px;
+            background:#fff;
+            border: 1px solid rgba(17,24,39,0.10);
+            box-shadow: 0 8px 18px rgba(17,24,39,0.10);
+            transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .body{
+            padding: 16px 18px 18px;
+            display:flex;
+            flex-direction:column;
+            gap: 16px;
+        }
+        .mediaCard{ display:flex; flex-direction:column; gap:10px; }
+        .label{
+            font-size: 12px;
+            font-weight: 800;
+            color: rgba(17,24,39,0.62);
+            letter-spacing: 0.02em;
+        }
+        .mediaFrame{
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: #fff;
             padding: 10px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
         }
-        .container {
-            max-width: 400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            overflow: hidden;
+        .mediaImg, .mediaVideo{
+            width:100%;
+            border-radius: 12px;
+            display:block;
+            background: linear-gradient(135deg, rgba(17,24,39,0.08), rgba(17,24,39,0.02));
         }
-        .header {
-            background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
-            color: white;
-            padding: 15px 20px;
-            text-align: center;
+        .mediaImg{ max-height: 220px; object-fit: cover; }
+        .mediaVideo{ max-height: 240px; object-fit: cover; background:#0B1220; }
+
+        .info{
+            display:flex;
+            flex-direction:column;
+            gap: 10px;
         }
-        .header h1 { font-size: 18px; margin-bottom: 6px; }
-        .header .sub { font-size: 12px; opacity: 0.95; word-break: break-all; }
-        .content { padding: 20px; }
-        .cover-image {
-            width: 100%; max-width: 300px; max-height: 200px; object-fit: contain;
-            border-radius: 10px; margin: 0 auto 15px; display: block;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        .infoBox{
+            background: var(--soft);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
         }
-        .video-player {
-            width: 100%; max-width: 300px; max-height: 200px; border-radius: 10px;
-            margin: 0 auto 15px; display: block; background: #000;
+        .infoText{
+            color: var(--ink);
+            font-weight: 800;
+            font-size: 14px;
+            line-height: 1.45;
+            word-break: break-word;
         }
-        .title-section {
-            background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px;
+
+        .actionsRow{
+            display:grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
-        .title-label { font-size: 11px; color: #666; margin-bottom: 5px; }
-        .title-text { font-size: 14px; line-height: 1.5; color: #333; word-break: break-word; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .btn {
-            padding: 12px 20px; border: none; border-radius: 8px; font-size: 14px;
-            font-weight: 600; cursor: pointer; min-height: 44px;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+        .btnPrimary, .btnSecondary{
+            width:100%;
+            height: 44px;
+            border-radius: 12px !important;
+            font-weight: 800;
+            transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
         }
-        .btn-full { width: 100%; }
-        .btn-copy { background: #0d9488; color: white; }
-        .btn-download { background: #10b981; color: white; }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-loading { position: relative; color: transparent !important; }
-        .btn-loading::after {
-            content: ''; position: absolute; width: 16px; height: 16px; top: 50%; left: 50%;
-            margin: -8px 0 0 -8px; border: 2px solid #fff; border-top-color: transparent;
-            border-radius: 50%; animation: spin 0.6s linear infinite;
+        .btnPrimary{
+            box-shadow: 0 10px 24px rgba(5,150,105,0.22);
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading { text-align: center; padding: 40px; color: #666; }
-        .loading::after {
-            content: ''; display: inline-block; width: 20px; height: 20px;
-            border: 3px solid #0d9488; border-top-color: transparent; border-radius: 50%;
-            animation: spin 0.8s linear infinite; margin-left: 10px;
+        .btnPrimary:active, .btnSecondary:active{ transform: translateY(0px) scale(0.99); opacity: .96; }
+        .footHint{
+            margin-top: 2px;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.45;
         }
-        .empty { text-align: center; padding: 30px 16px; color: #666; }
-        .toast {
-            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-            background: rgba(0,0,0,0.82); color: #fff; padding: 10px 18px; border-radius: 8px;
-            font-size: 14px; z-index: 1000; opacity: 0; transition: opacity 0.2s, transform 0.2s;
+
+        .skeleton{
+            padding: 18px;
+            display:flex;
+            flex-direction:column;
+            gap: 12px;
         }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .skLine{
+            height: 12px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(17,24,39,0.06), rgba(17,24,39,0.10), rgba(17,24,39,0.06));
+            background-size: 240% 100%;
+            animation: shimmer 1.2s ease-in-out infinite;
+        }
+        .skMedia{ height: 180px; border-radius: 14px; }
+        @keyframes shimmer{ 0%{ background-position: 0% 0; } 100%{ background-position: 100% 0; } }
+
+        @media (max-width: 420px){
+            .page{ padding: 14px; }
+            .header{ padding: 16px 14px 12px; }
+            .body{ padding: 14px 14px 16px; }
+            .seg{ min-width: 148px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📦 达人取片</h1>
-            <div class="sub" id="productLine">加载中…</div>
-        </div>
-        <div class="content" id="content"><div class="loading">加载中</div></div>
-    </div>
-    <div class="toast" id="toast"></div>
+    <div id="app"></div>
+
+    <script src="/static/i18n/influencer_i18n.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
     <script>
         (function () {
             const TOKEN = {$token_json|raw};
-            let currentVideo = null;
+            const i18n = window.InfluencerI18n;
+            const lang = i18n ? i18n.getLang('vi') : 'vi';
+            if (i18n && i18n.applyHtmlLang) i18n.applyHtmlLang(lang);
+
+            const { createApp, ref, reactive, computed, onMounted } = Vue;
+            const { ElMessage } = ElementPlus;
+            const { Download, CopyDocument, Link } = ElementPlusIconsVue;
+
+            function t(key) {
+                return i18n ? i18n.t(key, null, lang) : key;
+            }
 
             function getBaseUrl() {
-                const path = window.location.pathname;
+                const path = window.location.pathname || '';
                 const dMarker = '/d/';
                 const pos = path.indexOf(dMarker);
                 if (pos !== -1) {
                     let prefix = path.substring(0, pos);
-                    if (prefix.endsWith('/index.php')) {
-                        prefix = prefix.slice(0, -10);
-                    }
+                    if (prefix.endsWith('/index.php')) prefix = prefix.slice(0, -10);
                     return prefix || '';
                 }
                 if (path === '/' || path === '/index.php' || path.endsWith('/index.php')) return '';
@@ -113,127 +256,262 @@
                 return window.location.origin + getBaseUrl() + '/' + url.replace(/^\.\//, '');
             }
 
-            function showToast(msg) {
-                const toast = document.getElementById('toast');
-                toast.textContent = msg;
-                toast.classList.add('show');
-                setTimeout(() => toast.classList.remove('show'), 2000);
+            async function safeJson(res) {
+                const ct = (res.headers.get('content-type') || '').toLowerCase();
+                if (!ct.includes('application/json')) throw new Error('API returned non-JSON');
+                return await res.json();
             }
 
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
+            createApp({
+                setup() {
+                    const loading = ref(true);
+                    const productName = ref('—');
+                    const goodsUrl = ref('');
+                    const video = reactive({
+                        id: 0,
+                        title: '',
+                        cover_url: '',
+                        video_url: '',
+                        cover_file_name: '',
+                        video_file_name: ''
+                    });
 
-            async function loadVideo() {
-                const contentEl = document.getElementById('content');
-                contentEl.innerHTML = '<div class="loading">加载中</div>';
-                try {
-                    const baseUrl = getBaseUrl();
-                    const apiUrl = baseUrl + '/api/video/influencerRandom?token=' + encodeURIComponent(TOKEN);
-                    const response = await fetch(apiUrl);
-                    const result = await response.json();
-                    if (result.code === 0 && result.data) {
-                        currentVideo = result.data;
-                        const pn = result.data.product_name || '商品';
-                        document.getElementById('productLine').textContent = '商品：' + pn;
-                        if (result.data.goods_url) {
-                            document.getElementById('productLine').innerHTML =
-                                '商品：' + escapeHtml(pn) +
-                                ' <a href="' + escapeHtml(result.data.goods_url) + '" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">打开链接</a>';
+                    const busy = reactive({ copy: false, cover: false, video: false });
+
+                    const segThumbStyle = computed(() => ({
+                        transform: `translateX(${(lang === 'en') ? 100 : 0}%)`
+                    }));
+
+                    const coverAbs = computed(() => {
+                        const v = toAbsoluteUrl(video.cover_url);
+                        const vv = toAbsoluteUrl(video.video_url);
+                        return v || vv || '';
+                    });
+                    const videoAbs = computed(() => toAbsoluteUrl(video.video_url) || '');
+
+                    async function fetchVideo() {
+                        loading.value = true;
+                        try {
+                            const baseUrl = getBaseUrl();
+                            const apiUrl = baseUrl + '/api/video/influencerRandom?token=' + encodeURIComponent(TOKEN);
+                            const res = await fetch(apiUrl);
+                            const json = await safeJson(res);
+                            if (!json || json.code !== 0 || !json.data) {
+                                productName.value = '—';
+                                goodsUrl.value = '';
+                                video.id = 0;
+                                video.title = '';
+                                video.cover_url = '';
+                                video.video_url = '';
+                                throw new Error((json && json.msg) || t('influencer.empty'));
+                            }
+
+                            const d = json.data;
+                            productName.value = d.product_name || t('influencer.product');
+                            goodsUrl.value = d.goods_url || '';
+                            video.id = Number(d.id || 0);
+                            video.title = String(d.title || '');
+                            video.cover_url = String(d.cover_url || '');
+                            video.video_url = String(d.video_url || '');
+                            video.cover_file_name = String(d.cover_file_name || '');
+                            video.video_file_name = String(d.video_file_name || '');
+                        } finally {
+                            loading.value = false;
                         }
-                        renderVideo(result.data);
-                    } else {
-                        document.getElementById('productLine').textContent = '—';
-                        contentEl.innerHTML = '<div class="empty">' + escapeHtml(result.msg || '暂无视频') + '</div>';
                     }
-                } catch (e) {
-                    document.getElementById('productLine').textContent = '—';
-                    contentEl.innerHTML = '<div class="empty">加载失败：' + escapeHtml(e.message) + '</div>';
-                }
-            }
 
-            function renderVideo(video) {
-                let coverUrl = toAbsoluteUrl(video.cover_url);
-                const videoUrl = toAbsoluteUrl(video.video_url);
-                if (!coverUrl) coverUrl = videoUrl;
-                document.getElementById('content').innerHTML =
-                    '<div class="video-container">' +
-                    '<img src="' + escapeHtml(coverUrl) + '" alt="" class="cover-image" onerror="this.onerror=null;this.src=\'' + escapeHtml(videoUrl) + '\'">' +
-                    '<video src="' + escapeHtml(videoUrl) + '" controls class="video-player" preload="metadata"></video>' +
-                    '<div class="title-section">' +
-                    '<div class="title-label">标题</div>' +
-                    '<div class="title-text" id="titleText">' + escapeHtml(video.title) + '</div></div>' +
-                    '<div class="btn-group">' +
-                    '<button type="button" class="btn btn-copy" onclick="copyTitle()">复制标题</button>' +
-                    '<button type="button" class="btn btn-download" onclick="downloadFile(\'cover\')">下载封面</button></div>' +
-                    '<button type="button" class="btn btn-download btn-full" onclick="downloadFile(\'video\')">下载视频</button></div>';
-            }
-
-            window.copyTitle = function () {
-                const el = document.getElementById('titleText');
-                if (!el) return;
-                const text = el.textContent;
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(text).then(() => showToast('已复制'));
-                } else {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    showToast('已复制');
-                }
-            };
-
-            window.downloadFile = async function (type) {
-                if (!currentVideo) return;
-                const buttons = document.querySelectorAll('.btn-download, .btn-copy');
-                buttons.forEach(b => { b.disabled = true; b.classList.add('btn-loading'); });
-                try {
-                    const baseUrl = getBaseUrl();
-                    let fileName = type === 'cover'
-                        ? (currentVideo.cover_file_name || 'cover.jpg')
-                        : (currentVideo.video_file_name || 'video.mp4');
-                    const downloadUrl = baseUrl + '/api/video/download?video_id=' + currentVideo.id + '&type=' + type + '&force_download=1';
-                    const a = document.createElement('a');
-                    a.href = downloadUrl;
-                    a.download = fileName;
-                    a.style.display = 'none';
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 200);
-
-                    if (type === 'video') {
-                        setTimeout(async () => {
-                            try {
-                                await fetch(baseUrl + '/api/video/markDownloaded', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ video_id: currentVideo.id })
-                                });
-                            } catch (err) { console.warn(err); }
-                            showToast('已开始下载，下一条随机视频');
-                            setTimeout(() => loadVideo(), 1200);
-                        }, 400);
-                    } else {
-                        showToast('已开始下载封面');
+                    async function copyTitle() {
+                        const text = String(video.title || '').trim();
+                        if (!text) return;
+                        busy.copy = true;
+                        try {
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                await navigator.clipboard.writeText(text);
+                            } else {
+                                const ta = document.createElement('textarea');
+                                ta.value = text;
+                                ta.style.position = 'fixed';
+                                ta.style.left = '-9999px';
+                                document.body.appendChild(ta);
+                                ta.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(ta);
+                            }
+                            ElMessage.success(t('influencer.copied'));
+                        } catch (e) {
+                            ElMessage.error(t('influencer.failedPrefix') + ': ' + (e && e.message ? e.message : 'copy'));
+                        } finally {
+                            busy.copy = false;
+                        }
                     }
-                } catch (err) {
-                    showToast('失败：' + err.message);
-                } finally {
-                    setTimeout(() => {
-                        document.querySelectorAll('.btn-download, .btn-copy').forEach(b => {
-                            b.disabled = false;
-                            b.classList.remove('btn-loading');
+
+                    function triggerDownload(type) {
+                        const baseUrl = getBaseUrl();
+                        const fileName = type === 'cover'
+                            ? (video.cover_file_name || 'cover.jpg')
+                            : (video.video_file_name || 'video.mp4');
+                        const url = baseUrl + '/api/video/download?video_id=' + video.id + '&type=' + type + '&force_download=1';
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = fileName;
+                        a.rel = 'noopener';
+                        a.style.display = 'none';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 150);
+                        return { url, fileName };
+                    }
+
+                    async function markDownloaded() {
+                        try {
+                            const baseUrl = getBaseUrl();
+                            await fetch(baseUrl + '/api/video/markDownloaded', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ video_id: video.id })
+                            });
+                        } catch (e) { /* ignore */ }
+                    }
+
+                    async function download(type) {
+                        if (!video.id) return;
+                        if (type === 'cover') busy.cover = true;
+                        if (type === 'video') busy.video = true;
+                        try {
+                            triggerDownload(type);
+                            if (type === 'video') {
+                                setTimeout(async () => {
+                                    await markDownloaded();
+                                    ElMessage.success(t('influencer.downloadStartedNext'));
+                                    setTimeout(() => fetchVideo(), 600);
+                                }, 400);
+                            } else {
+                                ElMessage.success(t('influencer.downloadStartedCover'));
+                            }
+                        } catch (e) {
+                            ElMessage.error(t('influencer.failedPrefix') + ': ' + (e && e.message ? e.message : 'download'));
+                        } finally {
+                            setTimeout(() => {
+                                busy.cover = false;
+                                busy.video = false;
+                            }, 600);
+                        }
+                    }
+
+                    function setLangVi() { i18n && i18n.setLang('vi'); }
+                    function setLangEn() { i18n && i18n.setLang('en'); }
+
+                    onMounted(() => {
+                        document.title = t('influencer.title');
+                        fetchVideo().catch((e) => {
+                            // show empty state via message, keep UI stable
+                            ElMessage.warning(e && e.message ? e.message : t('common.loadingFailed'));
                         });
-                    }, 600);
-                }
-            };
+                    });
 
-            loadVideo();
+                    return {
+                        lang,
+                        t,
+                        loading,
+                        productName,
+                        goodsUrl,
+                        video,
+                        coverAbs,
+                        videoAbs,
+                        busy,
+                        segThumbStyle,
+                        Download,
+                        CopyDocument,
+                        Link,
+                        setLangVi,
+                        setLangEn,
+                        copyTitle,
+                        download,
+                        fetchVideo
+                    };
+                },
+                template: `
+                    <div class="page">
+                      <div class="card">
+                        <div class="header">
+                          <div class="headerLeft">
+                            <div class="appIcon" aria-hidden="true">
+                              <el-icon :size="18"><Download/></el-icon>
+                            </div>
+                            <div class="headText">
+                              <div class="hTitle">{{ t('influencer.title') }}</div>
+                              <div class="hSub">
+                                {{ t('influencer.product') }}: {{ productName }}
+                                <a v-if="goodsUrl" :href="goodsUrl" target="_blank" rel="noopener"
+                                   style="margin-left:8px; color:#111827; text-decoration:underline; text-underline-offset: 3px; opacity:.9;">
+                                  {{ t('influencer.openLink') }}
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="seg" role="tablist" aria-label="Language">
+                            <button class="segBtn" :class="{active: lang==='vi'}" role="tab" :aria-selected="lang==='vi'" @click="setLangVi">VI</button>
+                            <button class="segBtn" :class="{active: lang==='en'}" role="tab" :aria-selected="lang==='en'" @click="setLangEn">EN</button>
+                            <span class="segThumb" :style="segThumbStyle" aria-hidden="true"></span>
+                          </div>
+                        </div>
+
+                        <div v-if="loading" class="skeleton" aria-busy="true">
+                          <div class="skLine" style="width: 72%"></div>
+                          <div class="skLine" style="width: 52%"></div>
+                          <div class="skLine skMedia"></div>
+                          <div class="skLine skMedia" style="height: 200px;"></div>
+                          <div class="skLine" style="width: 46%"></div>
+                        </div>
+
+                        <div v-else class="body">
+                          <div class="mediaCard">
+                            <div class="label">{{ t('influencer.downloadCover') }}</div>
+                            <div class="mediaFrame">
+                              <img v-if="coverAbs" class="mediaImg" :src="coverAbs" alt="cover" />
+                              <div v-else style="height:180px; border-radius:12px; background:#F3F4F6;"></div>
+                            </div>
+                          </div>
+
+                          <div class="mediaCard">
+                            <div class="label">{{ t('influencer.downloadVideo') }}</div>
+                            <div class="mediaFrame">
+                              <video v-if="videoAbs" class="mediaVideo" :src="videoAbs" controls preload="metadata" playsinline webkit-playsinline />
+                              <div v-else style="height:200px; border-radius:12px; background:#0B1220;"></div>
+                            </div>
+                          </div>
+
+                          <div class="info">
+                            <div class="label">{{ t('influencer.videoTitle') }}</div>
+                            <div class="infoBox">
+                              <div class="infoText">{{ video.title || '—' }}</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div class="actionsRow">
+                              <el-button class="btnSecondary" :icon="CopyDocument" @click="copyTitle" :loading="busy.copy">
+                                {{ t('influencer.copyTitle') }}
+                              </el-button>
+                              <el-button class="btnSecondary" :icon="Download" @click="download('cover')" :loading="busy.cover">
+                                {{ t('influencer.downloadCover') }}
+                              </el-button>
+                            </div>
+
+                            <el-button class="btnPrimary" type="success" :icon="Download" style="margin-top:12px;" @click="download('video')" :loading="busy.video">
+                              {{ t('influencer.downloadVideo') }}
+                            </el-button>
+
+                            <div class="footHint">
+                              {{ t('influencer.downloadStartedNext') }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                `
+            }).use(ElementPlus).mount('#app');
         })();
     </script>
 </body>

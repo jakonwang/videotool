@@ -6,77 +6,332 @@
   <title>后台登录</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
   <style>
+    :root{
+      --ink:#111827;
+      --muted:rgba(17,24,39,.58);
+      --glass:rgba(255,255,255,.7);
+      --glass-border:rgba(255,255,255,.95);
+      --shadow:0 24px 60px rgba(15,23,42,.10);
+      --shadow-2:0 10px 30px rgba(15,23,42,.08);
+      --primary:#1677ff; /* 企业级纯色蓝 */
+      --field-bg:#F9FAFB;
+      --field-radius:10px;
+    }
     html, body { height: 100%; }
-    body {
-      margin: 0;
-      background: #f4f6f8;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
-      color: #111827;
+    body{
+      margin:0;
+      color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","PingFang SC","Microsoft YaHei",sans-serif;
+      overflow:hidden;
+      background:#0b1020;
     }
-    .wrap {
-      min-height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
+
+    /* 全屏背景：弥散渐变 + 网格 */
+    .bg{ position:fixed; inset:0; pointer-events:none; user-select:none; }
+    .bg-gradient{
+      position:absolute; inset:-20%;
+      background:
+        radial-gradient(900px 600px at 18% 20%, rgba(99,102,241,.26), transparent 60%),
+        radial-gradient(820px 560px at 78% 22%, rgba(56,189,248,.22), transparent 58%),
+        radial-gradient(860px 620px at 52% 78%, rgba(236,72,153,.16), transparent 62%),
+        linear-gradient(120deg,#f7f8ff 0%,#f3f7ff 45%,#f6f7ff 100%);
+      filter:saturate(110%);
     }
-    .card {
-      width: 420px;
-      max-width: 100%;
-      background: #fff;
-      border-radius: 10px;
-      padding: 24px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    .bg-grid{
+      position:absolute; inset:0;
+      background-image:
+        linear-gradient(rgba(17,24,39,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17,24,39,.06) 1px, transparent 1px);
+      background-size:40px 40px;
+      mask-image:radial-gradient(circle at 35% 30%, rgba(0,0,0,.65), transparent 70%);
+      opacity:.55;
     }
-    .breadcrumb {
-      font-size: 13px;
-      color: #909399;
-      margin-bottom: 6px;
-      line-height: 18px;
+    .bg-blur{
+      position:absolute;
+      width:520px; height:520px;
+      border-radius:999px;
+      filter:blur(45px);
+      opacity:.45;
+      transform:translateZ(0);
     }
-    .title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #111827;
-      line-height: 28px;
-      margin-bottom: 16px;
+    .bg-blur-1{ left:-120px; top:10%; background:rgba(56,189,248,.35); }
+    .bg-blur-2{ right:-140px; top:12%; background:rgba(99,102,241,.32); }
+    .bg-blur-3{ left:35%; bottom:-180px; background:rgba(236,72,153,.24); }
+
+    /* 左右分栏 */
+    .shell{
+      position:relative; z-index:1;
+      min-height:100vh;
+      display:grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      align-items:stretch;
     }
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 12px;
+
+    /* 左侧品牌区 */
+    .brand{
+      padding:64px 56px;
+      display:flex;
+      align-items:center;
     }
-    .actions .el-button { border-radius: 6px; }
-    .hint {
-      margin-top: 14px;
-      font-size: 12px;
-      color: #6b7280;
-      line-height: 18px;
+    .brand-inner{ max-width:560px; }
+    .brand-logo{
+      width:72px; height:72px;
+      border-radius:18px;
+      background:rgba(255,255,255,.75);
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow:var(--shadow-2);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
     }
-    .code-chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      border-radius: 6px;
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      color: #374151;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 12px;
-      line-height: 18px;
+    .brand-logo-mark{
+      width:44px; height:44px;
+      border-radius:14px;
+      background:rgba(99,102,241,.12);
+      color:#3730a3;
+      font-weight:800;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      letter-spacing:.02em;
+    }
+    .brand-title{
+      margin-top:22px;
+      font-size:28px;
+      font-weight:800;
+      line-height:1.15;
+      color:#0f172a;
+    }
+    .brand-subtitle{
+      margin-top:12px;
+      font-size:14px;
+      line-height:1.75;
+      color:rgba(15,23,42,.70);
+      max-width:520px;
+    }
+    .brand-art{
+      margin-top:28px;
+      position:relative;
+      height:220px;
+      border-radius:20px;
+      overflow:hidden;
+      background:rgba(255,255,255,.35);
+      border:1px solid rgba(255,255,255,.80);
+      box-shadow:var(--shadow-2);
+    }
+    .orb{
+      position:absolute;
+      border-radius:999px;
+      filter:blur(8px);
+      opacity:.95;
+      animation: floaty 10s ease-in-out infinite;
+    }
+    .orb-a{ width:180px; height:180px; left:12%; top:18%; background:rgba(56,189,248,.45); animation-delay:-1.5s; }
+    .orb-b{ width:220px; height:220px; right:10%; top:10%; background:rgba(99,102,241,.40); animation-delay:-3.2s; }
+    .orb-c{ width:260px; height:260px; left:42%; bottom:-35%; background:rgba(236,72,153,.28); animation-delay:-5.1s; }
+    .ring{
+      position:absolute;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.75);
+      box-shadow:0 0 0 1px rgba(17,24,39,.04) inset;
+      opacity:.9;
+    }
+    .ring-1{ width:180px; height:180px; left:52%; top:26%; transform:rotate(12deg); }
+    .ring-2{ width:120px; height:120px; left:18%; bottom:18%; transform:rotate(-10deg); }
+    .brand-footnote{
+      margin-top:14px;
+      font-size:12px;
+      color:rgba(15,23,42,.55);
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .brand-footnote .dot{
+      width:6px; height:6px;
+      border-radius:999px;
+      background:rgba(99,102,241,.6);
+    }
+
+    /* 右侧登录卡片区 */
+    .panel{
+      padding:64px 56px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .glass{
+      width:520px;
+      max-width:100%;
+      background:var(--glass);
+      border-radius:20px;
+      border:1px solid var(--glass-border);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      padding:64px 48px;
+    }
+    .panel-head{ margin-bottom:18px; }
+    .panel-logo{
+      width:44px; height:44px;
+      border-radius:14px;
+      background:rgba(255,255,255,.75);
+      border:1px solid rgba(255,255,255,.95);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 12px 28px rgba(15,23,42,.06);
+    }
+    .panel-logo-mark{
+      width:28px; height:28px;
+      border-radius:10px;
+      background:rgba(22,119,255,.14);
+      color:var(--primary);
+      font-weight:800;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .panel-title{
+      margin-top:14px;
+      font-size:24px;
+      font-weight:800;
+      color:var(--ink);
+      letter-spacing:.01em;
+    }
+    .panel-desc{
+      margin-top:6px;
+      font-size:13px;
+      color:rgba(17,24,39,.60);
+    }
+    .form{ margin-top:18px; }
+    .field + .field{ margin-top:16px; }
+    .label{
+      font-size:12px;
+      color:rgba(17,24,39,.65);
+      margin-bottom:8px;
+    }
+
+    /* 输入框：large 高度 48 + 浅蓝灰背景 + 微妙 hover/focus */
+    .input :deep(.el-input__wrapper){
+      height:48px;
+      border-radius: var(--field-radius);
+      background: var(--field-bg);
+      box-shadow:none;
+      border:1px solid transparent;
+      transition: border-color .16s ease, background .16s ease;
+    }
+    .input :deep(.el-input__wrapper:hover){
+      border-color: rgba(22,119,255,.22);
+      background:#F8FAFC;
+    }
+    .input :deep(.el-input__wrapper.is-focus){
+      border-color: rgba(22,119,255,.42);
+      background:#F8FAFC;
+      box-shadow:0 0 0 4px rgba(22,119,255,.10);
+    }
+    .input :deep(.el-input__inner){ font-size:14px; color:var(--ink); }
+    .input :deep(.el-input__prefix-inner){ color: rgba(17,24,39,.55); }
+    .input :deep(.el-icon){ font-size:18px; }
+
+    /* 按钮：large 48 高度，100% 宽，纯色 Primary，无廉价阴影 */
+    .submit{
+      margin-top:18px;
+      width:100%;
+      height:48px;
+      border-radius:10px;
+      box-shadow:none;
+      background: var(--primary);
+      border-color: var(--primary);
+      font-weight:600;
+    }
+    .hint{ margin-top:18px; font-size:12px; }
+    .hint :deep(.el-alert__title){ font-size:12px; line-height:18px; font-weight:500; }
+    .panel-footer{
+      margin-top:18px;
+      font-size:12px;
+      color:rgba(17,24,39,.50);
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    /* 响应式：窄屏上下布局 */
+    @media (max-width: 1024px){
+      body{ overflow:auto; }
+      .shell{ grid-template-columns:1fr; }
+      .brand{ padding:48px 24px 16px; }
+      .panel{ padding:16px 24px 48px; }
+      .glass{ padding:44px 22px; border-radius:18px; }
+    }
+
+    @keyframes floaty{
+      0%{ transform: translate3d(0,0,0) scale(1); }
+      50%{ transform: translate3d(0,-10px,0) scale(1.02); }
+      100%{ transform: translate3d(0,0,0) scale(1); }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card" id="loginApp"></div>
+  <div class="bg" aria-hidden="true">
+    <div class="bg-gradient"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-blur bg-blur-1"></div>
+    <div class="bg-blur bg-blur-2"></div>
+    <div class="bg-blur bg-blur-3"></div>
   </div>
 
+  <div class="shell">
+    <section class="brand" aria-label="品牌展示">
+      <div class="brand-inner">
+        <div class="brand-logo" aria-hidden="true">
+          <div class="brand-logo-mark">V</div>
+        </div>
+
+        <div class="brand-title" id="brandTitle">视频素材库</div>
+        <div class="brand-subtitle" id="brandSubtitle">更快的上传、更稳的下载、更清晰的分发，让素材流转更高效。</div>
+
+        <div class="brand-art" aria-hidden="true">
+          <div class="orb orb-a"></div>
+          <div class="orb orb-b"></div>
+          <div class="orb orb-c"></div>
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+        </div>
+
+        <div class="brand-footnote">
+          <span class="dot"></span>
+          <span id="brandFootnoteText">企业级后台 · 高密度信息 · 稳定可控</span>
+          <span style="margin-left:10px;"></span>
+          <a href="javascript:void(0)" id="btnLangZh" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">中文</a>
+          <span style="color:rgba(15,23,42,.35);">/</span>
+          <a href="javascript:void(0)" id="btnLangEn" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">English</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="登录面板">
+      <div class="glass" id="loginApp"></div>
+    </section>
+  </div>
+
+  <script src="/static/i18n/i18n.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
   <script>
     const REDIRECT = "{:addslashes((string)($redirect ?? ''))}";
+  </script>
+  <script>
+    (function () {
+      if (!window.AppI18n) return;
+      const lang = window.AppI18n.getLang('zh');
+      window.AppI18n.applyHtmlLang(lang);
+      document.title = window.AppI18n.t('auth.pageTitle', null, lang);
+      const zh = document.getElementById('btnLangZh');
+      const en = document.getElementById('btnLangEn');
+      if (zh) zh.addEventListener('click', () => window.AppI18n.setLang('zh'));
+      if (en) en.addEventListener('click', () => window.AppI18n.setLang('en'));
+    })();
   </script>
   <script>
     const { createApp, reactive, ref } = Vue;
@@ -85,6 +340,10 @@
 
     createApp({
       setup() {
+        const i18n = window.AppI18n;
+        const lang = i18n ? i18n.getLang('zh') : 'zh';
+        const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
+
         const loading = ref(false);
         const form = reactive({
           username: '',
@@ -94,7 +353,7 @@
 
         async function onSubmit() {
           if (!form.username || !form.password) {
-            ElMessage.warning('请输入用户名和密码');
+            ElMessage.warning(tt('auth.needUserPass'));
             return;
           }
           loading.value = true;
@@ -111,37 +370,73 @@
               credentials: 'same-origin',
             });
             const json = await resp.json();
-            if (!json || json.code !== 0) throw new Error((json && json.msg) || '登录失败');
+            if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('auth.loginBtn'));
             const to = (json.data && json.data.redirect) ? json.data.redirect : '/admin.php';
             window.location.href = to;
           } catch (e) {
-            ElMessage.error(e && e.message ? e.message : '登录失败');
+            ElMessage.error(e && e.message ? e.message : tt('auth.loginBtn'));
           } finally {
             loading.value = false;
           }
         }
 
-        return { form, loading, onSubmit, Lock, UserFilled };
+        return { form, loading, onSubmit, Lock, UserFilled, tt };
       },
       template: `
         <div>
-          <div class="breadcrumb">后台 / 登录</div>
-          <div class="title">登录后台</div>
+          <div class="panel-head">
+            <div class="panel-logo" aria-hidden="true"><div class="panel-logo-mark">V</div></div>
+            <div class="panel-title">{{ tt('auth.loginTitle') }}</div>
+            <div class="panel-desc">{{ tt('auth.loginDesc') }}</div>
+          </div>
 
-          <el-form @submit.prevent>
-            <el-form-item>
-              <el-input v-model="form.username" size="default" placeholder="用户名" :prefix-icon="UserFilled" autocomplete="username" />
-            </el-form-item>
-            <el-form-item>
-              <el-input v-model="form.password" size="default" placeholder="密码" :prefix-icon="Lock" show-password autocomplete="current-password" @keyup.enter="onSubmit" />
-            </el-form-item>
-            <div class="actions">
-              <el-button size="default" type="primary" :loading="loading" @click="onSubmit">登录</el-button>
+          <el-form class="form" @submit.prevent>
+            <div class="field">
+              <div class="label">{{ tt('auth.username') }}</div>
+              <el-input
+                v-model="form.username"
+                size="large"
+                class="input"
+                :placeholder="tt('auth.usernamePh')"
+                :prefix-icon="UserFilled"
+                autocomplete="username"
+                @keyup.enter="onSubmit"
+              />
             </div>
+
+            <div class="field">
+              <div class="label">{{ tt('auth.password') }}</div>
+              <el-input
+                v-model="form.password"
+                size="large"
+                class="input"
+                :placeholder="tt('auth.passwordPh')"
+                :prefix-icon="Lock"
+                show-password
+                autocomplete="current-password"
+                @keyup.enter="onSubmit"
+              />
+            </div>
+
+            <el-button
+              type="primary"
+              size="large"
+              class="submit"
+              :loading="loading"
+              @click="onSubmit"
+            >{{ tt('auth.loginBtn') }}</el-button>
+
+            <el-alert
+              class="hint"
+              type="info"
+              show-icon
+              :closable="false"
+              :title="tt('auth.defaultAccount')"
+            />
           </el-form>
 
-          <div class="hint">
-            默认账号（首次迁移后）：<span class="code-chip">admin / admin123</span>，登录后请尽快修改密码。
+          <div class="panel-footer">
+            <span>{{ tt('auth.loginProblem') }}</span>
           </div>
         </div>
       `

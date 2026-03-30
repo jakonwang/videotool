@@ -92,12 +92,16 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
   const { createApp, reactive, ref, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   const headerCellStyle = {
     backgroundColor: '#F9FAFB',
@@ -145,11 +149,11 @@
 
           const res = await fetch('/admin.php/product/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '加载失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         } finally {
           loading.value = false;
         }
@@ -184,7 +188,13 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm('确定删除该商品？关联视频的「所属商品」将清空。', '删除确认', { type: 'warning' });
+        await ElMessageBox.confirm(
+          lang === 'en'
+            ? 'Delete this product? The "product" field of related videos will be cleared.'
+            : '确定删除该商品？关联视频的「所属商品」将清空。',
+          lang === 'en' ? 'Confirm' : '删除确认',
+          { type: 'warning' }
+        );
         const resp = await fetch('/admin.php/product/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -193,12 +203,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '已删除');
+          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '已删除'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '删除失败');
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '删除失败'));
         }
       }
 
@@ -217,6 +227,7 @@
         pageSize,
         headerCellStyle,
         cellStyle,
+        tt,
         onSearch,
         onReset,
         onSortChange,
@@ -230,11 +241,11 @@
       <div class="admin-product-card">
         <div class="admin-product-header">
           <div>
-            <div class="admin-product-breadcrumb">素材 / 商品</div>
-            <div class="admin-product-title">商品</div>
+            <div class="admin-product-breadcrumb">${tt('page.product.breadcrumb')}</div>
+            <div class="admin-product-title">${tt('page.product.title')}</div>
           </div>
           <div class="admin-product-addbtn">
-            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 添加商品</el-button>
+            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">${tt('page.product.add')}</el-button>
           </div>
         </div>
 
@@ -243,18 +254,18 @@
             v-model="query.keyword"
             size="default"
             clearable
-            placeholder="搜索名称"
+            :placeholder="tt('page.product.searchName')"
             style="width:260px; flex:0 0 auto;"
             @keyup.enter="onSearch"
           />
-          <el-select v-model="query.status" size="default" clearable placeholder="全部状态" style="width:140px; flex:0 0 auto;">
-            <el-option label="启用" value="1" />
-            <el-option label="禁用" value="0" />
+          <el-select v-model="query.status" size="default" clearable :placeholder="tt('common.statusAll')" style="width:140px; flex:0 0 auto;">
+            <el-option :label="tt('common.statusEnabled')" value="1" />
+            <el-option :label="tt('common.statusDisabled')" value="0" />
           </el-select>
 
           <div class="admin-product-filter-actions">
-            <el-button size="default" type="primary" @click="onSearch">筛选</el-button>
-            <el-button size="default" @click="onReset">重置</el-button>
+            <el-button size="default" type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
+            <el-button size="default" @click="onReset">{{ tt('common.reset') }}</el-button>
           </div>
         </div>
 
@@ -268,12 +279,12 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column label="名称" min-width="220">
+          <el-table-column :label="lang==='en'?'Name':'名称'" min-width="220">
             <template #default="{ row }">
               <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="商品链接" min-width="320">
+          <el-table-column :label="lang==='en'?'Product URL':'商品链接'" min-width="320">
             <template #default="{ row }">
               <div v-if="row.goods_url" class="url-cell" :title="row.goods_url">
                 <a :href="row.goods_url" target="_blank" rel="noopener">{{ row.goods_url }}</a>
@@ -281,24 +292,24 @@
               <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
-          <el-table-column prop="sort_order" label="排序" width="110" sortable="custom" />
-          <el-table-column label="状态" width="120">
+          <el-table-column prop="sort_order" :label="lang==='en'?'Sort':'排序'" width="110" sortable="custom" />
+          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
-                {{ String(row.status) === '1' ? '启用' : '禁用' }}
+                {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" label="更新时间" min-width="180" />
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column prop="updated_at" :label="lang==='en'?'Updated':'更新时间'" min-width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
             <template #default="{ row }">
-              <el-button size="default" link type="primary" @click="goEdit(row)">编辑</el-button>
-              <el-button size="default" link type="danger" @click="doDelete(row)">删除</el-button>
+              <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
           </el-table-column>
 
           <template #empty>
-            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无数据</div>
+            <div style="padding: 28px 0; text-align:center; color:#6b7280;">{{ tt('common.noData') }}</div>
           </template>
         </el-table>
 

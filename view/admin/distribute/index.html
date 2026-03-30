@@ -106,12 +106,16 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
   const { createApp, reactive, ref, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   const headerCellStyle = {
     backgroundColor: '#F9FAFB',
@@ -151,11 +155,11 @@
 
           const res = await fetch('/admin.php/distribute/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '加载失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         } finally {
           loading.value = false;
         }
@@ -192,7 +196,7 @@
           }
           ElMessage.success('已复制链接');
         } catch (e) {
-          ElMessage.error('复制失败');
+          ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
         }
       }
 
@@ -257,6 +261,7 @@
         productOptions,
         headerCellStyle,
         cellStyle,
+        tt,
         onSearch,
         onReset,
         goAdd,
@@ -271,28 +276,28 @@
       <div class="admin-dist-card">
         <div class="admin-dist-header">
           <div>
-            <div class="admin-dist-breadcrumb">素材 / 达人链</div>
-            <div class="admin-dist-title">达人链</div>
+            <div class="admin-dist-breadcrumb">${tt('page.distribute.breadcrumb')}</div>
+            <div class="admin-dist-title">${tt('page.distribute.title')}</div>
           </div>
           <div class="admin-dist-actions">
-            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 生成达人链</el-button>
+            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">${tt('page.distribute.add')}</el-button>
           </div>
         </div>
 
         <div class="admin-dist-filters">
-          <el-select v-model="query.product_id" size="default" clearable placeholder="全部商品" style="width: 260px; flex:0 0 auto;">
-            <el-option label="全部商品" :value="0" />
+          <el-select v-model="query.product_id" size="default" clearable :placeholder="tt('page.distribute.allProducts')" style="width: 260px; flex:0 0 auto;">
+            <el-option :label="tt('page.distribute.allProducts')" :value="0" />
             <el-option v-for="o in productOptions" :key="o.id" :label="o.label" :value="o.id" />
           </el-select>
 
           <div class="admin-dist-filter-actions">
-            <el-button size="default" type="primary" @click="onSearch">筛选</el-button>
-            <el-button size="default" @click="onReset">重置</el-button>
+            <el-button size="default" type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
+            <el-button size="default" @click="onReset">{{ tt('common.reset') }}</el-button>
           </div>
         </div>
 
         <div class="admin-dist-hint">
-          达人打开链接后，随机展示该商品下一条未下载视频；下载后全局标记为已下载，不再出现。
+          {{ tt('page.distribute.hint') }}
         </div>
 
         <el-table
@@ -304,44 +309,44 @@
           :cell-style="cellStyle"
         >
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column label="商品" min-width="160">
+          <el-table-column :label="lang==='en'?'Product':'商品'" min-width="160">
             <template #default="{ row }">
               <div style="font-weight:500; color:#303133;">
                 {{ (row.product && row.product.name) ? row.product.name : '—' }}
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="备注" min-width="160">
+          <el-table-column :label="lang==='en'?'Note':'备注'" min-width="160">
             <template #default="{ row }">
               <span style="color:#4b5563;">{{ row.label || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="达人页链接" min-width="360">
+          <el-table-column :label="lang==='en'?'Link':'达人页链接'" min-width="360">
             <template #default="{ row }">
               <div class="link-cell">
                 <div class="link-text" :title="row.link">{{ row.link || '—' }}</div>
-                <el-button size="default" link type="primary" @click="copyText(row.link)">复制</el-button>
-                <el-button size="default" link type="primary" @click="openLink(row)">打开</el-button>
+                <el-button size="default" link type="primary" @click="copyText(row.link)">{{ tt('common.copy') }}</el-button>
+                <el-button size="default" link type="primary" @click="openLink(row)">{{ tt('common.open') }}</el-button>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="120">
+          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
-                {{ String(row.status) === '1' ? '启用' : '禁用' }}
+                {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" min-width="180" />
-          <el-table-column label="操作" width="180" fixed="right">
+          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="180" fixed="right">
             <template #default="{ row }">
-              <el-button size="default" link type="primary" @click="doToggle(row)">启停</el-button>
-              <el-button size="default" link type="danger" @click="doDelete(row)">删除</el-button>
+              <el-button size="default" link type="primary" @click="doToggle(row)">{{ lang==='en'?'Toggle':'启停' }}</el-button>
+              <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
           </el-table-column>
 
           <template #empty>
-            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无链接</div>
+            <div style="padding: 28px 0; text-align:center; color:#6b7280;">{{ tt('page.distribute.empty') }}</div>
           </template>
         </el-table>
 

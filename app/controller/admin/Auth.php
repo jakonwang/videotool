@@ -64,5 +64,14 @@ class Auth extends BaseController
         AdminAuthService::logout();
         return json(['code' => 0, 'msg' => '已退出']);
     }
+
+    /**
+     * GET 退出（用于无 JS / 菜单链接）
+     */
+    public function logoutPage()
+    {
+        AdminAuthService::logout();
+        return redirect('/admin.php/auth/login');
+    }
 }
 

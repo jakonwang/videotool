@@ -113,6 +113,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -121,6 +122,9 @@
   const { createApp, ref, reactive, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const { Refresh, Delete, Search, WarningFilled, Download, Coin, Bug } = ElementPlusIconsVue;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   const headerCellStyle = {
     backgroundColor: '#F9FAFB',
@@ -172,7 +176,7 @@
 
           const res = await fetch('/admin.php/downloadLog/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
 
           rows.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
@@ -189,7 +193,7 @@
             dateDash.value = ymdToDash(json.data.date);
           }
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '加载失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         } finally {
           loading.value = false;
         }
@@ -212,10 +216,13 @@
       }
 
       async function onClear() {
-        await ElMessageBox.confirm('确认清空（标记处理）下载异常记录？', '清空异常', {
+        await ElMessageBox.confirm(
+          lang === 'en' ? 'Clear (mark handled) download error records?' : '确认清空（标记处理）下载异常记录？',
+          lang === 'en' ? 'Confirm' : '清空异常',
+          {
           type: 'warning',
-          confirmButtonText: '清空',
-          cancelButtonText: '取消',
+          confirmButtonText: tt('common.ok'),
+          cancelButtonText: tt('common.cancel'),
         });
         const resp = await fetch('/admin.php/downloadLog/clear', {
           method: 'POST',
@@ -225,10 +232,10 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '已清空');
+          ElMessage.success(json.msg || (lang === 'en' ? 'Cleared' : '已清空'));
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '清空失败');
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Clear failed' : '清空失败'));
         }
       }
 
@@ -266,6 +273,7 @@
         Download,
         Coin,
         Bug,
+        tt,
         onSearch,
         onRefresh,
         onReset,
@@ -279,18 +287,18 @@
       <div class="admin-log-card">
         <div class="admin-log-header">
           <div>
-            <div class="admin-log-breadcrumb">系统 / 异常</div>
-            <div class="admin-log-title">下载异常</div>
+            <div class="admin-log-breadcrumb">${tt('page.errors.breadcrumb')}</div>
+            <div class="admin-log-title">${tt('page.errors.title')}</div>
           </div>
           <div class="admin-log-actions">
-            <el-button size="default" :icon="Refresh" @click="onRefresh">刷新</el-button>
-            <el-button size="default" type="danger" :icon="Delete" @click="onClear">清空异常</el-button>
+            <el-button size="default" :icon="Refresh" @click="onRefresh">{{ tt('common.refresh') }}</el-button>
+            <el-button size="default" type="danger" :icon="Delete" @click="onClear">${tt('page.errors.clear')}</el-button>
           </div>
         </div>
 
         <el-alert class="admin-log-alert" type="warning" show-icon :closable="false">
           <template #title>
-            本页从运行日志中提取下载/缓存相关异常，用于快速定位问题；可按日期与关键词筛选。
+            {{ tt('page.errors.tip') }}
           </template>
         </el-alert>
 
@@ -298,28 +306,28 @@
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.total_errors }}</div>
-              <div class="stat-label">总错误数</div>
+              <div class="stat-label">{{ lang==='en'?'Total errors':'总错误数' }}</div>
             </div>
             <div class="stat-icon stat-icon--red"><el-icon><WarningFilled/></el-icon></div>
           </div>
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.download_errors }}</div>
-              <div class="stat-label">下载错误</div>
+              <div class="stat-label">{{ lang==='en'?'Download errors':'下载错误' }}</div>
             </div>
             <div class="stat-icon stat-icon--amber"><el-icon><Download/></el-icon></div>
           </div>
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.cache_errors }}</div>
-              <div class="stat-label">缓存错误</div>
+              <div class="stat-label">{{ lang==='en'?'Cache errors':'缓存错误' }}</div>
             </div>
             <div class="stat-icon stat-icon--blue"><el-icon><Coin/></el-icon></div>
           </div>
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.other_errors }}</div>
-              <div class="stat-label">其他错误</div>
+              <div class="stat-label">{{ lang==='en'?'Other errors':'其他错误' }}</div>
             </div>
             <div class="stat-icon stat-icon--slate"><el-icon><Bug/></el-icon></div>
           </div>
@@ -332,7 +340,7 @@
             type="date"
             value-format="YYYY-MM-DD"
             format="YYYY-MM-DD"
-            placeholder="选择日期"
+            :placeholder="tt('page.errors.datePh')"
             style="width: 180px;"
             @change="onSearch"
           />
@@ -341,12 +349,12 @@
             size="default"
             clearable
             :prefix-icon="Search"
-            placeholder="搜索错误信息..."
+            :placeholder="tt('page.errors.keywordPh')"
             style="width: 320px;"
             @keyup.enter="onSearch"
           />
-          <el-button size="default" type="primary" @click="onSearch">查询</el-button>
-          <el-button size="default" @click="onReset">重置</el-button>
+          <el-button size="default" type="primary" @click="onSearch">{{ tt('common.search') }}</el-button>
+          <el-button size="default" @click="onReset">{{ tt('common.reset') }}</el-button>
         </div>
 
         <el-table
@@ -356,8 +364,8 @@
           :header-cell-style="headerCellStyle"
           :cell-style="cellStyle"
         >
-          <el-table-column prop="time_display" label="时间" width="140" />
-          <el-table-column label="视频ID" width="110">
+          <el-table-column prop="time_display" :label="lang==='en'?'Time':'时间'" width="140" />
+          <el-table-column :label="lang==='en'?'Video ID':'视频ID'" width="110">
             <template #default="{ row }">
               <span v-if="row.video_id">
                 <el-button size="default" link type="primary" @click="openVideo(row)">#{{ row.video_id }}</el-button>
@@ -365,12 +373,12 @@
               <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
-          <el-table-column label="视频标题" min-width="180">
+          <el-table-column :label="lang==='en'?'Video title':'视频标题'" min-width="180">
             <template #default="{ row }">
               <span style="font-weight:500; color:#303133;">{{ row.video_title || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="错误信息" min-width="360" show-overflow-tooltip>
+          <el-table-column :label="lang==='en'?'Error':'错误信息'" min-width="360" show-overflow-tooltip>
             <template #default="{ row }">
               <div style="color:#b91c1c; font-size:12px; line-height:18px;" :title="row.error">{{ row.error || '—' }}</div>
               <div v-if="row.url" style="color:#6b7280; font-size:12px; line-height:18px; margin-top:4px;" :title="row.url">
@@ -378,10 +386,10 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="140" fixed="right">
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="140" fixed="right">
             <template #default="{ row }">
-              <el-button v-if="row.video_id" size="default" link type="primary" @click="openVideo(row)">查看</el-button>
-              <el-button v-if="row.video_id" size="default" link type="warning" @click="openDebug(row)">调试</el-button>
+              <el-button v-if="row.video_id" size="default" link type="primary" @click="openVideo(row)">{{ lang==='en'?'View':'查看' }}</el-button>
+              <el-button v-if="row.video_id" size="default" link type="warning" @click="openDebug(row)">{{ lang==='en'?'Debug':'调试' }}</el-button>
               <span v-if="!row.video_id" class="text-muted">—</span>
             </template>
           </el-table-column>

@@ -96,6 +96,7 @@
 
 ### 前端页面
 - `view/admin/video/index.html`：通过 CDN 引入 Vue3/Element Plus，渲染表格与分页，并对接上述接口。
+- 移动端：列表表格在窄屏会自动启用**横向滚动容器**；上传弹窗在手机上会变为接近全屏，便于点按与查看进度。
 
 ## 后台：商品管理（Vue3 + Element Plus）（2026-03）
 
@@ -300,6 +301,7 @@
 - `GET /admin.php/auth/login`：登录页面
 - `POST /admin.php/auth/login`：登录（表单提交，返回 JSON，含 `redirect`）
 - `POST /admin.php/auth/logout`：退出（JSON）
+- `GET /admin.php/auth/logout`：退出（跳转到登录页，适合菜单链接/无 JS 场景）
 
 #### 管理员账号
 - `GET /admin.php/user`：用户管理页（Vue 渲染）
@@ -317,6 +319,22 @@
 
 ### 注意事项
 - 当前实现是 **后台 Session 登录**，适合 Web 管理后台；如需 APP/多端统一 Token/JWT，可在此基础上扩展。
+
+### 多语言切换（后台：中文/英文；达人页：越南语/英文）（2026-04）
+#### 后台管理（Admin）
+- 支持语言：中文（`zh`）/英文（`en`）
+- URL 参数：`?lang=zh` 或 `?lang=en`
+- 本地记忆：`localStorage(app_lang)`
+- 语言优先级：`?lang=` > `localStorage(app_lang)` > `navigator.language` > 默认中文
+- 代码位置：`public/static/i18n/i18n.js`
+
+#### 达人取片页（Influencer）
+- 支持语言：越南语（`vi`，默认）/英文（`en`）
+- 与后台切换**完全独立**（不读取/不写入 `app_lang`，不使用 `?lang=`）
+- URL 参数：`?ilang=vi` 或 `?ilang=en`
+- 本地记忆：`localStorage(influencer_lang)`
+- 语言优先级：`?ilang=` > `localStorage(influencer_lang)` > `navigator.language` > 默认越南语
+- 代码位置：`public/static/i18n/influencer_i18n.js`，页面：`view/index/influencer.html`
 
 ## 后台统一页面规范（与 /video 一致）（2026-03）
 

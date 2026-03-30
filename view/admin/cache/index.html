@@ -149,6 +149,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -157,6 +158,9 @@
   const { createApp, ref, reactive, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const { Refresh, Delete, Search, CopyDocument, Document, Coin, TrendCharts, Folder } = ElementPlusIconsVue;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   const headerCellStyle = {
     backgroundColor: '#F9FAFB',
@@ -201,7 +205,7 @@
 
           const res = await fetch('/admin.php/cache/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
 
           rows.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
@@ -215,7 +219,7 @@
           }
           isEnabled.value = !!(json.data && json.data.is_enabled);
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '加载失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         } finally {
           loading.value = false;
         }
@@ -231,10 +235,13 @@
       }
 
       async function onClear() {
-        await ElMessageBox.confirm('确认清空所有缓存？该操作无法恢复！', '清空缓存', {
+        await ElMessageBox.confirm(
+          lang === 'en' ? 'Clear all cache? This action cannot be undone.' : '确认清空所有缓存？该操作无法恢复！',
+          lang === 'en' ? 'Confirm' : '清空缓存',
+          {
           type: 'warning',
-          confirmButtonText: '清空',
-          cancelButtonText: '取消',
+          confirmButtonText: tt('common.ok'),
+          cancelButtonText: tt('common.cancel'),
         });
         const resp = await fetch('/admin.php/cache/clear', {
           method: 'POST',
@@ -244,21 +251,24 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '已清空缓存');
+          ElMessage.success(json.msg || (lang === 'en' ? 'Cache cleared' : '已清空缓存'));
           page.value = 1;
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '清空失败');
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Clear failed' : '清空失败'));
         }
       }
 
       async function onDelete(row) {
         const hash = row && row.hash ? String(row.hash) : '';
         if (!hash) return;
-        await ElMessageBox.confirm('确认删除该缓存文件？', '删除确认', {
+        await ElMessageBox.confirm(
+          lang === 'en' ? 'Delete this cache file?' : '确认删除该缓存文件？',
+          lang === 'en' ? 'Confirm' : '删除确认',
+          {
           type: 'warning',
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
+          confirmButtonText: tt('common.delete'),
+          cancelButtonText: tt('common.cancel'),
         });
         const resp = await fetch('/admin.php/cache/delete/' + hash, {
           method: 'POST',
@@ -268,12 +278,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '删除成功');
+          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '删除成功'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '删除失败');
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '删除失败'));
         }
       }
 
@@ -291,9 +301,9 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success('已复制');
+          ElMessage.success(tt('influencer.copied'));
         } catch (e) {
-          ElMessage.error('复制失败');
+          ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
         }
       }
 
@@ -322,6 +332,7 @@
         Coin,
         TrendCharts,
         Folder,
+        tt,
         onSearch,
         onRefresh,
         onClear,
@@ -334,12 +345,12 @@
       <div class="admin-cache-card">
         <div class="admin-cache-header">
           <div>
-            <div class="admin-cache-breadcrumb">系统 / 缓存</div>
-            <div class="admin-cache-title">缓存</div>
+            <div class="admin-cache-breadcrumb">${tt('page.cache.breadcrumb')}</div>
+            <div class="admin-cache-title">${tt('page.cache.title')}</div>
           </div>
           <div class="admin-cache-actions">
-            <el-button size="default" :icon="Refresh" @click="onRefresh">刷新</el-button>
-            <el-button size="default" type="danger" :icon="Delete" @click="onClear">清空缓存</el-button>
+            <el-button size="default" :icon="Refresh" @click="onRefresh">{{ tt('common.refresh') }}</el-button>
+            <el-button size="default" type="danger" :icon="Delete" @click="onClear">${tt('page.cache.clear')}</el-button>
           </div>
         </div>
 
@@ -397,7 +408,7 @@
             clearable
             class="search-input"
             :prefix-icon="Search"
-            placeholder="搜索文件名或来源URL"
+            :placeholder="tt('page.cache.search')"
             @keyup.enter="onSearch"
           />
         </div>
@@ -409,13 +420,13 @@
           :header-cell-style="headerCellStyle"
           :cell-style="cellStyle"
         >
-          <el-table-column prop="file_name" label="文件名" min-width="220" />
-          <el-table-column prop="source_url" label="来源 URL" min-width="320" show-overflow-tooltip />
-          <el-table-column prop="size_human" label="文件大小" width="120" />
-          <el-table-column prop="cached_at_text" label="缓存时间" width="180" />
-          <el-table-column label="操作" width="120" fixed="right">
+          <el-table-column prop="file_name" :label="lang==='en'?'File':'文件名'" min-width="220" />
+          <el-table-column prop="source_url" :label="lang==='en'?'Source URL':'来源 URL'" min-width="320" show-overflow-tooltip />
+          <el-table-column prop="size_human" :label="lang==='en'?'Size':'文件大小'" width="120" />
+          <el-table-column prop="cached_at_text" :label="lang==='en'?'Cached at':'缓存时间'" width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="120" fixed="right">
             <template #default="{ row }">
-              <el-button size="default" link type="danger" @click="onDelete(row)">删除</el-button>
+              <el-button size="default" link type="danger" @click="onDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
