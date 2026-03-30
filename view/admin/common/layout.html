@@ -581,8 +581,8 @@
             <div class="admin-topbar-title">后台管理</div>
             <ul class="navbar-nav ml-auto align-items-center">
                 <li class="nav-item d-none d-sm-flex">
-                    <span class="admin-topbar-user mr-2" title="{$Think.session.admin_username|default=''}">
-                        {$Think.session.admin_username|default=''}
+                    <span class="admin-topbar-user mr-2" title="{:session('admin_username') ?: ''}">
+                        {:session('admin_username') ?: ''}
                     </span>
                 </li>
                 <li class="nav-item">
@@ -714,8 +714,8 @@
                             </div>
                             <div class="rowline">
                                 <span class="k">账号</span>
-                                <span class="muted text-truncate" style="max-width: 120px;" title="{$Think.session.admin_username|default=''}">
-                                    {$Think.session.admin_username|default='—'}
+                                <span class="muted text-truncate" style="max-width: 120px;" title="{:session('admin_username') ?: ''}">
+                                    {:session('admin_username') ?: '—'}
                                 </span>
                             </div>
                             <div class="rowline">
