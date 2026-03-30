@@ -24,6 +24,7 @@ class Auth extends BaseController
             if (!$res['ok']) {
                 return json(['code' => 1, 'msg' => $res['msg'] ?? '登录失败']);
             }
+            $redirect = $this->sanitizeRedirect($redirect);
             return json([
                 'code' => 0,
                 'msg' => $res['msg'] ?? 'ok',
@@ -35,9 +36,27 @@ class Auth extends BaseController
         }
 
         $redirect = (string) $this->request->param('redirect', '');
-        return View::fetch('admin/auth/login', [
-            'redirect' => $redirect,
-        ]);
+        return View::fetch('admin/auth/login', ['redirect' => $this->sanitizeRedirect($redirect)]);
+    }
+
+    private function sanitizeRedirect(string $redirect): string
+    {
+        $r = trim($redirect);
+        if ($r === '') return '';
+
+        // 允许绝对 URL 但只取其 path+query，并且必须指向 /admin.php
+        if (stripos($r, 'http://') === 0 || stripos($r, 'https://') === 0) {
+            $p = parse_url($r);
+            $path = (string) ($p['path'] ?? '');
+            $query = (string) ($p['query'] ?? '');
+            $r = $path . ($query !== '' ? ('?' . $query) : '');
+        }
+
+        // 白名单：只允许跳转后台
+        if (strpos($r, '/admin.php') !== 0) {
+            return '';
+        }
+        return $r;
     }
 
     public function logout()

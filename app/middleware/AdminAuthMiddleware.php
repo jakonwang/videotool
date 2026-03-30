@@ -32,9 +32,25 @@ class AdminAuthMiddleware
             return json(['code' => 401, 'msg' => '未登录', 'data' => null]);
         }
 
-        $redirect = $request->url(true);
+        $redirect = $this->buildAdminRedirect($request, $path);
         $to = '/admin.php/auth/login?redirect=' . urlencode($redirect);
         return redirect($to);
+    }
+
+    private function buildAdminRedirect(Request $request, string $path): string
+    {
+        // 统一生成后台可回跳地址，避免某些环境下 url(true) 变成站点根（前端入口）
+        $base = '/admin.php';
+        $uri = ($path === '/' ? $base : ($base . $path));
+
+        $query = $request->get();
+        if (!empty($query)) {
+            $qs = http_build_query($query);
+            if ($qs !== '') {
+                $uri .= '?' . $qs;
+            }
+        }
+        return $uri;
     }
 
     private function expectsJson(Request $request, string $path): bool
