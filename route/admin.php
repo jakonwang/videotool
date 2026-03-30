@@ -7,6 +7,11 @@ use think\facade\Route;
 if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('/', 'app\controller\admin\Index@index');
 
+    // 后台认证
+    Route::get('auth/login', 'app\controller\admin\Auth@login');
+    Route::post('auth/login', 'app\controller\admin\Auth@login');
+    Route::post('auth/logout', 'app\controller\admin\Auth@logout');
+
     // 仪表盘统计（只读 JSON）
     Route::get('stats/overview', 'app\controller\admin\Stats@overview');
     Route::get('stats/trends', 'app\controller\admin\Stats@trends');
@@ -18,6 +23,15 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     Route::get('settings', 'app\controller\admin\Settings@index');
     Route::post('settings', 'app\controller\admin\Settings@index');
+
+    // 用户（管理员账号）
+    Route::get('user/list', 'app\controller\admin\User@listJson');
+    Route::post('user/create', 'app\controller\admin\User@create');
+    Route::post('user/update', 'app\controller\admin\User@update');
+    Route::post('user/toggle', 'app\controller\admin\User@toggle');
+    Route::post('user/resetPassword', 'app\controller\admin\User@resetPassword');
+    Route::post('user/delete', 'app\controller\admin\User@delete');
+    Route::get('user', 'app\controller\admin\User@index');
     
     // 平台管理 - 直接定义完整路径，避免路由组匹配问题
     Route::get('platform/list', 'app\controller\admin\Platform@listJson');

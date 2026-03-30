@@ -1,0 +1,56 @@
+<?php
+declare(strict_types=1);
+
+namespace app\middleware;
+
+use app\service\AdminAuthService;
+use Closure;
+use think\Request;
+
+class AdminAuthMiddleware
+{
+    public function handle(Request $request, Closure $next)
+    {
+        if (!defined('ENTRY_FILE') || ENTRY_FILE !== 'admin') {
+            return $next($request);
+        }
+
+        $path = '/' . ltrim((string) $request->pathinfo(), '/');
+        $path = rtrim($path, '/');
+        if ($path === '') $path = '/';
+
+        // 放行：登录与退出
+        if ($path === '/auth/login' || $path === '/auth/logout') {
+            return $next($request);
+        }
+
+        if (AdminAuthService::isLoggedIn()) {
+            return $next($request);
+        }
+
+        if ($this->expectsJson($request, $path)) {
+            return json(['code' => 401, 'msg' => '未登录', 'data' => null]);
+        }
+
+        $redirect = $request->url(true);
+        $to = '/admin.php/auth/login?redirect=' . urlencode($redirect);
+        return redirect($to);
+    }
+
+    private function expectsJson(Request $request, string $path): bool
+    {
+        $accept = (string) $request->header('accept', '');
+        if (stripos($accept, 'application/json') !== false) {
+            return true;
+        }
+        if ($request->isAjax()) {
+            return true;
+        }
+        // list 接口约定：多为 JSON
+        if (preg_match('#/(list|listJson)$#i', $path)) {
+            return true;
+        }
+        return false;
+    }
+}
+

@@ -273,6 +273,51 @@
 ### 前端页面
 - `view/admin/download_log/index.html`：通过 CDN 引入 Vue3/Element Plus（含 icons-vue），渲染标题操作区、提示、统计卡片、筛选、表格与分页，并对接 `GET /admin.php/downloadLog/list`。
 
+## 后台：用户登录与管理员管理（Session）（2026-04）
+
+### 目标
+- 为后台新增 **Session 登录**（Cookie + 服务端 session），访问后台页面与 JSON 接口前必须先登录。
+- 新增「系统 / 用户」用于维护管理员账号（增删改查、启停、重置密码）。
+
+### 数据库
+- 新增表：`admin_users`
+  - 字段：`username`（唯一）、`password_hash`、`status`、`last_login_at`、`last_login_ip`、时间戳
+
+#### 新装
+- 直接使用更新后的 `database/schema.sql`（包含默认管理员账号）。
+
+#### 升级（已有库）
+- Windows（PowerShell，项目根目录）：
+  - `php database\\run_migration_admin_users.php`
+- Linux：
+  - `php database/run_migration_admin_users.php`
+
+### 默认账号
+- 默认会写入：`admin / admin123`（**请登录后立即修改密码**）。
+
+### 路由与接口
+#### 登录/退出
+- `GET /admin.php/auth/login`：登录页面
+- `POST /admin.php/auth/login`：登录（表单提交，返回 JSON，含 `redirect`）
+- `POST /admin.php/auth/logout`：退出（JSON）
+
+#### 管理员账号
+- `GET /admin.php/user`：用户管理页（Vue 渲染）
+- `GET /admin.php/user/list`：列表 JSON（支持 `keyword/status/page/page_size`）
+- `POST /admin.php/user/create`：创建（`username/password/status`）
+- `POST /admin.php/user/update`：更新（`id/username/status`）
+- `POST /admin.php/user/toggle`：启停（`id`）
+- `POST /admin.php/user/resetPassword`：重置密码（`id/password`）
+- `POST /admin.php/user/delete`：删除（`id`）
+
+### 鉴权规则
+- 中间件：`app/middleware/AdminAuthMiddleware.php`
+  - 未登录访问后台页面：302 跳转 `/admin.php/auth/login?redirect=...`
+  - 未登录访问 JSON 接口：返回 `{code:401,msg:'未登录'}`
+
+### 注意事项
+- 当前实现是 **后台 Session 登录**，适合 Web 管理后台；如需 APP/多端统一 Token/JWT，可在此基础上扩展。
+
 ## 后台统一页面规范（与 /video 一致）（2026-03）
 
 ### 目标

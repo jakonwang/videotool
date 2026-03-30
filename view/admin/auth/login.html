@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>后台登录</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #f4f6f8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #111827;
+    }
+    .wrap {
+      min-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 420px;
+      max-width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .breadcrumb {
+      font-size: 13px;
+      color: #909399;
+      margin-bottom: 6px;
+      line-height: 18px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #111827;
+      line-height: 28px;
+      margin-bottom: 16px;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .actions .el-button { border-radius: 6px; }
+    .hint {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 18px;
+    }
+    .code-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      line-height: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="loginApp"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
+  <script>
+    const REDIRECT = "{:addslashes((string)($redirect ?? ''))}";
+  </script>
+  <script>
+    const { createApp, reactive, ref } = Vue;
+    const { ElMessage } = ElementPlus;
+    const { Lock, UserFilled } = ElementPlusIconsVue;
+
+    createApp({
+      setup() {
+        const loading = ref(false);
+        const form = reactive({
+          username: '',
+          password: '',
+          redirect: REDIRECT || '',
+        });
+
+        async function onSubmit() {
+          if (!form.username || !form.password) {
+            ElMessage.warning('请输入用户名和密码');
+            return;
+          }
+          loading.value = true;
+          try {
+            const body = new URLSearchParams();
+            body.set('username', form.username);
+            body.set('password', form.password);
+            body.set('redirect', form.redirect);
+
+            const resp = await fetch('/admin.php/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+              body: body.toString(),
+              credentials: 'same-origin',
+            });
+            const json = await resp.json();
+            if (!json || json.code !== 0) throw new Error((json && json.msg) || '登录失败');
+            const to = (json.data && json.data.redirect) ? json.data.redirect : '/admin.php';
+            window.location.href = to;
+          } catch (e) {
+            ElMessage.error(e && e.message ? e.message : '登录失败');
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        return { form, loading, onSubmit, Lock, UserFilled };
+      },
+      template: `
+        <div>
+          <div class="breadcrumb">后台 / 登录</div>
+          <div class="title">登录后台</div>
+
+          <el-form @submit.prevent>
+            <el-form-item>
+              <el-input v-model="form.username" size="default" placeholder="用户名" :prefix-icon="UserFilled" autocomplete="username" />
+            </el-form-item>
+            <el-form-item>
+              <el-input v-model="form.password" size="default" placeholder="密码" :prefix-icon="Lock" show-password autocomplete="current-password" @keyup.enter="onSubmit" />
+            </el-form-item>
+            <div class="actions">
+              <el-button size="default" type="primary" :loading="loading" @click="onSubmit">登录</el-button>
+            </div>
+          </el-form>
+
+          <div class="hint">
+            默认账号（首次迁移后）：<span class="code-chip">admin / admin123</span>，登录后请尽快修改密码。
+          </div>
+        </div>
+      `
+    }).use(ElementPlus).mount('#loginApp');
+  </script>
+</body>
+</html>
+

@@ -605,17 +605,23 @@
                         </div>
 
                         <div class="admin-sidenav-section">系统</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Settings' && $Request.controller != 'settings' && $Request.controller != 'Cache' && $Request.controller != 'cache' && $Request.controller != 'DownloadLog' && $Request.controller != 'downloadlog'}collapsed{/if} {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-system" aria-expanded="{if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}true{else /}false{/if}" aria-controls="admin-nav-system" role="button">
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Settings' && $Request.controller != 'settings' && $Request.controller != 'Cache' && $Request.controller != 'cache' && $Request.controller != 'DownloadLog' && $Request.controller != 'downloadlog' && $Request.controller != 'User' && $Request.controller != 'user'}collapsed{/if} {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-system" aria-expanded="{if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user'}true{else /}false{/if}" aria-controls="admin-nav-system" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="settings"></i></span>
                             <span class="admin-sidenav-txt">系统</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-system" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}show{/if}">
+                        <div id="admin-nav-system" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/settings" class="admin-sidenav-sublink {if $Request.controller == 'Settings' || $Request.controller == 'settings'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="sliders-horizontal"></i></span>
                                         <span class="admin-sidenav-subtxt">系统设置</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/user" class="admin-sidenav-sublink {if $Request.controller == 'User' || $Request.controller == 'user'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
+                                        <span class="admin-sidenav-subtxt">用户</span>
                                     </a>
                                 </li>
                                 <li>
