@@ -544,6 +544,8 @@
             /* 侧栏推拉/遮罩时，保证背景不透明 */
             .dark-dashboard .main-sidebar {
                 background: var(--dash-sidebar-bg);
+                /* 确保移动端侧栏层级最高，避免被内容区覆盖 */
+                z-index: 1085 !important;
             }
             .dark-dashboard .main-sidebar .sidebar {
                 background: var(--dash-sidebar-bg);
@@ -555,6 +557,8 @@
             .layout-fixed .content-wrapper {
                 margin-top: var(--dash-topbar-h) !important;
                 min-height: calc(100vh - var(--dash-footer-h) - var(--dash-topbar-h));
+                position: relative;
+                z-index: 1;
             }
             .dark-dashboard .main-footer { padding-bottom: 0.5rem; }
             .dark-dashboard .container-fluid { padding-left: 12px; padding-right: 12px; }
