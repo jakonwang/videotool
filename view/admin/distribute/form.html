@@ -1,0 +1,61 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}生成达人链{/block}
+{block name="page_title"}生成达人链{/block}
+{block name="breadcrumb"}<a href="/admin.php/distribute" class="text-muted">达人链</a> / 生成{/block}
+{block name="page_actions"}
+<a href="/admin.php/distribute" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> 返回</a>
+{/block}
+
+{block name="content"}
+<div class="row">
+    <div class="col-lg-7 col-xl-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form id="dist-form">
+                    <div class="form-group">
+                        <label for="product_id">商品 <span class="text-danger">*</span></label>
+                        <select name="product_id" id="product_id" class="form-control" required>
+                            <option value="">请选择</option>
+                            {volist name="products" id="p"}
+                            <option value="{$p.id}">{$p.name}</option>
+                            {/volist}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="label">备注</label>
+                        <input type="text" name="label" id="label" class="form-control" placeholder="可选，如达人昵称">
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-link mr-1"></i> 生成</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{/block}
+
+{block name="script"}
+<script>
+    $(function () {
+        $('#dist-form').on('submit', function (e) {
+            e.preventDefault();
+            const $btn = $(this).find('button[type="submit"]');
+            const html = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>');
+            $.post('/admin.php/distribute/add', $(this).serialize())
+                .done(function (res) {
+                    if (res.code === 0) {
+                        AdminUI.showToast('success', res.msg || '成功');
+                        setTimeout(() => location.href = '/admin.php/distribute', 600);
+                    } else {
+                        AdminUI.showToast('error', res.msg || '失败');
+                    }
+                })
+                .fail(function () { AdminUI.showToast('error', '网络错误'); })
+                .always(function () { $btn.prop('disabled', false).html(html); });
+        });
+    });
+</script>
+{/block}

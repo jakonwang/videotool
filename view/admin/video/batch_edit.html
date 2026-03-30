@@ -2,7 +2,7 @@
 
 {block name="title"}批量编辑视频{/block}
 {block name="page_title"}批量编辑视频{/block}
-{block name="breadcrumb"}<a href="/admin.php/video" class="text-muted">视频管理</a> / 批量编辑{/block}
+{block name="breadcrumb"}<a href="/admin.php/video" class="text-muted">视频</a> / 批量编辑{/block}
 {block name="page_actions"}
 <a href="/admin.php/video" class="btn btn-outline-secondary btn-sm">
     <i class="fas fa-arrow-left mr-1"></i> 返回列表
@@ -43,11 +43,7 @@
                             <td>{$video.id}</td>
                             <td>{$video.title|mb_substr=0,50,'utf-8'}{if mb_strlen($video.title, 'utf-8') > 50}...{/if}</td>
                             <td>
-                                {if $video.cover_url}
-                                <img src="{$video.cover_url}" style="max-width:80px; max-height:50px; object-fit:cover;" onerror="this.style.display='none'">
-                                {else /}
-                                <span class="text-muted">无封面</span>
-                                {/if}
+                                <img src="{:video_cover_pick($video.cover_url)}" style="max-width:80px; max-height:50px; object-fit:cover;" alt="" onerror="this.src='/static/default-cover.svg'">
                             </td>
                             <td>{if isset($video.device)}{$video.device.device_name}{else}未知设备{/if}</td>
                         </tr>

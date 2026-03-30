@@ -1,252 +1,441 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}缓存管理 - 社媒素材库{/block}
-{block name="page_title"}缓存管理{/block}
-{block name="breadcrumb"}缓存管理 &raquo; 下载缓存{/block}
-{block name="page_actions"}
-<button class="btn btn-outline-secondary mr-2" onclick="location.reload()">
-    <i class="fas fa-sync mr-1"></i>刷新
-</button>
-<button class="btn btn-danger" id="btnClearCache">
-    <i class="fas fa-trash-alt mr-1"></i>清空全部缓存
-</button>
-{/block}
+{block name="title"}缓存 - 社媒素材库{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
 
 {block name="style"}
 <style>
-    .cache-path-display {
-        font-size: 0.95rem;
-        font-weight: 600;
-        word-break: break-all;
-        line-height: 1.4;
-        color: #fff;
+    .content-header { display: none; }
+    /* High-Density Modern（仅该页生效） */
+    .tp-ep-wrap {
+        padding: 24px;
+        background: #f4f6f8;
+        min-height: calc(100vh - 0px);
     }
-    .cache-copy-btn {
-        border: 1px solid rgba(255,255,255,.5);
-        color: #fff;
-        font-size: 0.75rem;
+    .admin-cache-card {
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .admin-cache-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 0;
+    }
+    .admin-cache-breadcrumb {
+        font-size: 13px;
+        color: #909399;
+        line-height: 18px;
+        margin-bottom: 6px;
+    }
+    .admin-cache-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 28px;
+    }
+    .admin-cache-actions {
+        display: flex;
+        gap: 12px;
+        flex: 0 0 auto;
+    }
+    .admin-cache-actions .el-button { border-radius: 6px; }
+
+    .admin-cache-alert {
+        margin-top: 16px;
+        margin-bottom: 24px;
+    }
+    .code-chip {
+        display: inline-flex;
+        align-items: center;
         padding: 2px 8px;
-        border-radius: 20px;
-        background: transparent;
-        transition: background .2s;
+        border-radius: 6px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        color: #374151;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        line-height: 18px;
     }
-    .cache-copy-btn:hover {
-        background: rgba(255,255,255,.15);
-        color: #fff;
+
+    .admin-cache-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
     }
+    @media (max-width: 1200px) { .admin-cache-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .admin-cache-stats { grid-template-columns: 1fr; } }
+    .stat-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        min-width: 0;
+    }
+    .stat-left { min-width: 0; }
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 34px;
+    }
+    .stat-label {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 18px;
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+    }
+    .stat-icon svg { width: 20px; height: 20px; }
+    .stat-icon--blue { background: rgba(59,130,246,0.12); color: #1d4ed8; }
+    .stat-icon--green { background: rgba(34,197,94,0.12); color: #15803d; }
+    .stat-icon--amber { background: rgba(245,158,11,0.12); color: #b45309; }
+    .stat-icon--slate { background: rgba(100,116,139,0.12); color: #334155; }
+
+    .stat-value--path {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+    .path-ellipsis {
+        display: block;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 20px;
+    }
+
+    .admin-cache-search {
+        margin: 20px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .admin-cache-search .search-input { width: 320px; }
+
+    .admin-cache-card .el-table__inner-wrapper::before { height: 0; }
 </style>
 {/block}
 
 {block name="content"}
-    {if !$is_enabled}
-    <div class="alert alert-warning border-warning">
-        <i class="fas fa-exclamation-triangle mr-2"></i>
-        下载缓存尚未启用，请在 <code>config/download_cache.php</code> 或环境变量中开启 <code>download_cache.enabled</code>。
-    </div>
-    {/if}
-
-    <div class="row">
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="small-box bg-info">
-                <div class="inner">
-                    <h3>{$stats.total_files|default=0}</h3>
-                    <p>缓存文件数</p>
-                </div>
-                <div class="icon"><i class="fas fa-folder"></i></div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="small-box bg-success">
-                <div class="inner">
-                    <h3>{$stats.total_size_human|default='0 B'}</h3>
-                    <p>占用空间</p>
-                </div>
-                <div class="icon"><i class="fas fa-hdd"></i></div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="small-box bg-warning">
-                <div class="inner">
-                    {if !empty($stats.expire_seconds)}
-                    <h3>{:round($stats.expire_seconds / 3600, 1)} h</h3>
-                    {else}
-                    <h3>无限制</h3>
-                    {/if}
-                    <p>缓存有效期</p>
-                </div>
-                <div class="icon"><i class="fas fa-hourglass-half"></i></div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="small-box bg-danger">
-                <div class="inner">
-                    <div class="d-flex align-items-start">
-                        <div class="cache-path-display text-monospace flex-grow-1" id="cacheRootPath">{$stats.root|default='-'}</div>
-                        {if $stats.root}
-                        <button type="button" class="cache-copy-btn ml-2" data-path="{$stats.root}">
-                            <i class="fas fa-copy"></i> 复制
-                        </button>
-                        {/if}
-                    </div>
-                    <p class="mb-0 mt-2" style="font-size:13px;">缓存目录</p>
-                </div>
-                <div class="icon"><i class="fas fa-map-marker-alt"></i></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <form class="form-inline" method="get">
-                <div class="input-group mr-2" style="width:250px;">
-                    <input type="text" class="form-control" name="keyword" placeholder="搜索文件名或来源URL" value="{$keyword|htmlentities}">
-                    <div class="input-group-append">
-                        <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
-                    </div>
-                </div>
-                {if $keyword !== ''}
-                <a href="/admin.php/cache" class="btn btn-link text-muted">清除筛选</a>
-                {/if}
-            </form>
-        </div>
-        <div class="card-body table-responsive p-0">
-            {if empty($items)}
-            <div class="text-center text-muted py-5">
-                <i class="fas fa-box-open fa-3x mb-3"></i>
-                <div>暂无缓存记录</div>
-            </div>
-            {else}
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>哈希</th>
-                        <th>文件名</th>
-                        <th>类型</th>
-                        <th>大小</th>
-                        <th>缓存时间</th>
-                        <th>来源</th>
-                        <th class="text-right pr-3">操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {foreach $items as $item}
-                    <tr>
-                        <td><code>{$item.hash|substr=0,10}...</code></td>
-                        <td>
-                            <div class="font-weight-bold">{$item.file_name|default='-'}</div>
-                            {if $item.video_id}
-                            <small class="text-muted">视频ID：{$item.video_id}</small>
-                            {/if}
-                        </td>
-                        <td>{$item.type|default='video'}</td>
-                        <td>{$item.size_human}</td>
-                        <td>
-                            {$item.cached_at_text}
-                        </td>
-                        <td style="max-width:240px;">
-                            <div class="text-truncate" title="{$item.source_url}">{$item.source_url}</div>
-                        </td>
-                        <td class="text-right pr-3">
-                            <div class="btn-group btn-group-sm">
-                                <a class="btn btn-outline-primary" href="/admin.php/cache/download/{$item.hash}" target="_blank">
-                                    <i class="fas fa-download"></i>
-                                </a>
-                                <button class="btn btn-outline-secondary btn-copy-url" data-url="{$item.source_url}" title="复制来源链接">
-                                    <i class="fas fa-link"></i>
-                                </button>
-                                <button class="btn btn-outline-danger btn-delete-cache" data-hash="{$item.hash}">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {/foreach}
-                </tbody>
-            </table>
-            {/if}
-        </div>
-        {if !empty($items)}
-        <div class="card-footer d-flex justify-content-between align-items-center flex-wrap">
-            <div class="text-muted mb-2 mb-sm-0">
-                共 {$total} 条记录，当前第 {$page}/{$total_pages} 页
-            </div>
-            <nav>
-                <ul class="pagination pagination-sm mb-0">
-                    {for start="1" end="$total_pages+1"}
-                    {if $i == $page}
-                    <li class="page-item active"><span class="page-link">{$i}</span></li>
-                    {else}
-                    <li class="page-item">
-                        <a class="page-link" href="/admin.php/cache?page={$i}&keyword={$keyword|urlencode}">{$i}</a>
-                    </li>
-                    {/if}
-                    {/for}
-                </ul>
-            </nav>
-        </div>
-        {/if}
-    </div>
+<div class="tp-ep-wrap" id="cacheApp"></div>
 {/block}
 
 {block name="script"}
+<!-- Vue3 + ElementPlus（CDN） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
 <script>
-$(function () {
-    $('.btn-delete-cache').on('click', function () {
-        const hash = $(this).data('hash');
-        if (!hash) return;
-        AdminUI.confirm('确认删除该缓存文件？', function () {
-            $.post(`/admin.php/cache/delete/${hash}`, function (res) {
-                if (res.code === 0) {
-                    AdminUI.showToast('success', res.msg || '删除成功');
-                    setTimeout(() => location.reload(), 600);
-                } else {
-                    AdminUI.showToast('error', res.msg || '删除失败');
-                }
-            }).fail(function () {
-                AdminUI.showToast('error', '请求失败，请稍后再试');
-            });
-        });
-    });
+  {literal}
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const { Refresh, Delete, Search, CopyDocument, Document, Coin, TrendCharts, Folder } = ElementPlusIconsVue;
 
-    $('#btnClearCache').on('click', function () {
-        AdminUI.confirm('确认清空所有缓存？该操作无法恢复！', function () {
-            $.post('/admin.php/cache/clear', function (res) {
-                if (res.code === 0) {
-                    AdminUI.showToast('success', res.msg || '已清空缓存');
-                    setTimeout(() => location.reload(), 800);
-                } else {
-                    AdminUI.showToast('error', res.msg || '清空失败');
-                }
-            }).fail(function () {
-                AdminUI.showToast('error', '请求失败，请稍后再试');
-            });
-        });
-    });
+  const headerCellStyle = {
+    backgroundColor: '#F9FAFB',
+    color: '#4B5563',
+    fontWeight: '600',
+    height: '48px',
+    borderBottom: '1px solid #E5E7EB'
+  };
 
-    $('.btn-copy-url').on('click', function () {
-        const url = $(this).data('url');
-        if (!url) return;
-        copyText(url, '来源链接已复制');
-    });
+  const cellStyle = { padding: '12px 0' };
 
-    $('.cache-copy-btn').on('click', function () {
-        const path = $(this).data('path');
-        if (!path) return;
-        copyText(path, '缓存目录已复制');
-    });
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const keyword = ref('');
+      const rows = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(10);
 
-    function copyText(text, successMsg) {
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(text).then(() => {
-                AdminUI.showToast('success', successMsg || '复制成功');
-            }).catch(() => {
-                AdminUI.showToast('error', '复制失败');
-            });
-        } else {
-            AdminUI.showToast('error', '当前环境不支持复制');
+      const stats = reactive({
+        total_files: 0,
+        total_size_human: '0 B',
+        expire_seconds: null,
+        root: '-',
+      });
+      const isEnabled = ref(true);
+
+      const expireText = computed(() => {
+        if (!stats.expire_seconds) return '无限制';
+        const h = Math.round((Number(stats.expire_seconds) / 3600) * 10) / 10;
+        return `${h} h`;
+      });
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const params = new URLSearchParams();
+          params.set('page', String(page.value));
+          params.set('page_size', String(pageSize.value));
+          if (keyword.value.trim()) params.set('keyword', keyword.value.trim());
+
+          const res = await fetch('/admin.php/cache/list?' + params.toString(), { credentials: 'same-origin' });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+
+          rows.value = (json.data && json.data.items) ? json.data.items : [];
+          total.value = (json.data && json.data.total) ? json.data.total : 0;
+
+          const s = (json.data && json.data.stats) ? json.data.stats : null;
+          if (s) {
+            stats.total_files = s.total_files ?? 0;
+            stats.total_size_human = s.total_size_human ?? '0 B';
+            stats.expire_seconds = s.expire_seconds ?? null;
+            stats.root = s.root ?? '-';
+          }
+          isEnabled.value = !!(json.data && json.data.is_enabled);
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '加载失败');
+        } finally {
+          loading.value = false;
         }
-    }
-});
+      }
+
+      function onSearch() {
+        page.value = 1;
+        fetchList();
+      }
+
+      function onRefresh() {
+        fetchList();
+      }
+
+      async function onClear() {
+        await ElMessageBox.confirm('确认清空所有缓存？该操作无法恢复！', '清空缓存', {
+          type: 'warning',
+          confirmButtonText: '清空',
+          cancelButtonText: '取消',
+        });
+        const resp = await fetch('/admin.php/cache/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '已清空缓存');
+          page.value = 1;
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '清空失败');
+        }
+      }
+
+      async function onDelete(row) {
+        const hash = row && row.hash ? String(row.hash) : '';
+        if (!hash) return;
+        await ElMessageBox.confirm('确认删除该缓存文件？', '删除确认', {
+          type: 'warning',
+          confirmButtonText: '删除',
+          cancelButtonText: '取消',
+        });
+        const resp = await fetch('/admin.php/cache/delete/' + hash, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '删除成功');
+          const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
+          page.value = Math.min(page.value, maxPage);
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '删除失败');
+        }
+      }
+
+      async function copyText(text) {
+        const t = String(text || '');
+        if (!t) return;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(t);
+          } else {
+            const tmp = document.createElement('input');
+            tmp.value = t;
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+          }
+          ElMessage.success('已复制');
+        } catch (e) {
+          ElMessage.error('复制失败');
+        }
+      }
+
+      const cacheDirText = computed(() => stats.root || '-');
+
+      onMounted(() => fetchList());
+
+      return {
+        loading,
+        keyword,
+        rows,
+        total,
+        page,
+        pageSize,
+        stats,
+        isEnabled,
+        expireText,
+        cacheDirText,
+        headerCellStyle,
+        cellStyle,
+        Refresh,
+        Delete,
+        Search,
+        CopyDocument,
+        Document,
+        Coin,
+        TrendCharts,
+        Folder,
+        onSearch,
+        onRefresh,
+        onClear,
+        onDelete,
+        copyText,
+        fetchList,
+      };
+    },
+    template: `
+      <div class="admin-cache-card">
+        <div class="admin-cache-header">
+          <div>
+            <div class="admin-cache-breadcrumb">系统 / 缓存</div>
+            <div class="admin-cache-title">缓存</div>
+          </div>
+          <div class="admin-cache-actions">
+            <el-button size="default" :icon="Refresh" @click="onRefresh">刷新</el-button>
+            <el-button size="default" type="danger" :icon="Delete" @click="onClear">清空缓存</el-button>
+          </div>
+        </div>
+
+        <el-alert v-if="!isEnabled" class="admin-cache-alert" type="warning" show-icon :closable="false">
+          <template #title>
+            下载缓存尚未启用，请在 <span class="code-chip">config/download_cache.php</span> 或环境变量中开启 <span class="code-chip">download_cache.enabled</span>。
+          </template>
+        </el-alert>
+        <el-alert v-else class="admin-cache-alert" type="warning" show-icon :closable="false">
+          <template #title>
+            缓存用于加速下载与断点续传；可在 <span class="code-chip">config/download_cache.php</span> 调整策略。
+          </template>
+        </el-alert>
+
+        <div class="admin-cache-stats">
+          <div class="stat-card">
+            <div class="stat-left">
+              <div class="stat-value">{{ stats.total_files }}</div>
+              <div class="stat-label">缓存文件数</div>
+            </div>
+            <div class="stat-icon stat-icon--blue"><el-icon><Document/></el-icon></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-left">
+              <div class="stat-value">{{ stats.total_size_human }}</div>
+              <div class="stat-label">占用空间</div>
+            </div>
+            <div class="stat-icon stat-icon--green"><el-icon><Coin/></el-icon></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-left">
+              <div class="stat-value">{{ expireText }}</div>
+              <div class="stat-label">缓存有效期</div>
+            </div>
+            <div class="stat-icon stat-icon--amber"><el-icon><TrendCharts/></el-icon></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-left" style="width:100%;">
+              <div class="stat-value stat-value--path">
+                <el-tooltip :content="cacheDirText" placement="top" :show-after="200">
+                  <span class="path-ellipsis">{{ cacheDirText }}</span>
+                </el-tooltip>
+                <el-button size="default" link type="primary" :icon="CopyDocument" @click="copyText(cacheDirText)" aria-label="复制缓存目录" />
+              </div>
+              <div class="stat-label">缓存目录</div>
+            </div>
+            <div class="stat-icon stat-icon--slate"><el-icon><Folder/></el-icon></div>
+          </div>
+        </div>
+
+        <div class="admin-cache-search">
+          <el-input
+            v-model="keyword"
+            size="default"
+            clearable
+            class="search-input"
+            :prefix-icon="Search"
+            placeholder="搜索文件名或来源URL"
+            @keyup.enter="onSearch"
+          />
+        </div>
+
+        <el-table
+          :data="rows"
+          row-key="hash"
+          v-loading="loading"
+          :header-cell-style="headerCellStyle"
+          :cell-style="cellStyle"
+        >
+          <el-table-column prop="file_name" label="文件名" min-width="220" />
+          <el-table-column prop="source_url" label="来源 URL" min-width="320" show-overflow-tooltip />
+          <el-table-column prop="size_human" label="文件大小" width="120" />
+          <el-table-column prop="cached_at_text" label="缓存时间" width="180" />
+          <el-table-column label="操作" width="120" fixed="right">
+            <template #default="{ row }">
+              <el-button size="default" link type="danger" @click="onDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            size="default"
+            background
+            layout="total, prev, pager, next"
+            :total="total"
+            @update:current-page="(p)=>{ page=p; fetchList(); }"
+            @update:page-size="(s)=>{ pageSize=s; page=1; fetchList(); }"
+          />
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#cacheApp');
+  {/literal}
 </script>
 {/block}
 

@@ -1,124 +1,320 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}设备管理{/block}
-{block name="page_title"}设备管理{/block}
-{block name="page_actions"}
-<a href="/admin.php/device/add" class="btn btn-primary btn-sm">
-    <i class="fas fa-plus mr-1"></i> 添加设备
-</a>
+{block name="title"}设备{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
+
+{block name="style"}
+<style>
+    .content-header { display: none; }
+    /* High-Density Modern（仅该页生效，风格与商品/达人链统一） */
+    .tp-ep-wrap {
+        padding: 24px;
+        background: #f4f6f8;
+        min-height: calc(100vh - 0px);
+    }
+    .admin-dev-card {
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .admin-dev-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .admin-dev-breadcrumb {
+        font-size: 13px;
+        color: #909399;
+        line-height: 18px;
+        margin-bottom: 6px;
+    }
+    .admin-dev-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 28px;
+    }
+    .admin-dev-actions .el-button { border-radius: 6px; }
+    .admin-dev-filters {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: nowrap;
+        overflow-x: hidden;
+        padding-bottom: 0;
+        margin-bottom: 12px;
+    }
+    @media (max-width: 1200px) {
+        .admin-dev-filters { overflow-x: auto; padding-bottom: 4px; }
+    }
+    .admin-dev-filter-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
+    .name-cell {
+        font-weight: 500;
+        color: #303133;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .ip-cell {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        color: #374151;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 2px 8px;
+        display: inline-flex;
+        align-items: center;
+        line-height: 18px;
+    }
+    .admin-dev-card .el-table__inner-wrapper::before { height: 0; }
+    .admin-dev-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+</style>
 {/block}
 
 {block name="content"}
-<div class="card shadow-sm">
-    <div class="card-body">
-        <form method="get" class="form-row align-items-center mb-3">
-            <div class="col-md-4 mb-2">
-                <select name="platform_id" class="form-control form-control-sm">
-                    <option value="">全部平台</option>
-                    {volist name="platforms" id="platform"}
-                    <option value="{$platform.id}" {if $platform_id == $platform.id}selected{/if}>{$platform.name}</option>
-                    {/volist}
-                </select>
-            </div>
-            <div class="col-md-3 mb-2">
-                <select name="status" class="form-control form-control-sm">
-                    <option value="">全部状态</option>
-                    <option value="1" {if $status==='1'}selected{/if}>启用</option>
-                    <option value="0" {if $status==='0'}selected{/if}>禁用</option>
-                </select>
-            </div>
-            <div class="col-md-3 mb-2">
-                <input type="text" name="keyword" value="{$keyword|default=''}" class="form-control form-control-sm" placeholder="搜索设备名称或 IP">
-            </div>
-            <div class="col-md-1 col-6 mb-2">
-                <button type="submit" class="btn btn-primary btn-sm btn-block">
-                    <i class="fas fa-filter"></i>
-                </button>
-            </div>
-            <div class="col-md-1 col-6 mb-2">
-                <a href="/admin.php/device" class="btn btn-outline-secondary btn-sm btn-block">
-                    <i class="fas fa-undo"></i>
-                </a>
-            </div>
-        </form>
-
-        {if count($list)}
-        <div class="table-responsive">
-            <table class="table table-hover table-striped text-nowrap">
-                <thead class="thead-light">
-                    <tr>
-                        <th>ID</th>
-                        <th>设备名称</th>
-                        <th>所属平台</th>
-                        <th>IP 地址</th>
-                        <th class="text-center">状态</th>
-                        <th>创建时间</th>
-                        <th class="text-right">操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {volist name="list" id="item"}
-                    <tr>
-                        <td>{$item.id}</td>
-                        <td class="font-weight-bold">{$item.device_name|default='—'}</td>
-                        <td>{$item.platform.name|default='—'}</td>
-                        <td><code>{$item.ip_address|default='—'}</code></td>
-                        <td class="text-center">
-                            {if $item.status == 1}
-                            <span class="badge badge-success">启用</span>
-                            {else}
-                            <span class="badge badge-secondary">禁用</span>
-                            {/if}
-                        </td>
-                        <td>{$item.created_at|default='—'}</td>
-                        <td class="text-right">
-                            <div class="btn-group btn-group-sm">
-                                <a href="/admin.php/device/edit/{$item.id}" class="btn btn-outline-info">
-                                    <i class="fas fa-edit"></i> 编辑
-                                </a>
-                                <button type="button" class="btn btn-outline-danger js-delete" data-id="{$item.id}" data-name="{$item.device_name|default='设备'}">
-                                    <i class="fas fa-trash-alt"></i> 删除
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {/volist}
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-3">
-            {$list->render()|raw}
-        </div>
-        {else /}
-        <div class="text-center py-5 text-muted">
-            <i class="fas fa-box-open fa-2x mb-3"></i>
-            <p class="mb-1">暂无设备数据</p>
-            <p class="small">请先添加设备或调整筛选条件。</p>
-        </div>
-        {/if}
-    </div>
-</div>
+<script>
+  // 下拉选项：由服务端注入（平台列表），避免额外接口
+  const PLATFORM_OPTIONS = [];
+  {volist name="platforms" id="p"}
+  PLATFORM_OPTIONS.push({ id: {$p.id}, label: "{:addslashes((string)$p.name)}" });
+  {/volist}
+</script>
+<div class="tp-ep-wrap" id="deviceApp"></div>
 {/block}
 
 {block name="script"}
+<!-- Vue3 + ElementPlus（CDN） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
-    $(function () {
-        $('.js-delete').on('click', function () {
-            const id = $(this).data('id');
-            const name = $(this).data('name');
-            AdminUI.confirm(`确定要删除设备「${name}」吗？该设备下的所有视频也会被删除。`, function () {
-                $.post(`/admin.php/device/delete/${id}`, {}, function (res) {
-                    if (res.code === 0) {
-                        AdminUI.showToast('success', res.msg || '删除成功');
-                        setTimeout(() => window.location.reload(), 1000);
-                    } else {
-                        AdminUI.showToast('error', res.msg || '删除失败');
-                    }
-                }).fail(function () {
-                    AdminUI.showToast('error', '删除失败，请稍后再试');
-                });
-            });
+  {literal}
+  const { createApp, reactive, ref, computed, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+
+  const headerCellStyle = {
+    backgroundColor: '#F9FAFB',
+    color: '#4B5563',
+    fontWeight: '600',
+    height: '48px',
+    borderBottom: '1px solid #E5E7EB',
+  };
+
+  const cellStyle = {
+    padding: '12px 0',
+  };
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const items = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(10);
+
+      const query = reactive({
+        platform_id: 0,
+        status: '',
+        keyword: '',
+      });
+
+      const platformOptions = computed(() => (Array.isArray(PLATFORM_OPTIONS) ? PLATFORM_OPTIONS : []));
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const params = new URLSearchParams();
+          params.set('page', String(page.value));
+          params.set('page_size', String(pageSize.value));
+          if (query.platform_id && Number(query.platform_id) > 0) params.set('platform_id', String(query.platform_id));
+          if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
+          if (query.keyword) params.set('keyword', query.keyword);
+
+          const res = await fetch('/admin.php/device/list?' + params.toString(), { credentials: 'same-origin' });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          items.value = (json.data && json.data.items) ? json.data.items : [];
+          total.value = (json.data && json.data.total) ? json.data.total : 0;
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '加载失败');
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function onSearch() {
+        page.value = 1;
+        fetchList();
+      }
+
+      function onReset() {
+        query.platform_id = 0;
+        query.status = '';
+        query.keyword = '';
+        page.value = 1;
+        fetchList();
+      }
+
+      function goAdd() {
+        window.location.href = '/admin.php/device/add';
+      }
+
+      function goEdit(row) {
+        window.location.href = '/admin.php/device/edit/' + row.id;
+      }
+
+      async function doDelete(row) {
+        await ElMessageBox.confirm(`确定要删除设备「${row.device_name || '设备'}」吗？该设备下的所有视频也会被删除。`, '删除确认', { type: 'warning' });
+        const resp = await fetch('/admin.php/device/delete/' + row.id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
         });
-    });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '删除成功');
+          const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
+          page.value = Math.min(page.value, maxPage);
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '删除失败');
+        }
+      }
+
+      const rows = computed(() => items.value || []);
+
+      onMounted(() => fetchList());
+
+      return {
+        loading,
+        query,
+        rows,
+        total,
+        page,
+        pageSize,
+        platformOptions,
+        headerCellStyle,
+        cellStyle,
+        onSearch,
+        onReset,
+        goAdd,
+        goEdit,
+        doDelete,
+        fetchList,
+      };
+    },
+    template: `
+      <div class="admin-dev-card">
+        <div class="admin-dev-header">
+          <div>
+            <div class="admin-dev-breadcrumb">终端 / 设备</div>
+            <div class="admin-dev-title">设备</div>
+          </div>
+          <div class="admin-dev-actions">
+            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 添加设备</el-button>
+          </div>
+        </div>
+
+        <div class="admin-dev-filters">
+          <el-select v-model="query.platform_id" size="default" clearable placeholder="全部平台" style="width:180px; flex:0 0 auto;">
+            <el-option label="全部平台" :value="0" />
+            <el-option v-for="o in platformOptions" :key="o.id" :label="o.label" :value="o.id" />
+          </el-select>
+          <el-select v-model="query.status" size="default" clearable placeholder="全部状态" style="width:140px; flex:0 0 auto;">
+            <el-option label="启用" value="1" />
+            <el-option label="禁用" value="0" />
+          </el-select>
+          <el-input
+            v-model="query.keyword"
+            size="default"
+            clearable
+            placeholder="搜索设备名称或 IP"
+            style="width:260px; flex:0 0 auto;"
+            @keyup.enter="onSearch"
+          />
+
+          <div class="admin-dev-filter-actions">
+            <el-button size="default" type="primary" @click="onSearch">筛选</el-button>
+            <el-button size="default" @click="onReset">重置</el-button>
+          </div>
+        </div>
+
+        <el-table
+          :data="rows"
+          stripe
+          row-key="id"
+          v-loading="loading"
+          :header-cell-style="headerCellStyle"
+          :cell-style="cellStyle"
+        >
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="设备名称" min-width="180">
+            <template #default="{ row }">
+              <div class="name-cell" :title="row.device_name">{{ row.device_name || '—' }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="所属平台" min-width="160">
+            <template #default="{ row }">
+              <span style="color:#4b5563;">{{ (row.platform && row.platform.name) ? row.platform.name : '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="IP 地址" width="200">
+            <template #default="{ row }">
+              <span class="ip-cell">{{ row.ip_address || '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="120">
+            <template #default="{ row }">
+              <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
+                {{ String(row.status) === '1' ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="创建时间" min-width="180" />
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button size="default" link type="primary" @click="goEdit(row)">编辑</el-button>
+              <el-button size="default" link type="danger" @click="doDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+
+          <template #empty>
+            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无设备数据</div>
+          </template>
+        </el-table>
+
+        <div class="admin-dev-footer">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            size="default"
+            background
+            layout="total, prev, pager, next"
+            :total="total"
+            @update:current-page="(p)=>{ page=p; fetchList(); }"
+            @update:page-size="(s)=>{ pageSize=s; page=1; fetchList(); }"
+          />
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#deviceApp');
+  {/literal}
 </script>
 {/block}

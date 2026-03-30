@@ -6,8 +6,21 @@ use think\facade\Route;
 // 只在后台入口文件时加载此路由
 if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('/', 'app\controller\admin\Index@index');
+
+    // 仪表盘统计（只读 JSON）
+    Route::get('stats/overview', 'app\controller\admin\Stats@overview');
+    Route::get('stats/trends', 'app\controller\admin\Stats@trends');
+    Route::get('stats/platformDistribution', 'app\controller\admin\Stats@platformDistribution');
+    Route::get('stats/downloadErrorTrends', 'app\controller\admin\Stats@downloadErrorTrends');
+    Route::get('stats/downloadErrorTop', 'app\controller\admin\Stats@downloadErrorTop');
+    Route::get('stats/productDistribution', 'app\controller\admin\Stats@productDistribution');
+    Route::get('stats/storageUsage', 'app\controller\admin\Stats@storageUsage');
+
+    Route::get('settings', 'app\controller\admin\Settings@index');
+    Route::post('settings', 'app\controller\admin\Settings@index');
     
     // 平台管理 - 直接定义完整路径，避免路由组匹配问题
+    Route::get('platform/list', 'app\controller\admin\Platform@listJson');
     Route::get('platform/edit/<id>', 'app\controller\admin\Platform@edit');
     Route::post('platform/edit/<id>', 'app\controller\admin\Platform@edit');
     Route::post('platform/delete/<id>', 'app\controller\admin\Platform@delete');
@@ -16,6 +29,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('platform', 'app\controller\admin\Platform@index');
     
     // 设备管理
+    Route::get('device/list', 'app\controller\admin\Device@listJson');
     Route::get('device/edit/<id>', 'app\controller\admin\Device@edit');
     Route::post('device/edit/<id>', 'app\controller\admin\Device@edit');
     Route::post('device/delete/<id>', 'app\controller\admin\Device@delete');
@@ -24,7 +38,25 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('device/add', 'app\controller\admin\Device@add');
     Route::get('device', 'app\controller\admin\Device@index');
     
+    // 商品
+    Route::get('product/list', 'app\controller\admin\Product@listJson');
+    Route::get('product/edit/<id>', 'app\controller\admin\Product@edit');
+    Route::post('product/edit/<id>', 'app\controller\admin\Product@edit');
+    Route::post('product/delete/<id>', 'app\controller\admin\Product@delete');
+    Route::get('product/add', 'app\controller\admin\Product@add');
+    Route::post('product/add', 'app\controller\admin\Product@add');
+    Route::get('product', 'app\controller\admin\Product@index');
+
+    // 分发链接
+    Route::get('distribute/list', 'app\controller\admin\Distribute@listJson');
+    Route::get('distribute/add', 'app\controller\admin\Distribute@add');
+    Route::post('distribute/add', 'app\controller\admin\Distribute@add');
+    Route::post('distribute/delete/<id>', 'app\controller\admin\Distribute@delete');
+    Route::post('distribute/toggle/<id>', 'app\controller\admin\Distribute@toggle');
+    Route::get('distribute', 'app\controller\admin\Distribute@index');
+
     // 视频管理
+    Route::get('video/list', 'app\\controller\\admin\\Video@listJson');
     Route::get('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/delete/<id>', 'app\controller\admin\Video@delete');
@@ -37,12 +69,14 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('video', 'app\controller\admin\Video@index');
 
     // 缓存管理
+    Route::get('cache/list', 'app\controller\admin\Cache@listJson');
     Route::get('cache', 'app\controller\admin\Cache@index');
     Route::post('cache/delete/<hash>', 'app\controller\admin\Cache@delete');
     Route::post('cache/clear', 'app\controller\admin\Cache@clear');
     Route::get('cache/download/<hash>', 'app\controller\admin\Cache@download');
     
     // 下载错误监控
+    Route::get('downloadLog/list', 'app\controller\admin\DownloadLog@listJson');
     Route::get('downloadLog', 'app\controller\admin\DownloadLog@index');
     Route::post('downloadLog/clear', 'app\controller\admin\DownloadLog@clear');
 }

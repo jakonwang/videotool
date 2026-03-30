@@ -7,6 +7,7 @@ use app\BaseController;
 use app\model\Video as VideoModel;
 use app\model\Device as DeviceModel;
 use app\model\Platform as PlatformModel;
+use app\model\Product as ProductModel;
 use app\service\QiniuService;
 use think\facade\Filesystem;
 use think\facade\View;
@@ -16,17 +17,117 @@ use think\facade\View;
  */
 class Video extends BaseController
 {
+    /**
+     * 视频列表（JSON）
+     * 仅输出形式不同：复用 index() 的筛选与排序规则，供前端 Vue/ElementPlus 使用
+     */
+    public function listJson()
+    {
+        $platformIds = (array) $this->request->param('platform_ids', []);
+        $deviceIds = (array) $this->request->param('device_ids', []);
+        $productIds = (array) $this->request->param('product_ids', []);
+        $isDownloaded = $this->request->param('is_downloaded', []); // 支持多选：[]/["0","1"]
+        $keyword = trim((string)$this->request->param('keyword', ''));
+
+        $page = (int) $this->request->param('page', 1);
+        $pageSize = (int) $this->request->param('page_size', 10);
+        if ($pageSize <= 0) $pageSize = 10;
+        if ($pageSize > 100) $pageSize = 100;
+
+        $sortProp = (string) $this->request->param('sort_prop', 'id');
+        $sortOrder = (string) $this->request->param('sort_order', 'desc'); // asc|desc
+        $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
+
+        $allowedSort = ['id', 'created_at'];
+        if (!in_array($sortProp, $allowedSort, true)) {
+            $sortProp = 'id';
+        }
+
+        $query = VideoModel::with(['platform', 'device', 'product'])->order($sortProp, $sortOrder);
+
+        $platformIds = array_values(array_filter(array_map('intval', $platformIds)));
+        $deviceIds = array_values(array_filter(array_map('intval', $deviceIds)));
+        $productIds = array_values(array_filter(array_map('intval', $productIds)));
+
+        if (!empty($platformIds)) $query->whereIn('platform_id', $platformIds);
+        if (!empty($deviceIds)) $query->whereIn('device_id', $deviceIds);
+        if (!empty($productIds)) $query->whereIn('product_id', $productIds);
+
+        if ($isDownloaded !== '' && $isDownloaded !== null) {
+            $dl = is_array($isDownloaded) ? $isDownloaded : [$isDownloaded];
+            $dl = array_values(array_filter(array_map(static function ($v) {
+                $iv = (int) $v;
+                return ($iv === 0 || $iv === 1) ? $iv : null;
+            }, $dl), static fn($v) => $v !== null));
+            if (!empty($dl)) {
+                $query->whereIn('is_downloaded', $dl);
+            }
+        }
+
+        if ($keyword !== '') {
+            $query->where(function ($sub) use ($keyword) {
+                $sub->whereLike('title', '%' . $keyword . '%')
+                    ->whereOr('video_url', 'like', '%' . $keyword . '%');
+            });
+        }
+
+        $list = $query->paginate([
+            'list_rows' => $pageSize,
+            'page' => $page,
+            'query' => $this->request->param()
+        ]);
+
+        $items = [];
+        foreach ($list as $v) {
+            $items[] = [
+                'id' => (int) $v->id,
+                'title' => (string) ($v->title ?? ''),
+                'video_url' => (string) ($v->video_url ?? ''),
+                'cover_url' => (string) ($v->cover_url ?? ''),
+                'created_at' => (string) ($v->created_at ?? ''),
+                'is_downloaded' => (int) ($v->is_downloaded ?? 0),
+                'platform' => [
+                    'id' => (int) ($v->platform_id ?? 0),
+                    'name' => (string) (($v->platform->name ?? '') ?: ''),
+                ],
+                'device' => $v->device ? [
+                    'id' => (int) ($v->device_id ?? 0),
+                    'name' => (string) ($v->device->device_name ?? ''),
+                ] : null,
+                'product' => $v->product ? [
+                    'id' => (int) ($v->product_id ?? 0),
+                    'name' => (string) ($v->product->name ?? ''),
+                ] : null,
+            ];
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => 'ok',
+            'data' => [
+                'items' => $items,
+                'total' => (int) $list->total(),
+                'page' => (int) $list->currentPage(),
+                'page_size' => (int) $list->listRows(),
+            ],
+        ]);
+    }
+
     // 视频列表
     public function index()
     {
         $platformId = $this->request->param('platform_id', 0);
         $deviceId = $this->request->param('device_id', 0);
+        $productId = (int) $this->request->param('product_id', 0);
         $isDownloaded = $this->request->param('is_downloaded', -1);
         $keyword = trim((string)$this->request->param('keyword', ''));
         
-        $query = VideoModel::with(['platform', 'device'])->order('id', 'desc');
+        $query = VideoModel::with(['platform', 'device', 'product'])->order('id', 'desc');
         if ($platformId) $query->where('platform_id', '=', $platformId);
         if ($deviceId) $query->where('device_id', '=', $deviceId);
+        if ($productId > 0) {
+            $query->where('product_id', '=', $productId);
+        }
         if ($isDownloaded >= 0) $query->where('is_downloaded', '=', $isDownloaded);
         if ($keyword !== '') {
             $query->where(function ($sub) use ($keyword) {
@@ -42,13 +143,16 @@ class Video extends BaseController
             
         $platforms = PlatformModel::select();
         $devices = DeviceModel::select();
-        
+        $products = ProductModel::order('sort_order', 'asc')->order('id', 'desc')->select();
+
         return View::fetch('admin/video/index', [
             'list' => $list,
             'platforms' => $platforms,
             'devices' => $devices,
+            'products' => $products,
             'platform_id' => $platformId,
             'device_id' => $deviceId,
+            'product_id' => $productId,
             'is_downloaded' => $isDownloaded,
             'keyword' => $keyword
         ]);
@@ -64,6 +168,7 @@ class Video extends BaseController
             
             $platformId = $this->request->post('platform_id');
             $deviceId = $this->request->post('device_id');
+            $productId = (int) $this->request->post('product_id', 0);
             $files = $this->request->file('videos');
             
             // 检查是否是 413 错误（文件过大）
@@ -102,8 +207,11 @@ class Video extends BaseController
                 ]);
             }
             
-            if (!$files || !$platformId || !$deviceId) {
-                return json(['code' => 1, 'msg' => '参数不完整：' . (empty($files) ? '未选择文件' : '') . (empty($platformId) ? '未选择平台' : '') . (empty($deviceId) ? '未选择设备' : '')]);
+            if (!$files || !$platformId) {
+                return json(['code' => 1, 'msg' => '参数不完整：' . (empty($files) ? '未选择文件' : '') . (empty($platformId) ? '未选择平台' : '')]);
+            }
+            if ($productId <= 0 && empty($deviceId)) {
+                return json(['code' => 1, 'msg' => '未绑定商品时请同时选择设备（仅达人素材请先选择所属商品）']);
             }
             
             // 确保是数组
@@ -179,9 +287,13 @@ class Video extends BaseController
                     $title = $titles[$key] ?? '视频标题 ' . ($key + 1);
                     
                     // 先保存到数据库（使用本地URL）
+                    $devResolved = $productId > 0
+                        ? (!empty($deviceId) ? (int) $deviceId : null)
+                        : (int) $deviceId;
                     $videoModel = VideoModel::create([
                         'platform_id' => $platformId,
-                        'device_id' => $deviceId,
+                        'device_id' => $devResolved,
+                        'product_id' => $productId > 0 ? $productId : null,
                         'title' => $title,
                         'cover_url' => $coverUrl,
                         'video_url' => $videoUrl
@@ -212,10 +324,12 @@ class Video extends BaseController
         
         $platforms = PlatformModel::select();
         $devices = DeviceModel::select();
-        
+        $products = ProductModel::order('sort_order', 'asc')->order('id', 'desc')->select();
+
         return View::fetch('admin/video/batch_upload', [
             'platforms' => $platforms,
-            'devices' => $devices
+            'devices' => $devices,
+            'products' => $products,
         ]);
     }
     
@@ -292,7 +406,7 @@ class Video extends BaseController
             return false;
         }
         
-        $qiniuConfig = \think\facade\Config::get('qiniu');
+        $qiniuConfig = QiniuService::getMergedQiniuConfig();
         if (!empty($qiniuConfig['domain'])) {
             $cdnHost = parse_url($qiniuConfig['domain'], PHP_URL_HOST) ?: $qiniuConfig['domain'];
             if ($host === $cdnHost) {
@@ -436,9 +550,12 @@ class Video extends BaseController
                 // 移除 id 字段，避免更新主键
                 unset($data['id']);
                 
-                // 验证必填字段
-                if (empty($data['platform_id']) || empty($data['device_id']) || empty(trim($data['title'] ?? ''))) {
-                    return json(['code' => 1, 'msg' => '平台、设备和标题为必填项']);
+                $pidPost = isset($data['product_id']) ? (int) $data['product_id'] : 0;
+                if (empty($data['platform_id']) || empty(trim($data['title'] ?? ''))) {
+                    return json(['code' => 1, 'msg' => '平台和标题为必填项']);
+                }
+                if ($pidPost <= 0 && empty($data['device_id'])) {
+                    return json(['code' => 1, 'msg' => '未绑定商品时请同时选择设备']);
                 }
                 
                 // 初始化七牛云服务
@@ -581,10 +698,16 @@ class Video extends BaseController
                     $data['title'] = trim($data['title']);
                 }
                 
-                // 确保platform_id和device_id为整数
-                $data['platform_id'] = (int)$data['platform_id'];
-                $data['device_id'] = (int)$data['device_id'];
-                
+                // 确保 platform_id；device_id 在绑定商品时可空
+                $data['platform_id'] = (int) $data['platform_id'];
+                $pid = isset($data['product_id']) ? (int) $data['product_id'] : 0;
+                $data['product_id'] = $pid > 0 ? $pid : null;
+                $devIn = isset($data['device_id']) && $data['device_id'] !== '' ? (int) $data['device_id'] : 0;
+                $data['device_id'] = $devIn > 0 ? $devIn : ($pid > 0 ? null : null);
+                if ($pid <= 0 && $data['device_id'] === null) {
+                    return json(['code' => 1, 'msg' => '未绑定商品时必须选择设备']);
+                }
+
                 // 更新数据
                 $result = VideoModel::where('id', $id)->update($data);
                 
@@ -603,18 +726,20 @@ class Video extends BaseController
         
         // GET请求，显示编辑页面
         try {
-            $info = VideoModel::with(['platform', 'device'])->find($id);
+            $info = VideoModel::with(['platform', 'device', 'product'])->find($id);
             if (!$info) {
                 return '视频不存在';
             }
             
             $platforms = PlatformModel::select();
             $devices = DeviceModel::where('platform_id', $info->platform_id)->select();
-            
+            $products = ProductModel::order('sort_order', 'asc')->order('id', 'desc')->select();
+
             return View::fetch('admin/video/form', [
                 'info' => $info,
                 'platforms' => $platforms,
-                'devices' => $devices
+                'devices' => $devices,
+                'products' => $products,
             ]);
         } catch (\Exception $e) {
             \think\facade\Log::error('视频编辑页面加载错误: ' . $e->getMessage());
@@ -654,11 +779,15 @@ class Video extends BaseController
             $fileIndex = (int)$this->request->post('fileIndex', 0);
             $platformId = $this->request->post('platform_id');
             $deviceId = $this->request->post('device_id');
+            $productId = (int) $this->request->post('product_id', 0);
             $title = $this->request->post('title', '');
             $coverFile = $this->request->file('cover');
             
-            if (!$chunk || !$fileId || !$platformId || !$deviceId) {
-                return json(['code' => 1, 'msg' => '参数不完整：' . (!$chunk ? '缺少分片文件' : '') . (!$fileId ? '缺少文件ID' : '') . (!$platformId ? '缺少平台ID' : '') . (!$deviceId ? '缺少设备ID' : '')]);
+            if (!$chunk || !$fileId || !$platformId) {
+                return json(['code' => 1, 'msg' => '参数不完整：' . (!$chunk ? '缺少分片文件' : '') . (!$fileId ? '缺少文件ID' : '') . (!$platformId ? '缺少平台ID' : '')]);
+            }
+            if ($productId <= 0 && empty($deviceId)) {
+                return json(['code' => 1, 'msg' => '未绑定商品时请填写设备']);
             }
             
             // 检查分片文件是否有效
@@ -826,9 +955,13 @@ class Video extends BaseController
                 
                 // 保存到数据库（如果没有封面，使用视频URL作为默认封面）
                 try {
+                    $devResolved = $productId > 0
+                        ? (!empty($deviceId) ? (int) $deviceId : null)
+                        : (int) $deviceId;
                     $videoModel = VideoModel::create([
                         'platform_id' => (int)$platformId,
-                        'device_id' => (int)$deviceId,
+                        'device_id' => $devResolved,
+                        'product_id' => $productId > 0 ? $productId : null,
                         'title' => $title ?: $fileName,
                         'cover_url' => $coverUrl ?: $videoUrl,
                         'video_url' => $videoUrl

@@ -2,7 +2,7 @@
 
 {block name="title"}编辑视频{/block}
 {block name="page_title"}编辑视频{/block}
-{block name="breadcrumb"}<a href="/admin.php/video" class="text-muted">视频管理</a> / 编辑{/block}
+{block name="breadcrumb"}<a href="/admin.php/video" class="text-muted">视频</a> / 编辑{/block}
 {block name="page_actions"}
 <a href="/admin.php/video" class="btn btn-outline-secondary btn-sm">
     <i class="fas fa-arrow-left mr-1"></i> 返回列表
@@ -17,6 +17,16 @@
                 <form id="video-form" enctype="multipart/form-data">
                     <input type="hidden" name="id" value="{$info.id}">
                     <div class="form-group">
+                        <label for="product_id">所属商品</label>
+                        <select name="product_id" id="product_id" class="form-control">
+                            <option value="0">不绑定</option>
+                            {volist name="products" id="prod"}
+                            <option value="{$prod.id}" {if $info.product_id == $prod.id}selected{/if}>{$prod.name}</option>
+                            {/volist}
+                        </select>
+                        <small class="form-text text-muted">绑定后用于达人链；绑定商品时设备可不选。</small>
+                    </div>
+                    <div class="form-group">
                         <label for="platform_id">所属平台 <span class="text-danger">*</span></label>
                         <select name="platform_id" id="platform_id" class="form-control" required>
                             {volist name="platforms" id="platform"}
@@ -24,9 +34,10 @@
                             {/volist}
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="device_id">设备 <span class="text-danger">*</span></label>
-                        <select name="device_id" id="device_id" class="form-control" required>
+                    <div class="form-group" id="device_form_row">
+                        <label for="device_id">设备 <span class="text-danger device-req-star">*</span></label>
+                        <select name="device_id" id="device_id" class="form-control">
+                            <option value="" {if empty($info.device_id)}selected{/if}>无（仅达人取片）</option>
                             {volist name="devices" id="device"}
                             <option value="{$device.id}" {if $info.device_id == $device.id}selected{/if}>{$device.device_name}</option>
                             {/volist}
@@ -41,11 +52,9 @@
                         <input type="text" name="cover_url" id="cover_url" class="form-control" value="{$info.cover_url}" placeholder="封面图片 URL">
                         <small class="form-text text-muted">可上传新封面覆盖当前 URL。</small>
                         <input type="file" name="cover" class="form-control mt-2" accept="image/*">
-                        {if $info.cover_url}
                         <div class="mt-2">
-                            <img src="{$info.cover_url}" alt="封面" class="img-thumbnail" style="max-width:200px; object-fit:cover;" onerror="this.style.display='none'">
+                            <img src="{:video_cover_pick($info.cover_url)}" alt="封面" class="img-thumbnail" style="max-width:200px; object-fit:cover;" onerror="this.src='/static/default-cover.svg'">
                         </div>
-                        {/if}
                     </div>
                     <div class="form-group">
                         <label for="video_url">视频地址</label>
@@ -82,12 +91,12 @@
 <script>
     function refreshDevices(platformId) {
         if (!platformId) {
-            $('#device_id').html('<option value="">请选择</option>');
+            $('#device_id').html('<option value="">无（仅达人取片）</option>');
             return;
         }
         $.get('/admin.php/device/getByPlatform', { platform_id: platformId }, function (res) {
             const select = $('#device_id');
-            select.html('<option value="">请选择</option>');
+            select.html('<option value="">无（仅达人取片）</option>');
             if (res.code === 0 && Array.isArray(res.data)) {
                 res.data.forEach(function (device) {
                     select.append(`<option value="${device.id}">${device.device_name || device.ip_address}</option>`);
@@ -97,6 +106,26 @@
     }
 
     $(function () {
+        function applyProductDeviceUi(clearDevice) {
+            const pid = parseInt($('#product_id').val(), 10) || 0;
+            if (pid > 0) {
+                $('#device_form_row').addClass('d-none');
+                $('#device_id').prop('required', false);
+                $('.device-req-star').addClass('d-none');
+                if (clearDevice) {
+                    $('#device_id').val('');
+                }
+            } else {
+                $('#device_form_row').removeClass('d-none');
+                $('#device_id').prop('required', true);
+                $('.device-req-star').removeClass('d-none');
+            }
+        }
+        $('#product_id').on('change', function () {
+            applyProductDeviceUi(true);
+        });
+        applyProductDeviceUi(false);
+
         $('#platform_id').on('change', function () {
             refreshDevices($(this).val());
         });
@@ -107,8 +136,13 @@
             const submitBtn = $form.find('button[type="submit"]');
             const originalHtml = submitBtn.html();
 
-            if (!$('#platform_id').val() || !$('#device_id').val() || !$('#title').val().trim()) {
-                AdminUI.showToast('warning', '请填写平台、设备和标题');
+            const pid = parseInt($('#product_id').val(), 10) || 0;
+            if (!$('#platform_id').val() || !$('#title').val().trim()) {
+                AdminUI.showToast('warning', '请填写平台和标题');
+                return;
+            }
+            if (pid <= 0 && !$('#device_id').val()) {
+                AdminUI.showToast('warning', '未绑定商品时请同时选择设备');
                 return;
             }
 

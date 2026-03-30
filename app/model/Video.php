@@ -16,7 +16,8 @@ class Video extends Model
     protected $schema = [
         'id'            => 'int',
         'platform_id'   => 'int',
-        'device_id'     => 'int',
+        'device_id'     => 'int', // 可空：达人分发专用素材无需设备
+        'product_id'    => 'int',
         'title'         => 'string',
         'cover_url'     => 'string',
         'video_url'     => 'string',
@@ -36,6 +37,22 @@ class Video extends Model
     public function device()
     {
         return $this->belongsTo(Device::class, 'device_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    /**
+     * 某商品下随机一条未下载视频（全局核销）
+     */
+    public static function getRandomUndownloadedByProductId(int $productId): ?self
+    {
+        return self::where('product_id', $productId)
+            ->where('is_downloaded', 0)
+            ->orderRaw('RAND()')
+            ->find();
     }
     
     /**

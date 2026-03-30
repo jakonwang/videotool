@@ -61,6 +61,17 @@
 - ✅ 代理下载接口（支持流式传输，解决跨域和大文件下载问题）
 - ✅ 自动创建设备记录
 
+### 6. 商品与达人分发（全局下载状态）
+- ✅ 后台「商品」维护商品名称与可选商品页外链
+- ✅ 视频在列表/编辑/批量上传时可绑定「所属商品」
+- ✅ 「达人链」为商品生成达人链接；达人打开 `index.php/d/{token}` 随机获得该商品下一条**未下载**视频
+- ✅ 视频下载后 `is_downloaded` 全局为已下载，任意达人链接均不会再随机到该条
+
+### 7. 系统设置与默认封面
+- ✅ 后台「设置」：存储方式（**本地** 仅写服务器 / **七牛云** 走 CDN）；七牛密钥、Bucket、域名、区域可在本页填写，**非空项覆盖** `config/qiniu.php`（留空则仍用配置文件）
+- ✅ 默认封面：无封面时 API/前台使用配置的地址，未配置则用内置 `public/static/default-cover.svg`
+- ✅ 站点名称等键值存于 `system_settings` 表，可扩展
+
 ## 技术栈
 
 - **后端框架**: ThinkPHP 6.0
@@ -79,14 +90,21 @@ videotool/
 │   │   │   ├── Index.php        # 后台首页
 │   │   │   ├── Platform.php     # 平台管理
 │   │   │   ├── Device.php       # 设备管理
+│   │   │   ├── Product.php      # 商品
+│   │   │   ├── Distribute.php   # 分发链接
+│   │   │   ├── Settings.php     # 系统设置
 │   │   │   └── Video.php        # 视频管理
 │   │   ├── api/                 # API控制器
 │   │   │   └── Video.php        # 视频API
 │   │   └── index/               # 前台控制器
-│   │       └── Index.php        # 前台首页
+│   │       ├── Index.php        # 前台首页
+│   │       └── Influencer.php   # 达人取片页
 │   ├── model/                    # 模型
 │   │   ├── Platform.php         # 平台模型
 │   │   ├── Device.php           # 设备模型
+│   │   ├── Product.php          # 商品
+│   │   ├── ProductLink.php      # 分发链接
+│   │   ├── SystemSetting.php    # 系统设置表模型
 │   │   └── Video.php            # 视频模型
 │   └── middleware/               # 中间件
 ├── config/                       # 配置文件
@@ -95,6 +113,7 @@ videotool/
 ├── public/                       # 入口文件
 │   ├── index.php                # 前台入口
 │   ├── admin.php                # 后台入口
+│   ├── static/                  # 静态资源（如默认封面 default-cover.svg）
 │   └── uploads/                 # 上传目录
 │       ├── videos/              # 视频文件
 │       └── covers/              # 封面文件
@@ -106,6 +125,9 @@ videotool/
 │   │   ├── index/               # 首页
 │   │   ├── platform/            # 平台管理
 │   │   ├── device/              # 设备管理
+│   │   ├── product/             # 商品
+│   │   ├── distribute/          # 分发
+│   │   ├── settings/          # 设置
 │   │   └── video/               # 视频管理
 │   └── index/                   # 前台视图
 ├── database/                     # 数据库
@@ -131,15 +153,36 @@ videotool/
 - status: 状态
 - created_at/updated_at: 时间戳
 
+### products 商品表
+- id: 主键
+- name: 商品名称
+- goods_url: 商品页外链（可选）
+- status: 状态（1启用/0禁用）
+- sort_order: 排序
+
+### product_links 达人分发链接表
+- id: 主键
+- product_id: 商品ID
+- token: 令牌（唯一）
+- label: 备注（可选）
+- status: 状态（1启用/0禁用）
+
 ### videos 视频表
 - id: 主键
 - platform_id: 平台ID
-- device_id: 设备ID
+- device_id: 设备ID（可空；达人素材绑定商品时可不选设备）
+- product_id: 所属商品ID（可空，绑定后参与达人随机取片）
 - title: 视频标题
 - cover_url: 封面URL
 - video_url: 视频URL
 - is_downloaded: 是否已下载（0未下载/1已下载）
 - sort_order: 排序
+- created_at/updated_at: 时间戳
+
+### system_settings 系统设置表
+- id: 主键
+- skey: 键名（唯一），如 `storage`、`default_cover_url`、`site_name`
+- svalue: 值（文本）
 - created_at/updated_at: 时间戳
 
 ### download_logs 下载记录表
@@ -155,7 +198,10 @@ videotool/
 1. **解压项目文件**
 2. **安装依赖**: `composer install`
 3. **配置数据库**: 编辑 `config/database.php`
-4. **导入数据库**: `mysql -u root -p videotool < database/schema.sql`
+4. **导入数据库**: `mysql -u root -p videotool < database/schema.sql`  
+   - 已有库升级商品/达人链：**推荐**在项目根目录执行  
+     `php database/run_migration_product_distribution.php`（可重复执行，已存在的列/索引/外键会自动跳过）  
+     亦可手动在 MySQL 中执行 `database/migrations/20260330_product_distribution.sql`（若某步已执行过可能报错，需自行注释重复语句）
 5. **设置权限**: `chmod -R 777 public/uploads runtime`
 6. **访问系统**: 
    - 前台: `http://your-domain.com/`
@@ -171,17 +217,25 @@ videotool/
 
 ### 后台管理
 
-1. **平台管理**
+1. **设置**（建议优先配置）
+   - 存储方式：仅本地 或 七牛云；七牛参数可在「设置」页维护，或与 `config/qiniu.php` / 环境变量组合（数据库非空优先）
+   - 默认封面：无封面时的图片 URL（可留空用内置图）
+
+2. **平台管理**
    - 添加平台（TikTok、虾皮等）
    - 设置平台代码和图标
 
-2. **设备管理**
+3. **设备管理**
    - 系统会自动根据IP创建设备
    - 也可以手动添加设备
 
-3. **视频管理**
+4. **商品**（可选，用于达人分发）
+   - 添加商品名称与商品页链接（可选）
+   - 在「达人链」中为商品生成链接，将 `index.php/d/令牌` 发给达人
+
+5. **视频管理**
    - **批量上传**: 
-     - 选择平台和设备
+     - 选择平台；若选「所属商品」则无需设备，否则需选择设备
      - 拖拽或选择多个视频文件
      - 为每个视频设置标题和封面
      - 点击上传
@@ -194,7 +248,13 @@ videotool/
      - 修改视频信息
      - 上传新的封面或视频
 
-### 前台使用
+### 达人取片（分发链接）
+
+1. 在后台「达人链」复制某商品的达人链接（`…/index.php/d/令牌`）
+2. 手机浏览器打开；随机展示该商品下一条未下载视频（需视频已绑定该商品）
+3. 下载视频后全局标记已下载，该条不再出现
+
+### 前台使用（IP 设备流）
 
 1. 手机访问系统URL
 2. 系统自动识别IP和平台
@@ -206,6 +266,12 @@ videotool/
 5. 下载视频后自动显示下一个
 
 ## API接口文档
+
+### 达人随机取片（按分发 token）
+```
+GET /api/video/influencerRandom?token=分发令牌
+```
+- 返回该商品下随机一条 `is_downloaded=0` 且 `product_id` 匹配的视频；下载后仍走 `POST /api/video/markDownloaded` 全局核销。
 
 ### 获取视频
 ```
@@ -321,10 +387,10 @@ $cloudPhoneAPI->download($url, $deviceId);
 系统已集成七牛云对象存储服务，支持将视频和封面自动上传到七牛云CDN。
 
 **配置说明**：
-1. 编辑 `.env` 文件或 `config/qiniu.php`
-2. 设置 `enabled = true`
-3. 填写七牛云密钥、Bucket和域名
-4. 上传文件时会自动同步到七牛云
+1. **方式 A**：后台「设置」→ 七牛云：填写 Access Key、Secret Key、Bucket、访问域名、区域、**额外 CDN 域名**（密钥留空表示不修改已有后台保存值；Bucket/域名/区域/额外 CDN 留空表示使用配置文件；额外 CDN 非空时整表替换 `cdn_domains`）
+2. **方式 B**：编辑 `.env` 或 `config/qiniu.php`（与方式 A 合并，数据库中非空项优先）
+3. 配置中 `enabled = true`（或保持默认）且存储方式选「七牛云」时走 CDN
+4. 上传文件时会按当前合并后的配置同步到七牛云
 
 **详细配置请查看 [七牛云存储配置说明.md](七牛云存储配置说明.md)**
 

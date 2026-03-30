@@ -1,6 +1,6 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}平台{/block}
+{block name="title"}商品{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -8,57 +8,61 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern（仅该页生效，风格与商品/达人链统一） */
+
+    /* High-Density Modern（仅该页生效） */
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
         min-height: calc(100vh - 0px);
     }
-    .admin-plat-card {
+    .admin-product-card {
         background: #ffffff;
         padding: 24px;
         border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.03);
     }
-    .admin-plat-header {
+    .admin-product-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
         margin-bottom: 16px;
     }
-    .admin-plat-breadcrumb {
+    .admin-product-breadcrumb {
         font-size: 13px;
         color: #909399;
         line-height: 18px;
         margin-bottom: 6px;
     }
-    .admin-plat-title {
+    .admin-product-title {
         font-size: 20px;
         font-weight: 700;
         color: #111827;
         line-height: 28px;
     }
-    .admin-plat-actions .el-button { border-radius: 6px; }
-    .admin-plat-filters {
+    .admin-product-addbtn .el-button { border-radius: 6px; }
+
+    .admin-product-filters {
         display: flex;
         align-items: center;
         gap: 12px;
         flex-wrap: nowrap;
-        overflow-x: hidden;
+        overflow-x: hidden; /* 默认不出现横向滚动条 */
         padding-bottom: 0;
         margin-bottom: 12px;
     }
+    /* 仅在窄屏时允许横向滚动，避免布局断行 */
     @media (max-width: 1200px) {
-        .admin-plat-filters { overflow-x: auto; padding-bottom: 4px; }
+        .admin-product-filters { overflow-x: auto; padding-bottom: 4px; }
     }
-    .admin-plat-filter-actions {
+    .admin-product-filter-actions {
         display: flex;
         align-items: center;
         gap: 12px;
         flex: 0 0 auto;
         margin-left: auto;
     }
+
     .name-cell {
         font-weight: 500;
         color: #303133;
@@ -66,45 +70,23 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .code-cell {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        font-size: 12px;
-        color: #374151;
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        padding: 2px 8px;
-        display: inline-flex;
-        align-items: center;
-        line-height: 18px;
-    }
-    .link-cell {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 320px;
-        max-width: 560px;
-    }
-    .link-text {
-        flex: 1 1 auto;
-        min-width: 0;
+    .url-cell {
         color: #4b5563;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: 13px;
     }
-    .admin-plat-card .el-table__inner-wrapper::before { height: 0; }
-    .admin-plat-footer {
+    .admin-product-footer {
         display: flex;
         justify-content: flex-end;
         margin-top: 20px;
     }
+    .admin-product-card .el-table__inner-wrapper::before { height: 0; }
 </style>
 {/block}
 
 {block name="content"}
-<div class="tp-ep-wrap" id="platformApp"></div>
+<div class="tp-ep-wrap" id="productApp"></div>
 {/block}
 
 {block name="script"}
@@ -142,8 +124,8 @@
       const total = ref(0);
       const page = ref(1);
       const pageSize = ref(10);
-      const sortProp = ref('id');
-      const sortOrder = ref('desc');
+      const sortProp = ref('sort_order');
+      const sortOrder = ref('asc');
 
       const query = reactive({
         keyword: '',
@@ -161,7 +143,7 @@
           if (sortProp.value) params.set('sort_prop', sortProp.value);
           if (sortOrder.value) params.set('sort_order', sortOrder.value);
 
-          const res = await fetch('/admin.php/platform/list?' + params.toString(), { credentials: 'same-origin' });
+          const res = await fetch('/admin.php/product/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
           items.value = (json.data && json.data.items) ? json.data.items : [];
@@ -188,48 +170,22 @@
       function onSortChange({ prop, order }) {
         if (!prop) return;
         sortProp.value = prop;
-        sortOrder.value = toSort(order) || 'desc';
+        sortOrder.value = toSort(order) || (prop === 'sort_order' ? 'asc' : 'desc');
         page.value = 1;
         fetchList();
       }
 
       function goAdd() {
-        window.location.href = '/admin.php/platform/add';
+        window.location.href = '/admin.php/product/add';
       }
 
       function goEdit(row) {
-        window.location.href = '/admin.php/platform/edit/' + row.id;
-      }
-
-      async function copyText(text) {
-        const t = String(text || '');
-        if (!t) return;
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(t);
-          } else {
-            const tmp = document.createElement('input');
-            tmp.value = t;
-            document.body.appendChild(tmp);
-            tmp.select();
-            document.execCommand('copy');
-            document.body.removeChild(tmp);
-          }
-          ElMessage.success('已复制链接');
-        } catch (e) {
-          ElMessage.error('复制失败');
-        }
-      }
-
-      function openLink(row) {
-        const url = row && row.link ? String(row.link) : '';
-        if (!url) return;
-        window.open(url, '_blank', 'noopener');
+        window.location.href = '/admin.php/product/edit/' + row.id;
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(`确定要删除平台「${row.name || ''}」吗？删除后关联的设备与视频将一并移除。`, '删除确认', { type: 'warning' });
-        const resp = await fetch('/admin.php/platform/delete/' + row.id, {
+        await ElMessageBox.confirm('确定删除该商品？关联视频的「所属商品」将清空。', '删除确认', { type: 'warning' });
+        const resp = await fetch('/admin.php/product/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
           body: '',
@@ -237,7 +193,7 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '删除成功');
+          ElMessage.success(json.msg || '已删除');
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
@@ -248,7 +204,9 @@
 
       const rows = computed(() => items.value || []);
 
-      onMounted(() => fetchList());
+      onMounted(() => {
+        fetchList();
+      });
 
       return {
         loading,
@@ -264,30 +222,28 @@
         onSortChange,
         goAdd,
         goEdit,
-        copyText,
-        openLink,
         doDelete,
         fetchList,
       };
     },
     template: `
-      <div class="admin-plat-card">
-        <div class="admin-plat-header">
+      <div class="admin-product-card">
+        <div class="admin-product-header">
           <div>
-            <div class="admin-plat-breadcrumb">素材 / 平台</div>
-            <div class="admin-plat-title">平台</div>
+            <div class="admin-product-breadcrumb">素材 / 商品</div>
+            <div class="admin-product-title">商品</div>
           </div>
-          <div class="admin-plat-actions">
-            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 添加平台</el-button>
+          <div class="admin-product-addbtn">
+            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 添加商品</el-button>
           </div>
         </div>
 
-        <div class="admin-plat-filters">
+        <div class="admin-product-filters">
           <el-input
             v-model="query.keyword"
             size="default"
             clearable
-            placeholder="搜索名称或代码"
+            placeholder="搜索名称"
             style="width:260px; flex:0 0 auto;"
             @keyup.enter="onSearch"
           />
@@ -296,7 +252,7 @@
             <el-option label="禁用" value="0" />
           </el-select>
 
-          <div class="admin-plat-filter-actions">
+          <div class="admin-product-filter-actions">
             <el-button size="default" type="primary" @click="onSearch">筛选</el-button>
             <el-button size="default" @click="onReset">重置</el-button>
           </div>
@@ -312,39 +268,28 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column label="平台名称" min-width="160" sortable="custom" prop="name">
+          <el-table-column label="名称" min-width="220">
             <template #default="{ row }">
               <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="平台代码" width="160" sortable="custom" prop="code">
+          <el-table-column label="商品链接" min-width="320">
             <template #default="{ row }">
-              <span class="code-cell">{{ row.code || '—' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="图标" width="120">
-            <template #default="{ row }">
-              <span v-if="row.icon" v-html="row.icon"></span>
+              <div v-if="row.goods_url" class="url-cell" :title="row.goods_url">
+                <a :href="row.goods_url" target="_blank" rel="noopener">{{ row.goods_url }}</a>
+              </div>
               <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
-          <el-table-column label="访问链接" min-width="360">
-            <template #default="{ row }">
-              <div class="link-cell">
-                <div class="link-text" :title="row.link">{{ row.link || '—' }}</div>
-                <el-button size="default" link type="primary" @click="copyText(row.link)">复制</el-button>
-                <el-button size="default" link type="primary" @click="openLink(row)">打开</el-button>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="120" sortable="custom" prop="status">
+          <el-table-column prop="sort_order" label="排序" width="110" sortable="custom" />
+          <el-table-column label="状态" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? '启用' : '禁用' }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" min-width="180" sortable="custom" />
+          <el-table-column prop="updated_at" label="更新时间" min-width="180" />
           <el-table-column label="操作" width="160" fixed="right">
             <template #default="{ row }">
               <el-button size="default" link type="primary" @click="goEdit(row)">编辑</el-button>
@@ -353,11 +298,11 @@
           </el-table-column>
 
           <template #empty>
-            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无平台数据</div>
+            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无数据</div>
           </template>
         </el-table>
 
-        <div class="admin-plat-footer">
+        <div class="admin-product-footer">
           <el-pagination
             v-model:current-page="page"
             v-model:page-size="pageSize"
@@ -371,7 +316,7 @@
         </div>
       </div>
     `
-  }).use(ElementPlus).mount('#platformApp');
+  }).use(ElementPlus).mount('#productApp');
   {/literal}
 </script>
 {/block}

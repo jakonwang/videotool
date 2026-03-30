@@ -7,6 +7,8 @@ use app\BaseController;
 use app\model\Video as VideoModel;
 use app\model\Device;
 use app\model\Platform;
+use app\model\ProductLink;
+use app\service\VideoCoverService;
 use app\service\QiniuService;
 
 /**
@@ -73,7 +75,7 @@ class Video extends BaseController
         }
         
         $cdnDomains = [];
-        $qiniuConfig = \think\facade\Config::get('qiniu');
+        $qiniuConfig = QiniuService::getMergedQiniuConfig();
         if (!empty($qiniuConfig['domain'])) {
             $parsedDomain = parse_url($qiniuConfig['domain'], PHP_URL_HOST);
             $cdnHost = $parsedDomain ?: $qiniuConfig['domain'];
@@ -238,13 +240,8 @@ class Video extends BaseController
             }
             
             // 确保URL是绝对路径
-            $coverUrl = $video->cover_url;
+            $coverUrl = VideoCoverService::pick($video->cover_url);
             $videoUrl = $video->video_url;
-            
-            // 如果没有封面URL，使用视频URL作为默认封面（视频第一帧）
-            if (empty($coverUrl)) {
-                $coverUrl = $videoUrl;
-            }
             
             // 如果是相对路径，转换为绝对路径
             if ($coverUrl && !preg_match('/^https?:\/\//', $coverUrl)) {
@@ -283,6 +280,66 @@ class Video extends BaseController
                 'msg' => '服务器错误：' . $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        }
+    }
+
+    /**
+     * 达人页：按分发 token 取该商品下随机一条未下载视频（全局 is_downloaded）
+     */
+    public function influencerRandom()
+    {
+        try {
+            $token = trim((string) $this->request->param('token', ''));
+            if ($token === '') {
+                return json(['code' => 1, 'msg' => '缺少 token'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+
+            $link = ProductLink::findActiveByToken($token);
+            if (!$link) {
+                return json(['code' => 1, 'msg' => '链接无效或已禁用'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+
+            $video = VideoModel::getRandomUndownloadedByProductId((int) $link->product_id);
+            if (!$video) {
+                return json(['code' => 1, 'msg' => '暂无可用视频'], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
+
+            $coverUrl = VideoCoverService::pick($video->cover_url);
+            $videoUrl = $video->video_url;
+            if ($coverUrl && !preg_match('/^https?:\/\//', $coverUrl)) {
+                $coverUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                    . '://' . $_SERVER['HTTP_HOST']
+                    . (strpos($coverUrl, '/') === 0 ? '' : '/') . $coverUrl;
+            }
+            if ($videoUrl && !preg_match('/^https?:\/\//', $videoUrl)) {
+                $videoUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                    . '://' . $_SERVER['HTTP_HOST']
+                    . (strpos($videoUrl, '/') === 0 ? '' : '/') . $videoUrl;
+            }
+
+            $videoFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', 'video');
+            $coverFileName = $this->generateDownloadFileName($video->title ?? 'VideoTool', 'cover');
+            $productName = $link->product ? (string) $link->product->name : '';
+
+            return json([
+                'code' => 0,
+                'data' => [
+                    'id' => $video->id,
+                    'title' => $video->title,
+                    'cover_url' => $coverUrl,
+                    'video_url' => $videoUrl,
+                    'video_file_name' => $videoFileName,
+                    'cover_file_name' => $coverFileName,
+                    'product_name' => $productName,
+                    'goods_url' => $link->product && $link->product->goods_url ? (string) $link->product->goods_url : '',
+                ],
+            ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+        } catch (\Exception $e) {
+            \think\facade\Log::error('influencerRandom: ' . $e->getMessage());
+            return json([
+                'code' => 1,
+                'msg' => '服务器错误：' . $e->getMessage(),
             ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
         }
     }
@@ -395,18 +452,25 @@ class Video extends BaseController
         try {
             $data = $this->request->post();
             
-            // 验证必填字段
-            if (empty($data['platform_id']) || empty($data['device_id']) || empty($data['video_url'])) {
+            $pid = isset($data['product_id']) ? (int) $data['product_id'] : 0;
+            $devId = isset($data['device_id']) && $data['device_id'] !== '' ? (int) $data['device_id'] : 0;
+            if (empty($data['platform_id']) || empty($data['video_url'])) {
                 return json([
                     'code' => 1,
-                    'msg' => '参数不完整：缺少平台ID、设备ID或视频URL'
+                    'msg' => '参数不完整：缺少平台或视频URL'
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
             }
-            
+            if ($pid <= 0 && $devId <= 0) {
+                return json([
+                    'code' => 1,
+                    'msg' => '未绑定商品时请填写设备ID'
+                ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
+            }
             // 创建视频记录
             $video = VideoModel::create([
                 'platform_id' => (int)$data['platform_id'],
-                'device_id' => (int)$data['device_id'],
+                'device_id' => $devId > 0 ? $devId : null,
+                'product_id' => $pid > 0 ? $pid : null,
                 'title' => $data['title'] ?? '视频标题',
                 'cover_url' => $data['cover_url'] ?? $data['video_url'],
                 'video_url' => $data['video_url']
@@ -502,8 +566,10 @@ class Video extends BaseController
                 ], 200, [], ['json_encode_param' => JSON_UNESCAPED_UNICODE]);
             }
             
-            // 获取文件URL
-            $originalFileUrl = $type === 'cover' ? $video->cover_url : $video->video_url;
+            // 获取文件URL（封面无文件时用默认封面）
+            $originalFileUrl = $type === 'cover'
+                ? VideoCoverService::pick($video->cover_url)
+                : $video->video_url;
             if (empty($originalFileUrl)) {
                 if ($isAppRequest) {
                     return json([
@@ -525,7 +591,7 @@ class Video extends BaseController
             $fileUrl = $originalFileUrl;
             if (!preg_match('/^https?:\/\//', $fileUrl)) {
                 // 相对路径：检查是否是七牛云的相对路径（uploads/videos/...或videos/...）
-                $qiniuConfig = \think\facade\Config::get('qiniu');
+                $qiniuConfig = QiniuService::getMergedQiniuConfig();
                 if (!empty($qiniuConfig['domain']) && preg_match('#^(uploads/)?(videos|covers)/#', ltrim($fileUrl, '/'))) {
                     // 如果是相对路径格式（/uploads/videos/...或/uploads/covers/...），尝试构建CDN链接
                     $key = ltrim($fileUrl, '/');
@@ -554,7 +620,7 @@ class Video extends BaseController
                     $parsedAbsolute = parse_url($fileUrl);
                     $absolutePath = $parsedAbsolute['path'] ?? '';
                     $absoluteHost = $parsedAbsolute['host'] ?? '';
-                    $qiniuConfig = \think\facade\Config::get('qiniu');
+                    $qiniuConfig = QiniuService::getMergedQiniuConfig();
                     if (!empty($absolutePath) &&
                         preg_match('#/uploads/(videos|covers)/#', $absolutePath) &&
                         !empty($qiniuConfig['domain']) &&
@@ -593,7 +659,7 @@ class Video extends BaseController
             } else {
                 // 如果判断不是CDN链接，但原始URL是相对路径（/uploads/videos/...），尝试构建CDN链接
                 if (preg_match('#^/uploads/(videos|covers)/#', $originalFileUrl)) {
-                    $qiniuConfig = \think\facade\Config::get('qiniu');
+                    $qiniuConfig = QiniuService::getMergedQiniuConfig();
                     if (!empty($qiniuConfig['domain']) && !empty($qiniuConfig['enabled'])) {
                         $key = ltrim($originalFileUrl, '/');
                         if (strpos($key, 'uploads/') === 0) {

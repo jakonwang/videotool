@@ -13,6 +13,87 @@ use think\facade\Log;
  */
 class DownloadLog extends BaseController
 {
+    private function getLogFileByDate(string $dateYmd): string
+    {
+        $date = preg_replace('/[^0-9]/', '', $dateYmd);
+        if (strlen($date) !== 8) {
+            $date = date('Ymd');
+        }
+        return runtime_path() . 'log' . DIRECTORY_SEPARATOR . substr($date, 0, 6) . DIRECTORY_SEPARATOR . substr($date, 6, 2) . '.log';
+    }
+
+    private function parseErrors(string $dateYmd, string $keyword = ''): array
+    {
+        $logFile = $this->getLogFileByDate($dateYmd);
+        $errors = [];
+        $stats = [
+            'total_errors' => 0,
+            'download_errors' => 0,
+            'cache_errors' => 0,
+            'other_errors' => 0,
+        ];
+
+        if (!file_exists($logFile)) {
+            return [$errors, $stats];
+        }
+
+        $lines = file($logFile);
+        foreach ($lines as $line) {
+            if (!preg_match('/代理下载错误|下载失败|预缓存失败|缓存.*失败/i', $line)) {
+                continue;
+            }
+
+            $stats['total_errors']++;
+            if (preg_match('/下载失败|代理下载错误/i', $line)) {
+                $stats['download_errors']++;
+            } elseif (preg_match('/预缓存|缓存.*失败/i', $line)) {
+                $stats['cache_errors']++;
+            } else {
+                $stats['other_errors']++;
+            }
+
+            $videoId = null;
+            if (preg_match('/video_id["\']?\s*:\s*(\d+)/', $line, $matches)) {
+                $videoId = (int)$matches[1];
+            }
+
+            $errorMsg = '';
+            if (preg_match('/"error"["\']?\s*:\s*"([^"]+)"/', $line, $matches)) {
+                $errorMsg = $matches[1];
+            } elseif (preg_match('/下载失败[：:]\s*(.+?)(?:\s|$)/', $line, $matches)) {
+                $errorMsg = trim($matches[1]);
+            }
+
+            $fileUrl = null;
+            if (preg_match('/"file_url"["\']?\s*:\s*"([^"]+)"/', $line, $matches)) {
+                $fileUrl = $matches[1];
+            }
+
+            $time = '';
+            if (preg_match('/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/', $line, $matches)) {
+                $time = $matches[1];
+            }
+
+            if ($keyword && stripos($line, $keyword) === false) {
+                continue;
+            }
+
+            $errors[] = [
+                'video_id' => $videoId,
+                'error' => $errorMsg ?: substr(trim($line), 0, 200),
+                'url' => $fileUrl,
+                'time' => $time ?: date('Y-m-d H:i:s'),
+                'raw' => substr(trim($line), 0, 500),
+            ];
+        }
+
+        usort($errors, function ($a, $b) {
+            return strcmp($b['time'], $a['time']);
+        });
+
+        return [$errors, $stats];
+    }
+
     /**
      * 下载错误列表
      */
@@ -22,78 +103,7 @@ class DownloadLog extends BaseController
         $keyword = trim((string)$this->request->param('keyword', ''));
         $date = trim((string)$this->request->param('date', date('Ymd')));
         
-        // 解析日志文件
-        $logFile = runtime_path() . 'log' . DIRECTORY_SEPARATOR . substr($date, 0, 6) . DIRECTORY_SEPARATOR . substr($date, 6, 2) . '.log';
-        
-        $errors = [];
-        $stats = [
-            'total_errors' => 0,
-            'download_errors' => 0,
-            'cache_errors' => 0,
-            'other_errors' => 0,
-        ];
-        
-        if (file_exists($logFile)) {
-            $lines = file($logFile);
-            
-            foreach ($lines as $line) {
-                // 查找下载相关错误
-                if (preg_match('/代理下载错误|下载失败|预缓存失败|缓存.*失败/i', $line)) {
-                    $stats['total_errors']++;
-                    if (preg_match('/下载失败|代理下载错误/i', $line)) {
-                        $stats['download_errors']++;
-                    } elseif (preg_match('/预缓存|缓存.*失败/i', $line)) {
-                        $stats['cache_errors']++;
-                    } else {
-                        $stats['other_errors']++;
-                    }
-                    
-                    // 提取视频ID
-                    $videoId = null;
-                    if (preg_match('/video_id["\']?\s*:\s*(\d+)/', $line, $matches)) {
-                        $videoId = (int)$matches[1];
-                    }
-                    
-                    // 提取错误信息
-                    $errorMsg = '';
-                    if (preg_match('/"error"["\']?\s*:\s*"([^"]+)"/', $line, $matches)) {
-                        $errorMsg = $matches[1];
-                    } elseif (preg_match('/下载失败[：:]\s*(.+?)(?:\s|$)/', $line, $matches)) {
-                        $errorMsg = trim($matches[1]);
-                    }
-                    
-                    // 提取URL
-                    $fileUrl = null;
-                    if (preg_match('/"file_url"["\']?\s*:\s*"([^"]+)"/', $line, $matches)) {
-                        $fileUrl = $matches[1];
-                    }
-                    
-                    // 提取时间
-                    $time = '';
-                    if (preg_match('/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/', $line, $matches)) {
-                        $time = $matches[1];
-                    }
-                    
-                    // 筛选关键词
-                    if ($keyword && stripos($line, $keyword) === false) {
-                        continue;
-                    }
-                    
-                    $errors[] = [
-                        'video_id' => $videoId,
-                        'error' => $errorMsg ?: substr(trim($line), 0, 200),
-                        'url' => $fileUrl,
-                        'time' => $time ?: date('Y-m-d H:i:s'),
-                        'raw' => substr(trim($line), 0, 500),
-                    ];
-                }
-            }
-            
-            // 按时间倒序
-            usort($errors, function($a, $b) {
-                return strcmp($b['time'], $a['time']);
-            });
-        }
+        [$errors, $stats] = $this->parseErrors($date, $keyword);
         
         // 分页
         $perPage = 20;
@@ -150,6 +160,56 @@ class DownloadLog extends BaseController
             'date_formatted' => $dateFormatted,
             'url_suffix' => $urlSuffix,
             'available_dates' => $availableDates,
+        ]);
+    }
+
+    /**
+     * 下载错误列表（JSON）
+     * 供 Vue/ElementPlus 页面使用
+     */
+    public function listJson()
+    {
+        $page = (int)$this->request->param('page', 1);
+        $pageSize = (int)$this->request->param('page_size', 10);
+        if ($pageSize <= 0) $pageSize = 10;
+        if ($pageSize > 100) $pageSize = 100;
+
+        $keyword = trim((string)$this->request->param('keyword', ''));
+        $date = trim((string)$this->request->param('date', date('Ymd')));
+        $date = preg_replace('/[^0-9]/', '', $date);
+        if (strlen($date) !== 8) $date = date('Ymd');
+
+        [$errors, $stats] = $this->parseErrors($date, $keyword);
+
+        $perPage = $pageSize;
+        $total = count($errors);
+        $totalPages = (int)max(1, ceil($total / $perPage));
+        $page = max(1, min((int)$page, $totalPages));
+        $offset = ($page - 1) * $perPage;
+        $paged = array_slice($errors, $offset, $perPage);
+
+        foreach ($paged as &$error) {
+            if (!empty($error['video_id'])) {
+                $video = VideoModel::find($error['video_id']);
+                if ($video) {
+                    $error['video_title'] = $video->title;
+                }
+            }
+            $time = (string)($error['time'] ?? '');
+            $error['time_display'] = (strlen($time) > 16) ? substr($time, 0, 16) : $time;
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => 'ok',
+            'data' => [
+                'items' => array_values($paged),
+                'total' => (int)$total,
+                'page' => (int)$page,
+                'page_size' => (int)$perPage,
+                'stats' => $stats,
+                'date' => $date,
+            ],
         ]);
     }
     

@@ -8,6 +8,7 @@ Route::group('api', function() {
     Route::post('video/saveUploaded', 'app\controller\api\Video@saveUploadedFile'); // 保存上传成功的文件信息
     Route::group('video', function() {
         Route::get('getVideo', 'app\controller\api\Video@getVideo');
+        Route::get('influencerRandom', 'app\controller\api\Video@influencerRandom');
         Route::post('markDownloaded', 'app\controller\api\Video@markDownloaded');
         Route::rule('download', 'app\controller\api\Video@downloadProxy', 'GET|HEAD'); // 代理下载接口，兼容HEAD获取文件信息
     });

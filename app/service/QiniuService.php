@@ -11,6 +11,15 @@ use think\facade\Log;
  */
 class QiniuService
 {
+    /** 数据库键与 config/qiniu.php 键对应；非空则覆盖文件/环境变量（cdn_domains 见下方单独处理） */
+    private const DB_KEY_MAP = [
+        'qiniu_access_key' => 'access_key',
+        'qiniu_secret_key' => 'secret_key',
+        'qiniu_bucket' => 'bucket',
+        'qiniu_domain' => 'domain',
+        'qiniu_region' => 'region',
+    ];
+
     private $accessKey;
     private $secretKey;
     private $bucket;
@@ -20,10 +29,86 @@ class QiniuService
     private $uploadManager;
     private $bucketManager;
     private $enabled = false;
+
+    /**
+     * 合并 config/qiniu.php 与 system_settings 中非空项（数据库优先于文件）
+     */
+    public static function getMergedQiniuConfig(): array
+    {
+        $cfg = Config::get('qiniu');
+        if (!is_array($cfg)) {
+            $cfg = [];
+        }
+        foreach (self::DB_KEY_MAP as $dbKey => $cfgKey) {
+            $v = SystemConfigService::get($dbKey, '');
+            if ($v !== null && trim((string) $v) !== '') {
+                $cfg[$cfgKey] = trim((string) $v);
+            }
+        }
+        if (!empty($cfg['domain'])) {
+            $cfg['domain'] = rtrim((string) $cfg['domain'], '/');
+        }
+
+        $dbCdn = SystemConfigService::get('qiniu_cdn_domains', '');
+        if ($dbCdn !== null && trim((string) $dbCdn) !== '') {
+            $cfg['cdn_domains'] = self::parseCdnDomainsString((string) $dbCdn);
+        } else {
+            $cfg['cdn_domains'] = self::normalizeCdnDomains($cfg['cdn_domains'] ?? []);
+        }
+
+        return $cfg;
+    }
+
+    /**
+     * 将配置中的 cdn_domains 规范为去重后的字符串数组
+     *
+     * @param array|string $val 配置文件可能为数组或逗号分隔字符串
+     * @return string[]
+     */
+    private static function normalizeCdnDomains($val): array
+    {
+        if (is_array($val)) {
+            $out = [];
+            foreach ($val as $item) {
+                $t = trim((string) $item);
+                if ($t !== '') {
+                    $out[] = $t;
+                }
+            }
+
+            return array_values(array_unique($out));
+        }
+        if (is_string($val) && trim($val) !== '') {
+            return self::parseCdnDomainsString($val);
+        }
+
+        return [];
+    }
+
+    /**
+     * 解析后台/文本：一行一个，或逗号、分号分隔；支持完整 URL 或主机名
+     *
+     * @return string[]
+     */
+    private static function parseCdnDomainsString(string $raw): array
+    {
+        $lines = preg_split('/\R+/', $raw, -1, PREG_SPLIT_NO_EMPTY);
+        $out = [];
+        foreach ($lines as $line) {
+            foreach (preg_split('/[,;]+/', $line, -1, PREG_SPLIT_NO_EMPTY) as $p) {
+                $t = trim($p);
+                if ($t !== '') {
+                    $out[] = $t;
+                }
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
     
     public function __construct()
     {
-        $config = Config::get('qiniu');
+        $config = self::getMergedQiniuConfig();
         
         if (empty($config['access_key']) || empty($config['secret_key']) || empty($config['bucket'])) {
             $this->enabled = false;
@@ -60,11 +145,23 @@ class QiniuService
     }
     
     /**
-     * 检查是否启用
+     * 检查是否启用（配置文件可用 + 后台未强制「本地存储」）
      */
     public function isEnabled(): bool
     {
-        return $this->enabled;
+        if (!$this->enabled) {
+            return false;
+        }
+        try {
+            $storage = \app\service\SystemConfigService::get('storage', 'qiniu');
+            if ($storage === 'local') {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            // 未建表等：沿用仅配置文件逻辑
+        }
+
+        return true;
     }
     
     /**

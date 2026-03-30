@@ -94,7 +94,7 @@ if ($videoId) {
     echo "<div class='section'>";
     echo "<h2>2. 七牛云配置检查</h2>";
     
-    $qiniuConfig = \think\facade\Config::get('qiniu');
+    $qiniuConfig = \app\service\QiniuService::getMergedQiniuConfig();
     echo "<p><strong>七牛云启用:</strong> " . ($qiniuConfig['enabled'] ? '是' : '否') . "</p>";
     echo "<p><strong>七牛云域名:</strong> " . htmlspecialchars($qiniuConfig['domain'] ?? '未配置') . "</p>";
     

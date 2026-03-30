@@ -1,6 +1,6 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}平台{/block}
+{block name="title"}达人链{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -8,74 +8,63 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern（仅该页生效，风格与商品/达人链统一） */
+
+    /* High-Density Modern（仅该页生效，风格与商品页统一） */
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
         min-height: calc(100vh - 0px);
     }
-    .admin-plat-card {
+    .admin-dist-card {
         background: #ffffff;
         padding: 24px;
         border-radius: 10px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.03);
     }
-    .admin-plat-header {
+    .admin-dist-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
         margin-bottom: 16px;
     }
-    .admin-plat-breadcrumb {
+    .admin-dist-breadcrumb {
         font-size: 13px;
         color: #909399;
         line-height: 18px;
         margin-bottom: 6px;
     }
-    .admin-plat-title {
+    .admin-dist-title {
         font-size: 20px;
         font-weight: 700;
         color: #111827;
         line-height: 28px;
     }
-    .admin-plat-actions .el-button { border-radius: 6px; }
-    .admin-plat-filters {
+    .admin-dist-actions .el-button { border-radius: 6px; }
+
+    .admin-dist-filters {
         display: flex;
         align-items: center;
         gap: 12px;
         flex-wrap: nowrap;
         overflow-x: hidden;
         padding-bottom: 0;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }
     @media (max-width: 1200px) {
-        .admin-plat-filters { overflow-x: auto; padding-bottom: 4px; }
+        .admin-dist-filters { overflow-x: auto; padding-bottom: 4px; }
     }
-    .admin-plat-filter-actions {
+    .admin-dist-filter-actions {
         display: flex;
         align-items: center;
         gap: 12px;
         flex: 0 0 auto;
         margin-left: auto;
     }
-    .name-cell {
-        font-weight: 500;
-        color: #303133;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .code-cell {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    .admin-dist-hint {
+        margin: 6px 0 12px;
+        color: #6b7280;
         font-size: 12px;
-        color: #374151;
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        padding: 2px 8px;
-        display: inline-flex;
-        align-items: center;
         line-height: 18px;
     }
     .link-cell {
@@ -94,8 +83,8 @@
         text-overflow: ellipsis;
         font-size: 13px;
     }
-    .admin-plat-card .el-table__inner-wrapper::before { height: 0; }
-    .admin-plat-footer {
+    .admin-dist-card .el-table__inner-wrapper::before { height: 0; }
+    .admin-dist-footer {
         display: flex;
         justify-content: flex-end;
         margin-top: 20px;
@@ -104,7 +93,14 @@
 {/block}
 
 {block name="content"}
-<div class="tp-ep-wrap" id="platformApp"></div>
+<script>
+  // 下拉选项：由服务端注入（启用的商品），避免额外接口
+  const PRODUCT_OPTIONS = [];
+  {volist name="products" id="p"}
+  PRODUCT_OPTIONS.push({ id: {$p.id}, label: "{:addslashes((string)$p.name)}" });
+  {/volist}
+</script>
+<div class="tp-ep-wrap" id="distributeApp"></div>
 {/block}
 
 {block name="script"}
@@ -129,12 +125,6 @@
     padding: '12px 0',
   };
 
-  function toSort(order) {
-    if (order === 'ascending') return 'asc';
-    if (order === 'descending') return 'desc';
-    return '';
-  }
-
   createApp({
     setup() {
       const loading = ref(false);
@@ -142,13 +132,12 @@
       const total = ref(0);
       const page = ref(1);
       const pageSize = ref(10);
-      const sortProp = ref('id');
-      const sortOrder = ref('desc');
 
       const query = reactive({
-        keyword: '',
-        status: '',
+        product_id: 0,
       });
+
+      const productOptions = computed(() => (Array.isArray(PRODUCT_OPTIONS) ? PRODUCT_OPTIONS : []));
 
       async function fetchList() {
         loading.value = true;
@@ -156,12 +145,11 @@
           const params = new URLSearchParams();
           params.set('page', String(page.value));
           params.set('page_size', String(pageSize.value));
-          if (query.keyword) params.set('keyword', query.keyword);
-          if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
-          if (sortProp.value) params.set('sort_prop', sortProp.value);
-          if (sortOrder.value) params.set('sort_order', sortOrder.value);
+          if (query.product_id && Number(query.product_id) > 0) {
+            params.set('product_id', String(query.product_id));
+          }
 
-          const res = await fetch('/admin.php/platform/list?' + params.toString(), { credentials: 'same-origin' });
+          const res = await fetch('/admin.php/distribute/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
           items.value = (json.data && json.data.items) ? json.data.items : [];
@@ -179,26 +167,13 @@
       }
 
       function onReset() {
-        query.keyword = '';
-        query.status = '';
-        page.value = 1;
-        fetchList();
-      }
-
-      function onSortChange({ prop, order }) {
-        if (!prop) return;
-        sortProp.value = prop;
-        sortOrder.value = toSort(order) || 'desc';
+        query.product_id = 0;
         page.value = 1;
         fetchList();
       }
 
       function goAdd() {
-        window.location.href = '/admin.php/platform/add';
-      }
-
-      function goEdit(row) {
-        window.location.href = '/admin.php/platform/edit/' + row.id;
+        window.location.href = '/admin.php/distribute/add';
       }
 
       async function copyText(text) {
@@ -227,9 +202,10 @@
         window.open(url, '_blank', 'noopener');
       }
 
-      async function doDelete(row) {
-        await ElMessageBox.confirm(`确定要删除平台「${row.name || ''}」吗？删除后关联的设备与视频将一并移除。`, '删除确认', { type: 'warning' });
-        const resp = await fetch('/admin.php/platform/delete/' + row.id, {
+      async function doToggle(row) {
+        const id = row && row.id ? row.id : 0;
+        if (!id) return;
+        const resp = await fetch('/admin.php/distribute/toggle/' + id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
           body: '',
@@ -237,7 +213,26 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '删除成功');
+          ElMessage.success(json.msg || '已更新');
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '操作失败');
+        }
+      }
+
+      async function doDelete(row) {
+        const id = row && row.id ? row.id : 0;
+        if (!id) return;
+        await ElMessageBox.confirm('确定删除该链接？', '删除确认', { type: 'warning' });
+        const resp = await fetch('/admin.php/distribute/delete/' + id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '已删除');
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
@@ -248,7 +243,9 @@
 
       const rows = computed(() => items.value || []);
 
-      onMounted(() => fetchList());
+      onMounted(() => {
+        fetchList();
+      });
 
       return {
         loading,
@@ -257,49 +254,45 @@
         total,
         page,
         pageSize,
+        productOptions,
         headerCellStyle,
         cellStyle,
         onSearch,
         onReset,
-        onSortChange,
         goAdd,
-        goEdit,
         copyText,
         openLink,
+        doToggle,
         doDelete,
         fetchList,
       };
     },
     template: `
-      <div class="admin-plat-card">
-        <div class="admin-plat-header">
+      <div class="admin-dist-card">
+        <div class="admin-dist-header">
           <div>
-            <div class="admin-plat-breadcrumb">素材 / 平台</div>
-            <div class="admin-plat-title">平台</div>
+            <div class="admin-dist-breadcrumb">素材 / 达人链</div>
+            <div class="admin-dist-title">达人链</div>
           </div>
-          <div class="admin-plat-actions">
-            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 添加平台</el-button>
+          <div class="admin-dist-actions">
+            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">+ 生成达人链</el-button>
           </div>
         </div>
 
-        <div class="admin-plat-filters">
-          <el-input
-            v-model="query.keyword"
-            size="default"
-            clearable
-            placeholder="搜索名称或代码"
-            style="width:260px; flex:0 0 auto;"
-            @keyup.enter="onSearch"
-          />
-          <el-select v-model="query.status" size="default" clearable placeholder="全部状态" style="width:140px; flex:0 0 auto;">
-            <el-option label="启用" value="1" />
-            <el-option label="禁用" value="0" />
+        <div class="admin-dist-filters">
+          <el-select v-model="query.product_id" size="default" clearable placeholder="全部商品" style="width: 260px; flex:0 0 auto;">
+            <el-option label="全部商品" :value="0" />
+            <el-option v-for="o in productOptions" :key="o.id" :label="o.label" :value="o.id" />
           </el-select>
 
-          <div class="admin-plat-filter-actions">
+          <div class="admin-dist-filter-actions">
             <el-button size="default" type="primary" @click="onSearch">筛选</el-button>
             <el-button size="default" @click="onReset">重置</el-button>
           </div>
+        </div>
+
+        <div class="admin-dist-hint">
+          达人打开链接后，随机展示该商品下一条未下载视频；下载后全局标记为已下载，不再出现。
         </div>
 
         <el-table
@@ -309,26 +302,21 @@
           v-loading="loading"
           :header-cell-style="headerCellStyle"
           :cell-style="cellStyle"
-          @sort-change="onSortChange"
         >
-          <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column label="平台名称" min-width="160" sortable="custom" prop="name">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="商品" min-width="160">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
+              <div style="font-weight:500; color:#303133;">
+                {{ (row.product && row.product.name) ? row.product.name : '—' }}
+              </div>
             </template>
           </el-table-column>
-          <el-table-column label="平台代码" width="160" sortable="custom" prop="code">
+          <el-table-column label="备注" min-width="160">
             <template #default="{ row }">
-              <span class="code-cell">{{ row.code || '—' }}</span>
+              <span style="color:#4b5563;">{{ row.label || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="图标" width="120">
-            <template #default="{ row }">
-              <span v-if="row.icon" v-html="row.icon"></span>
-              <span v-else class="text-muted">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="访问链接" min-width="360">
+          <el-table-column label="达人页链接" min-width="360">
             <template #default="{ row }">
               <div class="link-cell">
                 <div class="link-text" :title="row.link">{{ row.link || '—' }}</div>
@@ -337,27 +325,27 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="120" sortable="custom" prop="status">
+          <el-table-column label="状态" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? '启用' : '禁用' }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" min-width="180" sortable="custom" />
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column prop="created_at" label="创建时间" min-width="180" />
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <el-button size="default" link type="primary" @click="goEdit(row)">编辑</el-button>
+              <el-button size="default" link type="primary" @click="doToggle(row)">启停</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">删除</el-button>
             </template>
           </el-table-column>
 
           <template #empty>
-            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无平台数据</div>
+            <div style="padding: 28px 0; text-align:center; color:#6b7280;">暂无链接</div>
           </template>
         </el-table>
 
-        <div class="admin-plat-footer">
+        <div class="admin-dist-footer">
           <el-pagination
             v-model:current-page="page"
             v-model:page-size="pageSize"
@@ -371,7 +359,7 @@
         </div>
       </div>
     `
-  }).use(ElementPlus).mount('#platformApp');
+  }).use(ElementPlus).mount('#distributeApp');
   {/literal}
 </script>
 {/block}

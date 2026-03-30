@@ -1,189 +1,523 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}视频管理{/block}
+{block name="title"}视频{/block}
 {block name="page_title"}视频管理{/block}
-{block name="page_actions"}
-<a href="/admin.php/video/batchUpload" class="btn btn-success btn-sm">
-    <i class="fas fa-cloud-upload-alt mr-1"></i> 批量上传
-</a>
-<button type="button" class="btn btn-warning btn-sm js-batch-edit">
-    <i class="fas fa-edit mr-1"></i> 批量编辑
-</button>
-<button type="button" class="btn btn-danger btn-sm js-batch-delete">
-    <i class="fas fa-trash-alt mr-1"></i> 批量删除
-</button>
+{block name="style"}
+<style>
+  /* 采用你提供的模板风格（全局样式，仅作用于该页） */
+  .page-container {
+    padding: 24px;
+    background-color: #f3f4f6;
+    min-height: calc(100vh - 0px);
+  }
+  .modern-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  }
+
+  /* 顶部操作区（更紧凑：16~20px 间距） */
+  .header-actions { margin-bottom: 16px; }
+  .breadcrumb {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 12px;
+    background: transparent !important;
+    padding: 0 !important;
+    line-height: 1.2;
+  }
+  .action-buttons { display: flex; gap: 12px; align-items: center; }
+  .btn-primary { border-radius: 8px; padding: 0 24px; font-weight: 500; }
+  .btn-danger { border-radius: 8px; border-color: #fca5a5; color: #ef4444; }
+
+  /* 筛选区 */
+  .filter-section {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .custom-form {
+    display: flex;
+    flex-wrap: nowrap; /* 强制同一行 */
+    gap: 12px;
+    align-items: center;
+  }
+  .custom-form .el-form-item { margin-bottom: 0 !important; margin-right: 0 !important; }
+  .custom-form .el-form-item { flex: 0 0 auto; }
+  .filter-buttons { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+
+  @media (max-width: 1200px) {
+    /* 屏幕窄时允许横向滚动，避免按钮掉行 */
+    .custom-form { overflow-x: auto; padding-bottom: 4px; }
+  }
+
+  /* 表格：图片与文字层级 */
+  .cover-image {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+  }
+  .image-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    font-size: 14px;
+  }
+  .title-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+  .main-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+  }
+  .sub-id {
+    font-size: 12px;
+    color: #6b7280;
+  }
+  .custom-tag { border-radius: 6px; border: none; font-weight: 500; }
+  .action-link { font-weight: 600; }
+
+  /* 底部分页 */
+  .footer-pagination {
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* 上传弹窗：嵌入原 /video/batchUpload */
+  .upload-iframe {
+    width: 100%;
+    height: 72vh;
+    border: 0;
+    border-radius: 10px;
+    background: #fff;
+  }
+  .upload-dialog .el-dialog__body { padding: 0 !important; }
+</style>
 {/block}
+{block name="page_actions"}{/block}
 
 {block name="content"}
-<div class="card shadow-sm">
-    <div class="card-body">
-        <form method="get" class="form-row align-items-center mb-3">
-            <div class="col-lg-3 col-md-4 mb-2">
-                <select name="platform_id" class="form-control form-control-sm">
-                    <option value="">全部平台</option>
-                    {volist name="platforms" id="platform"}
-                    <option value="{$platform.id}" {if $platform_id == $platform.id}selected{/if}>{$platform.name}</option>
-                    {/volist}
-                </select>
-            </div>
-            <div class="col-lg-3 col-md-4 mb-2">
-                <select name="device_id" class="form-control form-control-sm">
-                    <option value="">全部设备</option>
-                    {volist name="devices" id="device"}
-                    <option value="{$device.id}" {if $device_id == $device.id}selected{/if}>{$device.device_name}</option>
-                    {/volist}
-                </select>
-            </div>
-            <div class="col-lg-2 col-md-4 mb-2">
-                <select name="is_downloaded" class="form-control form-control-sm">
-                    <option value="-1" {if $is_downloaded==-1}selected{/if}>下载状态</option>
-                    <option value="0" {if $is_downloaded==0}selected{/if}>未下载</option>
-                    <option value="1" {if $is_downloaded==1}selected{/if}>已下载</option>
-                </select>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-2">
-                <input type="text" name="keyword" value="{$keyword|default=''}" class="form-control form-control-sm" placeholder="搜索标题或视频链接">
-            </div>
-            <div class="col-md-2 col-6 mb-2">
-                <button type="submit" class="btn btn-primary btn-sm btn-block">
-                    <i class="fas fa-filter"></i>
-                </button>
-            </div>
-            <div class="col-md-2 col-6 mb-2">
-                <a href="/admin.php/video" class="btn btn-outline-secondary btn-sm btn-block">
-                    <i class="fas fa-undo"></i>
-                </a>
-            </div>
-        </form>
-
-        {if count($list)}
-        <div class="table-responsive">
-            <table class="table table-hover table-striped text-nowrap align-middle">
-                <thead class="thead-light">
-                    <tr>
-                        <th width="40"><input type="checkbox" id="checkAll"></th>
-                        <th>ID</th>
-                        <th>标题</th>
-                        <th>平台 / 设备</th>
-                        <th>封面</th>
-                        <th>下载状态</th>
-                        <th>创建时间</th>
-                        <th class="text-right">操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {volist name="list" id="item"}
-                    <tr>
-                        <td><input type="checkbox" class="check-item" value="{$item.id}"></td>
-                        <td>{$item.id}</td>
-                        <td class="font-weight-bold" style="max-width:260px; white-space:normal;">
-                            {$item.title|default='—'}
-                            <div class="text-muted small">{$item.video_url}</div>
-                        </td>
-                        <td>
-                            <div>{$item.platform.name|default='—'}</div>
-                            <div class="text-muted small">{$item.device.device_name|default='—'}</div>
-                        </td>
-                        <td>
-                            {if !empty($item.cover_url)}
-                            <img src="{$item.cover_url}" alt="封面" class="img-thumbnail" style="max-width:96px; max-height:60px; object-fit:cover;">
-                            {else /}<span class="text-muted">—</span>{/if}
-                        </td>
-                        <td>
-                            {if $item.is_downloaded == 1}
-                            <span class="badge badge-success">已下载</span>
-                            {else}
-                            <span class="badge badge-warning">未下载</span>
-                            {/if}
-                        </td>
-                        <td>{$item.created_at|default='—'}</td>
-                        <td class="text-right">
-                            <div class="btn-group btn-group-sm">
-                                <a href="/admin.php/video/edit/{$item.id}" class="btn btn-outline-info">
-                                    <i class="fas fa-edit"></i> 编辑
-                                </a>
-                                <button type="button" class="btn btn-outline-danger js-delete" data-id="{$item.id}" data-title="{$item.title|default='视频'}">
-                                    <i class="fas fa-trash-alt"></i> 删除
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {/volist}
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-3">
-            {$list->render()|raw}
-        </div>
-        {else /}
-        <div class="text-center py-5 text-muted">
-            <i class="fas fa-box-open fa-2x mb-3"></i>
-            <p class="mb-1">暂无视频数据</p>
-            <p class="small">尝试调整筛选条件或前往批量上传。</p>
-        </div>
-        {/if}
-    </div>
-</div>
+<div class="tp-ep-wrap" id="videoApp"></div>
 {/block}
 
 {block name="script"}
+<!-- Vue3 + ElementPlus（CDN） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
-    function getCheckedIds() {
-        const ids = [];
-        $('.check-item:checked').each(function () { ids.push($(this).val()); });
-        return ids;
-    }
+  // 下拉选项：由服务端注入，避免额外接口
+  // 下拉选项：由服务端注入，避免额外接口（用 push 方式避免 @last 语法残留）
+  const PLATFORM_OPTIONS = [];
+  {volist name="platforms" id="p"}
+  PLATFORM_OPTIONS.push({ id: {$p.id}, label: "{:addslashes((string)$p.name)}" });
+  {/volist}
 
-    $(function () {
-        $('#checkAll').on('change', function () {
-            $('.check-item').prop('checked', $(this).prop('checked'));
+  const DEVICE_OPTIONS = [];
+  {volist name="devices" id="d"}
+  DEVICE_OPTIONS.push({ id: {$d.id}, label: "{:addslashes((string)$d.device_name)}" });
+  {/volist}
+
+  const PRODUCT_OPTIONS = [];
+  {volist name="products" id="pr"}
+  PRODUCT_OPTIONS.push({ id: {$pr.id}, label: "{:addslashes((string)$pr.name)}" });
+  {/volist}
+
+  {literal}
+  const { createApp, reactive, ref, onMounted, computed } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+
+  function toSort(order) {
+    if (order === 'ascending') return 'asc';
+    if (order === 'descending') return 'desc';
+    return 'desc';
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const tableData = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(10);
+      const sortProp = ref('created_at');
+      const sortOrder = ref('desc');
+
+      const filters = reactive({
+        platform_ids: [],
+        device_ids: [],
+        product_ids: [],
+        is_downloaded: [],
+        keyword: '',
+      });
+
+      const selection = ref([]);
+      const selectedCount = computed(() => selection.value.length);
+      const batchDeleteEnabled = computed(() => selectedCount.value > 0);
+      const tableRef = ref();
+
+      const uploadVisible = ref(false);
+      const uploadIframeSrc = ref('/admin.php/video/batchUpload');
+      const uploadFrame = ref(null);
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const params = new URLSearchParams();
+          params.set('page', String(page.value));
+          params.set('page_size', String(pageSize.value));
+          params.set('sort_prop', sortProp.value || 'created_at');
+          params.set('sort_order', sortOrder.value || 'desc');
+          if (filters.keyword) params.set('keyword', filters.keyword);
+          (filters.platform_ids || []).forEach(v => params.append('platform_ids[]', String(v)));
+          (filters.device_ids || []).forEach(v => params.append('device_ids[]', String(v)));
+          (filters.product_ids || []).forEach(v => params.append('product_ids[]', String(v)));
+          (filters.is_downloaded || []).forEach(v => params.append('is_downloaded[]', String(v)));
+
+          const res = await fetch('/admin.php/video/list?' + params.toString(), { credentials: 'same-origin' });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+          tableData.value = (json.data && json.data.items) ? json.data.items : [];
+          total.value = (json.data && json.data.total) ? json.data.total : 0;
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '加载失败');
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function onSortChange({ prop, order }) {
+        if (!prop) return;
+        sortProp.value = prop;
+        sortOrder.value = toSort(order);
+        page.value = 1;
+        fetchList();
+      }
+
+      function onSearch() {
+        page.value = 1;
+        fetchList();
+      }
+
+      function onReset() {
+        filters.platform_ids = [];
+        filters.device_ids = [];
+        filters.product_ids = [];
+        filters.is_downloaded = [];
+        filters.keyword = '';
+        page.value = 1;
+        fetchList();
+      }
+
+      function onSelectionChange(val) {
+        selection.value = Array.isArray(val) ? val : [];
+      }
+
+      function invertSelection() {
+        const t = tableRef.value;
+        if (!t) return;
+        const selectedIds = new Set(selection.value.map(r => r.id));
+        (tableData.value || []).forEach((row) => {
+          t.toggleRowSelection(row, !selectedIds.has(row.id));
         });
+      }
 
-        $('.js-delete').on('click', function () {
-            const id = $(this).data('id');
-            const title = $(this).data('title');
-            AdminUI.confirm(`确定要删除视频「${title}」吗？`, function () {
-                $.post(`/admin.php/video/delete/${id}`, {}, function (res) {
-                    if (res.code === 0) {
-                        AdminUI.showToast('success', res.msg || '删除成功');
-                        setTimeout(() => window.location.reload(), 1000);
-                    } else {
-                        AdminUI.showToast('error', res.msg || '删除失败');
-                    }
-                }).fail(function () {
-                    AdminUI.showToast('error', '删除失败，请稍后再试');
-                });
+      function goEdit(row) {
+        window.location.href = '/admin.php/video/edit/' + row.id;
+      }
+
+      async function doDelete(row) {
+        await ElMessageBox.confirm('确定删除该视频？', '提示', { type: 'warning' });
+        const resp = await fetch('/admin.php/video/delete/' + row.id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '删除成功');
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '删除失败');
+        }
+      }
+
+      async function doBatchDelete() {
+        if (!batchDeleteEnabled.value) return;
+        await ElMessageBox.confirm(`确定删除选中的 ${selectedCount.value} 条视频？`, '提示', { type: 'warning' });
+        const ids = selection.value.map(r => r.id);
+        const body = new URLSearchParams();
+        ids.forEach(id => body.append('ids[]', String(id)));
+        const resp = await fetch('/admin.php/video/batchDelete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: body.toString(),
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '批量删除成功');
+          selection.value = [];
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '批量删除失败');
+        }
+      }
+
+      async function copyText(text) {
+        const t = String(text || '');
+        if (!t) return;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(t);
+          } else {
+            const tmp = document.createElement('input');
+            tmp.value = t;
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+          }
+          ElMessage.success('已复制');
+        } catch (e) {
+          ElMessage.error('复制失败');
+        }
+      }
+
+      function openUpload() {
+        // cache-bust，避免弹窗内页面缓存旧状态
+        uploadIframeSrc.value = '/admin.php/video/batchUpload?_t=' + Date.now();
+        uploadVisible.value = true;
+      }
+
+      function onUploadIframeLoad() {
+        try {
+          const frameEl = uploadFrame.value;
+          if (!frameEl || !frameEl.contentDocument) return;
+          const doc = frameEl.contentDocument;
+
+          // 隐藏后台壳：侧栏/顶栏/页脚/面包屑，只保留上传表单主体
+          const hideSelectors = [
+            '.main-sidebar',
+            '.main-header',
+            '.main-footer',
+            '.content-header',
+            '.brand-link',
+            '.toast-container',
+          ];
+          hideSelectors.forEach((sel) => {
+            doc.querySelectorAll(sel).forEach((el) => {
+              el.style.display = 'none';
             });
-        });
+          });
 
-        $('.js-batch-edit').on('click', function () {
-            const ids = getCheckedIds();
-            if (!ids.length) {
-                AdminUI.showToast('warning', '请先勾选需要编辑的视频');
-                return;
-            }
-            window.location.href = '/admin.php/video/batchEdit?ids=' + ids.join(',');
-        });
+          // 归零布局偏移（AdminLTE 默认 content-wrapper 有 margin-left）
+          const cw = doc.querySelector('.content-wrapper');
+          if (cw) {
+            cw.style.marginLeft = '0';
+            cw.style.padding = '0';
+            cw.style.background = 'transparent';
+          }
+          const container = doc.querySelector('.content-wrapper .container-fluid');
+          if (container) {
+            container.style.paddingLeft = '0';
+            container.style.paddingRight = '0';
+          }
 
-        $('.js-batch-delete').on('click', function () {
-            const ids = getCheckedIds();
-            if (!ids.length) {
-                AdminUI.showToast('warning', '请先勾选需要删除的视频');
-                return;
-            }
-            AdminUI.confirm(`确定要删除选中的 ${ids.length} 个视频吗？`, function () {
-                $.post('/admin.php/video/batchDelete', { ids: ids }, function (res) {
-                    if (res.code === 0) {
-                        AdminUI.showToast('success', res.msg || '删除成功');
-                        setTimeout(() => window.location.reload(), 1200);
-                    } else {
-                        AdminUI.showToast('error', res.msg || '删除失败');
-                    }
-                }).fail(function () {
-                    AdminUI.showToast('error', '删除失败，请稍后再试');
-                });
-            });
-        });
-    });
+          // 页面背景与滚动优化
+          doc.documentElement.style.background = 'transparent';
+          doc.body.style.background = 'transparent';
+          doc.body.style.overflowX = 'hidden';
+
+          // 让卡片更贴合弹窗宽度
+          doc.querySelectorAll('.card').forEach((el) => {
+            el.style.borderRadius = '12px';
+            el.style.boxShadow = 'none';
+          });
+        } catch (e) {
+          // 同源失败或结构变化时静默
+        }
+      }
+
+      function onUploadDialogClose() {
+        // 上传完成后用户通常会关闭弹窗，这里直接刷新列表即可
+        page.value = 1;
+        fetchList();
+      }
+
+      onMounted(() => {
+        fetchList();
+      });
+
+      return {
+        loading, tableData, total, page, pageSize,
+        filters, selection, selectedCount, batchDeleteEnabled,
+        PLATFORM_OPTIONS, DEVICE_OPTIONS, PRODUCT_OPTIONS,
+        uploadVisible, uploadIframeSrc, uploadFrame, onUploadIframeLoad, onUploadDialogClose,
+        tableRef, fetchList, onSortChange, onSearch, onReset, onSelectionChange, invertSelection,
+        goEdit, doDelete, doBatchDelete, copyText, openUpload,
+      };
+    },
+    template: `
+      <div class="page-container">
+        <div class="modern-card">
+          <div class="header-actions">
+            <div class="breadcrumb">首页 / 素材 / 视频管理</div>
+            <div class="action-buttons">
+              <el-button type="primary" class="btn-primary" @click="openUpload">上传</el-button>
+              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">批量删除</el-button>
+              <span v-if="selectedCount" style="font-size:12px; color:#6b7280; margin-left:6px;">已选择 {{selectedCount}} 条</span>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <el-form :inline="true" class="custom-form" @submit.prevent>
+              <el-form-item>
+                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="平台" style="width: 140px;">
+                  <el-option v-for="o in PLATFORM_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="设备" style="width: 140px;">
+                  <el-option v-for="o in DEVICE_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="商品" style="width: 140px;">
+                  <el-option v-for="o in PRODUCT_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags placeholder="下载状态" style="width: 140px;">
+                  <el-option label="未下载" :value="0" />
+                  <el-option label="已下载" :value="1" />
+                </el-select>
+              </el-form-item>
+              <el-form-item class="search-input-item">
+                <el-input v-model="filters.keyword" placeholder="搜索标题或视频链接" style="width: 240px;" @keyup.enter="onSearch" />
+              </el-form-item>
+              <el-form-item class="filter-buttons">
+                <el-button type="primary" plain @click="onSearch">筛选</el-button>
+                <el-button @click="onReset">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+
+          <el-table
+            :data="tableData"
+            style="width: 100%"
+            stripe
+            v-loading="loading"
+            ref="tableRef"
+            row-key="id"
+            :default-sort="{ prop: 'created_at', order: 'descending' }"
+            @selection-change="onSelectionChange"
+            @sort-change="onSortChange"
+            :header-cell-style="{ backgroundColor: '#f9fafb', color: '#6b7280', height: '54px', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }"
+            :cell-style="{ padding: '10px 0', borderBottom: '1px solid #f3f4f6' }"
+          >
+            <el-table-column type="selection" width="55" />
+
+            <el-table-column label="封面" width="100">
+              <template #default="scope">
+                <el-image class="cover-image" :src="scope.row.cover_url || scope.row.video_url || '/static/default-cover.svg'" fit="cover">
+                  <template #error>
+                    <div class="image-placeholder">暂无</div>
+                  </template>
+                </el-image>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="标题 / ID" min-width="200">
+              <template #default="scope">
+                <div class="title-column">
+                  <span class="main-title">{{ scope.row.title || '—' }}</span>
+                  <span class="sub-id">ID {{ scope.row.id }}</span>
+                </div>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="created_at" label="时间" sortable="custom" min-width="180" />
+
+            <el-table-column label="平台" width="120">
+              <template #default="scope">
+                <el-tag type="info" effect="light" class="custom-tag">
+                  {{ (scope.row.platform && scope.row.platform.name) || '—' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="状态" width="120">
+              <template #default="scope">
+                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">已下载</el-tag>
+                <el-tag v-else type="warning" effect="light" class="custom-tag">未下载</el-tag>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="scope">
+                <el-dropdown trigger="click">
+                  <el-button type="primary" link class="action-link">操作</el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="copyText(scope.row.video_url)">复制链接</el-dropdown-item>
+                      <el-dropdown-item @click="goEdit(scope.row)">编辑</el-dropdown-item>
+                      <el-dropdown-item divided @click="doDelete(scope.row)">删除</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </template>
+            </el-table-column>
+
+            <template #empty>
+              <div style="padding: 28px 0; text-align:center; color:#6b7280;">
+                暂无视频数据
+              </div>
+            </template>
+          </el-table>
+
+          <div class="footer-pagination">
+            <el-button @click="invertSelection" :disabled="!tableData.length">反选</el-button>
+            <el-pagination
+              background
+              layout="total, prev, pager, next, sizes"
+              :total="total"
+              :page-size="pageSize"
+              :current-page="page"
+              :page-sizes="[10,20,50,100]"
+              @update:current-page="(p)=>{page=p; fetchList();}"
+              @update:page-size="(s)=>{pageSize=s; page=1; fetchList();}"
+            />
+          </div>
+
+          <el-dialog
+            class="upload-dialog"
+            v-model="uploadVisible"
+            title="上传视频"
+            width="920px"
+            :destroy-on-close="true"
+            @closed="onUploadDialogClose"
+          >
+            <iframe class="upload-iframe" ref="uploadFrame" :src="uploadIframeSrc" @load="onUploadIframeLoad"></iframe>
+          </el-dialog>
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#videoApp');
+  {/literal}
 </script>
 {/block}

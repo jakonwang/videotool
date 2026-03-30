@@ -1,156 +1,408 @@
 {extend name="admin/common/layout" /}
 
-{block name="page_title"}下载错误监控{/block}
+{block name="title"}下载异常{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
+
+{block name="style"}
+<style>
+    .content-header { display: none; }
+    /* High-Density Modern（与缓存页统一，仅该页生效） */
+    .tp-ep-wrap {
+        padding: 24px;
+        background: #f4f6f8;
+        min-height: calc(100vh - 0px);
+    }
+    .admin-log-card {
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .admin-log-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+    }
+    .admin-log-breadcrumb {
+        font-size: 13px;
+        color: #909399;
+        line-height: 18px;
+        margin-bottom: 6px;
+    }
+    .admin-log-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 28px;
+    }
+    .admin-log-actions {
+        display: flex;
+        gap: 12px;
+        flex: 0 0 auto;
+    }
+    .admin-log-actions .el-button { border-radius: 6px; }
+
+    .admin-log-alert {
+        margin-top: 16px;
+        margin-bottom: 24px;
+    }
+
+    .admin-log-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+    }
+    @media (max-width: 1200px) { .admin-log-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .admin-log-stats { grid-template-columns: 1fr; } }
+    .stat-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        min-width: 0;
+    }
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #111827;
+        line-height: 34px;
+    }
+    .stat-label {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 18px;
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+    }
+    .stat-icon svg { width: 20px; height: 20px; }
+    .stat-icon--red { background: rgba(239,68,68,0.12); color: #b91c1c; }
+    .stat-icon--amber { background: rgba(245,158,11,0.12); color: #b45309; }
+    .stat-icon--blue { background: rgba(59,130,246,0.12); color: #1d4ed8; }
+    .stat-icon--slate { background: rgba(100,116,139,0.12); color: #334155; }
+
+    .admin-log-filters {
+        margin: 20px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .admin-log-card .el-table__inner-wrapper::before { height: 0; }
+</style>
+{/block}
 
 {block name="content"}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">下载错误日志</h3>
-                    <div class="card-tools">
-                        <form method="get" class="form-inline">
-                            <input type="date" name="date" value="{$date_formatted|default=''}" class="form-control form-control-sm mr-2" style="width: 150px;">
-                            <input type="text" name="keyword" value="{$keyword}" placeholder="搜索错误信息..." class="form-control form-control-sm mr-2" style="width: 200px;">
-                            <button type="submit" class="btn btn-primary btn-sm mr-2">
-                                <i class="fas fa-search"></i> 查询
-                            </button>
-                            <a href="/admin.php/downloadLog" class="btn btn-outline-secondary btn-sm">
-                                <i class="fas fa-undo"></i> 重置
-                            </a>
-                        </form>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- 统计卡片 -->
-                    <div class="row mb-3">
-                        <div class="col-md-3 col-sm-6">
-                            <div class="small-box bg-danger">
-                                <div class="inner">
-                                    <h3>{$stats.total_errors}</h3>
-                                    <p>总错误数</p>
-                                </div>
-                                <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="small-box bg-warning">
-                                <div class="inner">
-                                    <h3>{$stats.download_errors}</h3>
-                                    <p>下载错误</p>
-                                </div>
-                                <div class="icon"><i class="fas fa-download"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="small-box bg-info">
-                                <div class="inner">
-                                    <h3>{$stats.cache_errors}</h3>
-                                    <p>缓存错误</p>
-                                </div>
-                                <div class="icon"><i class="fas fa-hdd"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="small-box bg-secondary">
-                                <div class="inner">
-                                    <h3>{$stats.other_errors}</h3>
-                                    <p>其他错误</p>
-                                </div>
-                                <div class="icon"><i class="fas fa-bug"></i></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {if empty($errors)}
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        暂无错误记录（{$date}）
-                    </div>
-                    {else}
-                    <div class="table-responsive">
-                        <table class="table table-hover table-striped">
-                            <thead>
-                                <tr>
-                                    <th style="width: 80px;">时间</th>
-                                    <th style="width: 80px;">视频ID</th>
-                                    <th>视频标题</th>
-                                    <th>错误信息</th>
-                                    <th style="width: 100px;">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {volist name="errors" id="error"}
-                                <tr>
-                                    <td class="text-nowrap small">{$error.time_display|default=$error.time|default=''}</td>
-                                    <td>
-                                        {if $error.video_id}
-                                        <a href="/admin.php/video/edit/{$error.video_id}" target="_blank" class="badge badge-info">#{$error.video_id}</a>
-                                        {else}
-                                        <span class="text-muted">—</span>
-                                        {/if}
-                                    </td>
-                                    <td>
-                                        {if $error.video_title}
-                                        <span class="font-weight-bold">{$error.video_title}</span>
-                                        {else}
-                                        <span class="text-muted">—</span>
-                                        {/if}
-                                    </td>
-                                    <td>
-                                        <div class="text-danger small" style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{$error.error}">
-                                            {$error.error|raw}
-                                        </div>
-                                        {if $error.url}
-                                        <div class="text-muted small mt-1" style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <i class="fas fa-link mr-1"></i>{$error.url|raw}
-                                        </div>
-                                        {/if}
-                                    </td>
-                                    <td>
-                                        {if $error.video_id}
-                                        <a href="/admin.php/video/edit/{$error.video_id}" target="_blank" class="btn btn-sm btn-info" title="查看视频">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="/download_debug.php?video_id={$error.video_id}&type=video" target="_blank" class="btn btn-sm btn-warning" title="调试">
-                                            <i class="fas fa-bug"></i>
-                                        </a>
-                                        {/if}
-                                    </td>
-                                </tr>
-                                {/volist}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- 分页 -->
-                    {if $total_pages > 1}
-                    <div class="d-flex justify-content-center mt-3">
-                        <nav>
-                            <ul class="pagination">
-                                {if $page > 1}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={$page-1}{$url_suffix}">上一页</a>
-                                </li>
-                                {/if}
-                                <li class="page-item active">
-                                    <span class="page-link">第 {$page} 页 / 共 {$total_pages} 页</span>
-                                </li>
-                                {if $page < $total_pages}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={$page+1}{$url_suffix}">下一页</a>
-                                </li>
-                                {/if}
-                            </ul>
-                        </nav>
-                    </div>
-                    {/if}
-                    {/if}
-                </div>
-            </div>
+<div class="tp-ep-wrap" id="downloadLogApp"></div>
+{/block}
+
+{block name="script"}
+<!-- Vue3 + ElementPlus（CDN） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
+<script>
+  {literal}
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const { Refresh, Delete, Search, WarningFilled, Download, Coin, Bug } = ElementPlusIconsVue;
+
+  const headerCellStyle = {
+    backgroundColor: '#F9FAFB',
+    color: '#4B5563',
+    fontWeight: '600',
+    height: '48px',
+    borderBottom: '1px solid #E5E7EB'
+  };
+  const cellStyle = { padding: '12px 0' };
+
+  function ymdToDash(ymd) {
+    const s = String(ymd || '').replace(/[^0-9]/g, '');
+    if (s.length !== 8) return '';
+    return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+  }
+  function dashToYmd(d) {
+    const s = String(d || '').replace(/[^0-9]/g, '');
+    return s.length === 8 ? s : '';
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const keyword = ref('');
+      const dateDash = ref('');
+
+      const rows = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(10);
+
+      const stats = reactive({
+        total_errors: 0,
+        download_errors: 0,
+        cache_errors: 0,
+        other_errors: 0,
+      });
+
+      const currentDateYmd = computed(() => dashToYmd(dateDash.value) || new Date().toISOString().slice(0,10).replaceAll('-',''));
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const params = new URLSearchParams();
+          params.set('page', String(page.value));
+          params.set('page_size', String(pageSize.value));
+          params.set('date', currentDateYmd.value);
+          if (keyword.value.trim()) params.set('keyword', keyword.value.trim());
+
+          const res = await fetch('/admin.php/downloadLog/list?' + params.toString(), { credentials: 'same-origin' });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
+
+          rows.value = (json.data && json.data.items) ? json.data.items : [];
+          total.value = (json.data && json.data.total) ? json.data.total : 0;
+
+          const s = (json.data && json.data.stats) ? json.data.stats : null;
+          if (s) {
+            stats.total_errors = s.total_errors ?? 0;
+            stats.download_errors = s.download_errors ?? 0;
+            stats.cache_errors = s.cache_errors ?? 0;
+            stats.other_errors = s.other_errors ?? 0;
+          }
+
+          if (!dateDash.value && json.data && json.data.date) {
+            dateDash.value = ymdToDash(json.data.date);
+          }
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '加载失败');
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function onSearch() {
+        page.value = 1;
+        fetchList();
+      }
+
+      function onRefresh() {
+        fetchList();
+      }
+
+      function onReset() {
+        keyword.value = '';
+        dateDash.value = '';
+        page.value = 1;
+        fetchList();
+      }
+
+      async function onClear() {
+        await ElMessageBox.confirm('确认清空（标记处理）下载异常记录？', '清空异常', {
+          type: 'warning',
+          confirmButtonText: '清空',
+          cancelButtonText: '取消',
+        });
+        const resp = await fetch('/admin.php/downloadLog/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || '已清空');
+          fetchList();
+        } else {
+          ElMessage.error((json && json.msg) || '清空失败');
+        }
+      }
+
+      function openVideo(row) {
+        const id = row && row.video_id ? row.video_id : 0;
+        if (!id) return;
+        window.open('/admin.php/video/edit/' + id, '_blank', 'noopener');
+      }
+
+      function openDebug(row) {
+        const id = row && row.video_id ? row.video_id : 0;
+        if (!id) return;
+        window.open('/download_debug.php?video_id=' + id + '&type=video', '_blank', 'noopener');
+      }
+
+      onMounted(() => {
+        fetchList();
+      });
+
+      return {
+        loading,
+        keyword,
+        dateDash,
+        rows,
+        total,
+        page,
+        pageSize,
+        stats,
+        headerCellStyle,
+        cellStyle,
+        Refresh,
+        Delete,
+        Search,
+        WarningFilled,
+        Download,
+        Coin,
+        Bug,
+        onSearch,
+        onRefresh,
+        onReset,
+        onClear,
+        openVideo,
+        openDebug,
+        fetchList,
+      };
+    },
+    template: `
+      <div class="admin-log-card">
+        <div class="admin-log-header">
+          <div>
+            <div class="admin-log-breadcrumb">系统 / 异常</div>
+            <div class="admin-log-title">下载异常</div>
+          </div>
+          <div class="admin-log-actions">
+            <el-button size="default" :icon="Refresh" @click="onRefresh">刷新</el-button>
+            <el-button size="default" type="danger" :icon="Delete" @click="onClear">清空异常</el-button>
+          </div>
         </div>
-    </div>
-</div>
+
+        <el-alert class="admin-log-alert" type="warning" show-icon :closable="false">
+          <template #title>
+            本页从运行日志中提取下载/缓存相关异常，用于快速定位问题；可按日期与关键词筛选。
+          </template>
+        </el-alert>
+
+        <div class="admin-log-stats">
+          <div class="stat-card">
+            <div>
+              <div class="stat-value">{{ stats.total_errors }}</div>
+              <div class="stat-label">总错误数</div>
+            </div>
+            <div class="stat-icon stat-icon--red"><el-icon><WarningFilled/></el-icon></div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-value">{{ stats.download_errors }}</div>
+              <div class="stat-label">下载错误</div>
+            </div>
+            <div class="stat-icon stat-icon--amber"><el-icon><Download/></el-icon></div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-value">{{ stats.cache_errors }}</div>
+              <div class="stat-label">缓存错误</div>
+            </div>
+            <div class="stat-icon stat-icon--blue"><el-icon><Coin/></el-icon></div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-value">{{ stats.other_errors }}</div>
+              <div class="stat-label">其他错误</div>
+            </div>
+            <div class="stat-icon stat-icon--slate"><el-icon><Bug/></el-icon></div>
+          </div>
+        </div>
+
+        <div class="admin-log-filters">
+          <el-date-picker
+            v-model="dateDash"
+            size="default"
+            type="date"
+            value-format="YYYY-MM-DD"
+            format="YYYY-MM-DD"
+            placeholder="选择日期"
+            style="width: 180px;"
+            @change="onSearch"
+          />
+          <el-input
+            v-model="keyword"
+            size="default"
+            clearable
+            :prefix-icon="Search"
+            placeholder="搜索错误信息..."
+            style="width: 320px;"
+            @keyup.enter="onSearch"
+          />
+          <el-button size="default" type="primary" @click="onSearch">查询</el-button>
+          <el-button size="default" @click="onReset">重置</el-button>
+        </div>
+
+        <el-table
+          :data="rows"
+          row-key="raw"
+          v-loading="loading"
+          :header-cell-style="headerCellStyle"
+          :cell-style="cellStyle"
+        >
+          <el-table-column prop="time_display" label="时间" width="140" />
+          <el-table-column label="视频ID" width="110">
+            <template #default="{ row }">
+              <span v-if="row.video_id">
+                <el-button size="default" link type="primary" @click="openVideo(row)">#{{ row.video_id }}</el-button>
+              </span>
+              <span v-else class="text-muted">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="视频标题" min-width="180">
+            <template #default="{ row }">
+              <span style="font-weight:500; color:#303133;">{{ row.video_title || '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="错误信息" min-width="360" show-overflow-tooltip>
+            <template #default="{ row }">
+              <div style="color:#b91c1c; font-size:12px; line-height:18px;" :title="row.error">{{ row.error || '—' }}</div>
+              <div v-if="row.url" style="color:#6b7280; font-size:12px; line-height:18px; margin-top:4px;" :title="row.url">
+                {{ row.url }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
+            <template #default="{ row }">
+              <el-button v-if="row.video_id" size="default" link type="primary" @click="openVideo(row)">查看</el-button>
+              <el-button v-if="row.video_id" size="default" link type="warning" @click="openDebug(row)">调试</el-button>
+              <span v-if="!row.video_id" class="text-muted">—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            size="default"
+            background
+            layout="total, prev, pager, next"
+            :total="total"
+            @update:current-page="(p)=>{ page=p; fetchList(); }"
+            @update:page-size="(s)=>{ pageSize=s; page=1; fetchList(); }"
+          />
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#downloadLogApp');
+  {/literal}
+</script>
 {/block}
 

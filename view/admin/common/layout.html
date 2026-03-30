@@ -23,10 +23,15 @@
             --dash-border: rgba(29,36,78,0.12);
             --dash-danger: #ff6b8e;
             --dash-success: #28c7a5;
-            --dash-sidebar-bg: #11152c;
-            --dash-sidebar-bg2: #161c39;
-            --dash-sidebar-border: rgba(255,255,255,0.08);
-            --dash-sidebar-text: rgba(255,255,255,0.72);
+            /* 侧栏：现代极简暗黑（Notion / Linear / Vercel 风格） */
+            --dash-sidebar-bg: #111827;
+            --dash-sidebar-border: rgba(255,255,255,0.06);
+            --dash-sidebar-text: #9CA3AF;
+            --dash-sidebar-text-active: #FFFFFF;
+            --dash-sidebar-primary: #6366F1;
+            --dash-topbar-h: 0px;
+            --dash-footer-h: 3.25rem;
+            --dash-brand-h: 57px;
         }
         body.dark-dashboard {
             background: radial-gradient(circle at 20% 20%, rgba(93,141,255,.18), transparent 50%),
@@ -35,6 +40,10 @@
                         linear-gradient(120deg, #f6f8ff 0%, #eef3ff 60%, #f4f7ff 100%);
             color: var(--dash-text);
             font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
+        }
+        html, body { height: 100%; }
+        body.dark-dashboard {
+            overflow-x: hidden;
         }
         body.dark-dashboard::before {
             content: "";
@@ -56,38 +65,254 @@
             font-size: 1.5rem;
             font-weight: 600;
         }
-        .dark-dashboard .main-header {
-            background: rgba(255,255,255,.82);
-            border-bottom: 1px solid rgba(29,36,78,.08);
-            backdrop-filter: blur(14px);
-            box-shadow: 0 20px 40px rgba(29,36,78,.08);
-        }
-        .dark-dashboard .navbar-nav .nav-link {
-            color: var(--dash-muted);
-        }
-        .dark-dashboard .navbar-nav .nav-link:hover {
-            color: var(--dash-accent);
-        }
+        /* 顶部栏：本项目不使用（保留结构兼容，但隐藏） */
+        .dark-dashboard .main-header { display: none; }
         .dark-dashboard .main-sidebar {
-            background: linear-gradient(180deg, var(--dash-sidebar-bg) 0%, var(--dash-sidebar-bg2) 100%);
+            background: var(--dash-sidebar-bg);
             border-right: 1px solid var(--dash-sidebar-border);
-            box-shadow: 20px 0 45px rgba(17,21,44,.55);
+            box-shadow: none;
+            backdrop-filter: none;
         }
         .dark-dashboard .brand-link {
-            background: rgba(255,255,255,.02);
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            color: #f3f6ff;
+            background: transparent;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            color: var(--dash-sidebar-text-active);
+            backdrop-filter: none;
         }
-        .dark-dashboard .nav-sidebar>.nav-item>.nav-link {
+        .dark-dashboard .brand-link .brand-text {
+            color: var(--dash-sidebar-text-active);
+            font-weight: 600;
+        }
+
+        /* 固定布局：避免页面底部多余滚动条；侧栏内部滚动 */
+        .layout-fixed .main-sidebar .sidebar {
+            height: calc(100vh - var(--dash-brand-h));
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .layout-fixed .content-wrapper {
+            margin-top: 0 !important;
+            min-height: calc(100vh - var(--dash-footer-h));
+        }
+        .layout-fixed .main-footer {
+            padding-bottom: 0.75rem;
+        }
+        /* 侧栏菜单：Bootstrap collapse 控制展开（与 SSR 一致）+ 极简暗黑 */
+        .dark-dashboard .sidebar .admin-sidenav {
+            padding: 10px 10px 10px;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-section {
+            padding: 10px 14px 6px;
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(148,163,184,0.70); /* slate-400/500 */
+            user-select: none;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-link,
+        .dark-dashboard .sidebar .admin-sidenav-group-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 10px 14px;
+            margin: 4px 0;
+            border-radius: 10px;
             color: var(--dash-sidebar-text);
-            transition: all .2s ease;
+            border: 1px solid transparent;
+            background: transparent;
+            box-shadow: none;
+            text-decoration: none !important;
+            transition: background 0.2s ease, color 0.2s ease;
+            font-size: 14px;
+            font-weight: 600;
+            position: relative;
         }
-        .dark-dashboard .nav-sidebar>.nav-item>.nav-link.active,
-        .dark-dashboard .nav-sidebar>.nav-item>.nav-link:hover {
-            background: rgba(85,112,255,.18);
-            color: #fff;
-            border-left: 3px solid var(--dash-accent);
-            box-shadow: inset 0 0 14px rgba(85,112,255,.25);
+        .dark-dashboard .sidebar .admin-sidenav-link:hover,
+        .dark-dashboard .sidebar .admin-sidenav-group-head:hover {
+            background: rgba(255,255,255,0.04);
+            color: var(--dash-sidebar-text-active);
+            transform: translateX(2px);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-link.active {
+            background: rgba(30,41,59,0.55); /* gray-800-ish */
+            color: var(--dash-sidebar-text-active);
+            border-color: transparent;
+            box-shadow: none;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-link.active::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            border-radius: 2px;
+            background: var(--dash-sidebar-primary);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-ico {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: currentColor;
+            flex: 0 0 auto;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-ico svg { width: 18px; height: 18px; }
+        .dark-dashboard .sidebar .admin-sidenav-link.active .admin-sidenav-ico,
+        .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) .admin-sidenav-ico,
+        .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot .admin-sidenav-ico {
+            color: var(--dash-sidebar-primary);
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot {
+            background: transparent;
+            border-color: transparent;
+            color: var(--dash-sidebar-text-active);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-txt {
+            flex: 1 1 auto;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-chev {
+            margin-left: auto;
+            opacity: 0.75;
+            font-size: 0.72rem;
+            transition: transform 0.2s ease;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) .admin-sidenav-chev {
+            transform: rotate(180deg);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-group-head:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(85, 112, 255, 0.35);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subwrap {
+            padding: 0 0 6px 0;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sub {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            border-left: none;
+            margin-left: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sublink {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px 8px 28px; /* 更紧凑 + 统一与图标对齐 */
+            margin: 2px 0;
+            border-radius: 10px;
+            color: #9CA3AF;
+            font-size: 13px;
+            text-decoration: none !important;
+            transition: background 0.2s ease, color 0.2s ease;
+            line-height: 1.2;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subico {
+            width: 16px;
+            height: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(156,163,175,0.85);
+            flex: 0 0 auto;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subico svg { width: 16px; height: 16px; }
+        .dark-dashboard .sidebar .admin-sidenav-subtxt {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sublink:hover {
+            background: rgba(255,255,255,0.04);
+            color: #FFFFFF;
+            transform: translateX(2px);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sublink:hover .admin-sidenav-subico {
+            color: rgba(255,255,255,0.92);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sublink.active {
+            color: #FFFFFF;
+            background: rgba(30,41,59,0.55);
+            box-shadow: none;
+            position: relative;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sublink.active::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            border-radius: 2px;
+            background: var(--dash-sidebar-primary);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sublink.active .admin-sidenav-subico {
+            color: var(--dash-sidebar-primary);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-link,
+        .dark-dashboard .sidebar .admin-sidenav-group-head,
+        .dark-dashboard .sidebar .admin-sidenav-sublink {
+            will-change: transform;
+        }
+
+        .dark-dashboard .sidebar .admin-sidenav-footer {
+            margin: 14px 10px 10px;
+            padding: 12px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            color: rgba(156,163,175,0.88);
+            font-size: 12px;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-footer .rowline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 6px 0;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-footer .rowline + .rowline {
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-footer .k {
+            color: rgba(148,163,184,0.75);
+            letter-spacing: 0.04em;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-footer .v {
+            color: rgba(255,255,255,0.92);
+            font-weight: 600;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-footer .muted {
+            color: rgba(156,163,175,0.70);
+            font-weight: 500;
+        }
+        .dark-dashboard .sidebar .collapse {
+            transition: height 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dark-dashboard .sidebar .collapsing {
+            transition: height 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .dark-dashboard .sidebar .collapse,
+            .dark-dashboard .sidebar .collapsing,
+            .dark-dashboard .sidebar .admin-sidenav-link,
+            .dark-dashboard .sidebar .admin-sidenav-group-head,
+            .dark-dashboard .sidebar .admin-sidenav-sublink,
+            .dark-dashboard .sidebar .admin-sidenav-chev {
+                transition: none !important;
+            }
         }
         .dark-dashboard .content-wrapper {
             background: transparent;
@@ -97,7 +322,6 @@
             border: 1px solid rgba(29,36,78,.08);
             box-shadow: 0 30px 60px rgba(29,36,78,.08);
             border-radius: 20px;
-        }
         }
         .dark-dashboard .card-header,
         .dark-dashboard .card-footer {
@@ -236,74 +460,194 @@
         .dark-dashboard .modal-footer {
             border-color: rgba(23,32,66,.12);
         }
+
+        /* ===== 统一后台页面规范（与 /video 风格一致）===== */
+        .admin-page-container {
+            padding: 20px;
+            background: #f3f4f6;
+            border-radius: 12px;
+        }
+        .admin-modern-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        }
+        .admin-header-actions {
+            margin-bottom: 16px;
+        }
+        .admin-breadcrumb {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 12px;
+            background: transparent;
+            padding: 0;
+            line-height: 1.2;
+        }
+        .admin-action-buttons {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .admin-filter-section {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .admin-custom-form {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .admin-custom-form .el-form-item,
+        .admin-custom-form .form-group,
+        .admin-custom-form .col,
+        .admin-custom-form .col-md-2,
+        .admin-custom-form .col-md-3,
+        .admin-custom-form .col-md-4 {
+            margin-bottom: 0 !important;
+            margin-right: 0 !important;
+        }
+        .admin-filter-buttons {
+            margin-left: auto;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex: 0 0 auto;
+        }
+        @media (max-width: 1200px) {
+            .admin-custom-form { overflow-x: auto; padding-bottom: 4px; }
+        }
+        .admin-footer-pagination {
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
     </style>
     {block name="style"}{/block}
 </head>
 <body class="hold-transition sidebar-mini layout-fixed dark-dashboard">
     <div class="wrapper">
-        <nav class="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
-                </li>
-            </ul>
-            <ul class="navbar-nav ml-auto">
-                <li class="nav-item d-none d-sm-inline">
-                    <span class="nav-link text-muted"><i class="fas fa-film mr-1"></i>社媒素材库</span>
-                </li>
-            </ul>
-        </nav>
+        <nav class="main-header navbar navbar-expand navbar-white navbar-light border-bottom"></nav>
 
         <aside class="main-sidebar sidebar-dark-primary elevation-4">
             <a href="/admin.php" class="brand-link text-center">
                 <span class="brand-text font-weight-light"><i class="fas fa-database mr-1"></i>社媒素材库</span>
             </a>
             <div class="sidebar">
-                <nav class="mt-2">
-                    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
-                        <li class="nav-item">
-                            <a href="/admin.php" class="nav-link {if $Request.controller == 'Index'}active{/if}">
-                                <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>仪表盘</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/cache" class="nav-link {if $Request.controller == 'Cache'}active{/if}">
-                                <i class="nav-icon fas fa-hdd"></i>
-                                <p>缓存管理</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/downloadLog" class="nav-link {if $Request.controller == 'DownloadLog'}active{/if}">
-                                <i class="nav-icon fas fa-exclamation-triangle"></i>
-                                <p>下载错误</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/platform" class="nav-link {if $Request.controller == 'Platform'}active{/if}">
-                                <i class="nav-icon fas fa-layer-group"></i>
-                                <p>平台管理</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/device" class="nav-link {if $Request.controller == 'Device'}active{/if}">
-                                <i class="nav-icon fas fa-mobile-alt"></i>
-                                <p>设备管理</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/video" class="nav-link {if $Request.controller == 'Video' && $Request.action != 'batchUpload'}active{/if}">
-                                <i class="nav-icon fas fa-video"></i>
-                                <p>视频列表</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin.php/video/batchUpload" class="nav-link {if $Request.controller == 'Video' && $Request.action == 'batchUpload'}active{/if}">
-                                <i class="nav-icon fas fa-cloud-upload-alt"></i>
-                                <p>批量上传</p>
-                            </a>
-                        </li>
-                    </ul>
+                <nav class="mt-2" aria-label="主导航">
+                    <div class="admin-sidenav">
+                        <div class="admin-sidenav-section">数据</div>
+                        <a href="/admin.php" class="admin-sidenav-link {if $Request.controller == 'Index'}active{/if}">
+                            <span class="admin-sidenav-ico"><i data-lucide="layout-dashboard"></i></span>
+                            <span class="admin-sidenav-txt">仪表盘</span>
+                        </a>
+
+                        <div class="admin-sidenav-section">素材</div>
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product' && $Request.controller != 'Distribute' && $Request.controller != 'distribute'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
+                            <span class="admin-sidenav-ico"><i data-lucide="folder"></i></span>
+                            <span class="admin-sidenav-txt">素材</span>
+                            <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
+                        </a>
+                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}show{/if}">
+                            <ul class="admin-sidenav-sub">
+                                <li>
+                                    <a href="/admin.php/video" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action != 'batchUpload' && $Request.action != 'batch_upload' && $Request.action != 'batchupload' && $Request.action != 'batch-upload'}active{/if}{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="video"></i></span>
+                                        <span class="admin-sidenav-subtxt">视频</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/video/batchUpload" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action == 'batchUpload' || $Request.action == 'batch_upload' || $Request.action == 'batchupload' || $Request.action == 'batch-upload'}active{/if}{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="cloud-upload"></i></span>
+                                        <span class="admin-sidenav-subtxt">上传</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/product" class="admin-sidenav-sublink {if $Request.controller == 'Product' || $Request.controller == 'product'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="shopping-bag"></i></span>
+                                        <span class="admin-sidenav-subtxt">商品</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
+                                        <span class="admin-sidenav-subtxt">达人链</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="admin-sidenav-section">设备</div>
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Platform' && $Request.controller != 'platform' && $Request.controller != 'Device' && $Request.controller != 'device'}collapsed{/if} {if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-terminal" aria-expanded="{if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}true{else /}false{/if}" aria-controls="admin-nav-terminal" role="button">
+                            <span class="admin-sidenav-ico"><i data-lucide="monitor-smartphone"></i></span>
+                            <span class="admin-sidenav-txt">终端</span>
+                            <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
+                        </a>
+                        <div id="admin-nav-terminal" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}show{/if}">
+                            <ul class="admin-sidenav-sub">
+                                <li>
+                                    <a href="/admin.php/platform" class="admin-sidenav-sublink {if $Request.controller == 'Platform' || $Request.controller == 'platform'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="layers"></i></span>
+                                        <span class="admin-sidenav-subtxt">平台</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/device" class="admin-sidenav-sublink {if $Request.controller == 'Device' || $Request.controller == 'device'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="smartphone"></i></span>
+                                        <span class="admin-sidenav-subtxt">设备</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="admin-sidenav-section">系统</div>
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Settings' && $Request.controller != 'settings' && $Request.controller != 'Cache' && $Request.controller != 'cache' && $Request.controller != 'DownloadLog' && $Request.controller != 'downloadlog'}collapsed{/if} {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-system" aria-expanded="{if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}true{else /}false{/if}" aria-controls="admin-nav-system" role="button">
+                            <span class="admin-sidenav-ico"><i data-lucide="settings"></i></span>
+                            <span class="admin-sidenav-txt">系统</span>
+                            <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
+                        </a>
+                        <div id="admin-nav-system" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}show{/if}">
+                            <ul class="admin-sidenav-sub">
+                                <li>
+                                    <a href="/admin.php/settings" class="admin-sidenav-sublink {if $Request.controller == 'Settings' || $Request.controller == 'settings'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="sliders-horizontal"></i></span>
+                                        <span class="admin-sidenav-subtxt">系统设置</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/cache" class="admin-sidenav-sublink {if $Request.controller == 'Cache' || $Request.controller == 'cache'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="database"></i></span>
+                                        <span class="admin-sidenav-subtxt">缓存</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/downloadLog" class="admin-sidenav-sublink {if $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="triangle-alert"></i></span>
+                                        <span class="admin-sidenav-subtxt">异常</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="admin-sidenav-footer">
+                            <div class="rowline">
+                                <span class="k">设备</span>
+                                <span class="v" id="sbDeviceCount">—</span>
+                            </div>
+                            <div class="rowline">
+                                <span class="k">上传量</span>
+                                <span class="v" id="sbUploadsSize">—</span>
+                            </div>
+                            <div class="rowline">
+                                <span class="k">版本</span>
+                                <span class="muted">{$Think.config.app.version|default='1.0.2'}</span>
+                            </div>
+                        </div>
+                    </div>
                 </nav>
             </div>
         </aside>
@@ -370,6 +714,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <script>
         window.AdminUI = (function () {
             const toastEl = $('#globalToast');
@@ -407,6 +752,87 @@
                 }
             };
         })();
+    </script>
+    <script>
+        $(function () {
+            try {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            } catch (e) {}
+        });
+    </script>
+    <script>
+        // 侧栏底部信息：设备数量 / uploads 占用
+        $(function () {
+            function formatBytes(bytes) {
+                const b = parseInt(bytes || 0, 10);
+                if (!b) return '0 B';
+                const u = ['B','KB','MB','GB','TB'];
+                let i = 0, v = b;
+                while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+                return v.toFixed(i === 0 ? 0 : 2) + ' ' + u[i];
+            }
+            $.get('/admin.php/stats/overview').done(function (res) {
+                if (res && res.code === 0 && res.data) {
+                    $('#sbDeviceCount').text(res.data.devices ?? '—');
+                }
+            });
+            $.get('/admin.php/stats/storageUsage').done(function (res) {
+                if (res && res.code === 0 && res.data && res.data.uploads) {
+                    $('#sbUploadsSize').text(formatBytes(res.data.uploads.bytes));
+                }
+            });
+        });
+    </script>
+    <script>
+        // 侧栏分组自动展开：按当前 URL 匹配子菜单链接，避免服务端 $Request.controller 命名差异导致全部收起
+        $(function () {
+            const path = (window.location.pathname || '').replace(/\/+$/, '');
+            const full = window.location.href || '';
+
+            function syncGroupHead($collapseEl) {
+                const id = $collapseEl.attr('id');
+                if (!id) return;
+                const $head = $('.admin-sidenav-group-head[data-target="#' + id + '"]');
+                if ($head.length) {
+                    $head.removeClass('collapsed').addClass('admin-sidenav-group-head--hot');
+                }
+            }
+
+            // 只处理我们自己的分组容器
+            const $collapses = $('.admin-sidenav-subwrap.collapse');
+            if (!$collapses.length) return;
+
+            let matched = false;
+            $('.admin-sidenav-sublink').each(function () {
+                const href = ($(this).attr('href') || '').replace(/\/+$/, '');
+                if (!href) return;
+
+                // href 通常形如 /admin.php/video/batchUpload
+                const hit = (path === href) || (path && href && path.indexOf(href) !== -1) || (full && full.indexOf(href) !== -1);
+                if (hit) {
+                    const $collapse = $(this).closest('.collapse');
+                    if ($collapse.length) {
+                        $collapse.collapse('show');
+                        syncGroupHead($collapse);
+                        matched = true;
+                        return false;
+                    }
+                }
+            });
+
+            // 如果没匹配到子项，则保留服务端渲染状态（一般不会发生）
+            if (!matched) {
+                $collapses.each(function () {
+                    const $c = $(this);
+                    if ($c.hasClass('show')) {
+                        syncGroupHead($c);
+                        return false;
+                    }
+                });
+            }
+        });
     </script>
     {block name="script"}{/block}
 </body>

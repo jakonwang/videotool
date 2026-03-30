@@ -1,0 +1,146 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}设置{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
+
+{block name="style"}
+<style>
+    .content-header { display: none; }
+</style>
+{/block}
+
+{block name="content"}
+<div class="admin-page-container">
+    <div class="admin-modern-card">
+        <div class="admin-header-actions">
+            <div class="admin-breadcrumb">系统 / 设置</div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                <div style="font-size:18px;font-weight:600;color:#111827;">设置</div>
+                <div class="admin-action-buttons">
+                    <button type="submit" form="settings-form" class="btn btn-primary">
+                        <i class="fas fa-save mr-1"></i> 保存
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-10 col-xl-8">
+                <form id="settings-form">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
+                    <h5 class="mb-3 text-muted">基础</h5>
+                    <div class="form-group">
+                        <label>存储方式</label>
+                        <div class="custom-control custom-radio mb-2">
+                            <input type="radio" id="st_local" name="storage" value="local" class="custom-control-input" {if $storage == 'local'}checked{/if}>
+                            <label class="custom-control-label" for="st_local">本地（public/uploads，不上传七牛）</label>
+                        </div>
+                        <div class="custom-control custom-radio">
+                            <input type="radio" id="st_qiniu" name="storage" value="qiniu" class="custom-control-input" {if $storage == 'qiniu'}checked{/if}>
+                            <label class="custom-control-label" for="st_qiniu">七牛云（密钥与域名可在下方填写，或仍使用配置文件 / 环境变量）</label>
+                        </div>
+                        <small class="form-text text-muted">选「本地」时上传仅保存到服务器；数据库中的七牛项非空时会覆盖 `config/qiniu.php` 对应项。</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="default_cover_url">默认封面地址</label>
+                        <input type="text" name="default_cover_url" id="default_cover_url" class="form-control" value="{$default_cover_url|default=''}" placeholder="留空则使用内置图 /static/default-cover.svg">
+                        <small class="form-text text-muted">可填完整 URL 或以 / 开头的站内路径。视频未上传封面时前台/API 显示此图。</small>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="site_name">站点名称</label>
+                        <input type="text" name="site_name" id="site_name" class="form-control" value="{$site_name|default=''}" placeholder="可选，用于标题或展示">
+                    </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
+                    <h5 class="mb-3 text-muted">七牛云</h5>
+                    <div class="form-group">
+                        <label for="qiniu_access_key">Access Key</label>
+                        <input type="text" name="qiniu_access_key" id="qiniu_access_key" class="form-control" value="" autocomplete="off" placeholder="{if $qiniu_access_configured}已保存，留空不修改{else /}可选，留空则使用配置文件{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="qiniu_access_clear" name="qiniu_access_clear" value="1">
+                            <label class="custom-control-label" for="qiniu_access_clear">清空后台中的 Access Key（改回仅使用配置文件）</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="qiniu_secret_key">Secret Key</label>
+                        <input type="password" name="qiniu_secret_key" id="qiniu_secret_key" class="form-control" value="" autocomplete="new-password" placeholder="{if $qiniu_secret_configured}已保存，留空不修改{else /}可选，留空则使用配置文件{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="qiniu_secret_clear" name="qiniu_secret_clear" value="1">
+                            <label class="custom-control-label" for="qiniu_secret_clear">清空后台中的 Secret Key</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="qiniu_bucket">空间名（Bucket）</label>
+                        <input type="text" name="qiniu_bucket" id="qiniu_bucket" class="form-control" value="{$qiniu_bucket|default=''}" placeholder="留空则使用配置文件">
+                    </div>
+                    <div class="form-group">
+                        <label for="qiniu_domain">访问域名（CDN，含 https://）</label>
+                        <input type="text" name="qiniu_domain" id="qiniu_domain" class="form-control" value="{$qiniu_domain|default=''}" placeholder="留空则使用配置文件">
+                    </div>
+                    <div class="form-group">
+                        <label for="qiniu_cdn_domains">额外 CDN 域名（cdn_domains）</label>
+                        <textarea name="qiniu_cdn_domains" id="qiniu_cdn_domains" class="form-control" rows="3" placeholder="一行一个，或英文逗号/分号分隔；与主域名并列用于下载/识别 CDN 链接。留空则仅使用配置文件中的列表">{$qiniu_cdn_domains|default=''}</textarea>
+                        <small class="form-text text-muted">与主「访问域名」一致时可不填；多域名加速或备用域时在此补充。后台非空时<strong>整表替换</strong>配置文件里的 cdn_domains。</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="qiniu_region">区域（Region）</label>
+                        <select name="qiniu_region" id="qiniu_region" class="form-control custom-select">
+                            <option value="" {if $qiniu_region == ''}selected{/if}>留空则使用配置文件</option>
+                            <option value="z0" {if $qiniu_region == 'z0'}selected{/if}>z0 华南</option>
+                            <option value="z1" {if $qiniu_region == 'z1'}selected{/if}>z1 华北</option>
+                            <option value="z2" {if $qiniu_region == 'z2'}selected{/if}>z2 华东</option>
+                            <option value="na0" {if $qiniu_region == 'na0'}selected{/if}>na0 北美</option>
+                            <option value="as0" {if $qiniu_region == 'as0'}selected{/if}>as0 东南亚</option>
+                        </select>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        当前生效域名（合并后）：<code>{$qiniu_effective.domain|default=''}</code>
+                        ｜ Bucket：<code>{$qiniu_effective.bucket|default=''}</code>
+                        ｜ Region：<code>{$qiniu_effective.region|default=''}</code>
+                    </p>
+                    <p class="small text-muted mb-0 mt-1">
+                        额外 CDN（合并后）：{if $qiniu_effective_cdn_label != ''}<code>{$qiniu_effective_cdn_label}</code>{else /}<span class="text-muted">无</span>{/if}
+                    </p>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
+                    </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{/block}
+
+{block name="script"}
+<script>
+    $(function () {
+        $('#settings-form').on('submit', function (e) {
+            e.preventDefault();
+            const $btn = $(this).find('button[type="submit"]');
+            const html = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>');
+            $.post('/admin.php/settings', $(this).serialize())
+                .done(function (res) {
+                    if (res.code === 0) {
+                        AdminUI.showToast('success', res.msg || '已保存');
+                        $('#qiniu_access_key').val('');
+                        $('#qiniu_secret_key').val('');
+                        setTimeout(function () { location.reload(); }, 500);
+                    } else {
+                        AdminUI.showToast('error', res.msg || '失败');
+                    }
+                })
+                .fail(function () { AdminUI.showToast('error', '网络错误'); })
+                .always(function () { $btn.prop('disabled', false).html(html); });
+        });
+    });
+</script>
+{/block}

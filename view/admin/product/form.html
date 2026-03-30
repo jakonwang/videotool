@@ -1,0 +1,74 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}{if isset($info)}编辑商品{else}添加商品{/if}{/block}
+{block name="page_title"}{if isset($info)}编辑商品{else}添加商品{/if}{/block}
+{block name="breadcrumb"}<a href="/admin.php/product" class="text-muted">商品</a> / {if isset($info)}编辑{else}添加{/if}{/block}
+{block name="page_actions"}
+<a href="/admin.php/product" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left mr-1"></i> 返回
+</a>
+{/block}
+
+{block name="content"}
+<div class="row">
+    <div class="col-lg-7 col-xl-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form id="product-form" autocomplete="off">
+                    {if isset($info)}<input type="hidden" name="id" value="{$info.id}">{/if}
+                    <div class="form-group">
+                        <label for="name">名称 <span class="text-danger">*</span></label>
+                        <input type="text" id="name" name="name" class="form-control" value="{$info.name|default=''}" required placeholder="商品名称">
+                    </div>
+                    <div class="form-group">
+                        <label for="goods_url">商品链接</label>
+                        <input type="url" id="goods_url" name="goods_url" class="form-control" value="{$info.goods_url|default=''}" placeholder="https:// 发给达人时可参考">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="sort_order">排序</label>
+                            <input type="number" id="sort_order" name="sort_order" class="form-control" value="{$info.sort_order|default=0}">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="status">状态</label>
+                            <select id="status" name="status" class="form-control">
+                                <option value="1" {if isset($info) && $info.status == 1}selected{/if}>启用</option>
+                                <option value="0" {if isset($info) && $info.status == 0}selected{/if}>禁用</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{/block}
+
+{block name="script"}
+<script>
+    $(function () {
+        $('#product-form').on('submit', function (event) {
+            event.preventDefault();
+            const $form = $(this);
+            const submitBtn = $form.find('button[type="submit"]');
+            const originalHtml = submitBtn.html();
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>保存中');
+            const url = {if isset($info)}'/admin.php/product/edit/{$info.id}'{else}'/admin.php/product/add'{/if};
+            $.post(url, $form.serialize())
+                .done(function (res) {
+                    if (res.code === 0) {
+                        AdminUI.showToast('success', res.msg || '保存成功');
+                        setTimeout(() => window.location.href = '/admin.php/product', 800);
+                    } else {
+                        AdminUI.showToast('error', res.msg || '保存失败');
+                    }
+                })
+                .fail(function () { AdminUI.showToast('error', '网络错误'); })
+                .always(function () { submitBtn.prop('disabled', false).html(originalHtml); });
+        });
+    });
+</script>
+{/block}

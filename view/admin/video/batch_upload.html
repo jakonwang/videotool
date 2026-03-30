@@ -1,10 +1,10 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}批量上传视频{/block}
-{block name="page_title"}批量上传视频{/block}
+{block name="title"}上传{/block}
+{block name="page_title"}上传{/block}
 {block name="page_actions"}
 <a href="/admin.php/video" class="btn btn-outline-secondary btn-sm">
-    <i class="fas fa-arrow-left mr-1"></i> 返回视频列表
+    <i class="fas fa-arrow-left mr-1"></i> 返回视频
 </a>
 {/block}
 
@@ -51,6 +51,16 @@
         <div class="card-body">
             <div class="row mb-3">
                 <div class="col-md-6">
+                    <label>所属商品</label>
+                    <select name="product_id" id="product_id" class="form-control">
+                        <option value="0">不绑定（需选设备）</option>
+                        {volist name="products" id="prod"}
+                        <option value="{$prod.id}">{$prod.name}</option>
+                        {/volist}
+                    </select>
+                    <small class="form-text text-muted">选择商品后用于达人链，无需再选设备。</small>
+                </div>
+                <div class="col-md-6">
                     <label>选择平台 <span class="text-danger">*</span></label>
                     <select name="platform_id" id="platform_id" class="form-control" required>
                         <option value="">请选择</option>
@@ -59,9 +69,11 @@
                         {/volist}
                     </select>
                 </div>
+            </div>
+            <div class="row mb-3" id="device_row">
                 <div class="col-md-6">
-                    <label>选择设备 <span class="text-danger">*</span></label>
-                    <select name="device_id" id="device_id" class="form-control" required>
+                    <label>选择设备 <span class="text-danger device-req">*</span></label>
+                    <select name="device_id" id="device_id" class="form-control">
                         <option value="">请先选择平台</option>
                     </select>
                 </div>
@@ -117,6 +129,21 @@
             return prefix + '_' + timestamp + '_' + random + '.' + ext;
         }
         
+        function syncUploadDeviceRow() {
+            const pid = parseInt($('#product_id').val(), 10) || 0;
+            if (pid > 0) {
+                $('#device_row').addClass('d-none');
+                $('#device_id').prop('required', false).val('');
+                $('.device-req').addClass('d-none');
+            } else {
+                $('#device_row').removeClass('d-none');
+                $('#device_id').prop('required', true);
+                $('.device-req').removeClass('d-none');
+            }
+        }
+        $('#product_id').off('change').on('change', syncUploadDeviceRow);
+        syncUploadDeviceRow();
+
         // 平台改变时加载设备
         $('#platform_id').off('change').on('change', function() {
             const platformId = $(this).val();
@@ -421,6 +448,7 @@
                     formData.append('fileIndex', fileIndex);
                     formData.append('platform_id', platformId);
                     formData.append('device_id', deviceId);
+                    formData.append('product_id', $('#product_id').val() || '0');
                     formData.append('title', titles[fileIndex] || file.name.replace(/\.[^/.]+$/, ''));
                     
                     // 如果是最后一个分片，添加封面文件
@@ -528,9 +556,14 @@
             const $form = $(this);
             const platformId = $('#platform_id').val();
             const deviceId = $('#device_id').val();
+            const productId = parseInt($('#product_id').val(), 10) || 0;
             
-            if (!platformId || !deviceId) {
-                AdminUI.showToast('warning', '请选择平台和设备');
+            if (!platformId) {
+                AdminUI.showToast('warning', '请选择平台');
+                return false;
+            }
+            if (productId <= 0 && !deviceId) {
+                AdminUI.showToast('warning', '未绑定商品时请同时选择设备');
                 return false;
             }
             
@@ -685,6 +718,7 @@
                             data: JSON.stringify({
                                 platform_id: platformId,
                                 device_id: deviceId,
+                                product_id: parseInt($('#product_id').val(), 10) || 0,
                                 title: title,
                                 video_url: videoUrl,
                                 cover_url: coverUrl
@@ -793,6 +827,7 @@
                         formData.append('videos[]', file);
                         formData.append('platform_id', platformId);
                         formData.append('device_id', deviceId);
+                        formData.append('product_id', $('#product_id').val() || '0');
                         formData.append('titles[' + fileIndex + ']', titles[fileIndex] || file.name.replace(/\.[^/.]+$/, ''));
                         
                         if (coverFile) {
