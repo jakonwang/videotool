@@ -5,6 +5,7 @@ namespace app\controller\admin;
 
 use app\BaseController;
 use app\model\Product as ProductModel;
+use think\facade\Db;
 use think\facade\View;
 
 /**
@@ -87,14 +88,48 @@ class Product extends BaseController
             'query' => $this->request->param(),
         ]);
 
+        $productIds = [];
+        foreach ($list as $p) {
+            $pid = (int) ($p->id ?? 0);
+            if ($pid > 0) {
+                $productIds[] = $pid;
+            }
+        }
+        $statsByProductId = [];
+        if (!empty($productIds)) {
+            $rows = Db::name('videos')
+                ->fieldRaw("
+                    product_id,
+                    COUNT(*) AS total_videos,
+                    SUM(CASE WHEN is_downloaded = 1 THEN 1 ELSE 0 END) AS downloaded_videos,
+                    SUM(CASE WHEN is_downloaded = 0 THEN 1 ELSE 0 END) AS undownloaded_videos
+                ")
+                ->whereIn('product_id', $productIds)
+                ->group('product_id')
+                ->select()
+                ->toArray();
+            foreach ($rows as $r) {
+                $statsByProductId[(int) $r['product_id']] = [
+                    'total_videos' => (int) ($r['total_videos'] ?? 0),
+                    'downloaded_videos' => (int) ($r['downloaded_videos'] ?? 0),
+                    'undownloaded_videos' => (int) ($r['undownloaded_videos'] ?? 0),
+                ];
+            }
+        }
+
         $items = [];
         foreach ($list as $p) {
+            $pid = (int) ($p->id ?? 0);
+            $st = $statsByProductId[$pid] ?? null;
             $items[] = [
-                'id' => (int) $p->id,
+                'id' => $pid,
                 'name' => (string) ($p->name ?? ''),
                 'goods_url' => (string) ($p->goods_url ?? ''),
                 'status' => (int) ($p->status ?? 0),
                 'sort_order' => (int) ($p->sort_order ?? 0),
+                'total_videos' => (int) ($st['total_videos'] ?? 0),
+                'downloaded_videos' => (int) ($st['downloaded_videos'] ?? 0),
+                'undownloaded_videos' => (int) ($st['undownloaded_videos'] ?? 0),
                 'updated_at' => (string) ($p->updated_at ?? ''),
                 'created_at' => (string) ($p->created_at ?? ''),
             ];

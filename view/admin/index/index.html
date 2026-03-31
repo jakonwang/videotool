@@ -1,7 +1,7 @@
 {extend name="admin/common/layout" /}
 
 {block name="title"}仪表盘{/block}
-{block name="page_title"}仪表盘{/block}
+{block name="page_title"}<span data-i18n="page.dashboard.title">仪表盘</span>{/block}
 {block name="style"}
 <style>
     /* SaaS Dashboard（更专业：层级清晰、可读性强）——仅作用于仪表盘 */
@@ -172,12 +172,15 @@
             <div class="kpi-left">
                 <div class="kpi-ico" style="background: rgba(245,158,11,0.10);"><i data-lucide="video"></i></div>
                 <div>
-                    <p class="kpi-title">视频总数</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.videosTotal">视频总数</p>
                     <p class="kpi-value">{$stats.videos|default=0}</p>
-                    <div class="kpi-trend">已下载 {$stats.downloaded|default=0} · 未下载 {$stats.undownloaded|default=0}</div>
+                    <div class="kpi-trend">
+                        <span data-i18n="dashboard.kpi.downloaded">已下载</span> {$stats.downloaded|default=0}
+                        · <span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$stats.undownloaded|default=0}
+                    </div>
                 </div>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-warning);" href="/admin.php/video">查看</a>
+            <a class="kpi-link" style="--kpi-c: var(--ds-warning);" href="/admin.php/video" data-i18n="dashboard.action.view">查看</a>
         </div>
     </div>
     <div class="kpi-card kpi-card--hero kpi-card--success" style="--kpi-c: var(--ds-success);">
@@ -185,12 +188,12 @@
             <div class="kpi-left">
                 <div class="kpi-ico" style="background: rgba(34,197,94,0.10);"><i data-lucide="badge-check"></i></div>
                 <div>
-                    <p class="kpi-title">已下载</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.downloaded">已下载</p>
                     <p class="kpi-value">{$stats.downloaded|default=0}</p>
-                    <div class="kpi-trend">占比 {$stats.download_rate|default=0}%</div>
+                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.downloadRate">下载率（重点）</span> {$stats.download_rate|default=0}%</div>
                 </div>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/video?is_downloaded=1">筛选</a>
+            <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/video?is_downloaded=1" data-i18n="dashboard.action.filter">筛选</a>
         </div>
     </div>
     <div class="kpi-card kpi-card--hero kpi-card--highlight" style="--kpi-c: var(--ds-primary);">
@@ -198,12 +201,15 @@
             <div class="kpi-left">
                 <div class="kpi-ico"><i data-lucide="trending-up"></i></div>
                 <div>
-                    <p class="kpi-title">下载率（重点）</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.downloadRate">下载率（重点）</p>
                     <p class="kpi-value">{$stats.download_rate|default=0}%</p>
-                    <div class="kpi-trend">截至 {$stats.asof|default=''} · 目标 100%</div>
+                    <div class="kpi-trend">
+                        <span data-i18n="dashboard.kpi.asof" data-i18n-title="dashboard.kpi.asof">截至 {$stats.asof|default=''}</span>
+                        · <span data-i18n="dashboard.kpi.target">目标 100%</span>
+                    </div>
                 </div>
             </div>
-            <a class="kpi-link" href="/admin.php/video?is_downloaded=1">查看</a>
+            <a class="kpi-link" href="/admin.php/video?is_downloaded=1" data-i18n="dashboard.action.view">查看</a>
         </div>
     </div>
     <div class="kpi-card kpi-card--hero kpi-card--danger" style="--kpi-c: var(--ds-danger);">
@@ -211,12 +217,12 @@
             <div class="kpi-left">
                 <div class="kpi-ico" style="background: rgba(239,68,68,0.10);"><i data-lucide="hourglass"></i></div>
                 <div>
-                    <p class="kpi-title">待下载</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.pending">待下载</p>
                     <p class="kpi-value">{$stats.undownloaded|default=0}</p>
-                    <div class="kpi-trend">占比 {$stats.undownload_rate|default=0}%</div>
+                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$stats.undownload_rate|default=0}%</div>
                 </div>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-danger);" href="/admin.php/video?is_downloaded=0">处理</a>
+            <a class="kpi-link" style="--kpi-c: var(--ds-danger);" href="/admin.php/video?is_downloaded=0" data-i18n="dashboard.action.handle">处理</a>
         </div>
     </div>
 </div>
@@ -227,12 +233,12 @@
             <div class="kpi-left">
                 <div class="kpi-ico"><i data-lucide="layers"></i></div>
                 <div>
-                    <p class="kpi-title">平台数量</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.platforms">平台数量</p>
                     <p class="kpi-value">{$stats.platforms|default=0}</p>
-                    <div class="kpi-trend">总览</div>
+                    <div class="kpi-trend" data-i18n="dashboard.kpi.overview">总览</div>
                 </div>
             </div>
-            <a class="kpi-link" href="/admin.php/platform">查看</a>
+            <a class="kpi-link" href="/admin.php/platform" data-i18n="dashboard.action.view">查看</a>
         </div>
     </div>
     <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-success);">
@@ -240,12 +246,12 @@
             <div class="kpi-left">
                 <div class="kpi-ico" style="background: rgba(34,197,94,0.10);"><i data-lucide="smartphone"></i></div>
                 <div>
-                    <p class="kpi-title">设备数量</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.devices">设备数量</p>
                     <p class="kpi-value">{$stats.devices|default=0}</p>
-                    <div class="kpi-trend">总览</div>
+                    <div class="kpi-trend" data-i18n="dashboard.kpi.overview">总览</div>
                 </div>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/device">查看</a>
+            <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/device" data-i18n="dashboard.action.view">查看</a>
         </div>
     </div>
     <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-primary);">
@@ -253,7 +259,7 @@
             <div class="kpi-left">
                 <div class="kpi-ico"><i data-lucide="cloud-upload"></i></div>
                 <div>
-                    <p class="kpi-title">今日上传</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.todayUpload">今日上传</p>
                     <p class="kpi-value">{$stats.today_uploaded|default=0}</p>
                     {if $stats.today_uploaded_delta_pct !== null}
                         <div class="kpi-trend {if $stats.today_uploaded_delta_pct >= 0}up{else /}down{/if}">
@@ -261,11 +267,14 @@
                             <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$stats.avg7_uploaded|default=0}</span>
                         </div>
                     {else /}
-                        <div class="kpi-trend">昨日 {$stats.yesterday_uploaded|default=0} · 7日均值 {$stats.avg7_uploaded|default=0}</div>
+                        <div class="kpi-trend">
+                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$stats.yesterday_uploaded|default=0}
+                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$stats.avg7_uploaded|default=0}
+                        </div>
                     {/if}
                 </div>
             </div>
-            <a class="kpi-link" href="/admin.php/video">列表</a>
+            <a class="kpi-link" href="/admin.php/video" data-i18n="dashboard.action.list">列表</a>
         </div>
     </div>
     <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-primary);">
@@ -273,7 +282,7 @@
             <div class="kpi-left">
                 <div class="kpi-ico"><i data-lucide="download"></i></div>
                 <div>
-                    <p class="kpi-title">今日下载</p>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.todayDownload">今日下载</p>
                     <p class="kpi-value">{$stats.today_downloaded|default=0}</p>
                     {if $stats.today_downloaded_delta_pct !== null}
                         <div class="kpi-trend {if $stats.today_downloaded_delta_pct >= 0}up{else /}down{/if}">
@@ -281,21 +290,26 @@
                             <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$stats.avg7_downloaded|default=0}</span>
                         </div>
                     {else /}
-                        <div class="kpi-trend">昨日 {$stats.yesterday_downloaded|default=0} · 7日均值 {$stats.avg7_downloaded|default=0}</div>
+                        <div class="kpi-trend">
+                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$stats.yesterday_downloaded|default=0}
+                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$stats.avg7_downloaded|default=0}
+                        </div>
                     {/if}
                 </div>
             </div>
-            <a class="kpi-link" href="/admin.php/downloadLog">异常</a>
+            <a class="kpi-link" href="/admin.php/downloadLog" data-i18n="dashboard.action.errors">异常</a>
         </div>
     </div>
 </div>
 
 <div class="ops-card">
-    <div class="ops-title">今日数据总结</div>
+    <div class="ops-title" data-i18n="dashboard.ops.title">今日数据总结</div>
     <p class="ops-text">
-        今日上传 <strong>{$stats.today_uploaded|default=0}</strong> 条，待处理 <strong>{$stats.undownloaded|default=0}</strong> 条，下载率 <strong>{$stats.download_rate|default=0}%</strong>。
+        <span data-i18n="dashboard.ops.todayUpload">今日上传</span> <strong>{$stats.today_uploaded|default=0}</strong> 条，
+        <span data-i18n="dashboard.ops.pending">待处理</span> <strong>{$stats.undownloaded|default=0}</strong> 条，
+        <span data-i18n="dashboard.ops.downloadRate">下载率</span> <strong>{$stats.download_rate|default=0}%</strong>。
     </p>
-    <div class="ops-hint">建议：优先处理未下载素材，提高下载率。</div>
+    <div class="ops-hint" data-i18n="dashboard.ops.hint">建议：优先处理未下载素材，提高下载率。</div>
 </div>
 
 <!-- 后续图表区域也限定最大宽度 -->
@@ -304,22 +318,22 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
-                <span class="font-weight-semibold">近30天趋势（上传柱状 + 下载折线）</span>
+                <span class="font-weight-semibold" data-i18n="dashboard.chart.trendsTitle30">近30天趋势（上传柱状 + 下载折线）</span>
                 <div>
-                    <button class="btn btn-sm btn-outline-secondary js-range" data-days="7">7天</button>
-                    <button class="btn btn-sm btn-outline-secondary js-range" data-days="30">30天</button>
+                    <button class="btn btn-sm btn-outline-secondary js-range" data-days="7" data-i18n="dashboard.chart.days7">7天</button>
+                    <button class="btn btn-sm btn-outline-secondary js-range" data-days="30" data-i18n="dashboard.chart.days30">30天</button>
                 </div>
             </div>
             <div class="card-body">
                 <div id="chartTrends" style="height:320px;"></div>
-                <div id="chartTrendsEmpty" class="text-muted small" style="display:none;">近30天暂无明显数据变化</div>
+                <div id="chartTrendsEmpty" class="text-muted small" style="display:none;" data-i18n="dashboard.chart.trendsEmpty30">近30天暂无明显数据变化</div>
             </div>
         </div>
     </div>
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <span class="font-weight-semibold">平台分布</span>
+                <span class="font-weight-semibold" data-i18n="dashboard.chart.platformDist">平台分布</span>
             </div>
             <div class="card-body">
                 <div id="platformList" class="plat-list"></div>
@@ -332,8 +346,8 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
-                <span class="font-weight-semibold">近7天下载异常趋势</span>
-                <a href="/admin.php/downloadLog" class="btn btn-sm btn-outline-secondary">打开异常</a>
+                <span class="font-weight-semibold" data-i18n="dashboard.chart.errorsTrend">近7天下载异常趋势</span>
+                <a href="/admin.php/downloadLog" class="btn btn-sm btn-outline-secondary" data-i18n="dashboard.chart.openErrors">打开异常</a>
             </div>
             <div class="card-body">
                 <div id="chartErrors" style="height:300px;"></div>
@@ -343,10 +357,10 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <span class="font-weight-semibold">Top异常</span>
+                <span class="font-weight-semibold" data-i18n="dashboard.chart.topErrors">Top异常</span>
             </div>
             <div class="card-body">
-                <div id="errorTopList" class="small text-muted">加载中…</div>
+                <div id="errorTopList" class="small text-muted" data-i18n="influencer.loading">加载中…</div>
             </div>
         </div>
     </div>
@@ -356,8 +370,8 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
-                <span class="font-weight-semibold">商品库存（Top12）</span>
-                <a href="/admin.php/product" class="btn btn-sm btn-outline-secondary">管理商品</a>
+                <span class="font-weight-semibold" data-i18n="dashboard.chart.productStockTop">商品库存（Top12）</span>
+                <a href="/admin.php/product" class="btn btn-sm btn-outline-secondary" data-i18n="dashboard.chart.manageProduct">管理商品</a>
             </div>
             <div class="card-body">
                 <div id="chartProduct" style="height:320px;"></div>
@@ -367,7 +381,7 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <span class="font-weight-semibold">容量</span>
+                <span class="font-weight-semibold" data-i18n="dashboard.chart.capacity">容量</span>
             </div>
             <div class="card-body">
                 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -375,7 +389,7 @@
                     <div class="font-weight-bold" id="uploadsSize">—</div>
                 </div>
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="text-muted small">uploads 文件数</div>
+                    <div class="text-muted small" data-i18n="dashboard.storage.uploadsFiles">uploads 文件数</div>
                     <div class="font-weight-bold" id="uploadsFiles">—</div>
                 </div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -383,7 +397,7 @@
                     <div class="font-weight-bold" id="cacheSize">—</div>
                 </div>
                 <div class="d-flex align-items-center justify-content-between">
-                    <div class="text-muted small">cache 文件数</div>
+                    <div class="text-muted small" data-i18n="dashboard.storage.cacheFiles">cache 文件数</div>
                     <div class="font-weight-bold" id="cacheFiles">—</div>
                 </div>
             </div>
@@ -398,6 +412,10 @@
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
 <script>
     $(function () {
+        const _t = function (key, vars) {
+            try { return (window.AppI18n && window.AppI18n.t) ? window.AppI18n.t(key, vars) : key; } catch (e) { return key; }
+        };
+        try { document.title = _t('page.dashboard.title'); } catch (e) {}
         try {
             if (window.lucide) {
                 window.lucide.createIcons();
@@ -439,7 +457,7 @@
             $trendsEmpty.hide();
             chartTrends.setOption({
                 tooltip: {trigger: 'axis'},
-                legend: {data: ['上传', '下载'], textStyle: {color: c.muted}},
+                legend: {data: [_t('dashboard.legend.upload'), _t('dashboard.legend.download')], textStyle: {color: c.muted}},
                 grid: {left: 40, right: 18, top: 40, bottom: 30},
                 xAxis: {
                     type: 'category',
@@ -455,14 +473,14 @@
                 },
                 series: [
                     {
-                        name: '上传',
+                        name: _t('dashboard.legend.upload'),
                         type: 'bar',
                         barWidth: 14,
                         itemStyle: {borderRadius: [8, 8, 2, 2], color: 'rgba(85,112,255,0.75)'},
                         data: uploaded
                     },
                     {
-                        name: '下载',
+                        name: _t('dashboard.legend.download'),
                         type: 'line',
                         smooth: true,
                         symbol: 'circle',
@@ -486,7 +504,7 @@
             const sumTotal = totals.reduce(function (s, v) { return s + (parseInt(v || 0, 10) || 0); }, 0);
 
             if (!labels.length || sumTotal === 0) {
-                $platformList.html('<div class="text-muted small">暂无平台数据</div>');
+                $platformList.html('<div class="text-muted small">' + escapeHtml(_t('dashboard.platform.noData')) + '</div>');
                 return;
             }
 
@@ -508,7 +526,7 @@
                     '    <div class="plat-pct">' + pctText + '</div>' +
                     '  </div>' +
                     '  <div class="plat-bar"><span style="width:' + r.pct + '%"></span></div>' +
-                    '  <div class="plat-sub">总量 ' + r.total + ' · 已下载 ' + r.downloaded + ' · 未下载 ' + r.undownloaded + '</div>' +
+                    '  <div class="plat-sub">' + escapeHtml(_t('dashboard.platform.sub', {total: r.total, downloaded: r.downloaded, undownloaded: r.undownloaded})) + '</div>' +
                     '</div>';
             }).join('');
             $platformList.html(html);
@@ -518,14 +536,14 @@
             const c = techColors();
             chartErrors.setOption({
                 tooltip: {trigger: 'axis'},
-                legend: {data: ['下载错误', '缓存错误', '其他'], textStyle: {color: c.muted}},
+                legend: {data: [_t('dashboard.errors.download'), _t('dashboard.errors.cache'), _t('dashboard.errors.other')], textStyle: {color: c.muted}},
                 grid: {left: 40, right: 18, top: 40, bottom: 30},
                 xAxis: {type: 'category', data: data.labels || [], axisLabel: {color: c.muted}, axisLine: {lineStyle: {color: c.grid}}, axisTick: {show: false}},
                 yAxis: {type: 'value', axisLabel: {color: c.muted}, splitLine: {lineStyle: {color: c.grid}}},
                 series: [
-                    {name: '下载错误', type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(255,107,142,0.75)'}, data: data.download || []},
-                    {name: '缓存错误', type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(85,112,255,0.65)'}, data: data.cache || []},
-                    {name: '其他', type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(255,186,73,0.65)'}, data: data.other || []}
+                    {name: _t('dashboard.errors.download'), type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(255,107,142,0.75)'}, data: data.download || []},
+                    {name: _t('dashboard.errors.cache'), type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(85,112,255,0.65)'}, data: data.cache || []},
+                    {name: _t('dashboard.errors.other'), type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(255,186,73,0.65)'}, data: data.other || []}
                 ]
             }, true);
         }
@@ -534,68 +552,68 @@
             const c = techColors();
             chartProduct.setOption({
                 tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
-                legend: {data: ['未下载', '已下载'], textStyle: {color: c.muted}},
+                legend: {data: [_t('dashboard.kpi.undownloaded'), _t('dashboard.kpi.downloaded')], textStyle: {color: c.muted}},
                 grid: {left: 12, right: 12, top: 30, bottom: 10, containLabel: true},
                 xAxis: {type: 'value', axisLabel: {color: c.muted}, splitLine: {lineStyle: {color: c.grid}}},
                 yAxis: {type: 'category', data: (data.labels || []).slice().reverse(), axisLabel: {color: c.muted}, axisLine: {lineStyle: {color: c.grid}}, axisTick: {show: false}},
                 series: [
-                    {name: '未下载', type: 'bar', stack: 'p', barWidth: 14, itemStyle: {borderRadius: [8,0,0,8], color: 'rgba(85,112,255,0.75)'}, data: (data.undownloaded || []).slice().reverse()},
-                    {name: '已下载', type: 'bar', stack: 'p', barWidth: 14, itemStyle: {borderRadius: [0,8,8,0], color: 'rgba(57,212,196,0.75)'}, data: (data.downloaded || []).slice().reverse()}
+                    {name: _t('dashboard.kpi.undownloaded'), type: 'bar', stack: 'p', barWidth: 14, itemStyle: {borderRadius: [8,0,0,8], color: 'rgba(85,112,255,0.75)'}, data: (data.undownloaded || []).slice().reverse()},
+                    {name: _t('dashboard.kpi.downloaded'), type: 'bar', stack: 'p', barWidth: 14, itemStyle: {borderRadius: [0,8,8,0], color: 'rgba(57,212,196,0.75)'}, data: (data.downloaded || []).slice().reverse()}
                 ]
             }, true);
         }
 
         function loadTrends(days) {
-            chartTrends.showLoading({text: '加载中…'});
+            chartTrends.showLoading({text: _t('common.loading')});
             $.get('/admin.php/stats/trends', {days: days || 30}).done(function (res) {
                 if (res && res.code === 0) {
                     renderTrends(res.data || {});
                 } else {
-                    AdminUI.showToast('error', (res && res.msg) || '趋势加载失败');
+                    AdminUI.showToast('error', (res && res.msg) || _t('dashboard.loadFail.trends'));
                 }
             }).fail(function () {
-                AdminUI.showToast('error', '趋势加载失败');
+                AdminUI.showToast('error', _t('dashboard.loadFail.trends'));
             }).always(function () {
                 chartTrends.hideLoading();
             });
         }
 
         function loadPlatform() {
-            $platformList.html('<div class="text-muted small">加载中…</div>');
+            $platformList.html('<div class="text-muted small">' + escapeHtml(_t('common.loading')) + '</div>');
             $.get('/admin.php/stats/platformDistribution').done(function (res) {
                 if (res && res.code === 0) {
                     renderPlatformList(res.data || {});
                 } else {
-                    AdminUI.showToast('error', (res && res.msg) || '平台分布加载失败');
+                    AdminUI.showToast('error', (res && res.msg) || _t('dashboard.loadFail.platform'));
                 }
             }).fail(function () {
-                AdminUI.showToast('error', '平台分布加载失败');
+                AdminUI.showToast('error', _t('dashboard.loadFail.platform'));
             }).always(function () {
             });
         }
 
         function loadErrors() {
-            chartErrors.showLoading({text: '加载中…'});
+            chartErrors.showLoading({text: _t('common.loading')});
             $.get('/admin.php/stats/downloadErrorTrends', {days: 7}).done(function (res) {
                 if (res && res.code === 0) {
                     renderErrors(res.data || {});
                 } else {
-                    AdminUI.showToast('error', (res && res.msg) || '异常趋势加载失败');
+                    AdminUI.showToast('error', (res && res.msg) || _t('dashboard.loadFail.errorsTrend'));
                 }
             }).fail(function () {
-                AdminUI.showToast('error', '异常趋势加载失败');
+                AdminUI.showToast('error', _t('dashboard.loadFail.errorsTrend'));
             }).always(function () {
                 chartErrors.hideLoading();
             });
         }
 
         function loadErrorTop() {
-            $('#errorTopList').text('加载中…');
+            $('#errorTopList').text(_t('common.loading'));
             $.get('/admin.php/stats/downloadErrorTop', {days: 7, limit: 8}).done(function (res) {
                 if (res && res.code === 0) {
                     const items = (res.data && res.data.items) ? res.data.items : [];
                     if (!items.length) {
-                        $('#errorTopList').text('暂无数据');
+                        $('#errorTopList').text(_t('common.noData'));
                         return;
                     }
                     const html = items.map(function (it) {
@@ -608,23 +626,23 @@
                     }).join('');
                     $('#errorTopList').html(html);
                 } else {
-                    $('#errorTopList').text('加载失败');
+                    $('#errorTopList').text(_t('common.loadingFailed'));
                 }
             }).fail(function () {
-                $('#errorTopList').text('加载失败');
+                $('#errorTopList').text(_t('common.loadingFailed'));
             });
         }
 
         function loadProduct() {
-            chartProduct.showLoading({text: '加载中…'});
+            chartProduct.showLoading({text: _t('common.loading')});
             $.get('/admin.php/stats/productDistribution', {limit: 12}).done(function (res) {
                 if (res && res.code === 0) {
                     renderProduct(res.data || {});
                 } else {
-                    AdminUI.showToast('error', (res && res.msg) || '商品分布加载失败');
+                    AdminUI.showToast('error', (res && res.msg) || _t('dashboard.loadFail.product'));
                 }
             }).fail(function () {
-                AdminUI.showToast('error', '商品分布加载失败');
+                AdminUI.showToast('error', _t('dashboard.loadFail.product'));
             }).always(function () {
                 chartProduct.hideLoading();
             });
@@ -644,9 +662,9 @@
                     const up = res.data.uploads || {};
                     const ca = res.data.runtime_cache || {};
                     $('#uploadsSize').text(formatBytes(up.bytes));
-                    $('#uploadsFiles').text((up.files || 0) + ' 个');
+                    $('#uploadsFiles').text((up.files || 0) + ' ' + _t('dashboard.unit.count'));
                     $('#cacheSize').text(formatBytes(ca.bytes));
-                    $('#cacheFiles').text((ca.files || 0) + ' 个');
+                    $('#cacheFiles').text((ca.files || 0) + ' ' + _t('dashboard.unit.count'));
                 }
             });
         }

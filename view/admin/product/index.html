@@ -292,6 +292,9 @@
               <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
+          <el-table-column prop="total_videos" :label="tt('page.product.totalVideos')" width="110" />
+          <el-table-column prop="downloaded_videos" :label="tt('page.product.downloadedVideos')" width="110" />
+          <el-table-column prop="undownloaded_videos" :label="tt('page.product.undownloadedVideos')" width="110" />
           <el-table-column prop="sort_order" :label="lang==='en'?'Sort':'排序'" width="110" sortable="custom" />
           <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">

@@ -122,7 +122,18 @@
   "msg": "ok",
   "data": {
     "items": [
-      { "id": 1, "name": "商品A", "goods_url": "", "status": 1, "sort_order": 10, "updated_at": "2026-03-30 10:00:00", "created_at": "2026-03-30 09:00:00" }
+      {
+        "id": 1,
+        "name": "商品A",
+        "goods_url": "",
+        "status": 1,
+        "sort_order": 10,
+        "total_videos": 100,
+        "downloaded_videos": 60,
+        "undownloaded_videos": 40,
+        "updated_at": "2026-03-30 10:00:00",
+        "created_at": "2026-03-30 09:00:00"
+      }
     ],
     "total": 1,
     "page": 1,
