@@ -688,12 +688,12 @@
                         </div>
 
                         <div class="admin-sidenav-section" data-i18n="admin.menu.system">系统</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Settings' && $Request.controller != 'settings' && $Request.controller != 'Cache' && $Request.controller != 'cache' && $Request.controller != 'DownloadLog' && $Request.controller != 'downloadlog' && $Request.controller != 'User' && $Request.controller != 'user'}collapsed{/if} {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-system" aria-expanded="{if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user'}true{else /}false{/if}" aria-controls="admin-nav-system" role="button">
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Settings' && $Request.controller != 'settings' && $Request.controller != 'Cache' && $Request.controller != 'cache' && $Request.controller != 'DownloadLog' && $Request.controller != 'downloadlog' && $Request.controller != 'User' && $Request.controller != 'user' && $Request.controller != 'ClientLicense' && $Request.controller != 'clientlicense' && $Request.controller != 'ClientVersion' && $Request.controller != 'clientversion'}collapsed{/if} {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user' || $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense' || $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-system" aria-expanded="{if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user' || $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense' || $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}true{else /}false{/if}" aria-controls="admin-nav-system" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="settings"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.system">系统</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-system" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user'}show{/if}">
+                        <div id="admin-nav-system" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user' || $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense' || $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/settings" class="admin-sidenav-sublink {if $Request.controller == 'Settings' || $Request.controller == 'settings'}active{/if}">
@@ -705,6 +705,18 @@
                                     <a href="/admin.php/user" class="admin-sidenav-sublink {if $Request.controller == 'User' || $Request.controller == 'user'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
                                         <span class="admin-sidenav-subtxt" data-i18n="admin.menu.user">用户</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/client_license" class="admin-sidenav-sublink {if $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="key"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.clientLicense">发卡</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/client_version" class="admin-sidenav-sublink {if $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="package"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.clientVersion">版本</span>
                                     </a>
                                 </li>
                                 <li>

@@ -94,5 +94,22 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('downloadLog/list', 'app\controller\admin\DownloadLog@listJson');
     Route::get('downloadLog', 'app\controller\admin\DownloadLog@index');
     Route::post('downloadLog/clear', 'app\controller\admin\DownloadLog@clear');
+
+    // 桌面端：发卡 / 版本
+    Route::get('client_license/list', 'app\controller\admin\ClientLicense@listJson');
+    Route::post('client_license/add', 'app\controller\admin\ClientLicense@add');
+    Route::post('client_license/update/<id>', 'app\controller\admin\ClientLicense@update');
+    Route::post('client_license/toggle/<id>', 'app\controller\admin\ClientLicense@toggle');
+    Route::post('client_license/unbind/<id>', 'app\controller\admin\ClientLicense@unbind');
+    Route::post('client_license/delete/<id>', 'app\controller\admin\ClientLicense@delete');
+    Route::get('client_license', 'app\controller\admin\ClientLicense@index');
+
+    Route::get('client_version/list', 'app\controller\admin\ClientVersion@listJson');
+    Route::post('client_version/add', 'app\controller\admin\ClientVersion@add');
+    Route::post('client_version/uploadPackage', 'app\controller\admin\ClientVersion@uploadPackage');
+    Route::post('client_version/update/<id>', 'app\controller\admin\ClientVersion@update');
+    Route::post('client_version/toggle/<id>', 'app\controller\admin\ClientVersion@toggle');
+    Route::post('client_version/delete/<id>', 'app\controller\admin\ClientVersion@delete');
+    Route::get('client_version', 'app\controller\admin\ClientVersion@index');
 }
 

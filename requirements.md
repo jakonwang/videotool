@@ -19,7 +19,7 @@
 | （顶栏） | 仪表盘 | 首页 |
 | 素材 | 视频 / 上传 / 商品 / 达人链 | 列表、批量上传、商品、达人分发链接 |
 | 终端 | 平台 / 设备 | 平台与终端设备 |
-| 系统 | 系统设置 / 缓存 / 异常 | 系统参数、缓存、下载错误监控 |
+| 系统 | 系统设置 / 用户 / 发卡 / 版本 / 缓存 / 异常 | 参数、管理员、桌面授权码、桌面安装包发布、缓存、下载错误监控 |
 
 - 侧栏分组使用 **Bootstrap collapse**（与页面 SSR 同步 `show`，避免 AdminLTE Treeview 初始化把当前分组收拢）；样式为自定义「玻璃拟态 + 霓虹描边」分组头与子项指示点，与 AdminLTE 默认 `nav-treeview` 视觉脱钩。
 
@@ -366,6 +366,76 @@
 ### 已适配页面
 - 列表页：平台（`view/admin/platform/index.html`）、设备（`view/admin/device/index.html`）、商品（`view/admin/product/index.html`）、达人链（`view/admin/distribute/index.html`）
 - 系统页：设置（`view/admin/settings/index.html`）、缓存（`view/admin/cache/index.html`）、异常（`view/admin/download_log/index.html`）
+- 桌面端：发卡（`view/admin/client_license/index.html`）、版本（`view/admin/client_version/index.html`）
 
 ### 说明
 - 这些页面会隐藏 layout 自带的 `content-header`，改用页面内部的统一标题区，避免出现两套标题/操作区导致不一致。
+
+## 桌面端：发卡与版本、公开下载（2026-04）
+
+### 目标
+- 后台管理**桌面客户端授权码**（生成、启停、解绑机器、改到期时间与删除）。
+- 后台管理**安装包版本**（发布/下线、强制更新标记、下载直链或本地上传）。
+- 提供**无需登录**的客户端 API：校验授权、检查更新。
+- 提供**无需登录**的公开下载页，展示最新版本与时间轴历史版本。
+
+### 数据库
+| 表名 | 说明 |
+|------|------|
+| `app_licenses` | `license_key`（唯一）、`machine_id`（可空）、`status`（1/0）、`expire_time`（可空=永久）、`created_at` |
+| `app_versions` | `version`（唯一）、`release_notes`、`download_url`、`is_mandatory`、`status`（1发布/0下线）、`created_at` |
+
+#### 新装
+- 使用更新后的 `database/schema.sql`（已含上述两表）。
+
+#### 升级（已有库）
+- Windows（PowerShell，项目根目录）：
+  - `php database\run_migration_client_app.php`
+- Linux：
+  - `php database/run_migration_client_app.php`
+- 亦可手动执行 `database/migrations/20260401_client_app.sql`（注意重复执行时的表已存在错误）。
+
+### 后台路由（`admin.php`，需登录）
+#### 发卡 `ClientLicense`
+- `GET /admin.php/client_license`：页面（Vue3 + Element Plus）
+- `GET /admin.php/client_license/list`：列表 JSON（`keyword`、`status`、`page`、`page_size`）
+- `POST /admin.php/client_license/add`：单条新增（`license_key` 可空自动生成；`expire_time` 可空；`status`）或批量（`batch_count`、`valid_days`，`valid_days=0` 表示永久）
+- `POST /admin.php/client_license/update/<id>`：修改 `expire_time`、`status`
+- `POST /admin.php/client_license/toggle/<id>`：启停
+- `POST /admin.php/client_license/unbind/<id>`：清空 `machine_id`
+- `POST /admin.php/client_license/delete/<id>`：删除
+
+#### 版本 `ClientVersion`
+- `GET /admin.php/client_version`：页面
+- `GET /admin.php/client_version/list`：列表 JSON（`keyword`、`status`、`page`、`page_size`）
+- `POST /admin.php/client_version/add`：发布（`version`、`release_notes`、`download_url`、`is_mandatory`、`status`）
+- `POST /admin.php/client_version/update/<id>`：同上
+- `POST /admin.php/client_version/toggle/<id>`：发布/下线切换
+- `POST /admin.php/client_version/delete/<id>`：删除
+- `POST /admin.php/client_version/uploadPackage`：`multipart/form-data` 字段 `file`，保存至 `public/uploads/client_releases/`，返回 `{ code:0, data:{ url } }`
+
+### 开放 API（`index.php/api/...`，无需登录）
+- `POST /index.php/api/client/verifyLicense`  
+  参数：`license_key`、`machine_id`  
+  逻辑：校验存在且启用、未过期；未绑定则写入 `machine_id`；已绑定则必须与传入一致。  
+  成功：`{ code:0, msg:'ok', data:{ valid:true, expire_time } }`
+- `GET` 或 `POST` `/index.php/api/client/checkUpdate`  
+  参数：`current_version`（如 `1.0.0`）  
+  逻辑：在 `status=1` 的记录中取**语义版本号大于**当前版本的最新一条（`version_compare`）。  
+  无更新：`data.has_update=false`；有更新：返回 `version`、`release_notes`、`download_url`、`is_mandatory`。
+
+### 公开下载页（SSR）
+- `GET /index.php/download` 或 `GET /index.php/index/download`
+- 控制器：`app\controller\index\Download@index`
+- 模板：`view/index/download.html`（Tailwind CDN + 极简排版；数据服务端渲染）
+- 仅展示 `app_versions.status=1`，按发布时间倒序；首条为「最新版本」，其余为时间轴「历史版本」。
+
+### 前端说明
+- 侧栏位于 **系统** 分组：`发卡`、`版本`（`view/admin/common/layout.html`）。
+- 列表页使用统一骨架类：`admin-page-container`、`admin-modern-card`、`admin-header-actions`、`admin-filter-section`、`admin-footer-pagination`。
+- 多语言键：`public/static/i18n/i18n.js` 中 `admin.menu.clientLicense` / `admin.menu.clientVersion`。
+
+### Windows 测试建议
+1. 执行迁移后登录后台，在「发卡」批量生成若干条，在「版本」发布一条并填下载链接或上传附件。
+2. 浏览器访问 `http://你的站点/index.php/download` 查看公开页。
+3. 使用 Postman 或 curl 调用 `api/client/verifyLicense` 与 `api/client/checkUpdate`。

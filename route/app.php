@@ -11,6 +11,8 @@ if (!defined('ENTRY_FILE') || ENTRY_FILE === 'index') {
     Route::get('platforms.html', 'app\controller\index\Index@platforms');
     // 兼容默认路由格式
     Route::get('index/platforms', 'app\controller\index\Index@platforms');
+    Route::get('download', 'app\controller\index\Download@index');
+    Route::get('index/download', 'app\controller\index\Download@index');
 }
 
 // 只加载 API 路由，不加载后台路由

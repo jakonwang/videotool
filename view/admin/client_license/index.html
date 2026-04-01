@@ -1,0 +1,307 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}发卡{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
+
+{block name="style"}
+<style>
+    .content-header { display: none; }
+    .admin-modern-card .el-table__inner-wrapper::before { height: 0; }
+    .lic-key { font-family: ui-monospace, monospace; font-size: 13px; }
+</style>
+{/block}
+
+{block name="content"}
+<div id="clientLicenseApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+  {literal}
+  const { createApp, reactive, ref, computed, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
+
+  const headerCellStyle = {
+    backgroundColor: '#F9FAFB',
+    color: '#4B5563',
+    fontWeight: '600',
+    height: '48px',
+    borderBottom: '1px solid #E5E7EB',
+  };
+  const cellStyle = { padding: '12px 0' };
+
+  function postForm(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: typeof body === 'string' ? body : new URLSearchParams(body).toString(),
+      credentials: 'same-origin',
+    }).then((r) => r.json());
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const items = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(10);
+      const query = reactive({ keyword: '', status: '' });
+
+      const batchVisible = ref(false);
+      const batchForm = reactive({ batch_count: 10, valid_days: 365 });
+      const editVisible = ref(false);
+      const editForm = reactive({ id: 0, expire_time: '', status: 1 });
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const params = new URLSearchParams();
+          params.set('page', String(page.value));
+          params.set('page_size', String(pageSize.value));
+          if (query.keyword) params.set('keyword', query.keyword);
+          if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
+          const res = await fetch('/admin.php/client_license/list?' + params.toString(), { credentials: 'same-origin' });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          items.value = (json.data && json.data.items) ? json.data.items : [];
+          total.value = (json.data && json.data.total) ? json.data.total : 0;
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function onSearch() { page.value = 1; fetchList(); }
+      function onReset() {
+        query.keyword = '';
+        query.status = '';
+        page.value = 1;
+        fetchList();
+      }
+
+      function openBatch() {
+        batchForm.batch_count = 10;
+        batchForm.valid_days = 365;
+        batchVisible.value = true;
+      }
+
+      async function submitBatch() {
+        const n = Math.min(500, Math.max(1, parseInt(String(batchForm.batch_count), 10) || 0));
+        const d = Math.max(0, parseInt(String(batchForm.valid_days), 10) || 0);
+        const j = await postForm('/admin.php/client_license/add', {
+          batch_count: String(n),
+          valid_days: String(d),
+        });
+        if (j && j.code === 0) {
+          batchVisible.value = false;
+          const keys = (j.data && j.data.keys) ? j.data.keys : [];
+          const text = keys.length ? keys.join('\n') : '';
+          ElMessage.success(j.msg || '生成成功');
+          if (text) {
+            ElMessageBox.alert(
+              '<pre style="max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap;">' +
+              text.replace(/</g, '&lt;') + '</pre>',
+              lang === 'en' ? 'Generated keys' : '本次生成的卡密',
+              { dangerouslyUseHTMLString: true, confirmButtonText: tt('common.ok') }
+            );
+          }
+          fetchList();
+        } else {
+          ElMessage.error((j && j.msg) || '失败');
+        }
+      }
+
+      function openEdit(row) {
+        editForm.id = row.id;
+        editForm.status = row.status;
+        editForm.expire_time = row.expire_time || '';
+        editVisible.value = true;
+      }
+
+      async function submitEdit() {
+        const body = {
+          expire_time: (editForm.expire_time === null || editForm.expire_time === undefined) ? '' : String(editForm.expire_time),
+          status: String(editForm.status),
+        };
+        const j = await postForm('/admin.php/client_license/update/' + editForm.id, body);
+        if (j && j.code === 0) {
+          editVisible.value = false;
+          ElMessage.success(j.msg || tt('common.save'));
+          fetchList();
+        } else {
+          ElMessage.error((j && j.msg) || '失败');
+        }
+      }
+
+      async function doToggle(row) {
+        const j = await postForm('/admin.php/client_license/toggle/' + row.id, {});
+        if (j && j.code === 0) {
+          ElMessage.success(j.msg || 'ok');
+          fetchList();
+        } else {
+          ElMessage.error((j && j.msg) || '失败');
+        }
+      }
+
+      async function doUnbind(row) {
+        await ElMessageBox.confirm(
+          lang === 'en' ? 'Unbind machine for this license?' : '确定解绑该卡密的机器码？',
+          lang === 'en' ? 'Confirm' : '确认',
+          { type: 'warning' }
+        );
+        const j = await postForm('/admin.php/client_license/unbind/' + row.id, {});
+        if (j && j.code === 0) {
+          ElMessage.success(j.msg || 'ok');
+          fetchList();
+        } else {
+          ElMessage.error((j && j.msg) || '失败');
+        }
+      }
+
+      async function doDelete(row) {
+        await ElMessageBox.confirm(
+          lang === 'en' ? 'Delete this license?' : '确定删除该授权码？',
+          lang === 'en' ? 'Confirm' : '删除确认',
+          { type: 'warning' }
+        );
+        const j = await postForm('/admin.php/client_license/delete/' + row.id, {});
+        if (j && j.code === 0) {
+          ElMessage.success(j.msg || tt('common.delete'));
+          const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
+          page.value = Math.min(page.value, maxPage);
+          fetchList();
+        } else {
+          ElMessage.error((j && j.msg) || '失败');
+        }
+      }
+
+      function fmtExpire(v) {
+        if (!v) return lang === 'en' ? 'Never' : '永久';
+        return v;
+      }
+
+      const rows = computed(() => items.value || []);
+
+      onMounted(() => { fetchList(); });
+
+      return {
+        loading, query, rows, total, page, pageSize,
+        batchVisible, batchForm, editVisible, editForm,
+        headerCellStyle, cellStyle, tt, lang,
+        onSearch, onReset, openBatch, submitBatch, openEdit, submitEdit,
+        doToggle, doUnbind, doDelete, fetchList, fmtExpire,
+      };
+    },
+    template: `
+      <div class="admin-modern-card">
+        <div class="admin-header-actions">
+          <div class="admin-breadcrumb">系统 / 发卡</div>
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div style="font-size:18px;font-weight:600;color:#111827;">{{ lang==='en' ? 'Licenses' : '发卡管理' }}</div>
+            <div class="admin-action-buttons">
+              <el-button type="primary" @click="openBatch">{{ lang==='en' ? 'Batch generate' : '批量生成卡密' }}</el-button>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-filter-section">
+          <div class="admin-custom-form">
+            <el-input v-model="query.keyword" clearable size="default"
+              :placeholder="lang==='en'?'Key / machine':'卡密或机器码'" style="width:240px;flex:0 0 auto;" @keyup.enter="onSearch" />
+            <el-select v-model="query.status" clearable size="default" :placeholder="tt('common.statusAll')" style="width:140px;flex:0 0 auto;">
+              <el-option :label="tt('common.statusEnabled')" value="1" />
+              <el-option :label="tt('common.statusDisabled')" value="0" />
+            </el-select>
+            <div class="admin-filter-buttons">
+              <el-button type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
+              <el-button @click="onReset">{{ tt('common.reset') }}</el-button>
+            </div>
+          </div>
+        </div>
+
+        <el-table :data="rows" stripe row-key="id" v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle">
+          <el-table-column prop="id" label="ID" width="72" />
+          <el-table-column :label="lang==='en'?'License key':'卡密'" min-width="200">
+            <template #default="{ row }"><span class="lic-key">{{ row.license_key }}</span></template>
+          </el-table-column>
+          <el-table-column :label="lang==='en'?'Machine':'机器码'" min-width="160">
+            <template #default="{ row }">{{ row.machine_id || '—' }}</template>
+          </el-table-column>
+          <el-table-column :label="lang==='en'?'Expires':'到期时间'" width="170">
+            <template #default="{ row }">{{ fmtExpire(row.expire_time) }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('common.statusEnabled')" width="100">
+            <template #default="{ row }">
+              <el-tag size="small" :type="String(row.status)==='1'?'success':'info'">
+                {{ String(row.status)==='1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" width="170" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="220" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="doToggle(row)">{{ String(row.status)==='1' ? (lang==='en'?'Disable':'停用') : (lang==='en'?'Enable':'启用') }}</el-button>
+              <el-button link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button link type="primary" @click="doUnbind(row)" :disabled="!row.machine_id">{{ lang==='en'?'Unbind':'解绑' }}</el-button>
+              <el-button link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div style="padding:28px 0;text-align:center;color:#6b7280;">{{ tt('common.noData') }}</div>
+          </template>
+        </el-table>
+
+        <div class="admin-footer-pagination">
+          <span style="color:#6b7280;font-size:13px;">{{ lang==='en' ? ('Total ' + total) : ('共 ' + total + ' 条') }}</span>
+          <el-pagination v-model:current-page="page" v-model:page-size="pageSize" background layout="prev, pager, next"
+            :total="total" @update:current-page="(p)=>{page=p;fetchList();}" @update:page-size="(s)=>{pageSize=s;page=1;fetchList();}" />
+        </div>
+
+        <el-dialog v-model="batchVisible" :title="lang==='en'?'Batch generate':'批量生成卡密'" width="420px" destroy-on-close>
+          <el-form label-width="100px">
+            <el-form-item :label="lang==='en'?'Count':'数量'">
+              <el-input-number v-model="batchForm.batch_count" :min="1" :max="500" />
+            </el-form-item>
+            <el-form-item :label="lang==='en'?'Valid days':'有效天数'">
+              <el-input-number v-model="batchForm.valid_days" :min="0" :max="36500" />
+              <div style="font-size:12px;color:#6b7280;margin-top:4px;">0 {{ lang==='en' ? '= never expire' : '= 永久有效' }}</div>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="batchVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" @click="submitBatch">{{ tt('common.create') }}</el-button>
+          </template>
+        </el-dialog>
+
+        <el-dialog v-model="editVisible" :title="tt('common.edit')" width="440px" destroy-on-close>
+          <el-form label-width="100px">
+            <el-form-item :label="lang==='en'?'Expires':'到期时间'">
+              <el-date-picker v-model="editForm.expire_time" type="datetime" value-format="YYYY-MM-DD HH:mm:ss"
+                style="width:100%" :placeholder="lang==='en'?'Clear = never':'留空表示永久'" clearable />
+            </el-form-item>
+            <el-form-item :label="tt('common.statusEnabled')">
+              <el-switch v-model="editForm.status" :active-value="1" :inactive-value="0" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="editVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" @click="submitEdit">{{ tt('common.save') }}</el-button>
+          </template>
+        </el-dialog>
+      </div>
+    `
+  }).use(ElementPlus).mount('#clientLicenseApp');
+  {/literal}
+</script>
+{/block}

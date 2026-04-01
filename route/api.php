@@ -12,5 +12,8 @@ Route::group('api', function() {
         Route::post('markDownloaded', 'app\controller\api\Video@markDownloaded');
         Route::rule('download', 'app\controller\api\Video@downloadProxy', 'GET|HEAD'); // 代理下载接口，兼容HEAD获取文件信息
     });
+
+    Route::post('client/verifyLicense', 'app\controller\api\ClientApp@verifyLicense');
+    Route::rule('client/checkUpdate', 'app\controller\api\ClientApp@checkUpdate', 'GET|POST');
 });
 
