@@ -439,6 +439,15 @@
 - 多为接口返回了 **HTML**（登录页、404、PHP 报错页），而前端按 JSON 解析。请确认：已登录后台；服务器已部署含 `client_version` 路由的代码；已执行迁移存在 `app_versions` 表。
 - 前端已对发卡/版本接口请求携带 `Accept: application/json`，未登录时中间件返回 `{code:401}` 而非跳转 HTML；保存/上传异常时控制器尽量返回 JSON 错误信息。
 
+### 版本安装包上传 HTTP 413（Content Too Large）
+- **含义**：请求体在到达 PHP 前被 **Web 服务器**拒绝（常见默认仅 1MB～几十 MB），响应多为 HTML，故前端曾提示「非 JSON」。
+- **处理**（Linux 部署示例，按实际环境调整数值）：
+  - **Nginx**：在 `http` / `server` / `location` 中增加或调大，例如 `client_max_body_size 256m;`，重载 Nginx。
+  - **PHP**：`php.ini` 中 `upload_max_filesize`、`post_max_size` 均须 **大于** 安装包体积（如 `256M`），修改后重启 PHP-FPM / Apache。
+  - **Apache**：可用 `LimitRequestBody`（字节）放宽限制。
+  - **Windows IIS**：在站点 `web.config` 中调整 `requestLimits` / `maxAllowedContentLength`（单位字节）。
+- **替代方案**：大文件不必走本地上传，在「版本」表单中直接填写 **安装包直链**（对象存储/CDN URL）。
+
 ### Windows 测试建议
 1. 执行迁移后登录后台，在「发卡」批量生成若干条，在「版本」发布一条并填下载链接或上传附件。
 2. 浏览器访问 `http://你的站点/index.php/download` 查看公开页。

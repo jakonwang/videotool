@@ -45,6 +45,11 @@
   };
 
   function parseJsonBody(res, text) {
+    if (res.status === 413) {
+      throw new Error(
+        '文件超过服务器允许的上传大小（HTTP 413）。请压缩安装包、改用下载直链，或在服务器调大：Nginx client_max_body_size、PHP upload_max_filesize/post_max_size（详见 requirements.md）。'
+      );
+    }
     try {
       return JSON.parse(text);
     } catch (err) {
@@ -334,6 +339,11 @@
               <el-upload class="mt-2" :show-file-list="false" :http-request="customUpload" :disabled="uploadLoading">
                 <el-button size="small" :loading="uploadLoading">{{ lang==='en' ? 'Upload file' : '上传附件' }}</el-button>
               </el-upload>
+              <div class="mt-1 text-muted" style="font-size:12px;color:#6b7280;line-height:1.5;">
+                {{ lang==='en'
+                  ? 'Large installers: use a direct URL, or raise Nginx/PHP upload limits (see docs).'
+                  : '安装包较大时建议填外链；本地上传若出现 413，需在服务器调大上传限制（见 requirements.md）。' }}
+              </div>
             </el-form-item>
             <el-form-item :label="lang==='en'?'Force update':'强制更新'">
               <el-switch v-model="form.is_mandatory" :active-value="1" :inactive-value="0" />

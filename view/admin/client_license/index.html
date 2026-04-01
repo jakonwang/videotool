@@ -45,6 +45,11 @@
   };
 
   function parseJsonBody(res, text) {
+    if (res.status === 413) {
+      throw new Error(
+        '请求体超过服务器限制（HTTP 413）。若为大文件相关操作，请调大 Nginx client_max_body_size 与 PHP upload_max_filesize/post_max_size（见 requirements.md）。'
+      );
+    }
     try {
       return JSON.parse(text);
     } catch (err) {
