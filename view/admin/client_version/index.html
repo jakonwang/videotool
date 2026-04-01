@@ -250,6 +250,28 @@
 
       const rows = computed(() => items.value || []);
 
+      function packageHref(row) {
+        const u = row && row.download_url ? String(row.download_url).trim() : '';
+        if (!u) return '';
+        if (/^https?:\/\//i.test(u)) return u;
+        if (u.startsWith('//')) return window.location.protocol + u;
+        if (u.startsWith('/')) return window.location.origin + u;
+        return window.location.origin + '/' + u.replace(/^\.\//, '');
+      }
+
+      function openPackage(row) {
+        const href = packageHref(row);
+        if (!href) {
+          ElMessage.warning(lang === 'en' ? 'No package URL' : '未配置安装包地址');
+          return;
+        }
+        window.open(href, '_blank', 'noopener');
+      }
+
+      function openPublicDownloadPage() {
+        window.open('/index.php/download', '_blank', 'noopener');
+      }
+
       onMounted(() => { fetchList(); });
 
       return {
@@ -258,6 +280,7 @@
         headerCellStyle, cellStyle, tt, lang,
         onSearch, onReset, openAdd, openEdit, submitForm,
         customUpload, doToggle, doDelete, fetchList,
+        packageHref, openPackage, openPublicDownloadPage,
       };
     },
     template: `
@@ -267,6 +290,7 @@
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div style="font-size:18px;font-weight:600;color:#111827;">{{ lang==='en' ? 'Desktop releases' : '版本发布' }}</div>
             <div class="admin-action-buttons">
+              <el-button @click="openPublicDownloadPage">{{ lang==='en' ? 'Public downloads' : '公开下载页' }}</el-button>
               <el-button type="primary" @click="openAdd">{{ lang==='en' ? 'New release' : '发布新版本' }}</el-button>
             </div>
           </div>
@@ -308,6 +332,12 @@
             </template>
           </el-table-column>
           <el-table-column prop="created_at" :label="lang==='en'?'Released':'发布时间'" width="170" />
+          <el-table-column :label="lang==='en'?'Download':'下载'" width="88" align="center">
+            <template #default="{ row }">
+              <el-button v-if="packageHref(row)" link type="primary" @click="openPackage(row)">{{ lang==='en' ? 'Download' : '下载' }}</el-button>
+              <span v-else style="color:#9ca3af;font-size:13px;">—</span>
+            </template>
+          </el-table-column>
           <el-table-column :label="lang==='en'?'Actions':'操作'" width="200" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>

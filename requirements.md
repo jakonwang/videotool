@@ -433,6 +433,7 @@
 ### 前端说明
 - 侧栏位于 **系统** 分组：`发卡`、`版本`（`view/admin/common/layout.html`）。
 - 列表页使用统一骨架类：`admin-page-container`、`admin-modern-card`、`admin-header-actions`、`admin-filter-section`、`admin-footer-pagination`。
+- **版本**列表：表格含 **「下载」** 列（新窗口打开该版本的 `download_url`；站内相对路径会自动补全域名）；右上角 **「公开下载页」** 打开 `/index.php/download`（给员工/用户看的落地页）。
 - 多语言键：`public/static/i18n/i18n.js` 中 `admin.menu.clientLicense` / `admin.menu.clientVersion`。
 
 ### 故障排查（版本页提示「Unexpected token '<'」等 JSON 解析错误）
