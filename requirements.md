@@ -439,3 +439,6 @@
 1. 执行迁移后登录后台，在「发卡」批量生成若干条，在「版本」发布一条并填下载链接或上传附件。
 2. 浏览器访问 `http://你的站点/index.php/download` 查看公开页。
 3. 使用 Postman 或 curl 调用 `api/client/verifyLicense` 与 `api/client/checkUpdate`。
+
+### 第三方桌面客户端接入（发给外部队开发）
+- 独立说明文档：`docs/client-desktop-api.md`（配置项、URL、参数、返回示例、`machine_id` 建议、curl 示例）。
