@@ -39,13 +39,40 @@
   };
   const cellStyle = { padding: '12px 0' };
 
-  function postForm(url, body) {
-    return fetch(url, {
+  const apiFetchHeaders = {
+    'Accept': 'application/json, text/javascript, */*;q=0.01',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+
+  function parseJsonBody(res, text) {
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      const html = text && String(text).trim().startsWith('<');
+      throw new Error(
+        html
+          ? ('服务器返回了网页而非 JSON（常见：未登录、404、PHP 报错）。HTTP ' + res.status)
+          : ('无法解析接口返回（HTTP ' + res.status + '）')
+      );
+    }
+  }
+
+  async function postForm(url, body) {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      headers: {
+        ...apiFetchHeaders,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
       body: typeof body === 'string' ? body : new URLSearchParams(body).toString(),
       credentials: 'same-origin',
-    }).then((r) => r.json());
+    });
+    const text = await res.text();
+    const j = parseJsonBody(res, text);
+    if (j && j.code === 401) {
+      throw new Error(j.msg || '未登录或会话已过期，请刷新页面重新登录');
+    }
+    return j;
   }
 
   createApp({
@@ -77,8 +104,13 @@
           params.set('page_size', String(pageSize.value));
           if (query.keyword) params.set('keyword', query.keyword);
           if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
-          const res = await fetch('/admin.php/client_version/list?' + params.toString(), { credentials: 'same-origin' });
-          const json = await res.json();
+          const res = await fetch('/admin.php/client_version/list?' + params.toString(), {
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+          });
+          const text = await res.text();
+          const json = parseJsonBody(res, text);
+          if (json && json.code === 401) throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登录');
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
@@ -130,13 +162,17 @@
         const url = formMode.value === 'add'
           ? '/admin.php/client_version/add'
           : '/admin.php/client_version/update/' + form.id;
-        const j = await postForm(url, body);
-        if (j && j.code === 0) {
-          formVisible.value = false;
-          ElMessage.success(j.msg || tt('common.save'));
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          const j = await postForm(url, body);
+          if (j && j.code === 0) {
+            formVisible.value = false;
+            ElMessage.success(j.msg || tt('common.save'));
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 
@@ -149,8 +185,13 @@
             method: 'POST',
             body: fd,
             credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
           });
-          const json = await res.json();
+          const text = await res.text();
+          const json = parseJsonBody(res, text);
+          if (json && json.code === 401) {
+            throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登录');
+          }
           if (json && json.code === 0 && json.data && json.data.url) {
             form.download_url = json.data.url;
             ElMessage.success(json.msg || '上传成功');
@@ -167,29 +208,38 @@
       }
 
       async function doToggle(row) {
-        const j = await postForm('/admin.php/client_version/toggle/' + row.id, {});
-        if (j && j.code === 0) {
-          ElMessage.success(j.msg || 'ok');
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          const j = await postForm('/admin.php/client_version/toggle/' + row.id, {});
+          if (j && j.code === 0) {
+            ElMessage.success(j.msg || 'ok');
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(
-          lang === 'en' ? 'Delete this version record?' : '确定删除该版本记录？',
-          lang === 'en' ? 'Confirm' : '删除确认',
-          { type: 'warning' }
-        );
-        const j = await postForm('/admin.php/client_version/delete/' + row.id, {});
-        if (j && j.code === 0) {
-          ElMessage.success(j.msg || tt('common.delete'));
-          const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
-          page.value = Math.min(page.value, maxPage);
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          await ElMessageBox.confirm(
+            lang === 'en' ? 'Delete this version record?' : '确定删除该版本记录？',
+            lang === 'en' ? 'Confirm' : '删除确认',
+            { type: 'warning' }
+          );
+          const j = await postForm('/admin.php/client_version/delete/' + row.id, {});
+          if (j && j.code === 0) {
+            ElMessage.success(j.msg || tt('common.delete'));
+            const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
+            page.value = Math.min(page.value, maxPage);
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          if (e === 'cancel') return;
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 

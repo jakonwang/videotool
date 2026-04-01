@@ -66,6 +66,10 @@ class AdminAuthMiddleware
         if (preg_match('#/(list|listJson)$#i', $path)) {
             return true;
         }
+        // 桌面端发卡/版本：POST/JSON 接口在未登录时须返回 JSON，避免 fetch 收到登录页 HTML
+        if (preg_match('#^/(client_version|client_license)/(list|add|batchGenerate|update|toggle|delete|unbind|uploadPackage)#i', $path)) {
+            return true;
+        }
         return false;
     }
 }

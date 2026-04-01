@@ -39,13 +39,40 @@
   };
   const cellStyle = { padding: '12px 0' };
 
-  function postForm(url, body) {
-    return fetch(url, {
+  const apiFetchHeaders = {
+    'Accept': 'application/json, text/javascript, */*;q=0.01',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+
+  function parseJsonBody(res, text) {
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      const html = text && String(text).trim().startsWith('<');
+      throw new Error(
+        html
+          ? ('服务器返回了网页而非 JSON（常见：未登录、404、PHP 报错）。HTTP ' + res.status)
+          : ('无法解析接口返回（HTTP ' + res.status + '）')
+      );
+    }
+  }
+
+  async function postForm(url, body) {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      headers: {
+        ...apiFetchHeaders,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
       body: typeof body === 'string' ? body : new URLSearchParams(body).toString(),
       credentials: 'same-origin',
-    }).then((r) => r.json());
+    });
+    const text = await res.text();
+    const j = parseJsonBody(res, text);
+    if (j && j.code === 401) {
+      throw new Error(j.msg || '未登录或会话已过期，请刷新页面重新登录');
+    }
+    return j;
   }
 
   createApp({
@@ -70,8 +97,13 @@
           params.set('page_size', String(pageSize.value));
           if (query.keyword) params.set('keyword', query.keyword);
           if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
-          const res = await fetch('/admin.php/client_license/list?' + params.toString(), { credentials: 'same-origin' });
-          const json = await res.json();
+          const res = await fetch('/admin.php/client_license/list?' + params.toString(), {
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+          });
+          const text = await res.text();
+          const json = parseJsonBody(res, text);
+          if (json && json.code === 401) throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登录');
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
@@ -97,28 +129,32 @@
       }
 
       async function submitBatch() {
-        const n = Math.min(500, Math.max(1, parseInt(String(batchForm.batch_count), 10) || 0));
-        const d = Math.max(0, parseInt(String(batchForm.valid_days), 10) || 0);
-        const j = await postForm('/admin.php/client_license/add', {
-          batch_count: String(n),
-          valid_days: String(d),
-        });
-        if (j && j.code === 0) {
-          batchVisible.value = false;
-          const keys = (j.data && j.data.keys) ? j.data.keys : [];
-          const text = keys.length ? keys.join('\n') : '';
-          ElMessage.success(j.msg || '生成成功');
-          if (text) {
-            ElMessageBox.alert(
-              '<pre style="max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap;">' +
-              text.replace(/</g, '&lt;') + '</pre>',
-              lang === 'en' ? 'Generated keys' : '本次生成的卡密',
-              { dangerouslyUseHTMLString: true, confirmButtonText: tt('common.ok') }
-            );
+        try {
+          const n = Math.min(500, Math.max(1, parseInt(String(batchForm.batch_count), 10) || 0));
+          const d = Math.max(0, parseInt(String(batchForm.valid_days), 10) || 0);
+          const j = await postForm('/admin.php/client_license/add', {
+            batch_count: String(n),
+            valid_days: String(d),
+          });
+          if (j && j.code === 0) {
+            batchVisible.value = false;
+            const keys = (j.data && j.data.keys) ? j.data.keys : [];
+            const text = keys.length ? keys.join('\n') : '';
+            ElMessage.success(j.msg || '生成成功');
+            if (text) {
+              ElMessageBox.alert(
+                '<pre style="max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap;">' +
+                text.replace(/</g, '&lt;') + '</pre>',
+                lang === 'en' ? 'Generated keys' : '本次生成的卡密',
+                { dangerouslyUseHTMLString: true, confirmButtonText: tt('common.ok') }
+              );
+            }
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
           }
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 
@@ -130,59 +166,77 @@
       }
 
       async function submitEdit() {
-        const body = {
-          expire_time: (editForm.expire_time === null || editForm.expire_time === undefined) ? '' : String(editForm.expire_time),
-          status: String(editForm.status),
-        };
-        const j = await postForm('/admin.php/client_license/update/' + editForm.id, body);
-        if (j && j.code === 0) {
-          editVisible.value = false;
-          ElMessage.success(j.msg || tt('common.save'));
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          const body = {
+            expire_time: (editForm.expire_time === null || editForm.expire_time === undefined) ? '' : String(editForm.expire_time),
+            status: String(editForm.status),
+          };
+          const j = await postForm('/admin.php/client_license/update/' + editForm.id, body);
+          if (j && j.code === 0) {
+            editVisible.value = false;
+            ElMessage.success(j.msg || tt('common.save'));
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 
       async function doToggle(row) {
-        const j = await postForm('/admin.php/client_license/toggle/' + row.id, {});
-        if (j && j.code === 0) {
-          ElMessage.success(j.msg || 'ok');
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          const j = await postForm('/admin.php/client_license/toggle/' + row.id, {});
+          if (j && j.code === 0) {
+            ElMessage.success(j.msg || 'ok');
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 
       async function doUnbind(row) {
-        await ElMessageBox.confirm(
-          lang === 'en' ? 'Unbind machine for this license?' : '确定解绑该卡密的机器码？',
-          lang === 'en' ? 'Confirm' : '确认',
-          { type: 'warning' }
-        );
-        const j = await postForm('/admin.php/client_license/unbind/' + row.id, {});
-        if (j && j.code === 0) {
-          ElMessage.success(j.msg || 'ok');
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          await ElMessageBox.confirm(
+            lang === 'en' ? 'Unbind machine for this license?' : '确定解绑该卡密的机器码？',
+            lang === 'en' ? 'Confirm' : '确认',
+            { type: 'warning' }
+          );
+          const j = await postForm('/admin.php/client_license/unbind/' + row.id, {});
+          if (j && j.code === 0) {
+            ElMessage.success(j.msg || 'ok');
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          if (e === 'cancel') return;
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(
-          lang === 'en' ? 'Delete this license?' : '确定删除该授权码？',
-          lang === 'en' ? 'Confirm' : '删除确认',
-          { type: 'warning' }
-        );
-        const j = await postForm('/admin.php/client_license/delete/' + row.id, {});
-        if (j && j.code === 0) {
-          ElMessage.success(j.msg || tt('common.delete'));
-          const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
-          page.value = Math.min(page.value, maxPage);
-          fetchList();
-        } else {
-          ElMessage.error((j && j.msg) || '失败');
+        try {
+          await ElMessageBox.confirm(
+            lang === 'en' ? 'Delete this license?' : '确定删除该授权码？',
+            lang === 'en' ? 'Confirm' : '删除确认',
+            { type: 'warning' }
+          );
+          const j = await postForm('/admin.php/client_license/delete/' + row.id, {});
+          if (j && j.code === 0) {
+            ElMessage.success(j.msg || tt('common.delete'));
+            const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
+            page.value = Math.min(page.value, maxPage);
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          if (e === 'cancel') return;
+          ElMessage.error(e && e.message ? e.message : '请求失败');
         }
       }
 

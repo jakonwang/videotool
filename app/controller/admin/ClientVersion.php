@@ -5,7 +5,10 @@ namespace app\controller\admin;
 
 use app\BaseController;
 use app\model\AppVersion as AppVersionModel;
+use think\facade\App;
+use think\facade\Log;
 use think\facade\View;
+use Throwable;
 
 /**
  * 桌面端版本发布
@@ -96,13 +99,21 @@ class ClientVersion extends BaseController
             return $this->jsonErr('请填写下载地址或上传安装包');
         }
 
-        AppVersionModel::create([
-            'version' => $version,
-            'release_notes' => trim((string) $this->request->post('release_notes', '')),
-            'download_url' => $downloadUrl,
-            'is_mandatory' => (int) $this->request->post('is_mandatory', 0) ? 1 : 0,
-            'status' => (int) $this->request->post('status', 1) ? 1 : 0,
-        ]);
+        try {
+            AppVersionModel::create([
+                'version' => $version,
+                'release_notes' => trim((string) $this->request->post('release_notes', '')),
+                'download_url' => $downloadUrl,
+                'is_mandatory' => (int) $this->request->post('is_mandatory', 0) ? 1 : 0,
+                'status' => (int) $this->request->post('status', 1) ? 1 : 0,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('ClientVersion@add: ' . $e->getMessage());
+
+            return $this->jsonErr(
+                App::isDebug() ? ('保存失败：' . $e->getMessage()) : '保存失败，请确认已执行数据库迁移（app_versions 表）或联系管理员'
+            );
+        }
 
         return $this->jsonOk([], '发布成功');
     }
@@ -137,7 +148,15 @@ class ClientVersion extends BaseController
         $row->download_url = $downloadUrl;
         $row->is_mandatory = (int) $this->request->post('is_mandatory', 0) ? 1 : 0;
         $row->status = (int) $this->request->post('status', 1) ? 1 : 0;
-        $row->save();
+        try {
+            $row->save();
+        } catch (Throwable $e) {
+            Log::error('ClientVersion@update: ' . $e->getMessage());
+
+            return $this->jsonErr(
+                App::isDebug() ? ('保存失败：' . $e->getMessage()) : '保存失败，请检查数据库或联系管理员'
+            );
+        }
 
         return $this->jsonOk([], '已保存');
     }
@@ -186,7 +205,17 @@ class ClientVersion extends BaseController
             return $this->jsonErr('创建目录失败');
         }
         $saveName = date('His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        $file->move($baseDir, $saveName);
+        try {
+            $file->move($baseDir, $saveName);
+        } catch (Throwable $e) {
+            Log::error('ClientVersion@uploadPackage: ' . $e->getMessage());
+
+            return $this->jsonErr(
+                App::isDebug()
+                    ? ('上传失败：' . $e->getMessage())
+                    : '上传失败，请检查 public/uploads 目录权限、PHP 上传大小限制'
+            );
+        }
         $url = '/uploads/client_releases/' . $dateStr . '/' . $saveName;
 
         return $this->jsonOk(['url' => $url], '上传成功');
