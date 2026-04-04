@@ -118,6 +118,40 @@ class ProductStyleImportService
         return ['ref' => $raw, 'temp' => '', 'ok' => false];
     }
 
+    /**
+     * 将临时/提取的图片复制到 public/uploads/product_style/，便于列表与 H5 展示
+     *
+     * @return string|null 站内路径如 /uploads/product_style/ps_xxx.jpg，失败返回 null
+     */
+    public static function persistStyleImageToPublic(string $sourceAbsolute, string $publicRoot): ?string
+    {
+        $sourceAbsolute = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $sourceAbsolute);
+        if (!\is_file($sourceAbsolute) || !\is_readable($sourceAbsolute)) {
+            return null;
+        }
+        $publicRoot = \rtrim(\str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $publicRoot), DIRECTORY_SEPARATOR);
+        $sub = 'uploads' . DIRECTORY_SEPARATOR . 'product_style';
+        $dir = $publicRoot . DIRECTORY_SEPARATOR . $sub;
+        if (!\is_dir($dir) && !@\mkdir($dir, 0755, true) && !\is_dir($dir)) {
+            return null;
+        }
+        $ext = \strtolower(\pathinfo($sourceAbsolute, PATHINFO_EXTENSION) ?: 'jpg');
+        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        if (!\in_array($ext, $allowed, true)) {
+            $ext = 'jpg';
+        }
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+        $name = 'ps_' . \date('Ymd') . '_' . \bin2hex(\random_bytes(8)) . '.' . $ext;
+        $dest = $dir . DIRECTORY_SEPARATOR . $name;
+        if (!@\copy($sourceAbsolute, $dest)) {
+            return null;
+        }
+
+        return '/' . \str_replace(DIRECTORY_SEPARATOR, '/', $sub . DIRECTORY_SEPARATOR . $name);
+    }
+
     /** 供 Excel 嵌入图等写入临时文件 */
     public static function createTempImagePath(string $ext): string
     {

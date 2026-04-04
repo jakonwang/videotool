@@ -399,8 +399,9 @@
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
 - `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）、`python_diag`（未就绪时简短诊断，便于排查 PATH/exec）
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log` 与 PHP/Nginx 限制。
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
+- `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
 ### 开放 API（无需登录，供仓库手机端 H5）
@@ -414,17 +415,17 @@
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
 - CSV 无数表头时按前两列为「编号、图片」解析；Excel 始终使用第一行为表头。
 - **CSV**：图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
-- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。
+- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。导入成功后嵌入图会**复制**到 `public/uploads/product_style/`，`image_ref` 存为站内路径（如 `/uploads/product_style/ps_xxx.jpg`），列表与 H5 可展示；若目录不可写则仍回退为占位文案「(Excel嵌入图)」。
 - 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`。
 
 ### 已适配页面
-- 后台：`view/admin/product_search/index.html`
+- 后台：`view/admin/product_search/index.html`（多选 + **批量删除**；「参考图」列：`http(s)`、站内路径、`data:image` 显示缩略图并可预览；纯文案仍只显示文字）
 - 前台 H5：`view/index/search_by_image.html`
 
 ### 注意
 - 向量检索为 **全表线性扫描**（适合万级以内）；数据量再大建议引入专用向量库。
 - 以图搜款依赖服务器已安装 Python 且 `embed_image.py` 可运行；导入前请先在本机执行 `python embed_image.py 某图片.jpg` 自检。
-- 手机上传大图若 413，需调大 Nginx `client_max_body_size` 与 PHP `upload_max_filesize`。
+- **后台寻款批量导入**、手机拍照寻款：若 **HTTP 413**，先调 Nginx `client_max_body_size`，再调 PHP `upload_max_filesize` 与 `post_max_size`（三者均要覆盖最大单文件体积）。
 
 ## 桌面端：发卡与版本、公开下载（2026-04）
 

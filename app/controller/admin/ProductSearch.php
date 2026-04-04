@@ -279,8 +279,10 @@ class ProductSearch extends BaseController
                     continue;
                 }
 
+                $excelEmbedSource = null;
                 if ($imgTemp !== null && is_file($imgTemp) && is_readable($imgTemp)) {
                     $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
+                    $excelEmbedSource = $imgTemp;
                 } else {
                     $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
                 }
@@ -293,9 +295,6 @@ class ProductSearch extends BaseController
                 }
 
                 $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
-                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
-                    @unlink($resolved['temp']);
-                }
                 if (!is_array($vec)) {
                     if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
                         @unlink($resolved['temp']);
@@ -307,9 +306,20 @@ class ProductSearch extends BaseController
                     continue;
                 }
 
+                $imageRef = $resolved['ref'];
+                if ($excelEmbedSource !== null && is_file($excelEmbedSource)) {
+                    $saved = ProductStyleImportService::persistStyleImageToPublic($excelEmbedSource, $publicRoot);
+                    if ($saved !== null) {
+                        $imageRef = $saved;
+                    }
+                }
+                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                    @unlink($resolved['temp']);
+                }
+
                 ItemModel::create([
                     'product_code' => $code,
-                    'image_ref' => $resolved['ref'],
+                    'image_ref' => $imageRef,
                     'hot_type' => $hot,
                     'embedding' => json_encode($vec, JSON_UNESCAPED_UNICODE),
                     'status' => 1,
@@ -336,6 +346,60 @@ class ProductSearch extends BaseController
         ItemModel::destroy($id);
 
         return $this->jsonOk([], '已删除');
+    }
+
+    /**
+     * POST：批量删除索引。JSON body: {"ids":[1,2,3]} 或表单 ids[] / ids=1,2
+     */
+    public function deleteBatch()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('仅支持 POST');
+            }
+            $ids = $this->parseIdListParam();
+            if ($ids === []) {
+                return $this->jsonErr('请选择要删除的记录（ids 不能为空）');
+            }
+            $max = 500;
+            if (count($ids) > $max) {
+                return $this->jsonErr('单次最多删除 ' . $max . ' 条');
+            }
+            ItemModel::whereIn('id', $ids)->delete();
+
+            return $this->jsonOk(['deleted' => count($ids)], '已批量删除');
+        } catch (\Throwable $e) {
+            Log::error('product_search deleteBatch: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+
+            return $this->jsonErr('批量删除失败：' . $e->getMessage());
+        }
+    }
+
+    /** @return int[] */
+    private function parseIdListParam(): array
+    {
+        $ids = $this->request->param('ids');
+        if (($ids === null || $ids === '' || $ids === []) && $this->request->getContent() !== '') {
+            $json = json_decode((string) $this->request->getContent(), true);
+            if (is_array($json) && isset($json['ids'])) {
+                $ids = $json['ids'];
+            }
+        }
+        if (is_string($ids)) {
+            $ids = preg_split('/[\s,]+/', $ids, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+        if (!is_array($ids)) {
+            return [];
+        }
+        $out = [];
+        foreach ($ids as $v) {
+            $n = (int) $v;
+            if ($n > 0) {
+                $out[$n] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($out));
     }
 
     /**
