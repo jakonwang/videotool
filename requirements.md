@@ -22,6 +22,7 @@
 | 系统 | 系统设置 / 用户 / 发卡 / 版本 / 缓存 / 异常 | 参数、管理员、桌面授权码、桌面安装包发布、缓存、下载错误监控 |
 
 - 侧栏分组使用 **Bootstrap collapse**（与页面 SSR 同步 `show`，避免 AdminLTE Treeview 初始化把当前分组收拢）；样式为自定义「玻璃拟态 + 霓虹描边」分组头与子项指示点，与 AdminLTE 默认 `nav-treeview` 视觉脱钩。
+- **后台多语言**：文案在 `public/static/i18n/i18n.js` 中维护；侧栏等使用 `data-i18n="键名"`，由 `AppI18n.applyDom` 替换。**新增或修改翻译键后**，须同步提高 `view/admin/common/layout.html` 里 `i18n.js` 的 `?v=` 缓存版本，否则浏览器可能仍加载旧脚本，界面会显示键名（如 `admin.menu.styleSearch`）而非译文。
 
 ### 侧边栏 UI（2026-03）
 - 暗黑侧栏参考 **Vercel / Tailwind UI**：分组标题更小更克制（uppercase + tracking-wider），可点击项与标题层级区分明显。
