@@ -62,6 +62,7 @@
       const pageSize = ref(10);
       const query = reactive({ keyword: '' });
       const pythonOk = ref(false);
+      const pythonDiag = ref('');
       const importing = ref(false);
       const fileList = ref([]);
 
@@ -81,6 +82,7 @@
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
           pythonOk.value = !!(json.data && json.data.python_ok);
+          pythonDiag.value = (json.data && json.data.python_diag) ? String(json.data.python_diag) : '';
         } catch (e) {
           ElMessage.error(e.message || '加载失败');
         } finally {
@@ -141,8 +143,8 @@
 
       onMounted(() => { fetchList(); });
 
-      return {
-        loading, items, total, page, pageSize, query, pythonOk, importing,
+        return {
+        loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
         fetchList, doImport, doDelete, openH5, lang,
       };
     },
@@ -163,7 +165,8 @@
           <div v-if="!pythonOk" style="color:#b45309;margin-bottom:8px;">
             <strong>Python 特征环境未就绪：</strong>服务器需安装 Python3，并在项目根执行
             <code>pip install -r tools/product_style_search/requirements.txt</code>，
-            首次运行会下载 MobileNet 权重。Windows 可在 <code>config/product_search.php</code> 或环境变量 <code>PRODUCT_SEARCH_PYTHON</code> 指定 python 路径。
+            首次运行会下载 MobileNet 权重。Web 进程（如 Apache）的 PATH 常与 CMD 不同；请在 <code>config/product_search.php</code> 的 <code>python_bin</code> 或环境变量 <code>PRODUCT_SEARCH_PYTHON</code> 填写 <strong>python.exe 绝对路径</strong>（Windows）或 <code>which python3</code> 路径（Linux）。
+            <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">诊断：{{ pythonDiag }}</div>
           </div>
           <div>CSV 需包含「产品编号」「图片」列（可选「爆款类型」）。图片支持 http(s) 链接、以 <code>/</code> 开头的站内路径、或 Base64 数据列。</div>
         </div>

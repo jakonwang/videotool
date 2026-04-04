@@ -11,9 +11,19 @@ use think\facade\Log;
  */
 class ProductStyleEmbeddingService
 {
+    /** @var string 最近一次 embed 子进程原始输出（截断），用于后台诊断 */
+    private static string $lastRawOutput = '';
+
     public static function pythonBinary(): string
     {
-        return (string) (Config::get('product_search.python_bin') ?: 'python');
+        $configured = trim((string) (Config::get('product_search.python_bin') ?? ''));
+
+        return $configured !== '' ? $configured : (PHP_OS_FAMILY === 'Windows' ? 'py -3' : 'python3');
+    }
+
+    public static function getLastRawOutput(): string
+    {
+        return self::$lastRawOutput;
     }
 
     public static function embedScriptPath(): string
@@ -32,40 +42,104 @@ class ProductStyleEmbeddingService
         if (!is_file($absolutePath) || !is_readable($absolutePath)) {
             return null;
         }
-        $py = self::pythonBinary();
         $script = self::embedScriptPath();
         if (!is_file($script)) {
             Log::error('embed_image.py 不存在: ' . $script);
 
             return null;
         }
-        $cmd = sprintf(
-            '%s %s %s',
-            escapeshellarg($py),
-            escapeshellarg($script),
-            escapeshellarg($absolutePath)
-        );
+        $cmd = self::buildEmbedCommand($script, $absolutePath) . ' 2>&1';
         $out = [];
         $code = 0;
-        exec($cmd . ' 2>&1', $out, $code);
-        $line = trim(implode("\n", $out));
-        if ($line === '') {
+        exec($cmd, $out, $code);
+        $raw = trim(implode("\n", $out));
+        self::$lastRawOutput = strlen($raw) > 4000 ? substr($raw, -4000) : $raw;
+        if ($raw === '') {
             Log::error('embed 无输出: ' . $cmd);
 
             return null;
         }
-        $data = json_decode($line, true);
-        if (!is_array($data)) {
-            Log::error('embed JSON 无效: ' . $line);
-
-            return null;
+        $vec = self::parseEmbedJsonLines($raw);
+        if ($vec === null) {
+            Log::error('embed JSON 无效: ' . substr($raw, 0, 800));
         }
+
+        return $vec;
+    }
+
+    /**
+     * 配置非空：单一可执行文件路径；配置为空：Windows 使用 py -3，否则 python3
+     */
+    private static function buildEmbedCommand(string $script, string $absolutePath): string
+    {
+        $configured = trim((string) (Config::get('product_search.python_bin') ?? ''));
+        if ($configured !== '') {
+            return sprintf(
+                '%s %s %s',
+                escapeshellarg($configured),
+                escapeshellarg($script),
+                escapeshellarg($absolutePath)
+            );
+        }
+        if (PHP_OS_FAMILY === 'Windows') {
+            return sprintf(
+                'py -3 %s %s',
+                escapeshellarg($script),
+                escapeshellarg($absolutePath)
+            );
+        }
+
+        return sprintf(
+            '%s %s %s',
+            escapeshellarg('python3'),
+            escapeshellarg($script),
+            escapeshellarg($absolutePath)
+        );
+    }
+
+    /**
+     * 解析脚本 stdout（可能含 PyTorch 等杂行）；取最后一行合法 JSON
+     *
+     * @return float[]|null
+     */
+    private static function parseEmbedJsonLines(string $raw): ?array
+    {
+        $data = json_decode($raw, true);
+        if (is_array($data) && self::isEmbedPayload($data)) {
+            return self::payloadToVector($data);
+        }
+        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $t = trim((string) $lines[$i]);
+            if ($t === '') {
+                continue;
+            }
+            $data = json_decode($t, true);
+            if (is_array($data) && self::isEmbedPayload($data)) {
+                return self::payloadToVector($data);
+            }
+        }
+
+        return null;
+    }
+
+    private static function isEmbedPayload(array $data): bool
+    {
+        if (array_key_exists('error', $data)) {
+            return true;
+        }
+
+        return isset($data[0]) && is_numeric($data[0]);
+    }
+
+    /**
+     * @return float[]|null
+     */
+    private static function payloadToVector(array $data): ?array
+    {
         if (isset($data['error'])) {
             Log::warning('embed 失败: ' . (string) $data['error']);
 
-            return null;
-        }
-        if (!isset($data[0]) || !is_numeric($data[0])) {
             return null;
         }
 

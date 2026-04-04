@@ -9,7 +9,9 @@
 
 ```bash
 cd tools/product_style_search
-pip install -r requirements.txt
+# 与将要被 PHP 调用的解释器一致（Windows 常用 py -3）
+py -3 -m pip install -r requirements.txt
+# 或 Linux：python3 -m pip install -r requirements.txt
 ```
 
 首次运行会下载 PyTorch 与 MobileNet 权重，需联网。
@@ -17,13 +19,15 @@ pip install -r requirements.txt
 ## 自检
 
 ```bash
-python embed_image.py C:\path\to\any.jpg
+py -3 embed_image.py C:\path\to\any.jpg
+# 或 Linux：python3 embed_image.py /path/to/any.jpg
 ```
 
 应输出一行 JSON 数组（浮点数列表）。
 
 ## 服务器配置
 
-在 `config/product_search.php` 或环境变量中设置：
+**phpStudy / Apache 等 Web 进程的 PATH 通常与用户 CMD 不同**，终端里能用 `python` 不代表 PHP `exec` 能找到。建议在 `config/product_search.php` 的 `python_bin` 或环境变量中设置：
 
-- `PRODUCT_SEARCH_PYTHON`：若 `python` 不在 PATH，写绝对路径，例如 `C:\Python311\python.exe`。
+- `PRODUCT_SEARCH_PYTHON` / `python_bin`：`python.exe` 或 `python3` 的**绝对路径**，例如 `C:\Users\xxx\AppData\Local\Programs\Python\Python311\python.exe`。
+- 留空时：代码在 Windows 上默认使用 `py -3`，在 Linux 上使用 `python3`（仍依赖系统 PATH 中存在对应命令）。

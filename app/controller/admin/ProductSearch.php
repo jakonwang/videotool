@@ -65,12 +65,22 @@ class ProductSearch extends BaseController
             ];
         }
 
+        $pythonOk = $this->checkPythonEmbed();
+        $pythonDiag = '';
+        if (!$pythonOk) {
+            $log = ProductStyleEmbeddingService::getLastRawOutput();
+            $pythonDiag = $log !== ''
+                ? substr(preg_replace('/\s+/u', ' ', $log), 0, 500)
+                : '无子进程输出：可能未找到 Python、php.ini 禁用了 exec，或 Web 服务账号 PATH 与 shell 不一致。Linux 请在 .env 设置 PRODUCT_SEARCH_PYTHON=python3 或 /usr/bin/python3；Windows 请指定 python.exe 绝对路径。';
+        }
+
         return $this->jsonOk([
             'items' => $items,
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
-            'python_ok' => $this->checkPythonEmbed(),
+            'python_ok' => $pythonOk,
+            'python_diag' => $pythonDiag,
         ]);
     }
 

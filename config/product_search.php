@@ -1,7 +1,7 @@
 <?php
-// 图片搜款式：Python 解释器与脚本路径（Windows 可设为 C:\Python311\python.exe）
+// 图片搜款式：Python 解释器。未设置环境变量时：Windows 留空（由代码使用 py -3），Linux/macOS 默认 python3。Web 进程 PATH 常与 shell 不同，生产环境建议 PRODUCT_SEARCH_PYTHON=/usr/bin/python3 等绝对路径。
 return [
-    'python_bin' => env('PRODUCT_SEARCH_PYTHON', 'python'),
+    'python_bin' => env('PRODUCT_SEARCH_PYTHON', PHP_OS_FAMILY === 'Windows' ? '' : 'python3'),
     /** @var int 搜索返回条数 */
     'top_k' => 3,
     /** @var int 导入时单张图下载超时（秒） */

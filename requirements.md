@@ -390,13 +390,14 @@
 
 ### Python 环境（服务器必装）
 - 路径：`tools/product_style_search/`
-- 依赖：`pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）
-- 配置：`config/product_search.php` 中 `python_bin`，或环境变量 `PRODUCT_SEARCH_PYTHON` 指向 `python.exe` 绝对路径。
+- 依赖：在项目根执行 `pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）；建议用与 Web 将调用的同一解释器，例如 `py -3 -m pip install -r tools/product_style_search/requirements.txt`（Windows）或 `python3 -m pip ...`（Linux）。
+- 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
+- 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组；若 `php.ini` 中 `disable_functions` 含 `exec`，PHP 无法调用脚本。
 - 说明：`tools/product_style_search/README.md`
 
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
-- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）
+- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）、`python_diag`（未就绪时简短诊断，便于排查 PATH/exec）
 - `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`，CSV 编码建议 UTF-8（带 BOM 亦可）
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV

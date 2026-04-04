@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import json
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 import torch
 import torch.nn.functional as F
