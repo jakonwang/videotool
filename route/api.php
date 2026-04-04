@@ -16,7 +16,8 @@ Route::group('api', function() {
     Route::post('client/verifyLicense', 'app\controller\api\ClientApp@verifyLicense');
     Route::rule('client/checkUpdate', 'app\controller\api\ClientApp@checkUpdate', 'GET|POST');
 
-    Route::post('product_search/searchByImage', 'app\controller\api\ProductSearch@searchByImage');
+    Route::post('product_search/searchByImage', 'app\controller\api\Search@searchByImage');
+    Route::post('search/searchByImage', 'app\controller\api\Search@searchByImage');
     Route::get('product_search/searchByCode', 'app\controller\api\ProductSearch@searchByCode');
 });
 

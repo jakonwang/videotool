@@ -5,6 +5,8 @@ namespace app\controller\admin;
 
 use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
+use app\service\AliyunImageSearchConfig;
+use app\service\ProductStyleAliyunQueueService;
 use app\service\ProductStyleEmbeddingService;
 use app\service\ProductStyleImportService;
 use app\service\ProductStyleXlsxImportService;
@@ -130,7 +132,39 @@ class ProductSearch extends BaseController
             'page_size' => (int) $list->listRows(),
             'python_ok' => $pythonOk,
             'python_diag' => $pythonDiag,
+            'aliyun_is_enabled' => AliyunImageSearchConfig::get()['enabled'],
+            'aliyun_is_pending' => ProductStyleAliyunQueueService::pendingCount(),
         ]);
+    }
+
+    /**
+     * 手动消费阿里云图传队列（导入未完成同步时可点此重试）
+     */
+    public function syncAliyunQueue()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('仅支持 POST');
+        }
+        $max = (int) $this->request->post('max', 300);
+        $sec = (int) $this->request->post('seconds', 180);
+        if ($max < 1) {
+            $max = 300;
+        }
+        if ($max > 2000) {
+            $max = 2000;
+        }
+        if ($sec < 10) {
+            $sec = 10;
+        }
+        if ($sec > 600) {
+            $sec = 600;
+        }
+        $sync = ProductStyleAliyunQueueService::drain($max, $sec);
+
+        return $this->jsonOk([
+            'sync' => $sync,
+            'pending' => ProductStyleAliyunQueueService::pendingCount(),
+        ], '同步批次完成');
     }
 
     private function checkPythonEmbed(): bool
@@ -267,10 +301,10 @@ class ProductSearch extends BaseController
             }
 
             $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
-            if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
-                @unlink($resolved['temp']);
-            }
             if (!is_array($vec)) {
+                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                    @unlink($resolved['temp']);
+                }
                 $fail++;
                 if (count($errors) < 30) {
                     $errors[] = "第{$rowIndex}行 {$code}：特征提取失败（请检查 Python 与 torch）";
@@ -279,6 +313,11 @@ class ProductSearch extends BaseController
             }
 
             $u = $this->upsertStyleItem($code, $resolved['ref'], $hot, $vec);
+            $picName = ProductStyleAliyunQueueService::makePicName($resolved['ref'], $resolved['temp']);
+            ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
+            if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                @unlink($resolved['temp']);
+            }
             if ($u['inserted']) {
                 $inserted++;
             } else {
@@ -294,11 +333,17 @@ class ProductSearch extends BaseController
         }
         fclose($handle);
 
+        $aliyunSync = ProductStyleAliyunQueueService::drain(800, 300);
+
         return $this->jsonOk([
             'imported' => $inserted,
             'updated' => $updated,
             'failed' => $fail,
             'errors' => $errors,
+            'aliyun' => [
+                'sync_batch' => $aliyunSync,
+                'pending' => ProductStyleAliyunQueueService::pendingCount(),
+            ],
         ], '导入完成');
     }
 
@@ -367,11 +412,13 @@ class ProductSearch extends BaseController
                         $imageRef = $saved;
                     }
                 }
+
+                $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec);
+                $picName = ProductStyleAliyunQueueService::makePicName($imageRef, $resolved['temp']);
+                ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
                 if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
                     @unlink($resolved['temp']);
                 }
-
-                $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec);
                 if ($u['inserted']) {
                     $inserted++;
                 } else {
@@ -389,11 +436,17 @@ class ProductSearch extends BaseController
             return $this->jsonErr('Excel 解析失败：' . $e->getMessage());
         }
 
+        $aliyunSync = ProductStyleAliyunQueueService::drain(800, 300);
+
         return $this->jsonOk([
             'imported' => $inserted,
             'updated' => $updated,
             'failed' => $fail,
             'errors' => $errors,
+            'aliyun' => [
+                'sync_batch' => $aliyunSync,
+                'pending' => ProductStyleAliyunQueueService::pendingCount(),
+            ],
         ], '导入完成');
     }
 

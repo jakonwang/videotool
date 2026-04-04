@@ -70,6 +70,9 @@
       const tableRef = ref(null);
       const selectedRows = ref([]);
       const batchDeleting = ref(false);
+      const aliyunEnabled = ref(false);
+      const aliyunPending = ref(0);
+      const syncingAliyun = ref(false);
 
       async function fetchList() {
         loading.value = true;
@@ -88,6 +91,8 @@
           total.value = (json.data && json.data.total) ? json.data.total : 0;
           pythonOk.value = !!(json.data && json.data.python_ok);
           pythonDiag.value = (json.data && json.data.python_diag) ? String(json.data.python_diag) : '';
+          aliyunEnabled.value = !!(json.data && json.data.aliyun_is_enabled);
+          aliyunPending.value = (json.data && json.data.aliyun_is_pending != null) ? Number(json.data.aliyun_is_pending) : 0;
         } catch (e) {
           ElMessage.error(e.message || '加载失败');
         } finally {
@@ -143,12 +148,16 @@
           }
           if (json && json.code === 0) {
             const d = json.data || {};
-            ElMessage.success(
-              (json.msg || '完成') +
-                ' 新增' + (d.imported != null ? d.imported : 0) +
-                ' 条，更新' + (d.updated != null ? d.updated : 0) +
-                ' 条，失败' + (d.failed || 0) + ' 条'
-            );
+            let msg = (json.msg || '完成') +
+              ' 新增' + (d.imported != null ? d.imported : 0) +
+              ' 条，更新' + (d.updated != null ? d.updated : 0) +
+              ' 条，失败' + (d.failed || 0) + ' 条';
+            if (d.aliyun && d.aliyun.sync_batch) {
+              const s = d.aliyun.sync_batch;
+              msg += '；阿里云已传' + (s.ok || 0) + ' 失败' + (s.fail || 0);
+              if (d.aliyun.pending > 0) msg += '，队列剩余 ' + d.aliyun.pending + '（可点「同步阿里云」）';
+            }
+            ElMessage.success(msg);
             if (d.errors && d.errors.length) console.warn(d.errors);
             input.value = '';
             fetchList();
@@ -310,11 +319,36 @@
         }
       }
 
+      async function doSyncAliyun() {
+        syncingAliyun.value = true;
+        try {
+          const fd = new URLSearchParams();
+          fd.set('max', '400');
+          fd.set('seconds', '240');
+          const res = await fetch('/admin.php/product_search/syncAliyunQueue', {
+            method: 'POST',
+            body: fd.toString(),
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          });
+          const j = parseJsonBody(res, await res.text());
+          if (j && j.code === 401) throw new Error('未登录或会话过期');
+          if (!j || j.code !== 0) throw new Error((j && j.msg) || '同步失败');
+          const s = (j.data && j.data.sync) ? j.data.sync : {};
+          aliyunPending.value = (j.data && j.data.pending != null) ? Number(j.data.pending) : 0;
+          ElMessage.success('同步批次：成功 ' + (s.ok || 0) + '，失败 ' + (s.fail || 0) + '，剩余队列 ' + aliyunPending.value);
+        } catch (e) {
+          ElMessage.error(e.message || '同步失败');
+        } finally {
+          syncingAliyun.value = false;
+        }
+      }
+
       onMounted(() => { fetchList(); });
 
       return {
         loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
-        tableRef, selectedRows, batchDeleting,
+        tableRef, selectedRows, batchDeleting, aliyunEnabled, aliyunPending, syncingAliyun, doSyncAliyun,
         editVisible, editSaving, editImageInputKey, editForm,
         fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang,
         imageDisplayUrl, isImagePreviewable,
@@ -341,6 +375,8 @@
             <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">诊断：{{ pythonDiag }}</div>
           </div>
           <div>支持 <strong>CSV / Excel（.xlsx、.xls）</strong>。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。若 <strong>HTTP 502</strong> 或导入到一半失败，多为<strong>超时/内存</strong>：调大 Nginx <code>fastcgi_read_timeout</code>、PHP-FPM <code>request_terminate_timeout</code>，或<strong>拆成多个表分批导入</strong>。</div>
+          <div v-if="aliyunEnabled" style="margin-top:8px;color:#1e40af;">已启用 <strong>阿里云图像搜索</strong>：导入成功行会入队并尽量在本轮上传；队列剩余 <strong>{{ aliyunPending }}</strong> 条时可点下方「同步阿里云」。</div>
+          <div v-else style="margin-top:8px;color:#64748b;">拍照寻款已改为 <strong>阿里云图像搜索</strong>，请在 <strong>系统 → 设置</strong> 填写 Endpoint、实例名与 AK/SK 并勾选启用；需先执行数据库脚本 <code>database/run_migration_product_style_is_queue.php</code>。</div>
         </div>
 
         <div class="admin-filter-section">
@@ -350,6 +386,7 @@
               <el-button type="primary" @click="()=>{page=1;fetchList();}">筛选</el-button>
               <input id="csvFileInput" type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:240px;" />
               <el-button type="success" :loading="importing" @click="doImport">导入</el-button>
+              <el-button type="primary" plain :loading="syncingAliyun" :disabled="!aliyunEnabled" @click="doSyncAliyun">同步阿里云</el-button>
               <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">批量删除</el-button>
             </div>
           </div>

@@ -43,6 +43,32 @@ class Settings extends BaseController
                 SystemConfigService::set($k, trim((string) $this->request->post($k, '')));
             }
 
+            SystemConfigService::set('aliyun_is_enabled', $this->request->post('aliyun_is_enabled') === '1' ? '1' : '0');
+
+            $aliyunAk = trim((string) $this->request->post('aliyun_is_access_key_id', ''));
+            if ($aliyunAk !== '') {
+                SystemConfigService::set('aliyun_is_access_key_id', $aliyunAk);
+            } elseif ($this->request->post('aliyun_is_access_clear') === '1') {
+                SystemConfigService::set('aliyun_is_access_key_id', '');
+            }
+            $aliyunSk = trim((string) $this->request->post('aliyun_is_access_key_secret', ''));
+            if ($aliyunSk !== '') {
+                SystemConfigService::set('aliyun_is_access_key_secret', $aliyunSk);
+            } elseif ($this->request->post('aliyun_is_secret_clear') === '1') {
+                SystemConfigService::set('aliyun_is_access_key_secret', '');
+            }
+            foreach (
+                [
+                    'aliyun_is_endpoint',
+                    'aliyun_is_instance_name',
+                    'aliyun_is_region_id',
+                    'aliyun_is_category_id',
+                    'aliyun_is_search_num',
+                ] as $k
+            ) {
+                SystemConfigService::set($k, trim((string) $this->request->post($k, '')));
+            }
+
             SystemConfigService::clearCache();
 
             return json(['code' => 0, 'msg' => '已保存']);
@@ -58,6 +84,14 @@ class Settings extends BaseController
         $qiniuDomain = SystemConfigService::get('qiniu_domain', '') ?? '';
         $qiniuRegion = SystemConfigService::get('qiniu_region', '') ?? '';
         $qiniuCdnDomains = SystemConfigService::get('qiniu_cdn_domains', '') ?? '';
+        $aliyunIsEnabled = SystemConfigService::get('aliyun_is_enabled', '0') === '1';
+        $aliyunAccessConfigured = trim((string) (SystemConfigService::get('aliyun_is_access_key_id', '') ?? '')) !== '';
+        $aliyunSecretConfigured = trim((string) (SystemConfigService::get('aliyun_is_access_key_secret', '') ?? '')) !== '';
+        $aliyunEndpoint = SystemConfigService::get('aliyun_is_endpoint', '') ?? '';
+        $aliyunInstance = SystemConfigService::get('aliyun_is_instance_name', '') ?? '';
+        $aliyunRegionId = SystemConfigService::get('aliyun_is_region_id', '') ?? '';
+        $aliyunCategoryId = SystemConfigService::get('aliyun_is_category_id', '') ?? '';
+        $aliyunSearchNum = SystemConfigService::get('aliyun_is_search_num', '') ?? '';
         $qiniuEffective = QiniuService::getMergedQiniuConfig();
         $qiniuEffectiveCdnLabel = '';
         if (!empty($qiniuEffective['cdn_domains']) && is_array($qiniuEffective['cdn_domains'])) {
@@ -76,6 +110,14 @@ class Settings extends BaseController
             'qiniu_cdn_domains' => $qiniuCdnDomains,
             'qiniu_effective' => $qiniuEffective,
             'qiniu_effective_cdn_label' => $qiniuEffectiveCdnLabel,
+            'aliyun_is_enabled' => $aliyunIsEnabled,
+            'aliyun_access_configured' => $aliyunAccessConfigured,
+            'aliyun_secret_configured' => $aliyunSecretConfigured,
+            'aliyun_is_endpoint' => $aliyunEndpoint,
+            'aliyun_is_instance_name' => $aliyunInstance,
+            'aliyun_is_region_id' => $aliyunRegionId,
+            'aliyun_is_category_id' => $aliyunCategoryId,
+            'aliyun_is_search_num' => $aliyunSearchNum,
         ]);
     }
 }

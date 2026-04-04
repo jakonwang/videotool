@@ -112,6 +112,59 @@
                     </div>
                         </div>
                     </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
+                    <h5 class="mb-3 text-muted">阿里云图像搜索（寻款）</h5>
+                    <p class="small text-muted">用于「拍照寻款」以图搜款；导入 CSV/Excel 时会将图片同步到阿里云商品图搜实例。AK/SK 建议使用 RAM 子账号最小权限。</p>
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="aliyun_is_enabled" name="aliyun_is_enabled" value="1" {if $aliyun_is_enabled}checked{/if}>
+                            <label class="custom-control-label" for="aliyun_is_enabled">启用阿里云图搜（需填写下列 Endpoint、实例名与密钥）</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyun_is_access_key_id">AccessKey ID</label>
+                        <input type="text" name="aliyun_is_access_key_id" id="aliyun_is_access_key_id" class="form-control" value="" autocomplete="off" placeholder="{if $aliyun_access_configured}已保存，留空不修改{else /}必填{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="aliyun_is_access_clear" name="aliyun_is_access_clear" value="1">
+                            <label class="custom-control-label" for="aliyun_is_access_clear">清空后台中的 AccessKey ID</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyun_is_access_key_secret">AccessKey Secret</label>
+                        <input type="password" name="aliyun_is_access_key_secret" id="aliyun_is_access_key_secret" class="form-control" value="" autocomplete="new-password" placeholder="{if $aliyun_secret_configured}已保存，留空不修改{else /}必填{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="aliyun_is_secret_clear" name="aliyun_is_secret_clear" value="1">
+                            <label class="custom-control-label" for="aliyun_is_secret_clear">清空 Secret</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyun_is_endpoint">Endpoint</label>
+                        <input type="text" name="aliyun_is_endpoint" id="aliyun_is_endpoint" class="form-control" value="{$aliyun_is_endpoint|default=''}" placeholder="例：imagesearch.cn-shanghai.aliyuncs.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyun_is_instance_name">实例名称 InstanceName</label>
+                        <input type="text" name="aliyun_is_instance_name" id="aliyun_is_instance_name" class="form-control" value="{$aliyun_is_instance_name|default=''}" placeholder="控制台实例信息中的名称">
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyun_is_region_id">RegionId（可选）</label>
+                        <input type="text" name="aliyun_is_region_id" id="aliyun_is_region_id" class="form-control" value="{$aliyun_is_region_id|default=''}" placeholder="一般可从 Endpoint 自动解析，留空即可">
+                    </div>
+                    <div class="form-group">
+                        <label for="aliyun_is_category_id">类目 CategoryId</label>
+                        <input type="text" name="aliyun_is_category_id" id="aliyun_is_category_id" class="form-control" value="{$aliyun_is_category_id|default=''}" placeholder="留空则默认 5（配饰，适合耳环等饰品）">
+                        <small class="form-text text-muted">官方类目表见阿里云文档「图像搜索图片类目与ID列表」。</small>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="aliyun_is_search_num">搜索返回条数 Num</label>
+                        <input type="text" name="aliyun_is_search_num" id="aliyun_is_search_num" class="form-control" value="{$aliyun_is_search_num|default=''}" placeholder="留空则默认 5">
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
+                    </div>
+                        </div>
+                    </div>
                 </form>
             </div>
         </div>
@@ -133,6 +186,8 @@
                         AdminUI.showToast('success', res.msg || '已保存');
                         $('#qiniu_access_key').val('');
                         $('#qiniu_secret_key').val('');
+                        $('#aliyun_is_access_key_id').val('');
+                        $('#aliyun_is_access_key_secret').val('');
                         setTimeout(function () { location.reload(); }, 500);
                     } else {
                         AdminUI.showToast('error', res.msg || '失败');
