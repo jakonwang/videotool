@@ -51,7 +51,7 @@ class ProductStyleEmbeddingService
         $cmd = self::buildEmbedCommand($script, $absolutePath) . ' 2>&1';
         $out = [];
         $code = 0;
-        exec($cmd, $out, $code);
+        \exec($cmd, $out, $code);
         $raw = trim(implode("\n", $out));
         self::$lastRawOutput = strlen($raw) > 4000 ? substr($raw, -4000) : $raw;
         if ($raw === '') {
@@ -76,9 +76,9 @@ class ProductStyleEmbeddingService
         if ($configured !== '') {
             return sprintf(
                 '%s %s %s',
-                escapeshellarg($configured),
-                escapeshellarg($script),
-                escapeshellarg($absolutePath)
+                \escapeshellarg($configured),
+                \escapeshellarg($script),
+                \escapeshellarg($absolutePath)
             );
         }
         if (PHP_OS_FAMILY === 'Windows') {
@@ -91,9 +91,9 @@ class ProductStyleEmbeddingService
 
         return sprintf(
             '%s %s %s',
-            escapeshellarg('python3'),
-            escapeshellarg($script),
-            escapeshellarg($absolutePath)
+            \escapeshellarg('python3'),
+            \escapeshellarg($script),
+            \escapeshellarg($absolutePath)
         );
     }
 
