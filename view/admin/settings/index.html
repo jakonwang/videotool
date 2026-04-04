@@ -115,6 +115,42 @@
 
                     <div class="card shadow-sm mb-3">
                         <div class="card-body">
+                    <h5 class="mb-3 text-muted">OpenAI Vision（寻款，推荐）</h5>
+                    <p class="small text-muted">填写 API Key 后，<strong>拍照寻款</strong>优先使用 <code>gpt-4o-mini</code> 看图+语义匹配库内「编号+特征」；按次计费、无月费。导入表格时可选择是否为每行参考图自动生成一句视觉描述（会按行调用 API）。</p>
+                    <div class="form-group">
+                        <label for="openai_api_key">API Key</label>
+                        <input type="password" name="openai_api_key" id="openai_api_key" class="form-control" value="" autocomplete="new-password" placeholder="{if $openai_key_configured}已保存，留空不修改{else /}sk-...{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="openai_api_key_clear" name="openai_api_key_clear" value="1">
+                            <label class="custom-control-label" for="openai_api_key_clear">清空后台中的 API Key</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="openai_base_url">Base URL（可选）</label>
+                        <input type="text" name="openai_base_url" id="openai_base_url" class="form-control" value="{$openai_base_url|default=''}" placeholder="默认 https://api.openai.com/v1，代理或兼容接口时填写">
+                    </div>
+                    <div class="form-group">
+                        <label for="openai_model">模型</label>
+                        <input type="text" name="openai_model" id="openai_model" class="form-control" value="{$openai_model|default=''}" placeholder="留空则 gpt-4o-mini">
+                    </div>
+                    <div class="form-group">
+                        <label for="openai_max_catalog">单次寻款带入库内条数上限</label>
+                        <input type="text" name="openai_max_catalog" id="openai_max_catalog" class="form-control" value="{$openai_max_catalog|default=''}" placeholder="留空则 250（仅包含有 AI 描述的行）">
+                    </div>
+                    <div class="form-group mb-0">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="openai_describe_on_import" name="openai_describe_on_import" value="1" {if $openai_describe_on_import}checked{/if}>
+                            <label class="custom-control-label" for="openai_describe_on_import">导入 CSV/Excel 时为每行参考图自动生成 AI 描述（按行计费）</label>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
+                    </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
                     <h5 class="mb-3 text-muted">阿里云图像搜索（寻款）</h5>
                     <p class="small text-muted">用于「拍照寻款」以图搜款；导入 CSV/Excel 时会将图片同步到阿里云商品图搜实例。AK/SK 建议使用 RAM 子账号最小权限。</p>
                     <div class="form-group">
@@ -188,6 +224,7 @@
                         $('#qiniu_secret_key').val('');
                         $('#aliyun_is_access_key_id').val('');
                         $('#aliyun_is_access_key_secret').val('');
+                        $('#openai_api_key').val('');
                         setTimeout(function () { location.reload(); }, 500);
                     } else {
                         AdminUI.showToast('error', res.msg || '失败');

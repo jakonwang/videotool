@@ -8,6 +8,9 @@ use app\model\ProductStyleItem as ItemModel;
 use app\service\AliyunImageSearchConfig;
 use app\service\ProductStyleAliyunQueueService;
 use app\service\ProductStyleEmbeddingService;
+use app\service\VisionOpenAIConfig;
+use app\service\VisionSearchService;
+use think\facade\Db;
 use app\service\ProductStyleImportService;
 use app\service\ProductStyleXlsxImportService;
 use think\facade\Log;
@@ -44,22 +47,26 @@ class ProductSearch extends BaseController
     }
 
     /**
-     * 按 product_code 插入或更新：同一编号重复导入不新增行，仅更新参考图、爆款类型、向量等。
+     * 按 product_code 插入或更新：同一编号重复导入不新增行，仅更新参考图、爆款类型、向量与可选 ai_description。
      *
      * @return array{inserted:bool, updated:bool}
      */
-    private function upsertStyleItem(string $code, string $imageRef, string $hotType, array $embeddingVec): array
+    private function upsertStyleItem(string $code, string $imageRef, string $hotType, array $embeddingVec, ?string $aiDescription = null): array
     {
         $code = trim($code);
         $embJson = json_encode($embeddingVec, JSON_UNESCAPED_UNICODE);
         $row = ItemModel::where('product_code', $code)->find();
         if ($row) {
-            $row->save([
+            $data = [
                 'image_ref' => $imageRef,
                 'hot_type' => $hotType,
                 'embedding' => $embJson,
                 'status' => 1,
-            ]);
+            ];
+            if ($aiDescription !== null && $aiDescription !== '') {
+                $data['ai_description'] = $aiDescription;
+            }
+            $row->save($data);
 
             return ['inserted' => false, 'updated' => true];
         }
@@ -68,11 +75,24 @@ class ProductSearch extends BaseController
             'product_code' => $code,
             'image_ref' => $imageRef,
             'hot_type' => $hotType,
+            'ai_description' => $aiDescription ?? '',
             'embedding' => $embJson,
             'status' => 1,
         ]);
 
         return ['inserted' => true, 'updated' => false];
+    }
+
+    private function syncProductAiDescription(string $productCode, ?string $desc): void
+    {
+        if ($desc === null || $desc === '') {
+            return;
+        }
+        try {
+            Db::name('products')->where('name', $productCode)->update(['ai_description' => $desc]);
+        } catch (\Throwable $e) {
+            Log::warning('syncProductAiDescription: ' . $e->getMessage());
+        }
     }
 
     public function index()
@@ -106,11 +126,14 @@ class ProductSearch extends BaseController
         $items = [];
         foreach ($list as $row) {
             $emb = (string) ($row->embedding ?? '');
+            $aiDesc = trim((string) ($row->ai_description ?? ''));
             $items[] = [
                 'id' => (int) $row->id,
                 'product_code' => (string) ($row->product_code ?? ''),
                 'image_ref' => (string) ($row->image_ref ?? ''),
                 'hot_type' => (string) ($row->hot_type ?? ''),
+                'ai_description' => $aiDesc,
+                'ai_description_short' => $aiDesc !== '' ? (mb_strlen($aiDesc) > 60 ? mb_substr($aiDesc, 0, 60) . '…' : $aiDesc) : '',
                 'has_embedding' => $emb !== '' && $emb[0] === '[',
                 'created_at' => (string) ($row->created_at ?? ''),
             ];
@@ -125,6 +148,17 @@ class ProductSearch extends BaseController
                 : '无子进程输出：可能未找到 Python、php.ini 禁用了 exec，或 Web 服务账号 PATH 与 shell 不一致。Linux 请在 .env 设置 PRODUCT_SEARCH_PYTHON=python3 或 /usr/bin/python3；Windows 请指定 python.exe 绝对路径。';
         }
 
+        $visionCfg = VisionOpenAIConfig::get();
+        $visionDescCount = 0;
+        try {
+            $visionDescCount = (int) Db::name('product_style_items')
+                ->where('status', 1)
+                ->whereRaw('ai_description IS NOT NULL AND TRIM(ai_description) <> \'\'')
+                ->count();
+        } catch (\Throwable $e) {
+            $visionDescCount = 0;
+        }
+
         return $this->jsonOk([
             'items' => $items,
             'total' => (int) $list->total(),
@@ -132,6 +166,8 @@ class ProductSearch extends BaseController
             'page_size' => (int) $list->listRows(),
             'python_ok' => $pythonOk,
             'python_diag' => $pythonDiag,
+            'vision_openai_enabled' => $visionCfg['enabled'],
+            'vision_items_with_desc' => $visionDescCount,
             'aliyun_is_enabled' => AliyunImageSearchConfig::get()['enabled'],
             'aliyun_is_pending' => ProductStyleAliyunQueueService::pendingCount(),
         ]);
@@ -247,6 +283,7 @@ class ProductSearch extends BaseController
         $fail = 0;
         $errors = [];
         $maxImports = 5000;
+        $visionDescribed = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             $rowIndex++;
@@ -312,7 +349,16 @@ class ProductSearch extends BaseController
                 continue;
             }
 
-            $u = $this->upsertStyleItem($code, $resolved['ref'], $hot, $vec);
+            $aiDesc = null;
+            $vCfg = VisionOpenAIConfig::get();
+            if ($vCfg['enabled'] && $vCfg['describe_on_import']) {
+                $aiDesc = VisionSearchService::describeEarringImage($resolved['temp']);
+                if ($aiDesc !== null && $aiDesc !== '') {
+                    $visionDescribed++;
+                }
+            }
+            $u = $this->upsertStyleItem($code, $resolved['ref'], $hot, $vec, $aiDesc);
+            $this->syncProductAiDescription($code, $aiDesc);
             $picName = ProductStyleAliyunQueueService::makePicName($resolved['ref'], $resolved['temp']);
             ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
             if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
@@ -340,6 +386,11 @@ class ProductSearch extends BaseController
             'updated' => $updated,
             'failed' => $fail,
             'errors' => $errors,
+            'vision' => [
+                'openai_enabled' => VisionOpenAIConfig::get()['enabled'],
+                'describe_on_import' => VisionOpenAIConfig::get()['describe_on_import'],
+                'described_rows' => $visionDescribed,
+            ],
             'aliyun' => [
                 'sync_batch' => $aliyunSync,
                 'pending' => ProductStyleAliyunQueueService::pendingCount(),
@@ -358,6 +409,7 @@ class ProductSearch extends BaseController
         $fail = 0;
         $errors = [];
         $maxImports = 5000;
+        $visionDescribed = 0;
 
         try {
             foreach (ProductStyleXlsxImportService::iterateRows($tmp) as $rec) {
@@ -413,7 +465,16 @@ class ProductSearch extends BaseController
                     }
                 }
 
-                $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec);
+                $aiDesc = null;
+                $vCfg = VisionOpenAIConfig::get();
+                if ($vCfg['enabled'] && $vCfg['describe_on_import']) {
+                    $aiDesc = VisionSearchService::describeEarringImage($resolved['temp']);
+                    if ($aiDesc !== null && $aiDesc !== '') {
+                        $visionDescribed++;
+                    }
+                }
+                $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
+                $this->syncProductAiDescription($code, $aiDesc);
                 $picName = ProductStyleAliyunQueueService::makePicName($imageRef, $resolved['temp']);
                 ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
                 if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
@@ -443,6 +504,11 @@ class ProductSearch extends BaseController
             'updated' => $updated,
             'failed' => $fail,
             'errors' => $errors,
+            'vision' => [
+                'openai_enabled' => VisionOpenAIConfig::get()['enabled'],
+                'describe_on_import' => VisionOpenAIConfig::get()['describe_on_import'],
+                'described_rows' => $visionDescribed,
+            ],
             'aliyun' => [
                 'sync_batch' => $aliyunSync,
                 'pending' => ProductStyleAliyunQueueService::pendingCount(),
@@ -560,6 +626,12 @@ class ProductSearch extends BaseController
                 if (!is_array($vec)) {
                     return $this->jsonErr('特征提取失败，请检查 Python 环境');
                 }
+                if (VisionOpenAIConfig::get()['enabled']) {
+                    $aiNew = VisionSearchService::describeEarringImage($tmp);
+                    if ($aiNew !== null && $aiNew !== '') {
+                        $update['ai_description'] = $aiNew;
+                    }
+                }
                 $saved = ProductStyleImportService::persistStyleImageToPublic($tmp, $publicRoot);
                 $update['image_ref'] = $saved ?? ($imageRefInput !== '' ? $imageRefInput : (string) ($row->image_ref ?? ''));
                 if ($update['image_ref'] === '') {
@@ -575,17 +647,30 @@ class ProductSearch extends BaseController
                     return $this->jsonErr('参考图无法解析（链接无效或文件不存在）');
                 }
                 $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
+                if (!is_array($vec)) {
+                    if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                        @unlink($resolved['temp']);
+                    }
+
+                    return $this->jsonErr('特征提取失败，请检查 Python 环境');
+                }
+                if (VisionOpenAIConfig::get()['enabled']) {
+                    $aiNew = VisionSearchService::describeEarringImage($resolved['temp']);
+                    if ($aiNew !== null && $aiNew !== '') {
+                        $update['ai_description'] = $aiNew;
+                    }
+                }
                 if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
                     @unlink($resolved['temp']);
-                }
-                if (!is_array($vec)) {
-                    return $this->jsonErr('特征提取失败，请检查 Python 环境');
                 }
                 $update['image_ref'] = $resolved['ref'];
                 $update['embedding'] = json_encode($vec, JSON_UNESCAPED_UNICODE);
             }
 
             $row->save($update);
+            if (isset($update['ai_description']) && (string) $update['ai_description'] !== '') {
+                $this->syncProductAiDescription($productCode, (string) $update['ai_description']);
+            }
 
             return $this->jsonOk([], '已保存');
         } catch (\Throwable $e) {

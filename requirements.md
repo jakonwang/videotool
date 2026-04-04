@@ -373,55 +373,58 @@
 ### 说明
 - 这些页面会隐藏 layout 自带的 `content-header`，改用页面内部的统一标题区，避免出现两套标题/操作区导致不一致。
 
-## 图片搜款式「寻款」（2026-04，2026-04 起以图搜对接阿里云）
+## 图片搜款式「寻款」（2026-04；拍照寻款优先 OpenAI Vision）
 
 ### 目标
-- 从 **CSV / Excel** 导入「产品编号 + 参考图 + 可选爆款类型」：仍使用 **本地 Python**（MobileNetV2）生成向量写入 MySQL（兼容列表与历史数据）；**同时**将图片 **入队** 并上传至 **阿里云图像搜索（商品实例）**，`ProductId`=产品编号，`PicName`=图片文件名，`CustomContent`=JSON（含 `hot_type` 等）。
-- **H5 拍照寻款**：以图搜款已改为调用阿里云 **SearchImageByPic**，固定 **Num=5**、**类目 CategoryId**（默认 **5=配饰**，适合耳环等饰品，可在后台修改），并开启 **主体识别（Crop）**；返回的 `ProductId` 再与本地 `product_style_items`、`products` 合并展示（含商品上架状态等）。支持 **编号模糊查询**（原接口，不走向量）。
-- 后台 **系统 → 设置** 可维护阿里云 **AccessKey、Endpoint、InstanceName、类目 ID、Num** 等；**素材 / 寻款** 可查看队列剩余条数并 **「同步阿里云」** 手动消费队列。
+- 从 **CSV / Excel** 导入「产品编号 + 参考图 + 可选爆款类型」：仍使用 **本地 Python**（MobileNetV2）生成向量写入 MySQL（兼容列表与历史数据）。若 **后台已配置 OpenAI** 且勾选 **导入时生成描述**，则对每行参考图调用 **`gpt-4o-mini` Vision** 生成一句中文 **视觉特征** 写入 **`product_style_items.ai_description`**，并同步到 **`products.ai_description`**（当存在 `products.name` 与产品编号一致时）。
+- **H5 拍照寻款**：**仅用户点击拍照/选图搜索时**调用 OpenAI（每请求约一次 chat+图）；将库内「编号|特征|爆款」列表与用户实拍图一并交给模型，返回 **最多 5 条** `product_code` + 置信度 + 简短理由，再与本地表合并展示。**未配置 OpenAI** 时，若启用了阿里云图搜则 **回退** 为 `SearchImageByPic`。支持 **编号模糊查询**（`searchByCode`，不走向量）。
+- 可选：导入行仍 **入队阿里云** AddImage（与 OpenAI 独立，可在设置中关闭阿里云以省云费用）。
 
 ### 数据库
 | 表名 | 说明 |
 |------|------|
-| `product_style_items` | `product_code`（**全局唯一**）、`image_ref`（展示用）、`hot_type`、`embedding`（JSON 浮点数组）、`status` |
-| `product_style_is_queue` | 导入后待调用阿里云 AddImage 的队列（`image_path` 指向 `runtime/is_queue` 下临时文件，成功后删除） |
+| `product_style_items` | `product_code`（**全局唯一**）、`image_ref`、`hot_type`、**`ai_description`**（OpenAI 生成）、`embedding`、`status` |
+| `products` | 增加 **`ai_description`**（与寻款编号同名商品时由导入/编辑同步） |
+| `product_style_is_queue` | 阿里云 AddImage 队列（可选） |
 
 #### 升级（已有库）
 - `php database\run_migration_product_style_search.php`（Windows）或 `php database/run_migration_product_style_search.php`（Linux）：若表尚不存在则创建（新脚本创建的表已含 `product_code` 唯一索引）。
 - **早期已建表**（仅有普通索引 `idx_code`）时，为与「编号唯一」一致，请执行：  
   `php database\run_migration_product_style_unique_code.php`（Linux 路径写法 `database/run_migration_product_style_unique_code.php`）。  
   若库内已有重复 `product_code`，脚本会列出示例编号并中止，需先手工保留一条、删除或合并其余重复行后再执行。
-- **阿里云队列表**：`php database\run_migration_product_style_is_queue.php`（Windows：`php database\run_migration_product_style_is_queue.php`）。
+- **阿里云队列表**：`php database\run_migration_product_style_is_queue.php`（Linux：`php database/run_migration_product_style_is_queue.php`）。
+- **OpenAI 字段**：`php database\run_migration_openai_vision_columns.php`（Linux：`php database/run_migration_openai_vision_columns.php`）。
 
 ### Python 环境（服务器必装）
 - 路径：`tools/product_style_search/`
-- **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**；**阿里云图搜** 依赖 Composer 包 **`alibabacloud/imagesearch-20201214`**。要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等）。部署后务必执行 `composer install` / `composer update`。
+- **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**；**OpenAI** 使用 **`guzzlehttp/guzzle`** 调 REST；**阿里云图搜（可选）** 依赖 **`alibabacloud/imagesearch-20201214`**。要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等）。部署后务必执行 `composer install` / `composer update`。
 - 依赖：在项目根执行 `pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）；建议用与 Web 将调用的同一解释器，例如 `py -3 -m pip install -r tools/product_style_search/requirements.txt`（Windows）或 `python3 -m pip ...`（Linux）。
 - 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
 - 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组。`ProductStyleEmbeddingService` 会依次尝试 **`exec` → `proc_open` → `shell_exec`** 拉取子进程输出；若 `php.ini` 的 **`disable_functions` 把三者都禁用**，则无法从 PHP 调 Python，需在配置中**至少放行其一**（常见仅禁用 `exec` 时，`proc_open` 仍可用）。
 - 说明：`tools/product_style_search/README.md`
 
-### 配置（`config/services.php` 与环境变量）
-- 键名 **`services.aliyun_is`**：`access_key_id`、`access_key_secret`、`endpoint`、`instance_name`、`region_id`（可空）、`category_id`（默认 5）、`search_num`（默认 5）、超时与 `qps_delay_ms` 等。后台 **设置** 中保存的项会**覆盖**同名文件配置（与七牛一致）。
-- 可选环境变量示例：`ALIYUN_IS_ACCESS_KEY_ID`、`ALIYUN_IS_ACCESS_KEY_SECRET`、`ALIYUN_IS_ENDPOINT`、`ALIYUN_IS_INSTANCE_NAME`、`ALIYUN_IS_CATEGORY_ID`、`ALIYUN_IS_SEARCH_NUM` 等。
+### 配置
+- **`config/openai.php` 与环境变量**：`api_key`（`OPENAI_API_KEY`）、`base_url`（默认官方 `https://api.openai.com/v1`）、`model`（默认 `gpt-4o-mini`）、`describe_on_import`、`max_catalog_items`（单次寻款带入库内条数上限，默认 250）、超时等。后台 **设置 → OpenAI Vision** 可覆盖 Key、Base URL、模型、条数上限，并勾选是否 **导入时生成描述**（关闭后导入不再为每行调用 Vision，可显著省费；但库内无 `ai_description` 时拍照寻款无法走 OpenAI，需依赖阿里云或补描述）。
+- **`config/services.php`**：阿里云图搜项见前文；后台 **设置** 覆盖同七牛逻辑。
+- 环境变量示例：`OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_VISION_MODEL`、`OPENAI_DESCRIBE_ON_IMPORT`、`OPENAI_MAX_CATALOG_ITEMS`；阿里云：`ALIYUN_IS_*` 等。
 
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
-- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`aliyun_is_enabled`**、**`aliyun_is_pending`**
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。**若已启用阿里云图搜**：每行成功后会 **入队** `product_style_is_queue`，并在本轮请求末尾 **尽力批量调用 AddImage**（仍可能剩余队列，见 `data.aliyun`）。成功响应 `data` 含 `imported`、`updated`、`failed`、`errors`、**`aliyun.sync_batch`**（`processed`/`ok`/`fail`）、**`aliyun.pending`**。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
+- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。**若 OpenAI 已配置且开启导入描述**：每行成功后再调 Vision 写 **`ai_description`**（按行计费）。响应 **`data.vision`**：`openai_enabled`、`describe_on_import`、`described_rows`。**若已启用阿里云图搜**：仍 **入队** 并 **drain**，见 **`data.aliyun`**。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
 - `POST /admin.php/product_search/syncAliyunQueue`：表单字段 `max`（单次最多处理条数，默认 300，上限 2000）、`seconds`（时间上限秒，默认 180，上限 600）；用于消费队列。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
-- `POST /admin.php/product_search/update/<id>`：编辑；`multipart`：`product_code`（必填）、`hot_type`、`image_ref`（修改链接/路径会**重算向量**）；可选文件字段 `image` 上传新图覆盖（重算向量并尽量写入 `uploads/product_style/`）
+- `POST /admin.php/product_search/update/<id>`：编辑；`multipart`：`product_code`（必填）、`hot_type`、`image_ref`（修改链接/路径会**重算向量**）；可选文件字段 `image` 上传新图覆盖（重算向量并尽量写入 `uploads/product_style/`）。若已配置 OpenAI 且**更换了参考图**，会尝试 **重新生成 `ai_description`** 并同步 `products`。
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
 ### 开放 API（无需登录，供仓库手机端 H5）
-- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；`multipart/form-data`，字段名 `file`。须 **后台启用阿里云图搜**；成功时返回 **`data.items` 最多 5 条**（`Num=5`），每项含 `product_code`、`image_ref`、`hot_type`、`similarity`（归一化到 0～1）、`aliyun_pic_name`、**`product`**（若 `products.name` 与编号一致或模糊匹配到则含 `id`、`name`、`status`、`status_text`、`goods_url`）。**未启用**时 `code=1` 与提示文案。**限流**时 `code=429`；**超时**时 `code=504`；主体识别失败时返回可读提示（如请靠近拍摄）。
+- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；`multipart/form-data`，字段名 `file`。**优先级**：已配置 **OpenAI** → 走 Vision 语义匹配（`data.engine`=`openai_vision`，`data.catalog_size` 为本次参与匹配的库内条数）；否则若启用 **阿里云** → `aliyun_is`；否则 `code=1`。**Vision 成功**时 `items` 每项含 `product_code`、`image_ref`、`hot_type`、`similarity`（0～1）、**`match_reason`**、**`product`**（同前）。**阿里云**时仍可有 `aliyun_pic_name`。**限流/超时**：阿里云路径下 `code` 可能为 429/504。
 - `POST /index.php/api/search/searchByImage`：同上（别名路径）。
 - `GET /index.php/api/product_search/searchByCode?q=`：编号 **LIKE** 模糊匹配（仍由 `ProductSearch` 提供）。
 
 ### H5 页面
-- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；上传前 **前端压缩**（长边约 1600、JPEG 质量递减直至约 **2MB** 以内）；结果区 **大字号** 显示产品编号，并展示 **Top 5** 与可选 **商品表关联信息**。
+- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；上传前 **前端压缩**（长边约 1600、JPEG 质量递减直至约 **2MB** 以内）；结果区展示 **匹配说明 `match_reason`**（Vision）、**Top 至多 5 条** 与 **商品表关联信息**。
 
 ### CSV / Excel 列说明
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
@@ -435,9 +438,10 @@
 - 前台 H5：`view/index/search_by_image.html`
 
 ### 注意
-- **以图搜款（拍照）** 依赖 **阿里云图像搜索实例** 与 **正确类目**；导入侧仍写本地向量，便于列表与兼容，但 **H5 搜图不再使用本地余弦相似度**。
-- 向量（本地）仍为 **全表线性扫描**（适合万级以内）；仅作辅助，主检索以阿里云为准。
-- 导入与编辑仍依赖 Python 抽特征时，请保证 `embed_image.py` 可用；以图搜款链路 **不要求** Python，但 **导入** 仍会调用。
+- **拍照寻款**在配置 OpenAI 后 **按次计费**；库内无 `ai_description` 时须先 **导入并开启描述生成** 或改用阿里云。
+- 单次 Vision 寻款仅加载 **最近 N 条（默认 250）且已有描述** 的索引；款式极多时请在后台调大 **单次带入条数上限** 或拆业务库（见 `config/openai.php` / 设置）。
+- 向量（本地）仍为 **全表线性扫描**（适合万级以内）；**拍照流程默认不走本地余弦**，除非未配 OpenAI 与阿里云。
+- 导入仍依赖 Python 抽特征时，请保证 `embed_image.py` 可用。
 - **后台寻款批量导入**、手机拍照寻款：若 **HTTP 413**，先调 Nginx `client_max_body_size`，再调 PHP `upload_max_filesize` 与 `post_max_size`（三者均要覆盖最大单文件体积）。
 - **HTTP 502**（Nginx Bad Gateway）常见于 **导入 Excel 中途**：每行要调 Python 抽特征，总时间易超过 **Nginx `fastcgi_read_timeout`** 或 **PHP-FPM `request_terminate_timeout`**，或 **内存** 爆掉导致子进程退出。处理：Nginx 对 `admin.php` 增加 `fastcgi_read_timeout 600s;`、`fastcgi_send_timeout 600s;`；`php.ini` 提高 `max_execution_time`、`memory_limit`（如 512M）；`www.conf` 中 `request_terminate_timeout = 600` 或 `0`。仍失败则 **拆分 Excel 分批导入**。代码侧导入入口会尝试 `set_time_limit(0)` 与提高 `memory_limit`（受宿主策略限制）。
 

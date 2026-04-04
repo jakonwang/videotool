@@ -17,6 +17,7 @@ class ProductStyleItem extends Model
         'product_code' => 'string',
         'image_ref'    => 'string',
         'hot_type'     => 'string',
+        'ai_description' => 'string',
         'embedding'    => 'string',
         'status'       => 'int',
         'created_at'   => 'datetime',

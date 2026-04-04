@@ -69,6 +69,17 @@ class Settings extends BaseController
                 SystemConfigService::set($k, trim((string) $this->request->post($k, '')));
             }
 
+            $openaiKeyNew = trim((string) $this->request->post('openai_api_key', ''));
+            if ($openaiKeyNew !== '') {
+                SystemConfigService::set('openai_api_key', $openaiKeyNew);
+            } elseif ($this->request->post('openai_api_key_clear') === '1') {
+                SystemConfigService::set('openai_api_key', '');
+            }
+            foreach (['openai_base_url', 'openai_model', 'openai_max_catalog'] as $k) {
+                SystemConfigService::set($k, trim((string) $this->request->post($k, '')));
+            }
+            SystemConfigService::set('openai_describe_on_import', $this->request->post('openai_describe_on_import') === '1' ? '1' : '0');
+
             SystemConfigService::clearCache();
 
             return json(['code' => 0, 'msg' => '已保存']);
@@ -92,6 +103,12 @@ class Settings extends BaseController
         $aliyunRegionId = SystemConfigService::get('aliyun_is_region_id', '') ?? '';
         $aliyunCategoryId = SystemConfigService::get('aliyun_is_category_id', '') ?? '';
         $aliyunSearchNum = SystemConfigService::get('aliyun_is_search_num', '') ?? '';
+        $openaiKeyConfigured = trim((string) (SystemConfigService::get('openai_api_key', '') ?? '')) !== '';
+        $openaiBaseUrl = SystemConfigService::get('openai_base_url', '') ?? '';
+        $openaiModel = SystemConfigService::get('openai_model', '') ?? '';
+        $openaiMaxCatalog = SystemConfigService::get('openai_max_catalog', '') ?? '';
+        $openaiDescribeFlag = SystemConfigService::get('openai_describe_on_import', '');
+        $openaiDescribeOnImport = $openaiDescribeFlag === '' || $openaiDescribeFlag === '1';
         $qiniuEffective = QiniuService::getMergedQiniuConfig();
         $qiniuEffectiveCdnLabel = '';
         if (!empty($qiniuEffective['cdn_domains']) && is_array($qiniuEffective['cdn_domains'])) {
@@ -118,6 +135,11 @@ class Settings extends BaseController
             'aliyun_is_region_id' => $aliyunRegionId,
             'aliyun_is_category_id' => $aliyunCategoryId,
             'aliyun_is_search_num' => $aliyunSearchNum,
+            'openai_key_configured' => $openaiKeyConfigured,
+            'openai_base_url' => $openaiBaseUrl,
+            'openai_model' => $openaiModel,
+            'openai_max_catalog' => $openaiMaxCatalog,
+            'openai_describe_on_import' => $openaiDescribeOnImport,
         ]);
     }
 }

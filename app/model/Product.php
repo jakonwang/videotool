@@ -16,6 +16,7 @@ class Product extends Model
         'id'          => 'int',
         'name'        => 'string',
         'goods_url'   => 'string',
+        'ai_description' => 'string',
         'status'      => 'int',
         'sort_order'  => 'int',
         'created_at'  => 'datetime',

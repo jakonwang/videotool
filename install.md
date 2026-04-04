@@ -113,6 +113,8 @@ mysql -u root -p videotool < database/schema.sql
 
 **寻款阿里云队列表：** 使用阿里云图搜导入同步时，执行 `php database/run_migration_product_style_is_queue.php`（Windows：`php database\run_migration_product_style_is_queue.php`），并执行 `composer install` 安装 `alibabacloud/imagesearch-20201214`。
 
+**寻款 OpenAI Vision 字段：** 执行 `php database/run_migration_openai_vision_columns.php`（Linux 务必用正斜杠：`php database/run_migration_openai_vision_columns.php`），为 `products`、`product_style_items` 增加 `ai_description`。
+
 **如果遇到字符集错误（emoji无法插入）：**
 
 1. 如果数据库已存在，先执行 `database/fix_charset.sql` 修复字符集：
