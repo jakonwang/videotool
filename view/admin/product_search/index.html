@@ -106,7 +106,23 @@
             credentials: 'same-origin',
             headers: { ...apiFetchHeaders },
           });
-          const json = parseJsonBody(res, await res.text());
+          const text = await res.text();
+          let json = null;
+          try {
+            json = JSON.parse(text);
+          } catch (parseErr) {
+            const snippet = (text || '').replace(/\s+/g, ' ').trim().slice(0, 280);
+            ElMessage.error(
+              '服务器返回非 JSON（HTTP ' + res.status + '）。多为 PHP 报错页：请查看 runtime/log，或确认已执行 composer install、数据库表 product_style_items 已建。' +
+              (snippet ? ' 片段：' + snippet : '')
+            );
+            console.error('importCsv raw:', text);
+            return;
+          }
+          if (json && json.code === 401) {
+            ElMessage.error('未登录或会话过期');
+            return;
+          }
           if (json && json.code === 0) {
             const d = json.data || {};
             ElMessage.success((json.msg || '完成') + ' 成功' + (d.imported || 0) + ' 条，失败' + (d.failed || 0) + ' 条');
@@ -114,7 +130,7 @@
             input.value = '';
             fetchList();
           } else {
-            ElMessage.error((json && json.msg) || '导入失败');
+            ElMessage.error((json && json.msg) || ('导入失败 HTTP ' + res.status));
           }
         } catch (e) {
           ElMessage.error(e.message || '导入失败');

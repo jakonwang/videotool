@@ -8,6 +8,7 @@ use app\model\ProductStyleItem as ItemModel;
 use app\service\ProductStyleEmbeddingService;
 use app\service\ProductStyleImportService;
 use app\service\ProductStyleXlsxImportService;
+use think\facade\Log;
 use think\facade\View;
 
 /**
@@ -112,6 +113,17 @@ class ProductSearch extends BaseController
      */
     public function importCsv()
     {
+        try {
+            return $this->importCsvInner();
+        } catch (\Throwable $e) {
+            Log::error('product_search importCsv: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+
+            return $this->jsonErr('导入失败：' . $e->getMessage());
+        }
+    }
+
+    private function importCsvInner()
+    {
         if (!$this->request->isPost()) {
             return $this->jsonErr('仅支持 POST');
         }
@@ -120,6 +132,9 @@ class ProductSearch extends BaseController
             return $this->jsonErr('请上传文件');
         }
         $ext = strtolower((string) $file->extension());
+        if ($ext === '') {
+            $ext = strtolower(pathinfo((string) $file->getOriginalName(), PATHINFO_EXTENSION));
+        }
         $tmp = $file->getPathname();
         if (!is_readable($tmp)) {
             return $this->jsonErr('无法读取上传文件');

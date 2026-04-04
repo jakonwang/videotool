@@ -399,7 +399,7 @@
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
 - `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）、`python_diag`（未就绪时简短诊断，便于排查 PATH/exec）
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log` 与 PHP/Nginx 限制。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
