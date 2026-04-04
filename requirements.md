@@ -402,6 +402,7 @@
 - `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
+- `POST /admin.php/product_search/update/<id>`：编辑；`multipart`：`product_code`（必填）、`hot_type`、`image_ref`（修改链接/路径会**重算向量**）；可选文件字段 `image` 上传新图覆盖（重算向量并尽量写入 `uploads/product_style/`）
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
 ### 开放 API（无需登录，供仓库手机端 H5）
@@ -419,7 +420,7 @@
 - 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`。
 
 ### 已适配页面
-- 后台：`view/admin/product_search/index.html`（多选 + **批量删除**；「参考图」列：`http(s)`、站内路径、`data:image` 显示缩略图并可预览；纯文案仍只显示文字）
+- 后台：`view/admin/product_search/index.html`（**编辑**编号/爆款/参考图；多选 + **批量删除**；「参考图」缩略图与预览）
 - 前台 H5：`view/index/search_by_image.html`
 
 ### 注意

@@ -237,12 +237,74 @@
         return imageDisplayUrl(ref) !== '';
       }
 
+      const editVisible = ref(false);
+      const editSaving = ref(false);
+      const editImageInputKey = ref(0);
+      const editForm = reactive({ id: 0, product_code: '', hot_type: '', image_ref: '' });
+
+      function openEdit(row) {
+        editForm.id = row.id;
+        editForm.product_code = row.product_code || '';
+        editForm.hot_type = row.hot_type || '';
+        editForm.image_ref = row.image_ref || '';
+        editImageInputKey.value++;
+        editVisible.value = true;
+      }
+
+      async function saveEdit() {
+        if (!String(editForm.product_code || '').trim()) {
+          ElMessage.warning('请填写产品编号');
+          return;
+        }
+        editSaving.value = true;
+        try {
+          const input = document.getElementById('editImageInput');
+          const fd = new FormData();
+          fd.append('product_code', String(editForm.product_code).trim());
+          fd.append('hot_type', String(editForm.hot_type || '').trim());
+          fd.append('image_ref', String(editForm.image_ref || '').trim());
+          if (input && input.files && input.files[0]) {
+            fd.append('image', input.files[0]);
+          }
+          const res = await fetch('/admin.php/product_search/update/' + editForm.id, {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+          });
+          const text = await res.text();
+          let json;
+          try {
+            json = JSON.parse(text);
+          } catch {
+            ElMessage.error('保存失败（非 JSON）HTTP ' + res.status);
+            return;
+          }
+          if (json.code === 401) {
+            ElMessage.error('未登录或会话过期');
+            return;
+          }
+          if (json.code !== 0) {
+            ElMessage.error(json.msg || '保存失败');
+            return;
+          }
+          ElMessage.success('已保存');
+          editVisible.value = false;
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || '保存失败');
+        } finally {
+          editSaving.value = false;
+        }
+      }
+
       onMounted(() => { fetchList(); });
 
       return {
         loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
         tableRef, selectedRows, batchDeleting,
-        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openH5, lang,
+        editVisible, editSaving, editImageInputKey, editForm,
+        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang,
         imageDisplayUrl, isImagePreviewable,
       };
     },
@@ -312,12 +374,36 @@
             </template>
           </el-table-column>
           <el-table-column prop="created_at" label="导入时间" width="170" />
-          <el-table-column label="操作" width="90" fixed="right">
+          <el-table-column label="操作" width="130" fixed="right">
             <template #default="{ row }">
+              <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
               <el-button link type="danger" @click="doDelete(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
+
+        <el-dialog v-model="editVisible" title="编辑索引" width="520px" destroy-on-close align-center>
+          <el-form label-width="96px" @submit.prevent>
+            <el-form-item label="产品编号">
+              <el-input v-model="editForm.product_code" maxlength="128" placeholder="必填" />
+            </el-form-item>
+            <el-form-item label="爆款类型">
+              <el-input v-model="editForm.hot_type" maxlength="200" placeholder="可选" />
+            </el-form-item>
+            <el-form-item label="参考图">
+              <el-input v-model="editForm.image_ref" type="textarea" :rows="3" placeholder="http(s) 链接或 /uploads/... 站内路径" />
+              <div style="margin-top:8px;font-size:12px;color:#6b7280;line-height:1.5;">
+                修改此处并保存会重新下载/读取图片并<strong>重算向量</strong>。不改图片时请勿清空原文本。
+              </div>
+              <div style="margin-top:10px;font-size:13px;color:#374151;">或上传新图覆盖：</div>
+              <input :key="editImageInputKey" id="editImageInput" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png" style="margin-top:6px;max-width:100%;font-size:13px;" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="editVisible = false">取消</el-button>
+            <el-button type="primary" :loading="editSaving" @click="saveEdit">保存</el-button>
+          </template>
+        </el-dialog>
 
         <div class="admin-footer-pagination" style="margin-top:16px;">
           <span style="color:#6b7280;font-size:13px;">共 {{ total }} 条</span>

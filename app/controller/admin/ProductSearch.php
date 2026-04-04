@@ -403,6 +403,89 @@ class ProductSearch extends BaseController
     }
 
     /**
+     * POST multipart/form-data：更新编号、爆款类型；可选修改参考图（文本链接/路径或上传新图，会重算向量）
+     */
+    public function updateItem()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('仅支持 POST');
+            }
+            $id = (int) $this->request->param('id', 0);
+            if ($id <= 0) {
+                return $this->jsonErr('无效 ID');
+            }
+            $row = ItemModel::find($id);
+            if (!$row) {
+                return $this->jsonErr('记录不存在');
+            }
+            $productCode = trim((string) $this->request->param('product_code', ''));
+            if ($productCode === '') {
+                return $this->jsonErr('产品编号不能为空');
+            }
+            $hotType = trim((string) $this->request->param('hot_type', ''));
+            $imageRefInput = trim((string) $this->request->param('image_ref', ''));
+            $publicRoot = root_path() . 'public';
+
+            $update = [
+                'product_code' => $productCode,
+                'hot_type' => $hotType,
+            ];
+
+            $file = $this->request->file('image');
+            if ($file && $file->isValid()) {
+                $ext = strtolower((string) $file->extension());
+                if ($ext === '') {
+                    $ext = strtolower(pathinfo((string) $file->getOriginalName(), PATHINFO_EXTENSION));
+                }
+                $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                if (!in_array($ext, $allowed, true)) {
+                    return $this->jsonErr('仅支持 jpg / png / gif / webp 图片');
+                }
+                $tmp = $file->getPathname();
+                if (!is_readable($tmp)) {
+                    return $this->jsonErr('无法读取上传图片');
+                }
+                $vec = ProductStyleEmbeddingService::embedFile($tmp);
+                if (!is_array($vec)) {
+                    return $this->jsonErr('特征提取失败，请检查 Python 环境');
+                }
+                $saved = ProductStyleImportService::persistStyleImageToPublic($tmp, $publicRoot);
+                $update['image_ref'] = $saved ?? ($imageRefInput !== '' ? $imageRefInput : (string) ($row->image_ref ?? ''));
+                if ($update['image_ref'] === '') {
+                    $update['image_ref'] = '(本地上传)';
+                }
+                $update['embedding'] = json_encode($vec, JSON_UNESCAPED_UNICODE);
+            } elseif ($imageRefInput !== (string) ($row->image_ref ?? '')) {
+                if ($imageRefInput === '') {
+                    return $this->jsonErr('参考图不能为空；不修改图片时请保持原文本或上传新图');
+                }
+                $resolved = ProductStyleImportService::resolveImage($imageRefInput, $publicRoot);
+                if (!$resolved['ok'] || $resolved['temp'] === '') {
+                    return $this->jsonErr('参考图无法解析（链接无效或文件不存在）');
+                }
+                $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
+                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                    @unlink($resolved['temp']);
+                }
+                if (!is_array($vec)) {
+                    return $this->jsonErr('特征提取失败，请检查 Python 环境');
+                }
+                $update['image_ref'] = $resolved['ref'];
+                $update['embedding'] = json_encode($vec, JSON_UNESCAPED_UNICODE);
+            }
+
+            $row->save($update);
+
+            return $this->jsonOk([], '已保存');
+        } catch (\Throwable $e) {
+            Log::error('product_search updateItem: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+
+            return $this->jsonErr('保存失败：' . $e->getMessage());
+        }
+    }
+
+    /**
      * 下载示例 CSV
      */
     public function sampleCsv()
