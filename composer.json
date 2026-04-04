@@ -6,7 +6,8 @@
     "homepage": "https://github.com/top-think/framework",
     "license": "Apache-2.0",
     "require": {
-        "php": ">=7.2.5",
+        "php": "^8.1",
+        "phpoffice/phpspreadsheet": "^5.4",
         "qiniu/php-sdk": "^7.11",
         "topthink/framework": "^6.1.0",
         "topthink/think-orm": "^2.0",

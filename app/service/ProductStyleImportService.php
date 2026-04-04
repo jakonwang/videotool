@@ -118,6 +118,12 @@ class ProductStyleImportService
         return ['ref' => $raw, 'temp' => '', 'ok' => false];
     }
 
+    /** 供 Excel 嵌入图等写入临时文件 */
+    public static function createTempImagePath(string $ext): string
+    {
+        return self::tempPath($ext);
+    }
+
     private static function tempPath(string $ext): string
     {
         $dir = root_path() . 'runtime' . DIRECTORY_SEPARATOR . 'temp' . DIRECTORY_SEPARATOR . 'style_import';

@@ -1,6 +1,6 @@
 # 款式图向量提取（Python）
 
-后台导入 CSV 时，PHP 会调用本目录下的 `embed_image.py` 对每张图提取 **MobileNetV2** 全局特征（ImageNet 预训练），用于余弦相似度检索。
+后台导入 **CSV 或 Excel（.xlsx）** 时：Excel 内嵌图由 PHP（PhpSpreadsheet）导出为临时文件；随后调用本目录下的 `embed_image.py` 对每张图提取 **MobileNetV2** 全局特征（ImageNet 预训练），用于余弦相似度检索。
 
 ## 环境
 

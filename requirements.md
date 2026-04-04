@@ -390,6 +390,7 @@
 
 ### Python 环境（服务器必装）
 - 路径：`tools/product_style_search/`
+- **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**，要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等，见 Composer 安装提示）。部署后务必执行 `composer update` 安装/更新依赖。
 - 依赖：在项目根执行 `pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）；建议用与 Web 将调用的同一解释器，例如 `py -3 -m pip install -r tools/product_style_search/requirements.txt`（Windows）或 `python3 -m pip ...`（Linux）。
 - 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
 - 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组；若 `php.ini` 中 `disable_functions` 含 `exec`，PHP 无法调用脚本。
@@ -398,7 +399,7 @@
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
 - `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）、`python_diag`（未就绪时简短诊断，便于排查 PATH/exec）
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`，CSV 编码建议 UTF-8（带 BOM 亦可）
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
@@ -409,11 +410,12 @@
 ### H5 页面
 - `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；结果区 **大字号** 显示产品编号。
 
-### CSV 列说明
-- 首行表头需能识别 **产品编号**、**图片** 列（支持同义列名，见 `ProductStyleImportService`）；可选 **爆款类型**。
-- 若无数表头，则按前两列依次为「编号、图片」解析。
-- 图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
-- 从 Excel 导出说明见：`docs/耳环款式CSV说明.md`。
+### CSV / Excel 列说明
+- 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
+- CSV 无数表头时按前两列为「编号、图片」解析；Excel 始终使用第一行为表头。
+- **CSV**：图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
+- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。
+- 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`。
 
 ### 已适配页面
 - 后台：`view/admin/product_search/index.html`

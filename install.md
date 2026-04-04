@@ -3,14 +3,14 @@
 ## 版本信息
 - **版本**: v1.0.0
 - **发布日期**: 2025-11-20
-- **PHP版本要求**: >= 7.2.5
+- **PHP版本要求**: >= 8.1（寻款 Excel 导入等依赖 PhpSpreadsheet 5.x）
 - **MySQL版本要求**: >= 5.7
 - **框架**: ThinkPHP 6.1
 
 ## 一、环境要求
 
 ### 必需环境
-- **PHP**: >= 7.2.5
+- **PHP**: >= 8.1
 - **MySQL**: >= 5.7（推荐 5.7+ 或 8.0+）
 - **Web服务器**: Apache 2.4+ 或 Nginx 1.18+
 - **Composer**: 用于安装PHP依赖
@@ -19,7 +19,8 @@
 - `pdo_mysql` - MySQL数据库支持
 - `mbstring` - 多字节字符串支持
 - `fileinfo` - 文件信息检测
-- `gd` 或 `imagick` - 图片处理（可选）
+- `zip`、`xml`、`dom`、`libxml`、`simplexml` - Excel 解析（PhpSpreadsheet，寻款导入）
+- `gd` - 图片处理；寻款 Excel 嵌入图导出依赖 **gd**（建议启用）
 - `curl` - HTTP请求支持（可选）
 
 ### 检查PHP环境

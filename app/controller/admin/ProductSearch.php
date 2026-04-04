@@ -7,6 +7,7 @@ use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
 use app\service\ProductStyleEmbeddingService;
 use app\service\ProductStyleImportService;
+use app\service\ProductStyleXlsxImportService;
 use think\facade\View;
 
 /**
@@ -107,7 +108,7 @@ class ProductSearch extends BaseController
     }
 
     /**
-     * POST CSV 文件：列含 产品编号、图片（URL/路径/Base64）、可选 爆款类型
+     * POST 文件：CSV/TXT（链接、路径、Base64）或 Excel（xlsx/xls，图片列支持单元格嵌入图）
      */
     public function importCsv()
     {
@@ -116,18 +117,22 @@ class ProductSearch extends BaseController
         }
         $file = $this->request->file('file');
         if (!$file) {
-            return $this->jsonErr('请上传 CSV 文件');
+            return $this->jsonErr('请上传文件');
         }
         $ext = strtolower((string) $file->extension());
-        if (!in_array($ext, ['csv', 'txt'], true)) {
-            return $this->jsonErr('仅支持 .csv / .txt');
-        }
         $tmp = $file->getPathname();
         if (!is_readable($tmp)) {
             return $this->jsonErr('无法读取上传文件');
         }
 
         $publicRoot = root_path() . 'public';
+
+        if (in_array($ext, ['xlsx', 'xls', 'xlsm'], true)) {
+            return $this->importExcelSpreadsheet($tmp, $publicRoot);
+        }
+        if (!in_array($ext, ['csv', 'txt'], true)) {
+            return $this->jsonErr('仅支持 .csv / .txt / .xlsx / .xls / .xlsm');
+        }
         $handle = fopen($tmp, 'rb');
         if ($handle === false) {
             return $this->jsonErr('无法打开文件');
@@ -221,6 +226,87 @@ class ProductSearch extends BaseController
             }
         }
         fclose($handle);
+
+        return $this->jsonOk([
+            'imported' => $ok,
+            'failed' => $fail,
+            'errors' => $errors,
+        ], '导入完成');
+    }
+
+    private function importExcelSpreadsheet(string $tmp, string $publicRoot)
+    {
+        if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
+            return $this->jsonErr('未安装 Excel 解析依赖，请在项目根目录执行 composer install（需 phpoffice/phpspreadsheet）');
+        }
+
+        $ok = 0;
+        $fail = 0;
+        $errors = [];
+        $maxImports = 5000;
+
+        try {
+            foreach (ProductStyleXlsxImportService::iterateRows($tmp) as $rec) {
+                $rowIndex = (int) $rec['row'];
+                $code = $rec['code'];
+                if ($code === '') {
+                    continue;
+                }
+                $imgTemp = $rec['imageTemp'];
+                $imgRaw = $rec['imageRaw'];
+                $hot = $rec['hot'];
+
+                if (($imgTemp === null || !is_file($imgTemp) || !is_readable($imgTemp)) && trim($imgRaw) === '') {
+                    $fail++;
+                    if (count($errors) < 30) {
+                        $errors[] = "第{$rowIndex}行 {$code}：图片列为空且无嵌入图（请确认图片插在「图片」列对应单元格内）";
+                    }
+                    continue;
+                }
+
+                if ($imgTemp !== null && is_file($imgTemp) && is_readable($imgTemp)) {
+                    $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
+                } else {
+                    $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
+                }
+                if (!$resolved['ok'] || $resolved['temp'] === '') {
+                    $fail++;
+                    if (count($errors) < 30) {
+                        $errors[] = "第{$rowIndex}行 {$code}：图片无法解析（嵌入图失败或链接/路径无效）";
+                    }
+                    continue;
+                }
+
+                $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
+                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                    @unlink($resolved['temp']);
+                }
+                if (!is_array($vec)) {
+                    if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
+                        @unlink($resolved['temp']);
+                    }
+                    $fail++;
+                    if (count($errors) < 30) {
+                        $errors[] = "第{$rowIndex}行 {$code}：特征提取失败（请检查 Python 与 torch）";
+                    }
+                    continue;
+                }
+
+                ItemModel::create([
+                    'product_code' => $code,
+                    'image_ref' => $resolved['ref'],
+                    'hot_type' => $hot,
+                    'embedding' => json_encode($vec, JSON_UNESCAPED_UNICODE),
+                    'status' => 1,
+                ]);
+                $ok++;
+                if ($ok >= $maxImports) {
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            return $this->jsonErr('Excel 解析失败：' . $e->getMessage());
+        }
 
         return $this->jsonOk([
             'imported' => $ok,
