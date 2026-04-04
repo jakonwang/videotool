@@ -71,7 +71,7 @@ CREATE TABLE product_style_items (
     status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1有效 0停用',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_code (product_code),
+    UNIQUE KEY uk_product_code (product_code),
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='款式图搜索引'
 SQL);

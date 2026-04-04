@@ -383,10 +383,13 @@
 ### 数据库
 | 表名 | 说明 |
 |------|------|
-| `product_style_items` | `product_code`、`image_ref`（展示用）、`hot_type`、`embedding`（JSON 浮点数组）、`status` |
+| `product_style_items` | `product_code`（**全局唯一**）、`image_ref`（展示用）、`hot_type`、`embedding`（JSON 浮点数组）、`status` |
 
 #### 升级（已有库）
-- `php database\run_migration_product_style_search.php`（Windows）或 `php database/run_migration_product_style_search.php`（Linux）
+- `php database\run_migration_product_style_search.php`（Windows）或 `php database/run_migration_product_style_search.php`（Linux）：若表尚不存在则创建（新脚本创建的表已含 `product_code` 唯一索引）。
+- **早期已建表**（仅有普通索引 `idx_code`）时，为与「编号唯一」一致，请执行：  
+  `php database\run_migration_product_style_unique_code.php`（Linux 路径写法 `database/run_migration_product_style_unique_code.php`）。  
+  若库内已有重复 `product_code`，脚本会列出示例编号并中止，需先手工保留一条、删除或合并其余重复行后再执行。
 
 ### Python 环境（服务器必装）
 - 路径：`tools/product_style_search/`
@@ -399,7 +402,7 @@
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
 - `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）、`python_diag`（未就绪时简短诊断，便于排查 PATH/exec）
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。成功响应 `data` 含 `imported`（新增条数）、`updated`（更新条数）、`failed`、`errors`。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
 - `POST /admin.php/product_search/update/<id>`：编辑；`multipart`：`product_code`（必填）、`hot_type`、`image_ref`（修改链接/路径会**重算向量**）；可选文件字段 `image` 上传新图覆盖（重算向量并尽量写入 `uploads/product_style/`）
@@ -427,6 +430,7 @@
 - 向量检索为 **全表线性扫描**（适合万级以内）；数据量再大建议引入专用向量库。
 - 以图搜款依赖服务器已安装 Python 且 `embed_image.py` 可运行；导入前请先在本机执行 `python embed_image.py 某图片.jpg` 自检。
 - **后台寻款批量导入**、手机拍照寻款：若 **HTTP 413**，先调 Nginx `client_max_body_size`，再调 PHP `upload_max_filesize` 与 `post_max_size`（三者均要覆盖最大单文件体积）。
+- **HTTP 502**（Nginx Bad Gateway）常见于 **导入 Excel 中途**：每行要调 Python 抽特征，总时间易超过 **Nginx `fastcgi_read_timeout`** 或 **PHP-FPM `request_terminate_timeout`**，或 **内存** 爆掉导致子进程退出。处理：Nginx 对 `admin.php` 增加 `fastcgi_read_timeout 600s;`、`fastcgi_send_timeout 600s;`；`php.ini` 提高 `max_execution_time`、`memory_limit`（如 512M）；`www.conf` 中 `request_terminate_timeout = 600` 或 `0`。仍失败则 **拆分 Excel 分批导入**。代码侧导入入口会尝试 `set_time_limit(0)` 与提高 `memory_limit`（受宿主策略限制）。
 
 ## 桌面端：发卡与版本、公开下载（2026-04）
 

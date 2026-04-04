@@ -109,6 +109,8 @@ return [
 mysql -u root -p videotool < database/schema.sql
 ```
 
+**寻款表增量（旧库升级）：** 若 `product_style_items` 早已存在且 `product_code` 仍为普通索引（无唯一约束），在配置好数据库连接后执行 `php database/run_migration_product_style_unique_code.php`（Windows：`php database\run_migration_product_style_unique_code.php`）。库内若存在重复编号需先合并或删除后再执行，详见 `requirements.md` 中「图片搜款式」一节。
+
 **如果遇到字符集错误（emoji无法插入）：**
 
 1. 如果数据库已存在，先执行 `database/fix_charset.sql` 修复字符集：
@@ -202,6 +204,10 @@ server {
 
     # 上传文件大小限制
     client_max_body_size 100M;
+
+    # 后台寻款等大导入：逐行调 Python，易超默认 60s 导致 502，按需调大
+    fastcgi_read_timeout 600s;
+    fastcgi_send_timeout 600s;
 
     # 前台入口
     location / {

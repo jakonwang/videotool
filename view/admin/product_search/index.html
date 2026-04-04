@@ -122,6 +122,13 @@
               );
               return;
             }
+            if (res.status === 502) {
+              ElMessage.error(
+                '网关超时（HTTP 502）：多为导入耗时过长或内存不足，PHP-FPM 被 Nginx 断开。请调大 Nginx fastcgi_read_timeout / fastcgi_send_timeout（如 600s）、PHP max_execution_time 与 memory_limit；PHP-FPM 的 request_terminate_timeout 须大于上述时间。大表请拆成多个 Excel 分批导入（每批几十行）。'
+              );
+              console.error('importCsv raw:', text);
+              return;
+            }
             const snippet = (text || '').replace(/\s+/g, ' ').trim().slice(0, 280);
             ElMessage.error(
               '服务器返回非 JSON（HTTP ' + res.status + '）。若为 PHP 报错请查看 runtime/log；另请确认已 composer install、已建表 product_style_items。' +
@@ -136,7 +143,12 @@
           }
           if (json && json.code === 0) {
             const d = json.data || {};
-            ElMessage.success((json.msg || '完成') + ' 成功' + (d.imported || 0) + ' 条，失败' + (d.failed || 0) + ' 条');
+            ElMessage.success(
+              (json.msg || '完成') +
+                ' 新增' + (d.imported != null ? d.imported : 0) +
+                ' 条，更新' + (d.updated != null ? d.updated : 0) +
+                ' 条，失败' + (d.failed || 0) + ' 条'
+            );
             if (d.errors && d.errors.length) console.warn(d.errors);
             input.value = '';
             fetchList();
@@ -328,7 +340,7 @@
             首次运行会下载 MobileNet 权重。Web 进程（如 Apache）的 PATH 常与 CMD 不同；请在 <code>config/product_search.php</code> 的 <code>python_bin</code> 或环境变量 <code>PRODUCT_SEARCH_PYTHON</code> 填写 <strong>python.exe 绝对路径</strong>（Windows）或 <code>which python3</code> 路径（Linux）。
             <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">诊断：{{ pythonDiag }}</div>
           </div>
-          <div>支持 <strong>CSV / Excel（.xlsx、.xls）</strong>。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。</div>
+          <div>支持 <strong>CSV / Excel（.xlsx、.xls）</strong>。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。若 <strong>HTTP 502</strong> 或导入到一半失败，多为<strong>超时/内存</strong>：调大 Nginx <code>fastcgi_read_timeout</code>、PHP-FPM <code>request_terminate_timeout</code>，或<strong>拆成多个表分批导入</strong>。</div>
         </div>
 
         <div class="admin-filter-section">

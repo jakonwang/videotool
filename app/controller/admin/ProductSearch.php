@@ -26,6 +26,53 @@ class ProductSearch extends BaseController
         return json(['code' => $code, 'msg' => $msg, 'data' => $data]);
     }
 
+    /**
+     * Excel/大批量导入逐行调 Python，默认 PHP/Nginx 易超时或内存不足导致 502；在允许时放宽执行时间与内存。
+     */
+    private function prepareLongRunningImport(): void
+    {
+        if (\function_exists('set_time_limit')) {
+            @\set_time_limit(0);
+        }
+        @\ini_set('max_execution_time', '0');
+        $cur = (string) \ini_get('memory_limit');
+        if ($cur !== '-1' && $cur !== '') {
+            @\ini_set('memory_limit', '512M');
+        }
+    }
+
+    /**
+     * 按 product_code 插入或更新：同一编号重复导入不新增行，仅更新参考图、爆款类型、向量等。
+     *
+     * @return array{inserted:bool, updated:bool}
+     */
+    private function upsertStyleItem(string $code, string $imageRef, string $hotType, array $embeddingVec): array
+    {
+        $code = trim($code);
+        $embJson = json_encode($embeddingVec, JSON_UNESCAPED_UNICODE);
+        $row = ItemModel::where('product_code', $code)->find();
+        if ($row) {
+            $row->save([
+                'image_ref' => $imageRef,
+                'hot_type' => $hotType,
+                'embedding' => $embJson,
+                'status' => 1,
+            ]);
+
+            return ['inserted' => false, 'updated' => true];
+        }
+
+        ItemModel::create([
+            'product_code' => $code,
+            'image_ref' => $imageRef,
+            'hot_type' => $hotType,
+            'embedding' => $embJson,
+            'status' => 1,
+        ]);
+
+        return ['inserted' => true, 'updated' => false];
+    }
+
     public function index()
     {
         return View::fetch('admin/product_search/index', []);
@@ -140,6 +187,8 @@ class ProductSearch extends BaseController
             return $this->jsonErr('无法读取上传文件');
         }
 
+        $this->prepareLongRunningImport();
+
         $publicRoot = root_path() . 'public';
 
         if (in_array($ext, ['xlsx', 'xls', 'xlsm'], true)) {
@@ -159,7 +208,8 @@ class ProductSearch extends BaseController
 
         $rowIndex = 0;
         $headerMap = null;
-        $ok = 0;
+        $inserted = 0;
+        $updated = 0;
         $fail = 0;
         $errors = [];
         $maxImports = 5000;
@@ -228,22 +278,25 @@ class ProductSearch extends BaseController
                 continue;
             }
 
-            ItemModel::create([
-                'product_code' => $code,
-                'image_ref' => $resolved['ref'],
-                'hot_type' => $hot,
-                'embedding' => json_encode($vec, JSON_UNESCAPED_UNICODE),
-                'status' => 1,
-            ]);
-            $ok++;
-            if ($ok >= $maxImports) {
+            $u = $this->upsertStyleItem($code, $resolved['ref'], $hot, $vec);
+            if ($u['inserted']) {
+                $inserted++;
+            } else {
+                $updated++;
+            }
+            $success = $inserted + $updated;
+            if ($success % 5 === 0) {
+                \gc_collect_cycles();
+            }
+            if ($success >= $maxImports) {
                 break;
             }
         }
         fclose($handle);
 
         return $this->jsonOk([
-            'imported' => $ok,
+            'imported' => $inserted,
+            'updated' => $updated,
             'failed' => $fail,
             'errors' => $errors,
         ], '导入完成');
@@ -255,7 +308,8 @@ class ProductSearch extends BaseController
             return $this->jsonErr('未安装 Excel 解析依赖，请在项目根目录执行 composer install（需 phpoffice/phpspreadsheet）');
         }
 
-        $ok = 0;
+        $inserted = 0;
+        $updated = 0;
         $fail = 0;
         $errors = [];
         $maxImports = 5000;
@@ -317,15 +371,17 @@ class ProductSearch extends BaseController
                     @unlink($resolved['temp']);
                 }
 
-                ItemModel::create([
-                    'product_code' => $code,
-                    'image_ref' => $imageRef,
-                    'hot_type' => $hot,
-                    'embedding' => json_encode($vec, JSON_UNESCAPED_UNICODE),
-                    'status' => 1,
-                ]);
-                $ok++;
-                if ($ok >= $maxImports) {
+                $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec);
+                if ($u['inserted']) {
+                    $inserted++;
+                } else {
+                    $updated++;
+                }
+                $success = $inserted + $updated;
+                if ($success % 5 === 0) {
+                    \gc_collect_cycles();
+                }
+                if ($success >= $maxImports) {
                     break;
                 }
             }
@@ -334,7 +390,8 @@ class ProductSearch extends BaseController
         }
 
         return $this->jsonOk([
-            'imported' => $ok,
+            'imported' => $inserted,
+            'updated' => $updated,
             'failed' => $fail,
             'errors' => $errors,
         ], '导入完成');
