@@ -28,3 +28,6 @@ Thumbs.db
 .env
 .env.local
 
+# 本地大体积 Excel 样例（勿提交 GitHub，单文件限 100MB）
+docs/*.xlsx
+

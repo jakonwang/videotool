@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>拍照寻款</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+  <style>
+    .skeleton { animation: pulse 1.2s ease-in-out infinite; background: linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%); background-size: 200% 100%; }
+    @keyframes pulse { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .code-xl { font-size: clamp(1.75rem, 6vw, 2.25rem); font-weight: 800; letter-spacing: 0.02em; line-height: 1.2; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+<div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col pb-10">
+  <header class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3">
+    <h1 class="text-lg font-bold text-slate-900">拍照寻款</h1>
+    <p class="text-xs text-slate-500 mt-0.5">拍摄实物或上传图片，匹配款式编号（Top 3）</p>
+  </header>
+
+  <main class="flex-1 px-4 pt-4 space-y-4">
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <label class="block text-sm font-medium text-slate-700 mb-2">手动输入编号（模糊）</label>
+      <div class="flex gap-2">
+        <input v-model="manualQ" type="text" placeholder="例如 EH001" class="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-base focus:ring-2 focus:ring-indigo-500 outline-none" @keyup.enter="searchByCode" />
+        <button type="button" @click="searchByCode" class="shrink-0 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-semibold">查询</button>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <p class="text-sm font-medium text-slate-700 mb-3">拍照 / 相册</p>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" @click="openCamera" class="rounded-xl bg-indigo-600 text-white py-3 text-sm font-semibold shadow">打开相机</button>
+        <label class="rounded-xl border-2 border-dashed border-slate-300 py-3 text-center text-sm font-semibold text-slate-700 cursor-pointer">
+          选图文件
+          <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFile" />
+        </label>
+      </div>
+      <video ref="videoEl" playsinline autoplay muted class="w-full rounded-xl mt-3 bg-black max-h-56 object-cover" v-show="cameraOn"></video>
+      <div class="flex gap-2 mt-3" v-if="cameraOn">
+        <button type="button" @click="capture" class="flex-1 rounded-xl bg-emerald-600 text-white py-2.5 text-sm font-semibold">拍照搜索</button>
+        <button type="button" @click="stopCamera" class="rounded-xl bg-slate-200 px-4 py-2.5 text-sm">关闭</button>
+      </div>
+      <canvas ref="canvasEl" class="hidden"></canvas>
+    </section>
+
+    <section v-if="loading" class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+      <div class="skeleton h-8 rounded-lg w-2/3"></div>
+      <div class="skeleton h-24 rounded-xl"></div>
+      <div class="skeleton h-8 rounded-lg"></div>
+      <p class="text-center text-xs text-slate-500">正在比对特征…</p>
+    </section>
+
+    <section v-if="!loading && codeResults.length" class="space-y-2">
+      <h2 class="text-sm font-semibold text-slate-600 px-1">编号查询结果</h2>
+      <div v-for="(r,i) in codeResults" :key="'c'+i" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="p-4 border-b border-slate-100 flex gap-3">
+          <div class="w-20 h-20 rounded-lg bg-slate-100 shrink-0 overflow-hidden">
+            <img v-if="imgUrl(r.image_ref)" :src="imgUrl(r.image_ref)" class="w-full h-full object-cover" alt="" @error="hideImg" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="code-xl text-slate-900 break-all">{{ r.product_code }}</div>
+            <div class="text-xs text-amber-800 mt-1" v-if="r.hot_type">{{ r.hot_type }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="!loading && imgResults.length" class="space-y-2">
+      <h2 class="text-sm font-semibold text-slate-600 px-1">以图搜款（相似度 Top {{ imgResults.length }}）</h2>
+      <div v-for="(r,i) in imgResults" :key="'i'+i" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="px-3 py-1.5 bg-slate-50 text-xs text-slate-500 flex justify-between">
+          <span>排名 {{ i + 1 }}</span>
+          <span>相似度 {{ (r.similarity * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="p-4 flex gap-3">
+          <div class="w-24 h-24 rounded-lg bg-slate-100 shrink-0 overflow-hidden border border-slate-100">
+            <img v-if="imgUrl(r.image_ref)" :src="imgUrl(r.image_ref)" class="w-full h-full object-cover" alt="" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="code-xl text-indigo-950 break-all">{{ r.product_code }}</div>
+            <div class="text-sm text-slate-600 mt-1" v-if="r.hot_type">爆款：{{ r.hot_type }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p v-if="errMsg" class="text-center text-sm text-red-600 bg-red-50 rounded-xl py-2 px-3">{{ errMsg }}</p>
+  </main>
+</div>
+
+<script>
+const { createApp, ref, onUnmounted, nextTick } = Vue;
+
+createApp({
+  setup() {
+    const manualQ = ref('');
+    const loading = ref(false);
+    const imgResults = ref([]);
+    const codeResults = ref([]);
+    const errMsg = ref('');
+    const cameraOn = ref(false);
+    const videoEl = ref(null);
+    const canvasEl = ref(null);
+    const fileInput = ref(null);
+    let stream = null;
+
+    function imgUrl(ref) {
+      if (!ref) return '';
+      if (/^https?:\/\//i.test(ref)) return ref;
+      if (ref.startsWith('//')) return location.protocol + ref;
+      if (ref.startsWith('/')) return location.origin + ref;
+      return location.origin + '/' + ref.replace(/^\.\//, '');
+    }
+
+    function hideImg(e) {
+      if (e.target) e.target.style.display = 'none';
+    }
+
+    async function searchByCode() {
+      errMsg.value = '';
+      imgResults.value = [];
+      const q = manualQ.value.trim();
+      if (!q) {
+        errMsg.value = '请输入编号';
+        return;
+      }
+      loading.value = true;
+      try {
+        const res = await fetch('/index.php/api/product_search/searchByCode?' + new URLSearchParams({ q, limit: '10' }));
+        const json = await res.json();
+        if (!json || json.code !== 0) throw new Error((json && json.msg) || '查询失败');
+        codeResults.value = (json.data && json.data.items) ? json.data.items : [];
+        if (!codeResults.value.length) errMsg.value = '无匹配编号';
+      } catch (e) {
+        errMsg.value = e.message || '网络错误';
+        codeResults.value = [];
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    async function searchByImageBlob(blob) {
+      errMsg.value = '';
+      codeResults.value = [];
+      loading.value = true;
+      const fd = new FormData();
+      fd.append('file', blob, 'query.jpg');
+      try {
+        const res = await fetch('/index.php/api/product_search/searchByImage', {
+          method: 'POST',
+          body: fd,
+          credentials: 'same-origin',
+        });
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (x) {
+          throw new Error('服务器返回非 JSON');
+        }
+        if (!json || json.code !== 0) throw new Error((json && json.msg) || '搜索失败');
+        imgResults.value = (json.data && json.data.items) ? json.data.items : [];
+        if (!imgResults.value.length) errMsg.value = '未找到相似款式，请尝试更清晰、正对实物拍摄';
+      } catch (e) {
+        errMsg.value = e.message || '请求失败';
+        imgResults.value = [];
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    async function openCamera() {
+      errMsg.value = '';
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        cameraOn.value = true;
+        await nextTick();
+        if (videoEl.value) {
+          videoEl.value.srcObject = stream;
+          await videoEl.value.play();
+        }
+      } catch (e) {
+        errMsg.value = '无法打开相机，请检查权限或使用「选图文件」';
+      }
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      cameraOn.value = false;
+    }
+
+    function capture() {
+      const v = videoEl.value;
+      const c = canvasEl.value;
+      if (!v || !c || !v.videoWidth) return;
+      c.width = v.videoWidth;
+      c.height = v.videoHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(v, 0, 0);
+      c.toBlob(blob => {
+        if (blob) searchByImageBlob(blob);
+        stopCamera();
+      }, 'image/jpeg', 0.92);
+    }
+
+    function onFile(ev) {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      searchByImageBlob(f);
+      ev.target.value = '';
+    }
+
+    onUnmounted(() => stopCamera());
+
+    return {
+      manualQ, loading, imgResults, codeResults, errMsg, cameraOn, videoEl, canvasEl, fileInput,
+      imgUrl, hideImg, searchByCode, openCamera, stopCamera, capture, onFile,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

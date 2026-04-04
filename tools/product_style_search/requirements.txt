@@ -1,0 +1,4 @@
+# Python 3.9+，用于款式图 MobileNet 特征（CPU 即可）
+torch>=2.0.0
+torchvision>=0.15.0
+Pillow>=9.0.0

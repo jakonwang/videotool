@@ -17,7 +17,7 @@
 | 分组 | 子菜单 | 含义 |
 |------|--------|------|
 | （顶栏） | 仪表盘 | 首页 |
-| 素材 | 视频 / 上传 / 商品 / 达人链 | 列表、批量上传、商品、达人分发链接 |
+| 素材 | 视频 / 上传 / 商品 / 达人链 / 寻款 | 列表、批量上传、商品、达人分发、图片搜款式索引 |
 | 终端 | 平台 / 设备 | 平台与终端设备 |
 | 系统 | 系统设置 / 用户 / 发卡 / 版本 / 缓存 / 异常 | 参数、管理员、桌面授权码、桌面安装包发布、缓存、下载错误监控 |
 
@@ -367,9 +367,60 @@
 - 列表页：平台（`view/admin/platform/index.html`）、设备（`view/admin/device/index.html`）、商品（`view/admin/product/index.html`）、达人链（`view/admin/distribute/index.html`）
 - 系统页：设置（`view/admin/settings/index.html`）、缓存（`view/admin/cache/index.html`）、异常（`view/admin/download_log/index.html`）
 - 桌面端：发卡（`view/admin/client_license/index.html`）、版本（`view/admin/client_version/index.html`）
+- 寻款：`view/admin/product_search/index.html`；H5 `view/index/search_by_image.html`
 
 ### 说明
 - 这些页面会隐藏 layout 自带的 `content-header`，改用页面内部的统一标题区，避免出现两套标题/操作区导致不一致。
+
+## 图片搜款式「寻款」（2026-04）
+
+### 目标
+- 从 **CSV** 导入「产品编号 + 参考图（URL / 站内路径 / Base64）+ 可选爆款类型」，使用 **本地 Python**（MobileNetV2 特征）生成向量写入 MySQL。
+- **H5 拍照寻款页**：调用相机或选图，上传后与索引库做 **余弦相似度**，返回 Top3；支持 **编号模糊查询**（不走向量）。
+- 后台 **素材 / 寻款** 管理索引；风格与现有后台一致。
+
+### 数据库
+| 表名 | 说明 |
+|------|------|
+| `product_style_items` | `product_code`、`image_ref`（展示用）、`hot_type`、`embedding`（JSON 浮点数组）、`status` |
+
+#### 升级（已有库）
+- `php database\run_migration_product_style_search.php`（Windows）或 `php database/run_migration_product_style_search.php`（Linux）
+
+### Python 环境（服务器必装）
+- 路径：`tools/product_style_search/`
+- 依赖：`pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）
+- 配置：`config/product_search.php` 中 `python_bin`，或环境变量 `PRODUCT_SEARCH_PYTHON` 指向 `python.exe` 绝对路径。
+- 说明：`tools/product_style_search/README.md`
+
+### 后台路由（`admin.php`，需登录）
+- `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
+- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`（能否成功提取特征）
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`，CSV 编码建议 UTF-8（带 BOM 亦可）
+- `POST /admin.php/product_search/delete/<id>`：删除一条索引
+- `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
+
+### 开放 API（无需登录，供仓库手机端 H5）
+- `POST /index.php/api/product_search/searchByImage`：`multipart/form-data`，字段名 `file`，返回 Top `config product_search.top_k`（默认 3）条，含 `product_code`、`image_ref`、`hot_type`、`similarity`（0～1）。
+- `GET /index.php/api/product_search/searchByCode?q=`：编号 **LIKE** 模糊匹配。
+
+### H5 页面
+- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；结果区 **大字号** 显示产品编号。
+
+### CSV 列说明
+- 首行表头需能识别 **产品编号**、**图片** 列（支持同义列名，见 `ProductStyleImportService`）；可选 **爆款类型**。
+- 若无数表头，则按前两列依次为「编号、图片」解析。
+- 图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
+- 从 Excel 导出说明见：`docs/耳环款式CSV说明.md`。
+
+### 已适配页面
+- 后台：`view/admin/product_search/index.html`
+- 前台 H5：`view/index/search_by_image.html`
+
+### 注意
+- 向量检索为 **全表线性扫描**（适合万级以内）；数据量再大建议引入专用向量库。
+- 以图搜款依赖服务器已安装 Python 且 `embed_image.py` 可运行；导入前请先在本机执行 `python embed_image.py 某图片.jpg` 自检。
+- 手机上传大图若 413，需调大 Nginx `client_max_body_size` 与 PHP `upload_max_filesize`。
 
 ## 桌面端：发卡与版本、公开下载（2026-04）
 

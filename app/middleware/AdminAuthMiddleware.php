@@ -70,6 +70,9 @@ class AdminAuthMiddleware
         if (preg_match('#^/(client_version|client_license)/(list|add|batchGenerate|update|toggle|delete|unbind|uploadPackage)#i', $path)) {
             return true;
         }
+        if (preg_match('#^/product_search/(list|importCsv|delete|sampleCsv)#i', $path)) {
+            return true;
+        }
         return false;
     }
 }

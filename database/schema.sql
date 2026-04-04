@@ -156,6 +156,20 @@ CREATE TABLE app_versions (
     INDEX idx_status_created (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='桌面端版本发布';
 
+-- 图片搜款式索引
+CREATE TABLE product_style_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    product_code VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '产品编号',
+    image_ref VARCHAR(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '参考图 URL 或站内路径',
+    hot_type VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '爆款类型',
+    embedding MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '特征向量 JSON',
+    status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1有效',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_code (product_code),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='款式图搜索引';
+
 -- 初始化平台数据
 INSERT INTO platforms (name, code, icon) VALUES
 ('TikTok', 'tiktok', '🎵'),

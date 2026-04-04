@@ -630,12 +630,12 @@
                         </a>
 
                         <div class="admin-sidenav-section" data-i18n="admin.menu.material">素材</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product' && $Request.controller != 'Distribute' && $Request.controller != 'distribute'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'ProductSearch' && $Request.controller != 'productsearch'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="folder"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.material">素材</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}show{/if}">
+                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/video" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action != 'batchUpload' && $Request.action != 'batch_upload' && $Request.action != 'batchupload' && $Request.action != 'batch-upload'}active{/if}{/if}">
@@ -659,6 +659,12 @@
                                     <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
                                         <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">达人链</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/product_search" class="admin-sidenav-sublink {if $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="camera"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.styleSearch">寻款</span>
                                     </a>
                                 </li>
                             </ul>

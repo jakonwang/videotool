@@ -111,5 +111,12 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('client_version/toggle/<id>', 'app\controller\admin\ClientVersion@toggle');
     Route::post('client_version/delete/<id>', 'app\controller\admin\ClientVersion@delete');
     Route::get('client_version', 'app\controller\admin\ClientVersion@index');
+
+    // 图片搜款式
+    Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
+    Route::post('product_search/importCsv', 'app\controller\admin\ProductSearch@importCsv');
+    Route::post('product_search/delete/<id>', 'app\controller\admin\ProductSearch@delete');
+    Route::get('product_search/sampleCsv', 'app\controller\admin\ProductSearch@sampleCsv');
+    Route::get('product_search', 'app\controller\admin\ProductSearch@index');
 }
 

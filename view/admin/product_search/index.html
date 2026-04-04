@@ -1,0 +1,210 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}寻款{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
+
+{block name="style"}
+<style>
+    .content-header { display: none; }
+    .admin-modern-card .el-table__inner-wrapper::before { height: 0; }
+    .hint-box { font-size: 13px; color: #4b5563; line-height: 1.6; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+    .hint-box code { font-size: 12px; }
+</style>
+{/block}
+
+{block name="content"}
+<div id="productSearchApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+  {literal}
+  const { createApp, reactive, ref, computed, onMounted } = Vue;
+  const { ElMessage } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+
+  const apiFetchHeaders = {
+    'Accept': 'application/json, text/javascript, */*;q=0.01',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+
+  function parseJsonBody(res, text) {
+    try { return JSON.parse(text); } catch (e) {
+      throw new Error('非 JSON 响应 HTTP ' + res.status);
+    }
+  }
+
+  async function postForm(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { ...apiFetchHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: typeof body === 'string' ? body : new URLSearchParams(body).toString(),
+      credentials: 'same-origin',
+    });
+    const j = parseJsonBody(res, await res.text());
+    if (j && j.code === 401) throw new Error('未登录或会话过期');
+    return j;
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const items = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(10);
+      const query = reactive({ keyword: '' });
+      const pythonOk = ref(false);
+      const importing = ref(false);
+      const fileList = ref([]);
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(page.value));
+          p.set('page_size', String(pageSize.value));
+          if (query.keyword) p.set('keyword', query.keyword);
+          const res = await fetch('/admin.php/product_search/list?' + p.toString(), {
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (!json || json.code !== 0) throw new Error(json && json.msg ? json.msg : '加载失败');
+          items.value = (json.data && json.data.items) ? json.data.items : [];
+          total.value = (json.data && json.data.total) ? json.data.total : 0;
+          pythonOk.value = !!(json.data && json.data.python_ok);
+        } catch (e) {
+          ElMessage.error(e.message || '加载失败');
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      async function doImport() {
+        const input = document.getElementById('csvFileInput');
+        if (!input || !input.files || !input.files[0]) {
+          ElMessage.warning('请选择 CSV 文件');
+          return;
+        }
+        importing.value = true;
+        try {
+          const fd = new FormData();
+          fd.append('file', input.files[0]);
+          const res = await fetch('/admin.php/product_search/importCsv', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 0) {
+            const d = json.data || {};
+            ElMessage.success((json.msg || '完成') + ' 成功' + (d.imported || 0) + ' 条，失败' + (d.failed || 0) + ' 条');
+            if (d.errors && d.errors.length) console.warn(d.errors);
+            input.value = '';
+            fetchList();
+          } else {
+            ElMessage.error((json && json.msg) || '导入失败');
+          }
+        } catch (e) {
+          ElMessage.error(e.message || '导入失败');
+        } finally {
+          importing.value = false;
+        }
+      }
+
+      async function doDelete(row) {
+        try {
+          const j = await postForm('/admin.php/product_search/delete/' + row.id, {});
+          if (j && j.code === 0) {
+            ElMessage.success('已删除');
+            fetchList();
+          } else {
+            ElMessage.error((j && j.msg) || '失败');
+          }
+        } catch (e) {
+          ElMessage.error(e.message || '失败');
+        }
+      }
+
+      function openH5() {
+        window.open('/index.php/searchByImage', '_blank', 'noopener');
+      }
+
+      onMounted(() => { fetchList(); });
+
+      return {
+        loading, items, total, page, pageSize, query, pythonOk, importing,
+        fetchList, doImport, doDelete, openH5, lang,
+      };
+    },
+    template: `
+      <div class="admin-modern-card">
+        <div class="admin-header-actions">
+          <div class="admin-breadcrumb">素材 / 寻款</div>
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div style="font-size:18px;font-weight:600;color:#111827;">图片搜款式 · 索引管理</div>
+            <div class="admin-action-buttons">
+              <el-button type="default" @click="openH5">{{ lang==='en' ? 'Open H5' : '打开拍照寻款页' }}</el-button>
+              <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/sampleCsv" style="border-radius:8px;">{{ lang==='en' ? 'Sample CSV' : '下载示例 CSV' }}</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="hint-box">
+          <div v-if="!pythonOk" style="color:#b45309;margin-bottom:8px;">
+            <strong>Python 特征环境未就绪：</strong>服务器需安装 Python3，并在项目根执行
+            <code>pip install -r tools/product_style_search/requirements.txt</code>，
+            首次运行会下载 MobileNet 权重。Windows 可在 <code>config/product_search.php</code> 或环境变量 <code>PRODUCT_SEARCH_PYTHON</code> 指定 python 路径。
+          </div>
+          <div>CSV 需包含「产品编号」「图片」列（可选「爆款类型」）。图片支持 http(s) 链接、以 <code>/</code> 开头的站内路径、或 Base64 数据列。</div>
+        </div>
+
+        <div class="admin-filter-section">
+          <div class="admin-custom-form">
+            <el-input v-model="query.keyword" clearable size="default" placeholder="产品编号" style="width:220px;" @keyup.enter="fetchList" />
+            <div class="admin-filter-buttons">
+              <el-button type="primary" @click="()=>{page=1;fetchList();}">筛选</el-button>
+              <input id="csvFileInput" type="file" accept=".csv,.txt" style="max-width:200px;" />
+              <el-button type="success" :loading="importing" @click="doImport">导入 CSV</el-button>
+            </div>
+          </div>
+        </div>
+
+        <el-table :data="items" stripe v-loading="loading" row-key="id">
+          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column prop="product_code" label="产品编号" min-width="120" />
+          <el-table-column prop="image_ref" label="参考图" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="hot_type" label="爆款类型" width="120" />
+          <el-table-column label="向量" width="80">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.has_embedding ? 'success' : 'danger'">{{ row.has_embedding ? '已建' : '无' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="导入时间" width="170" />
+          <el-table-column label="操作" width="90" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="danger" @click="doDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="admin-footer-pagination" style="margin-top:16px;">
+          <span style="color:#6b7280;font-size:13px;">共 {{ total }} 条</span>
+          <el-pagination v-model:current-page="page" v-model:page-size="pageSize" background layout="prev, pager, next"
+            :total="total" @update:current-page="(p)=>{page=p;fetchList();}" @update:page-size="(s)=>{pageSize=s;page=1;fetchList();}" />
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#productSearchApp');
+  {/literal}
+</script>
+{/block}
