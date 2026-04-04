@@ -151,6 +151,64 @@
 
                     <div class="card shadow-sm mb-3">
                         <div class="card-body">
+                    <h5 class="mb-3 text-muted">Google Product Search（寻款）</h5>
+                    <p class="small text-muted">启用后，<strong>拍照寻款</strong>优先走 Google Cloud Vision 商品图搜；导入 CSV/Excel 时会将参考图写入 <strong>GCS</strong> 并注册到指定 <strong>Product Set</strong>。类目默认 <code>homegoods-v2</code>（饰品场景）。首次请在 GCP 控制台开通 Vision API，并执行 <code>php scripts/google_create_product_set.php</code> 创建 ProductSet。</p>
+                    <p class="small text-danger font-weight-bold">密钥 JSON 必须放在<strong>项目根目录之外</strong>的绝对路径（不可位于 <code>public</code> 下），切勿提交到 Git 或暴露 URL。</p>
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="google_ps_enabled" name="google_ps_enabled" value="1" {if $google_ps_enabled}checked{/if}>
+                            <label class="custom-control-label" for="google_ps_enabled">启用 Google 寻款（需填 project、区域、Product Set、GCS Bucket 与密钥路径）</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_key_file">服务账号 JSON 绝对路径</label>
+                        <input type="text" name="google_ps_key_file" id="google_ps_key_file" class="form-control" value="" autocomplete="off" placeholder="{if $google_ps_key_configured}已保存，留空不修改；或填写新路径{else /}例：D:\secrets\xxx.json 或 /var/www/keys/vision.json{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="google_ps_key_file_clear" name="google_ps_key_file_clear" value="1">
+                            <label class="custom-control-label" for="google_ps_key_file_clear">清空后台保存的路径（改用环境变量 GOOGLE_APPLICATION_CREDENTIALS 亦可）</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_project_id">GCP Project ID</label>
+                        <input type="text" name="google_ps_project_id" id="google_ps_project_id" class="form-control" value="{$google_ps_project_id|default=''}" placeholder="与控制台项目 ID 一致">
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_location">Location（区域）</label>
+                        <input type="text" name="google_ps_location" id="google_ps_location" class="form-control" value="{$google_ps_location|default=''}" placeholder="如 us-east1、asia-east1（须与 Product Search 控制台区域一致）">
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_product_set_id">Product Set ID</label>
+                        <input type="text" name="google_ps_product_set_id" id="google_ps_product_set_id" class="form-control" value="{$google_ps_product_set_id|default=''}" placeholder="自建 ProductSet 的资源短 ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_gcs_bucket">GCS Bucket（参考图存储）</label>
+                        <input type="text" name="google_ps_gcs_bucket" id="google_ps_gcs_bucket" class="form-control" value="{$google_ps_gcs_bucket|default=''}" placeholder="须与本项目服务账号同 GCP 项目，且 Vision 可读">
+                        <small class="form-text text-muted">导入时会上传 <code>gs://bucket/...</code>，索引完成后对象可保留或自行配置生命周期。</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_gcs_prefix">对象前缀（可选）</label>
+                        <input type="text" name="google_ps_gcs_prefix" id="google_ps_gcs_prefix" class="form-control" value="{$google_ps_gcs_prefix|default=''}" placeholder="留空则默认 vision_product_search_refs">
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_product_category">product_category</label>
+                        <input type="text" name="google_ps_product_category" id="google_ps_product_category" class="form-control" value="{$google_ps_product_category|default=''}" placeholder="留空则 homegoods-v2">
+                    </div>
+                    <div class="form-group">
+                        <label for="google_ps_match_score_min">完全匹配最低分（0～1）</label>
+                        <input type="text" name="google_ps_match_score_min" id="google_ps_match_score_min" class="form-control" value="{$google_ps_match_score_min|default=''}" placeholder="留空则 0.5；低于此分时提示「未找到完全匹配款式」">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="google_ps_search_top_k">返回条数上限</label>
+                        <input type="text" name="google_ps_search_top_k" id="google_ps_search_top_k" class="form-control" value="{$google_ps_search_top_k|default=''}" placeholder="留空则 5，最大 20">
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
+                    </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
                     <h5 class="mb-3 text-muted">阿里云图像搜索（寻款）</h5>
                     <p class="small text-muted">用于「拍照寻款」以图搜款；导入 CSV/Excel 时会将图片同步到阿里云商品图搜实例。AK/SK 建议使用 RAM 子账号最小权限。</p>
                     <div class="form-group">
@@ -225,6 +283,7 @@
                         $('#aliyun_is_access_key_id').val('');
                         $('#aliyun_is_access_key_secret').val('');
                         $('#openai_api_key').val('');
+                        $('#google_ps_key_file').val('');
                         setTimeout(function () { location.reload(); }, 500);
                     } else {
                         AdminUI.showToast('error', res.msg || '失败');

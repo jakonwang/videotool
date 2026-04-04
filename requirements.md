@@ -373,12 +373,13 @@
 ### 说明
 - 这些页面会隐藏 layout 自带的 `content-header`，改用页面内部的统一标题区，避免出现两套标题/操作区导致不一致。
 
-## 图片搜款式「寻款」（2026-04；拍照寻款优先 OpenAI Vision）
+## 图片搜款式「寻款」（2026-04；可选 Google Product Search）
 
 ### 目标
 - 从 **CSV / Excel** 导入「产品编号 + 参考图 + 可选爆款类型」：仍使用 **本地 Python**（MobileNetV2）生成向量写入 MySQL（兼容列表与历史数据）。若 **后台已配置 OpenAI** 且勾选 **导入时生成描述**，则对每行参考图调用 **`gpt-4o-mini` Vision** 生成一句中文 **视觉特征** 写入 **`product_style_items.ai_description`**，并同步到 **`products.ai_description`**（当存在 `products.name` 与产品编号一致时）。
-- **H5 拍照寻款**：**仅用户点击拍照/选图搜索时**调用 OpenAI（每请求约一次 chat+图）；将库内「编号|特征|爆款」列表与用户实拍图一并交给模型，返回 **最多 5 条** `product_code` + 置信度 + 简短理由，再与本地表合并展示。**未配置 OpenAI** 时，若启用了阿里云图搜则 **回退** 为 `SearchImageByPic`。支持 **编号模糊查询**（`searchByCode`，不走向量）。
-- 可选：导入行仍 **入队阿里云** AddImage（与 OpenAI 独立，可在设置中关闭阿里云以省云费用）。
+- **Google Cloud Vision Product Search（可选）**：后台 **设置** 启用并填写 Project、Location、Product Set、**GCS Bucket** 与**密钥 JSON 绝对路径**（须**不在 `public` 目录下**）后，导入时每行会 **上传参考图至 GCS**，并调用 **`createProduct` + `addProductToProductSet` + `createReferenceImage`**（`product_category` 默认 **`homegoods-v2`**）；**拍照寻款**优先走 **`ImageAnnotatorClient::productSearch`**。返回 **`score` / `similarity`**（0～1）；若最高分低于配置阈值（默认 **0.5**），`msg` 为 **「未找到完全匹配款式」**（仍可能返回 Top 结果便于人工核对）。**运维脚本**：`php scripts/google_create_product_set.php --project=... --location=... --set-id=...`（可加 `--key-file=` 或环境变量 `GOOGLE_APPLICATION_CREDENTIALS`）。
+- **H5 拍照寻款**：未启用 Google 时，**仅用户点击拍照/选图搜索时**调用 OpenAI（每请求约一次 chat+图）；将库内「编号|特征|爆款」列表与用户实拍图一并交给模型，返回 **最多 5 条** `product_code` + 置信度 + 简短理由，再与本地表合并展示。**未配置 OpenAI** 时，若启用了阿里云图搜则 **回退** 为 `SearchImageByPic`。支持 **编号模糊查询**（`searchByCode`，不走向量）。
+- 可选：导入行仍 **入队阿里云** AddImage（与 OpenAI / Google 独立，可在设置中关闭阿里云以省云费用）。
 
 ### 数据库
 | 表名 | 说明 |
@@ -397,7 +398,7 @@
 
 ### Python 环境（服务器必装）
 - 路径：`tools/product_style_search/`
-- **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**；**OpenAI** 使用 **`guzzlehttp/guzzle`** 调 REST；**阿里云图搜（可选）** 依赖 **`alibabacloud/imagesearch-20201214`**。要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等）。部署后务必执行 `composer install` / `composer update`。
+- **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**；**OpenAI** 使用 **`guzzlehttp/guzzle`** 调 REST；**阿里云图搜（可选）** 依赖 **`alibabacloud/imagesearch-20201214`**；**Google Product Search（可选）** 依赖 **`google/cloud-vision` ^1.7** 与 **`google/cloud-storage`**（参考图须 **gs://**，由导入逻辑上传）。要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等）。部署后务必执行 `composer install` / `composer update`。
 - 依赖：在项目根执行 `pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）；建议用与 Web 将调用的同一解释器，例如 `py -3 -m pip install -r tools/product_style_search/requirements.txt`（Windows）或 `python3 -m pip ...`（Linux）。
 - 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
 - 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组。`ProductStyleEmbeddingService` 会依次尝试 **`exec` → `proc_open` → `shell_exec`** 拉取子进程输出；若 `php.ini` 的 **`disable_functions` 把三者都禁用**，则无法从 PHP 调 Python，需在配置中**至少放行其一**（常见仅禁用 `exec` 时，`proc_open` 仍可用）。
@@ -405,13 +406,13 @@
 
 ### 配置
 - **`config/openai.php` 与环境变量**：`api_key`（`OPENAI_API_KEY`）、`base_url`（默认官方 `https://api.openai.com/v1`）、`model`（默认 `gpt-4o-mini`）、`describe_on_import`、`max_catalog_items`（单次寻款带入库内条数上限，默认 250）、超时等。后台 **设置 → OpenAI Vision** 可覆盖 Key、Base URL、模型、条数上限，并勾选是否 **导入时生成描述**（关闭后导入不再为每行调用 Vision，可显著省费；但库内无 `ai_description` 时拍照寻款无法走 OpenAI，需依赖阿里云或补描述）。
-- **`config/services.php`**：阿里云图搜项见前文；后台 **设置** 覆盖同七牛逻辑。
-- 环境变量示例：`OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_VISION_MODEL`、`OPENAI_DESCRIBE_ON_IMPORT`、`OPENAI_MAX_CATALOG_ITEMS`；阿里云：`ALIYUN_IS_*` 等。
+- **`config/services.php`**：阿里云图搜、`google_product_search`（`project_id`、`location`、`product_set_id`、`key_file`、`gcs_bucket`、`gcs_prefix`、`product_category`、`match_score_min`、`search_top_k`）；后台 **设置** 覆盖同七牛逻辑。
+- 环境变量示例：`OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_VISION_MODEL`、`OPENAI_DESCRIBE_ON_IMPORT`、`OPENAI_MAX_CATALOG_ITEMS`；阿里云：`ALIYUN_IS_*`；Google：`GOOGLE_PS_*`、`GOOGLE_APPLICATION_CREDENTIALS`。
 
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
-- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。**若 OpenAI 已配置且开启导入描述**：每行成功后再调 Vision 写 **`ai_description`**（按行计费）。响应 **`data.vision`**：`openai_enabled`、`describe_on_import`、`described_rows`。**若已启用阿里云图搜**：仍 **入队** 并 **drain**，见 **`data.aliyun`**。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
+- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**、**`google_ps_enabled`**
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。**若 OpenAI 已配置且开启导入描述**：每行成功后再调 Vision 写 **`ai_description`**（按行计费）。响应 **`data.vision`**：`openai_enabled`、`describe_on_import`、`described_rows`。**若已启用阿里云图搜**：仍 **入队** 并 **drain**，见 **`data.aliyun`**。**若已启用 Google Product Search**：每行尝试 **GCS + Vision 索引**，见 **`data.google_ps`**（`synced_rows`、`failed_rows`、`errors`）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
 - `POST /admin.php/product_search/syncAliyunQueue`：表单字段 `max`（单次最多处理条数，默认 300，上限 2000）、`seconds`（时间上限秒，默认 180，上限 600）；用于消费队列。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
@@ -419,12 +420,12 @@
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
 ### 开放 API（无需登录，供仓库手机端 H5）
-- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；`multipart/form-data`，字段名 `file`。**优先级**：已配置 **OpenAI** → 走 Vision 语义匹配（`data.engine`=`openai_vision`，`data.catalog_size` 为本次参与匹配的库内条数）；否则若启用 **阿里云** → `aliyun_is`；否则 `code=1`。**Vision 成功**时 `items` 每项含 `product_code`、`image_ref`、`hot_type`、`similarity`（0～1）、**`match_reason`**、**`product`**（同前）。**阿里云**时仍可有 `aliyun_pic_name`。**限流/超时**：阿里云路径下 `code` 可能为 429/504。
+- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；`multipart/form-data`，字段名 `file`。**优先级**：后台启用 **Google Product Search** → `data.engine`=`google_ps`（`items` 含 **`score`** 与 **`similarity`**、`best_score`、`low_confidence`）；否则已配置 **OpenAI** → `openai_vision`（`data.catalog_size`）；否则若启用 **阿里云** → `aliyun_is`；否则 `code=1`。**Vision 成功**时 `items` 每项含 `product_code`、`image_ref`、`hot_type`、`similarity`（0～1）、**`match_reason`**、**`product`**。**阿里云**时仍可有 `aliyun_pic_name`。**限流/超时**：阿里云路径下 `code` 可能为 429/504。
 - `POST /index.php/api/search/searchByImage`：同上（别名路径）。
 - `GET /index.php/api/product_search/searchByCode?q=`：编号 **LIKE** 模糊匹配（仍由 `ProductSearch` 提供）。
 
 ### H5 页面
-- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；上传前 **前端压缩**（长边约 1600、JPEG 质量递减直至约 **2MB** 以内）；结果区展示 **匹配说明 `match_reason`**（Vision）、**Top 至多 5 条** 与 **商品表关联信息**。
+- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；以图寻款上传前 **前端压缩**（长边 **640**、JPEG 质量递减直至约 **2MB** 以内）；加载态文案 **「AI 正在比对款式…」**；结果区展示 **匹配说明 `match_reason`**（Vision）、**Top 至多 5 条** 与 **商品表关联信息**；Google 路径下若 **`low_confidence`** 会提示 **未找到完全匹配款式**。
 
 ### CSV / Excel 列说明
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
@@ -438,9 +439,10 @@
 - 前台 H5：`view/index/search_by_image.html`
 
 ### 注意
-- **拍照寻款**在配置 OpenAI 后 **按次计费**；库内无 `ai_description` 时须先 **导入并开启描述生成** 或改用阿里云。
+- **Google**：需在 GCP 开通 **Vision API**，服务账号须具备 **Storage 写入**与 **Vision** 权限；**Product Search 索引有延迟**，新导入后可能需数分钟才可搜到。
+- **拍照寻款**在配置 OpenAI 后 **按次计费**；库内无 `ai_description` 时须先 **导入并开启描述生成** 或改用阿里云 / Google。
 - 单次 Vision 寻款仅加载 **最近 N 条（默认 250）且已有描述** 的索引；款式极多时请在后台调大 **单次带入条数上限** 或拆业务库（见 `config/openai.php` / 设置）。
-- 向量（本地）仍为 **全表线性扫描**（适合万级以内）；**拍照流程默认不走本地余弦**，除非未配 OpenAI 与阿里云。
+- 向量（本地）仍为 **全表线性扫描**（适合万级以内）；**拍照流程默认不走本地余弦**，除非未配 Google、OpenAI 与阿里云。
 - 导入仍依赖 Python 抽特征时，请保证 `embed_image.py` 可用。
 - **后台寻款批量导入**、手机拍照寻款：若 **HTTP 413**，先调 Nginx `client_max_body_size`，再调 PHP `upload_max_filesize` 与 `post_max_size`（三者均要覆盖最大单文件体积）。
 - **HTTP 502**（Nginx Bad Gateway）常见于 **导入 Excel 中途**：每行要调 Python 抽特征，总时间易超过 **Nginx `fastcgi_read_timeout`** 或 **PHP-FPM `request_terminate_timeout`**，或 **内存** 爆掉导致子进程退出。处理：Nginx 对 `admin.php` 增加 `fastcgi_read_timeout 600s;`、`fastcgi_send_timeout 600s;`；`php.ini` 提高 `max_execution_time`、`memory_limit`（如 512M）；`www.conf` 中 `request_terminate_timeout = 600` 或 `0`。仍失败则 **拆分 Excel 分批导入**。代码侧导入入口会尝试 `set_time_limit(0)` 与提高 `memory_limit`（受宿主策略限制）。

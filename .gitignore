@@ -28,6 +28,11 @@ Thumbs.db
 .env
 .env.local
 
+# 云服务密钥（勿提交仓库）
+google-key.json
+*-google-key.json
+*-credentials.json
+
 # 本地大体积 Excel 样例（勿提交 GitHub，单文件限 100MB）
 docs/*.xlsx
 

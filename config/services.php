@@ -28,4 +28,23 @@ return [
         /** SearchImageByPic 是否按 ProductId 去重 */
         'distinct_product_id' => true,
     ],
+    /**
+     * Google Cloud Vision — Product Search（拍照寻款，可选）
+     * 后台「设置」或环境变量可覆盖；参考图须先上传到 GCS（见 GoogleProductSearchService）。
+     */
+    'google_product_search' => [
+        'project_id' => env('GOOGLE_PS_PROJECT_ID', ''),
+        /** 与控制台 Product Search 区域一致，如 us-east1、asia-east1 */
+        'location' => env('GOOGLE_PS_LOCATION', ''),
+        'product_set_id' => env('GOOGLE_PS_PRODUCT_SET_ID', ''),
+        /** 服务账号 JSON 绝对路径，须不在 public 下 */
+        'key_file' => env('GOOGLE_PS_KEY_FILE', env('GOOGLE_APPLICATION_CREDENTIALS', '')),
+        /** 存放参考图的 Bucket（须与项目同账号，且 Vision 可读取） */
+        'gcs_bucket' => env('GOOGLE_PS_GCS_BUCKET', ''),
+        'gcs_prefix' => env('GOOGLE_PS_GCS_PREFIX', 'vision_product_search_refs'),
+        'product_category' => env('GOOGLE_PS_PRODUCT_CATEGORY', 'homegoods-v2'),
+        /** 低于此分时提示「未找到完全匹配款式」 */
+        'match_score_min' => (float) env('GOOGLE_PS_MATCH_SCORE_MIN', 0.5),
+        'search_top_k' => (int) env('GOOGLE_PS_SEARCH_TOP_K', 5),
+    ],
 ];

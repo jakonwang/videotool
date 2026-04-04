@@ -6,6 +6,8 @@ namespace app\controller\admin;
 use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
 use app\service\AliyunImageSearchConfig;
+use app\service\GoogleProductSearchConfig;
+use app\service\GoogleProductSearchService;
 use app\service\ProductStyleAliyunQueueService;
 use app\service\ProductStyleEmbeddingService;
 use app\service\VisionOpenAIConfig;
@@ -170,6 +172,7 @@ class ProductSearch extends BaseController
             'vision_items_with_desc' => $visionDescCount,
             'aliyun_is_enabled' => AliyunImageSearchConfig::get()['enabled'],
             'aliyun_is_pending' => ProductStyleAliyunQueueService::pendingCount(),
+            'google_ps_enabled' => GoogleProductSearchConfig::get()['enabled'],
         ]);
     }
 
@@ -284,6 +287,9 @@ class ProductSearch extends BaseController
         $errors = [];
         $maxImports = 5000;
         $visionDescribed = 0;
+        $googleSynced = 0;
+        $googleFailed = 0;
+        $googleErrors = [];
 
         while (($row = fgetcsv($handle)) !== false) {
             $rowIndex++;
@@ -359,6 +365,7 @@ class ProductSearch extends BaseController
             }
             $u = $this->upsertStyleItem($code, $resolved['ref'], $hot, $vec, $aiDesc);
             $this->syncProductAiDescription($code, $aiDesc);
+            $this->syncGoogleProductSearchIndex($code, $resolved['temp'], $googleSynced, $googleFailed, $googleErrors);
             $picName = ProductStyleAliyunQueueService::makePicName($resolved['ref'], $resolved['temp']);
             ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
             if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
@@ -395,7 +402,38 @@ class ProductSearch extends BaseController
                 'sync_batch' => $aliyunSync,
                 'pending' => ProductStyleAliyunQueueService::pendingCount(),
             ],
+            'google_ps' => [
+                'enabled' => GoogleProductSearchConfig::get()['enabled'],
+                'synced_rows' => $googleSynced,
+                'failed_rows' => $googleFailed,
+                'errors' => $googleErrors,
+            ],
         ], '导入完成');
+    }
+
+    /**
+     * @param int $synced
+     * @param int $failed
+     * @param string[] $errors
+     */
+    private function syncGoogleProductSearchIndex(string $productCode, string $localPath, int &$synced, int &$failed, array &$errors): void
+    {
+        if (!GoogleProductSearchConfig::get()['enabled']) {
+            return;
+        }
+        $r = GoogleProductSearchService::syncReferenceFromLocalFile($productCode, $localPath);
+        if (!empty($r['skipped'])) {
+            return;
+        }
+        if ($r['ok'] ?? false) {
+            $synced++;
+
+            return;
+        }
+        $failed++;
+        if (count($errors) < 20) {
+            $errors[] = $productCode . '：' . (string) ($r['error'] ?? '同步失败');
+        }
     }
 
     private function importExcelSpreadsheet(string $tmp, string $publicRoot)
@@ -410,6 +448,9 @@ class ProductSearch extends BaseController
         $errors = [];
         $maxImports = 5000;
         $visionDescribed = 0;
+        $googleSynced = 0;
+        $googleFailed = 0;
+        $googleErrors = [];
 
         try {
             foreach (ProductStyleXlsxImportService::iterateRows($tmp) as $rec) {
@@ -475,6 +516,7 @@ class ProductSearch extends BaseController
                 }
                 $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
                 $this->syncProductAiDescription($code, $aiDesc);
+                $this->syncGoogleProductSearchIndex($code, $resolved['temp'], $googleSynced, $googleFailed, $googleErrors);
                 $picName = ProductStyleAliyunQueueService::makePicName($imageRef, $resolved['temp']);
                 ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
                 if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
@@ -512,6 +554,12 @@ class ProductSearch extends BaseController
             'aliyun' => [
                 'sync_batch' => $aliyunSync,
                 'pending' => ProductStyleAliyunQueueService::pendingCount(),
+            ],
+            'google_ps' => [
+                'enabled' => GoogleProductSearchConfig::get()['enabled'],
+                'synced_rows' => $googleSynced,
+                'failed_rows' => $googleFailed,
+                'errors' => $googleErrors,
             ],
         ], '导入完成');
     }

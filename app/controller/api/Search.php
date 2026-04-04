@@ -8,11 +8,13 @@ use app\model\Product as ProductModel;
 use app\model\ProductStyleItem as ItemModel;
 use app\service\AliyunImageSearchConfig;
 use app\service\AliyunImageSearchService;
+use app\service\GoogleProductSearchConfig;
+use app\service\GoogleProductSearchService;
 use app\service\VisionOpenAIConfig;
 use app\service\VisionSearchService;
 
 /**
- * 以图搜款：优先 OpenAI Vision（语义+图），未配置时回退阿里云图像搜索
+ * 以图搜款：已启用时优先 Google Product Search，其次 OpenAI Vision，再回退阿里云图像搜索
  */
 class Search extends BaseController
 {
@@ -35,6 +37,10 @@ class Search extends BaseController
             return $this->jsonOut(['code' => 1, 'msg' => '无法读取上传文件', 'data' => null]);
         }
 
+        if (GoogleProductSearchConfig::get()['enabled']) {
+            return $this->searchByGoogleProductSearch($tmp);
+        }
+
         $visionCfg = VisionOpenAIConfig::get();
         if ($visionCfg['enabled']) {
             return $this->searchByOpenAiVision($tmp, $visionCfg);
@@ -46,8 +52,78 @@ class Search extends BaseController
 
         return $this->jsonOut([
             'code' => 1,
-            'msg' => '未配置寻款引擎：请在后台「设置」填写 OpenAI API Key（推荐），或启用阿里云图像搜索',
+            'msg' => '未配置寻款引擎：请在后台「设置」启用 Google Product Search，或填写 OpenAI Key，或启用阿里云图像搜索',
             'data' => null,
+        ]);
+    }
+
+    private function searchByGoogleProductSearch(string $tmp)
+    {
+        $gr = GoogleProductSearchService::searchByImageFile($tmp);
+        if (!($gr['ok'] ?? false)) {
+            return $this->jsonOut([
+                'code' => 1,
+                'msg' => (string) ($gr['error'] ?? 'Google 检索失败'),
+                'data' => ['engine' => 'google_ps'],
+            ]);
+        }
+
+        $hits = $gr['items'] ?? [];
+        $low = !empty($gr['low_confidence']);
+        $bestScore = (float) ($gr['best_score'] ?? 0);
+
+        $items = [];
+        foreach ($hits as $h) {
+            $code = (string) ($h['product_code'] ?? '');
+            if ($code === '') {
+                continue;
+            }
+            $row = ItemModel::where('status', 1)->where('product_code', $code)->order('id', 'desc')->find();
+            $product = ProductModel::where('name', $code)->where('status', 1)->find();
+            if (!$product) {
+                $product = ProductModel::whereLike('name', '%' . $code . '%')->where('status', 1)->order('id', 'desc')->find();
+            }
+            $score = (float) ($h['score'] ?? 0);
+            if ($score > 1) {
+                $score = 1.0;
+            }
+            if ($score < 0) {
+                $score = 0.0;
+            }
+
+            $items[] = [
+                'product_code' => $code,
+                'image_ref' => $row ? (string) ($row->image_ref ?? '') : '',
+                'hot_type' => $row ? (string) ($row->hot_type ?? '') : '',
+                'similarity' => round($score, 4),
+                'score' => round($score, 4),
+                'product' => $product ? [
+                    'id' => (int) $product->id,
+                    'name' => (string) ($product->name ?? ''),
+                    'status' => (int) ($product->status ?? 0),
+                    'status_text' => ((int) ($product->status ?? 0)) === 1 ? '上架' : '停用',
+                    'goods_url' => (string) ($product->goods_url ?? ''),
+                ] : null,
+            ];
+        }
+
+        $msg = 'ok';
+        if ($items === []) {
+            $msg = '未检索到相似商品，请确认索引已导入且与 Product Set 一致';
+        } elseif ($low) {
+            $msg = '未找到完全匹配款式';
+        }
+
+        return $this->jsonOut([
+            'code' => 0,
+            'msg' => $msg,
+            'data' => [
+                'items' => $items,
+                'engine' => 'google_ps',
+                'num' => count($items),
+                'best_score' => round($bestScore, 4),
+                'low_confidence' => $low,
+            ],
         ]);
     }
 

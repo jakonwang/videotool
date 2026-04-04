@@ -80,6 +80,28 @@ class Settings extends BaseController
             }
             SystemConfigService::set('openai_describe_on_import', $this->request->post('openai_describe_on_import') === '1' ? '1' : '0');
 
+            SystemConfigService::set('google_ps_enabled', $this->request->post('google_ps_enabled') === '1' ? '1' : '0');
+            $gKey = trim((string) $this->request->post('google_ps_key_file', ''));
+            if ($gKey !== '') {
+                SystemConfigService::set('google_ps_key_file', $gKey);
+            } elseif ($this->request->post('google_ps_key_file_clear') === '1') {
+                SystemConfigService::set('google_ps_key_file', '');
+            }
+            foreach (
+                [
+                    'google_ps_project_id',
+                    'google_ps_location',
+                    'google_ps_product_set_id',
+                    'google_ps_gcs_bucket',
+                    'google_ps_gcs_prefix',
+                    'google_ps_product_category',
+                    'google_ps_match_score_min',
+                    'google_ps_search_top_k',
+                ] as $gk
+            ) {
+                SystemConfigService::set($gk, trim((string) $this->request->post($gk, '')));
+            }
+
             SystemConfigService::clearCache();
 
             return json(['code' => 0, 'msg' => '已保存']);
@@ -109,6 +131,17 @@ class Settings extends BaseController
         $openaiMaxCatalog = SystemConfigService::get('openai_max_catalog', '') ?? '';
         $openaiDescribeFlag = SystemConfigService::get('openai_describe_on_import', '');
         $openaiDescribeOnImport = $openaiDescribeFlag === '' || $openaiDescribeFlag === '1';
+        $googlePsEnabled = SystemConfigService::get('google_ps_enabled', '0') === '1';
+        $googlePsKeyConfigured = trim((string) (SystemConfigService::get('google_ps_key_file', '') ?? '')) !== ''
+            || trim((string) (getenv('GOOGLE_APPLICATION_CREDENTIALS') ?: '')) !== '';
+        $googlePsProject = SystemConfigService::get('google_ps_project_id', '') ?? '';
+        $googlePsLocation = SystemConfigService::get('google_ps_location', '') ?? '';
+        $googlePsSetId = SystemConfigService::get('google_ps_product_set_id', '') ?? '';
+        $googlePsGcsBucket = SystemConfigService::get('google_ps_gcs_bucket', '') ?? '';
+        $googlePsGcsPrefix = SystemConfigService::get('google_ps_gcs_prefix', '') ?? '';
+        $googlePsCategory = SystemConfigService::get('google_ps_product_category', '') ?? '';
+        $googlePsScoreMin = SystemConfigService::get('google_ps_match_score_min', '') ?? '';
+        $googlePsTopK = SystemConfigService::get('google_ps_search_top_k', '') ?? '';
         $qiniuEffective = QiniuService::getMergedQiniuConfig();
         $qiniuEffectiveCdnLabel = '';
         if (!empty($qiniuEffective['cdn_domains']) && is_array($qiniuEffective['cdn_domains'])) {
@@ -140,6 +173,16 @@ class Settings extends BaseController
             'openai_model' => $openaiModel,
             'openai_max_catalog' => $openaiMaxCatalog,
             'openai_describe_on_import' => $openaiDescribeOnImport,
+            'google_ps_enabled' => $googlePsEnabled,
+            'google_ps_key_configured' => $googlePsKeyConfigured,
+            'google_ps_project_id' => $googlePsProject,
+            'google_ps_location' => $googlePsLocation,
+            'google_ps_product_set_id' => $googlePsSetId,
+            'google_ps_gcs_bucket' => $googlePsGcsBucket,
+            'google_ps_gcs_prefix' => $googlePsGcsPrefix,
+            'google_ps_product_category' => $googlePsCategory,
+            'google_ps_match_score_min' => $googlePsScoreMin,
+            'google_ps_search_top_k' => $googlePsTopK,
         ]);
     }
 }

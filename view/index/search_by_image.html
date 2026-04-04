@@ -16,7 +16,7 @@
 <div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col pb-10">
   <header class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3">
     <h1 class="text-lg font-bold text-slate-900">拍照寻款</h1>
-    <p class="text-xs text-slate-500 mt-0.5">拍摄实物或上传图片，OpenAI Vision 语义匹配库内款式（或阿里云图搜备选）</p>
+    <p class="text-xs text-slate-500 mt-0.5">拍摄实物或上传图片；后台启用 Google 时优先商品图搜，否则 OpenAI Vision 或阿里云图搜</p>
   </header>
 
   <main class="flex-1 px-4 pt-4 space-y-4">
@@ -49,7 +49,7 @@
       <div class="skeleton h-8 rounded-lg w-2/3"></div>
       <div class="skeleton h-24 rounded-xl"></div>
       <div class="skeleton h-8 rounded-lg"></div>
-      <p class="text-center text-xs text-slate-500">正在识图匹配…</p>
+      <p class="text-center text-xs text-slate-500">AI 正在比对款式…</p>
     </section>
 
     <section v-if="!loading && codeResults.length" class="space-y-2">
@@ -113,10 +113,12 @@ createApp({
     let stream = null;
 
     const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
-    const MAX_EDGE = 1600;
+    /** 寻款上传：Google 建议约 640 边长，兼顾流量与速度 */
+    const SEARCH_MAX_EDGE = 640;
 
     /** 上传前压缩：限制长边与体积，减轻网络延迟 */
-    function compressImageBlob(blob) {
+    function compressImageBlob(blob, maxEdge) {
+      const cap = typeof maxEdge === 'number' && maxEdge > 0 ? maxEdge : SEARCH_MAX_EDGE;
       return new Promise((resolve) => {
         if (!blob || !blob.type || !blob.type.startsWith('image/')) {
           resolve(blob);
@@ -132,7 +134,7 @@ createApp({
             resolve(blob);
             return;
           }
-          const scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+          const scale = Math.min(1, cap / Math.max(w, h));
           w = Math.round(w * scale);
           h = Math.round(h * scale);
           const c = document.createElement('canvas');
@@ -201,7 +203,7 @@ createApp({
       codeResults.value = [];
       loading.value = true;
       try {
-        const toSend = await compressImageBlob(blob);
+        const toSend = await compressImageBlob(blob, SEARCH_MAX_EDGE);
         const fd = new FormData();
         fd.append('file', toSend, 'query.jpg');
         const res = await fetch('/index.php/api/product_search/searchByImage', {
@@ -222,7 +224,11 @@ createApp({
           throw new Error((json && json.msg) || '搜索失败');
         }
         imgResults.value = (json.data && json.data.items) ? json.data.items : [];
-        if (!imgResults.value.length) errMsg.value = '未找到相似款式，请靠近拍摄、减少背景并保持光线充足';
+        if (json.data && json.data.low_confidence) {
+          errMsg.value = (json.msg && json.msg !== 'ok') ? json.msg : '未找到完全匹配款式';
+        } else if (!imgResults.value.length) {
+          errMsg.value = (json.msg && json.msg !== 'ok') ? json.msg : '未找到相似款式，请靠近拍摄、减少背景并保持光线充足';
+        }
       } catch (e) {
         errMsg.value = e.message || '请求失败';
         imgResults.value = [];
