@@ -393,7 +393,7 @@
 - **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**，要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等，见 Composer 安装提示）。部署后务必执行 `composer update` 安装/更新依赖。
 - 依赖：在项目根执行 `pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）；建议用与 Web 将调用的同一解释器，例如 `py -3 -m pip install -r tools/product_style_search/requirements.txt`（Windows）或 `python3 -m pip ...`（Linux）。
 - 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
-- 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组；若 `php.ini` 中 `disable_functions` 含 `exec`，PHP 无法调用脚本。
+- 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组。`ProductStyleEmbeddingService` 会依次尝试 **`exec` → `proc_open` → `shell_exec`** 拉取子进程输出；若 `php.ini` 的 **`disable_functions` 把三者都禁用**，则无法从 PHP 调 Python，需在配置中**至少放行其一**（常见仅禁用 `exec` 时，`proc_open` 仍可用）。
 - 说明：`tools/product_style_search/README.md`
 
 ### 后台路由（`admin.php`，需登录）

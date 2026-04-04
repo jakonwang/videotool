@@ -48,23 +48,65 @@ class ProductStyleEmbeddingService
 
             return null;
         }
-        $cmd = self::buildEmbedCommand($script, $absolutePath) . ' 2>&1';
-        $out = [];
-        $code = 0;
-        \exec($cmd, $out, $code);
-        $raw = trim(implode("\n", $out));
-        self::$lastRawOutput = strlen($raw) > 4000 ? substr($raw, -4000) : $raw;
+        $baseCmd = self::buildEmbedCommand($script, $absolutePath);
+        $raw = self::runShellCapture($baseCmd);
+        self::$lastRawOutput = \strlen($raw) > 4000 ? \substr($raw, -4000) : $raw;
         if ($raw === '') {
-            Log::error('embed 无输出: ' . $cmd);
+            Log::error('embed 无输出（请检查 php.ini 是否禁用 exec/proc_open/shell_exec，或 Python 命令是否可用）: ' . $baseCmd);
 
             return null;
         }
         $vec = self::parseEmbedJsonLines($raw);
         if ($vec === null) {
-            Log::error('embed JSON 无效: ' . substr($raw, 0, 800));
+            Log::error('embed JSON 无效: ' . \substr($raw, 0, 800));
         }
 
         return $vec;
+    }
+
+    /**
+     * 执行子进程并合并 stdout/stderr。优先 exec；若被 disable_functions 禁用则依次尝试 proc_open、shell_exec。
+     */
+    private static function runShellCapture(string $baseCmd): string
+    {
+        $merged = $baseCmd . ' 2>&1';
+        if (\function_exists('exec')) {
+            $out = [];
+            $code = 0;
+            @\exec($merged, $out, $code);
+
+            return \trim(\implode("\n", $out));
+        }
+        if (\function_exists('proc_open')) {
+            $spec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $proc = @\proc_open($baseCmd, $spec, $pipes, null, null);
+            if (\is_resource($proc)) {
+                \fclose($pipes[0]);
+                $stdout = (string) \stream_get_contents($pipes[1]);
+                \fclose($pipes[1]);
+                $stderr = (string) \stream_get_contents($pipes[2]);
+                \fclose($pipes[2]);
+                \proc_close($proc);
+                $combined = $stdout;
+                if ($stderr !== '') {
+                    $combined .= ($stdout !== '' ? "\n" : '') . $stderr;
+                }
+
+                return \trim($combined);
+            }
+        }
+        if (\function_exists('shell_exec')) {
+            $r = @\shell_exec($merged);
+
+            return \trim((string) $r);
+        }
+        Log::error('embed 无法执行子进程：exec、proc_open、shell_exec 均不可用（可能被 php.ini 的 disable_functions 禁用）');
+
+        return '';
     }
 
     /**
@@ -84,8 +126,8 @@ class ProductStyleEmbeddingService
         if (PHP_OS_FAMILY === 'Windows') {
             return sprintf(
                 'py -3 %s %s',
-                escapeshellarg($script),
-                escapeshellarg($absolutePath)
+                \escapeshellarg($script),
+                \escapeshellarg($absolutePath)
             );
         }
 
