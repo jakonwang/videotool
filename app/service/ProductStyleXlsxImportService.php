@@ -79,7 +79,7 @@ class ProductStyleXlsxImportService
 
                 $n = 0;
                 for ($r = 2; $r <= $highestRow; $r++) {
-                    $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r);
+                    $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path);
                     if ($rec !== null) {
                         $n++;
                     }
@@ -132,7 +132,7 @@ class ProductStyleXlsxImportService
             $imgCol = $headerMap['image'] + 1;
             $hotCol = isset($headerMap['hot']) ? $headerMap['hot'] + 1 : null;
 
-            return self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $excelRow);
+            return self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $excelRow, $path);
         } finally {
             $spreadsheet->disconnectWorksheets();
         }
@@ -177,7 +177,7 @@ class ProductStyleXlsxImportService
             $hotCol = isset($headerMap['hot']) ? $headerMap['hot'] + 1 : null;
 
             for ($r = $startRow; $r <= $highestRow; $r++) {
-                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r);
+                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path);
                 if ($rec !== null) {
                     return ['rec' => $rec, 'next_line_idx' => $r + 1];
                 }
@@ -220,7 +220,7 @@ class ProductStyleXlsxImportService
 
             $highestRow = (int) $sheet->getHighestRow();
             for ($r = 2; $r <= $highestRow; $r++) {
-                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r);
+                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path);
                 if ($rec !== null) {
                     yield $rec;
                 }
@@ -240,7 +240,8 @@ class ProductStyleXlsxImportService
         int $codeCol,
         int $imgCol,
         ?int $hotCol,
-        int $r
+        int $r,
+        ?string $sourceFilePath = null
     ): ?array {
         $code = \trim((string) $sheet->getCell(self::cellAddr($codeCol, $r))->getFormattedValue());
         $imgRaw = \trim((string) $sheet->getCell(self::cellAddr($imgCol, $r))->getFormattedValue());
@@ -249,7 +250,7 @@ class ProductStyleXlsxImportService
             $hot = \trim((string) $sheet->getCell(self::cellAddr($hotCol, $r))->getFormattedValue());
         }
 
-        $imageTemp = self::resolveRowEmbeddedImage($sheet, $drawingsByCell, $imgCol, $r);
+        $imageTemp = self::resolveRowEmbeddedImage($sheet, $drawingsByCell, $imgCol, $r, $sourceFilePath);
 
         if ($code === '' && $imageTemp === null && $imgRaw === '') {
             return null;
@@ -269,7 +270,7 @@ class ProductStyleXlsxImportService
      *
      * @param array<string, SheetDrawing|MemoryDrawing> $drawingsByCell
      */
-    private static function resolveRowEmbeddedImage(Worksheet $sheet, array $drawingsByCell, int $imgCol, int $r): ?string
+    private static function resolveRowEmbeddedImage(Worksheet $sheet, array $drawingsByCell, int $imgCol, int $r, ?string $sourceFilePath = null): ?string
     {
         $tryCols = [$imgCol];
         for ($d = -2; $d <= 2; $d++) {
@@ -303,6 +304,19 @@ class ProductStyleXlsxImportService
             $val = $cell->getValue();
             if ($val instanceof BaseDrawing) {
                 $tmp = self::exportDrawingToTemp($val);
+                if ($tmp !== null) {
+                    return $tmp;
+                }
+            }
+        }
+
+        if ($sourceFilePath !== null && \is_file($sourceFilePath) && \is_readable($sourceFilePath)
+            && \preg_match('/\\.(xlsx|xlsm)$/i', $sourceFilePath) === 1) {
+            $real = \realpath($sourceFilePath);
+            $openPath = $real !== false ? $real : $sourceFilePath;
+            $title = $sheet->getTitle();
+            foreach ($tryCols as $col) {
+                $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageAtCell($openPath, $title, $col, $r);
                 if ($tmp !== null) {
                     return $tmp;
                 }

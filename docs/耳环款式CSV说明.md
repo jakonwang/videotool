@@ -14,4 +14,4 @@
 
 将保存的 `.csv` 在后台 **素材 → 寻款** 中上传导入。图片链接需部署环境可访问（本机路径请放在 `public` 下并用 `/` 开头的 Web 路径填写）。
 
-使用 **Excel .xlsx** 时，支持 **浮动插入图** 与 **「将图片放置在单元格中」**（Microsoft 365）；后者由 PhpSpreadsheet 读入为单元格内对象，后台导入已按单元格值解析，无需再改成「浮动」样式。
+使用 **Excel .xlsx** 时，支持 **浮动插入图**、**「将图片放置在单元格中」**（Microsoft 365）以及 **表格/List 内嵌图**。除 PhpSpreadsheet 外，后台对 **xlsx/xlsm** 还有 **直接解压按 OOXML 读 drawing+media** 的兜底，多数 WPS/Excel 嵌入场景可识别。

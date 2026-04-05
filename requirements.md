@@ -437,7 +437,7 @@
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
 - CSV 无数表头时按前两列为「编号、图片」解析；Excel 始终使用第一行为表头。
 - **CSV**：图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
-- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。**Microsoft 365 / Excel「将图片放置在单元格中」**：PhpSpreadsheet 将图读为单元格值（`BaseDrawing`），导入逻辑会 **读取单元格 `getValue()`** 并导出，不再只依赖浮动 `DrawingCollection`。解析时会把 **oneCell / twoCell 锚点矩形** 覆盖到的单元格都映射到该图；并在「图片」列左右各 **2 列**内扫描单元格内图片，减轻表头列错位。 **zip://** 媒体在部分环境下 `fopen` 失败时会 **回退 `file_get_contents`** 读取。导入成功后嵌入图会**复制**到 `public/uploads/product_style/`，`image_ref` 存为站内路径（如 `/uploads/product_style/ps_xxx.jpg`），列表与 H5 可展示；若目录不可写则仍回退为占位文案「(Excel嵌入图)」。
+- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。**Microsoft 365 / Excel「将图片放置在单元格中」**：PhpSpreadsheet 将图读为单元格值（`BaseDrawing`），导入逻辑会 **读取单元格 `getValue()`** 并导出，不再只依赖浮动 `DrawingCollection`。解析时会把 **oneCell / twoCell 锚点矩形** 覆盖到的单元格都映射到该图；并在「图片」列左右各 **2 列**内扫描单元格内图片，减轻表头列错位。**ZIP/OOXML 兜底**（`ProductStyleXlsxZipEmbeddedImageService`）：若上述仍拿不到图，对 **`.xlsx`/`.xlsm`** 直接按 OOXML 解析 `xl/drawings/*.xml` 与 `xl/media/*`，按锚点匹配行列并解压图片到临时文件（**单工作表**且工作表未挂 `drawing` 关系时，会扫描全部 `drawing*.xml`）。 **zip://** 媒体在部分环境下 `fopen` 失败时会 **回退 `file_get_contents`** 读取。导入成功后嵌入图会**复制**到 `public/uploads/product_style/`，`image_ref` 存为站内路径（如 `/uploads/product_style/ps_xxx.jpg`），列表与 H5 可展示；若目录不可写则仍回退为占位文案「(Excel嵌入图)」。
 - **CSV/TXT**：**不支持**单元格嵌入图；有编号但图片列为空时任务日志会提示改用 **xlsx** 或填链接/Base64。
 - 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`（文档面向饰品全品类，表名历史原因保留「耳环」）。
 
