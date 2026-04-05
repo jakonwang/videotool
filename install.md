@@ -115,7 +115,7 @@ mysql -u root -p videotool < database/schema.sql
 
 **寻款 CSV 异步导入任务表：** 后台 **CSV/TXT** 导入会创建 `product_style_import_tasks` 任务并轮询 `importTaskTick`。新环境或旧库升级请执行：`php database/run_migration_product_style_import_tasks.php`（Windows：`php database\run_migration_product_style_import_tasks.php`）。详见 `requirements.md`。
 
-**寻款拍照 / 导入描述（豆包，必选能力）：** 无需额外 Composer 包，使用 Guzzle 调方舟 OpenAPI。环境变量示例：`VOLC_ACCESS_KEY`（方舟 **API Key**，Bearer）、`VOLC_ENDPOINT_ID`（接入点 **ep-** ID）、`VOLC_ARK_BASE_URL`（默认 `https://ark.cn-beijing.volces.com/api/v3`）。后台 **设置 → 豆包视觉** 填写并启用。调用后可在 **`runtime/log`** 检索 **`[volc_ark] 豆包`** 确认是否请求成功；详见 `requirements.md`。
+**寻款拍照 / 导入描述（豆包，必选能力）：** 无需额外 Composer 包，使用 Guzzle 调方舟 **Chat Completions**（`/chat/completions`），与官方 SDK 示例里的 **`multimodal_embeddings`（向量）** 不是同一路径。环境变量示例：`VOLC_ACCESS_KEY`（方舟 **API Key**，Bearer）、`VOLC_ENDPOINT_ID`（**对话类多模态**推理接入点 **ep-** ID）、`VOLC_ARK_BASE_URL`（默认 `https://ark.cn-beijing.volces.com/api/v3`）。后台 **设置 → 豆包视觉** 填写并启用。调用后可在 **`runtime/log`** 检索 **`[volc_ark] 豆包`** 确认是否请求成功；失败时日志含 **`ark_error`**；详见 `requirements.md`。
 
 **历史：Google / 阿里云图搜：** `composer install` 仍可能安装相关包。**异步导入已不再**调用 Google 索引与阿里云入队；如需清理旧队列数据可直连数据库。**后台设置页已仅保留豆包**，详见 `requirements.md`。
 

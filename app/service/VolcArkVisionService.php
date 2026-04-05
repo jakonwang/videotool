@@ -254,10 +254,12 @@ TXT;
             $code = $res->getStatusCode();
             $raw = (string) $res->getBody();
             if ($code < 200 || $code >= 300) {
+                $arkErr = self::parseArkErrorMessage($raw);
                 Log::warning('[volc_ark] 豆包 HTTP 失败', [
                     'purpose' => $purpose,
                     'endpoint_id' => $endpointId,
                     'http' => $code,
+                    'ark_error' => $arkErr,
                     'body_snip' => mb_substr($raw, 0, 600),
                 ]);
 
@@ -287,6 +289,37 @@ TXT;
 
             return null;
         }
+    }
+
+    /**
+     * 方舟错误体常见格式：{"error":{"message":"...","code":"..."}} 或顶层 message。
+     */
+    private static function parseArkErrorMessage(string $raw): ?string
+    {
+        $dec = json_decode($raw, true);
+        if (!is_array($dec)) {
+            return null;
+        }
+        $err = $dec['error'] ?? null;
+        if (is_array($err)) {
+            $msg = isset($err['message']) ? trim((string) $err['message']) : '';
+            $c = isset($err['code']) ? trim((string) $err['code']) : '';
+            if ($msg === '' && $c === '') {
+                return null;
+            }
+            if ($c !== '' && $msg !== '') {
+                return $msg . ' [' . $c . ']';
+            }
+
+            return $msg !== '' ? $msg : $c;
+        }
+        if (isset($dec['message']) && is_string($dec['message'])) {
+            $m = trim($dec['message']);
+
+            return $m !== '' ? $m : null;
+        }
+
+        return null;
     }
 
     private static function parseChatCompletionText(?string $raw): ?string
