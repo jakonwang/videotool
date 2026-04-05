@@ -437,7 +437,8 @@
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
 - CSV 无数表头时按前两列为「编号、图片」解析；Excel 始终使用第一行为表头。
 - **CSV**：图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
-- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。导入成功后嵌入图会**复制**到 `public/uploads/product_style/`，`image_ref` 存为站内路径（如 `/uploads/product_style/ps_xxx.jpg`），列表与 H5 可展示；若目录不可写则仍回退为占位文案「(Excel嵌入图)」。
+- **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。解析时会把 **oneCell / twoCell 锚点矩形** 覆盖到的单元格都映射到该图（大图跨多格时也能命中「图片」列所在格）。**zip://** 媒体在部分环境下 `fopen` 失败时会 **回退 `file_get_contents`** 读取。导入成功后嵌入图会**复制**到 `public/uploads/product_style/`，`image_ref` 存为站内路径（如 `/uploads/product_style/ps_xxx.jpg`），列表与 H5 可展示；若目录不可写则仍回退为占位文案「(Excel嵌入图)」。
+- **CSV/TXT**：**不支持**单元格嵌入图；有编号但图片列为空时任务日志会提示改用 **xlsx** 或填链接/Base64。
 - 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`（文档面向饰品全品类，表名历史原因保留「耳环」）。
 
 ### 已适配页面

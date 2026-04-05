@@ -324,7 +324,9 @@ class ProductStyleImportTaskRunner
             $code = \trim((string) $row[$ci]);
             $imgRaw = (string) $row[$ii];
             $hot = $hi !== null && isset($row[$hi]) ? \trim((string) $row[$hi]) : '';
-            if ($code === '' || $imgRaw === '') {
+            $rowLabel = $lineIdx + 1;
+
+            if ($code === '' && \trim($imgRaw) === '') {
                 $task->line_idx = $lineIdx + 1;
                 $task->save();
                 $skipped++;
@@ -332,7 +334,24 @@ class ProductStyleImportTaskRunner
                 continue;
             }
 
-            $rowLabel = $lineIdx + 1;
+            if ($code !== '' && \trim($imgRaw) === '') {
+                $task->failed_count = (int) $task->failed_count + 1;
+                $task->processed_rows = (int) $task->processed_rows + 1;
+                $task->line_idx = $lineIdx + 1;
+                $task->save();
+                self::appendLog($task, '第' . $rowLabel . '行：有编号但图片列为空。**CSV/TXT 无法保存 Excel 单元格嵌入图**，请改用 **.xlsx/.xls/.xlsm** 上传，或在「图片」列填写 **http(s) 链接**、**站内路径**或 **Base64**。');
+
+                return self::formatSnapshot($task);
+            }
+
+            if ($code === '') {
+                $task->line_idx = $lineIdx + 1;
+                $task->save();
+                $skipped++;
+
+                continue;
+            }
+
             $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
             if (!$resolved['ok'] || $resolved['temp'] === '') {
                 $task->failed_count = (int) $task->failed_count + 1;

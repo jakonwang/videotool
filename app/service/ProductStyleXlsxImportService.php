@@ -5,6 +5,7 @@ namespace app\service;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Worksheet\BaseDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing as SheetDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -274,35 +275,118 @@ class ProductStyleXlsxImportService
     }
 
     /**
+     * 将每个嵌入图映射到其锚点矩形覆盖的所有单元格（含 twoCellAnchor），避免图跨多格时仅顶格可命中。
+     *
      * @return array<string, SheetDrawing|MemoryDrawing>
      */
     private static function indexDrawingsByCell(Worksheet $sheet): array
     {
         $map = [];
-        $add = static function ($drawing) use (&$map): void {
-            $coord = self::normalizeCellAddress($drawing->getCoordinates());
-            if ($coord === '' || isset($map[$coord])) {
-                return;
+        $seen = [];
+        foreach (self::collectAllDrawings($sheet) as $drawing) {
+            $id = \spl_object_id($drawing);
+            if (isset($seen[$id])) {
+                continue;
             }
-            $map[$coord] = $drawing;
-        };
-        if (\method_exists($sheet, 'getInCellDrawingCollection')) {
-            foreach ($sheet->getInCellDrawingCollection() as $drawing) {
-                $add($drawing);
-            }
-        }
-        foreach ($sheet->getDrawingCollection() as $drawing) {
-            $add($drawing);
+            $seen[$id] = true;
+            self::mapDrawingToCellRange($drawing, $map);
         }
 
         return $map;
     }
 
-    private static function normalizeCellAddress(string $coord): string
+    /**
+     * @return list<BaseDrawing>
+     */
+    private static function collectAllDrawings(Worksheet $sheet): array
     {
-        $coord = \str_replace('$', '', \trim($coord));
+        $list = [];
+        if (\method_exists($sheet, 'getInCellDrawingCollection')) {
+            foreach ($sheet->getInCellDrawingCollection() as $drawing) {
+                $list[] = $drawing;
+            }
+        }
+        foreach ($sheet->getDrawingCollection() as $drawing) {
+            $list[] = $drawing;
+        }
 
-        return \strtoupper($coord);
+        return $list;
+    }
+
+    /**
+     * @param array<string, SheetDrawing|MemoryDrawing> $map
+     */
+    private static function mapDrawingToCellRange(BaseDrawing $drawing, array &$map): void
+    {
+        $coordStr = \trim($drawing->getCoordinates());
+        if ($coordStr === '') {
+            return;
+        }
+        try {
+            $from = Coordinate::indexesFromString($coordStr);
+        } catch (\Throwable $e) {
+            return;
+        }
+        $fromCol = (int) $from[0];
+        $fromRow = (int) $from[1];
+        $toCoord = \trim((string) $drawing->getCoordinates2());
+        if ($toCoord === '') {
+            $toCol = $fromCol;
+            $toRow = $fromRow;
+        } else {
+            try {
+                $to = Coordinate::indexesFromString($toCoord);
+                $toCol = (int) $to[0];
+                $toRow = (int) $to[1];
+            } catch (\Throwable $e) {
+                $toCol = $fromCol;
+                $toRow = $fromRow;
+            }
+        }
+        $minCol = \min($fromCol, $toCol);
+        $maxCol = \max($fromCol, $toCol);
+        $minRow = \min($fromRow, $toRow);
+        $maxRow = \max($fromRow, $toRow);
+        /** @var int $maxSpan 防止异常锚点导致巨量循环 */
+        $maxSpan = 200;
+        if (($maxCol - $minCol + 1) * ($maxRow - $minRow + 1) > 2000) {
+            $maxCol = \min($maxCol, $minCol + $maxSpan - 1);
+            $maxRow = \min($maxRow, $minRow + $maxSpan - 1);
+        }
+        for ($rr = $minRow; $rr <= $maxRow; $rr++) {
+            for ($cc = $minCol; $cc <= $maxCol; $cc++) {
+                $addr = \strtoupper(Coordinate::stringFromColumnIndex($cc) . $rr);
+                if (!isset($map[$addr])) {
+                    $map[$addr] = $drawing;
+                }
+            }
+        }
+    }
+
+    /**
+     * 读取 SheetDrawing 路径（含 zip://、data:URL），兼容 Windows 下 fopen 失败的情况。
+     */
+    private static function readDrawingPathBinary(string $path): ?string
+    {
+        if ($path === '') {
+            return null;
+        }
+        if (\preg_match('#^data:image/#', $path) === 1) {
+            $raw = @\file_get_contents($path);
+
+            return ($raw !== false && $raw !== '') ? $raw : null;
+        }
+        $in = @\fopen($path, 'rb');
+        if ($in !== false) {
+            $data = \stream_get_contents($in);
+            \fclose($in);
+            if ($data !== false && $data !== '') {
+                return $data;
+            }
+        }
+        $raw = @\file_get_contents($path);
+
+        return ($raw !== false && $raw !== '') ? $raw : null;
     }
 
     /**
@@ -338,13 +422,8 @@ class ProductStyleXlsxImportService
             if ($path === '') {
                 return null;
             }
-            $in = @\fopen($path, 'rb');
-            if ($in === false) {
-                return null;
-            }
-            $data = \stream_get_contents($in);
-            \fclose($in);
-            if ($data === false || $data === '') {
+            $data = self::readDrawingPathBinary($path);
+            if ($data === null || $data === '') {
                 return null;
             }
             $ext = $drawing->getExtension();
