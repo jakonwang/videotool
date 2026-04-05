@@ -249,11 +249,7 @@ class ProductStyleXlsxImportService
             $hot = \trim((string) $sheet->getCell(self::cellAddr($hotCol, $r))->getFormattedValue());
         }
 
-        $imgCoord = \strtoupper(self::cellAddr($imgCol, $r));
-        $imageTemp = null;
-        if (isset($drawingsByCell[$imgCoord])) {
-            $imageTemp = self::exportDrawingToTemp($drawingsByCell[$imgCoord]);
-        }
+        $imageTemp = self::resolveRowEmbeddedImage($sheet, $drawingsByCell, $imgCol, $r);
 
         if ($code === '' && $imageTemp === null && $imgRaw === '') {
             return null;
@@ -266,6 +262,54 @@ class ProductStyleXlsxImportService
             'imageTemp' => $imageTemp,
             'imageRaw' => $imgRaw,
         ];
+    }
+
+    /**
+     * 解析本行嵌入图：浮动锚点映射 + **单元格内图片**（Office 365「放置在单元格中」时值为 {@see BaseDrawing}）+ 同行左右各 2 列兜底。
+     *
+     * @param array<string, SheetDrawing|MemoryDrawing> $drawingsByCell
+     */
+    private static function resolveRowEmbeddedImage(Worksheet $sheet, array $drawingsByCell, int $imgCol, int $r): ?string
+    {
+        $tryCols = [$imgCol];
+        for ($d = -2; $d <= 2; $d++) {
+            if ($d === 0) {
+                continue;
+            }
+            $c = $imgCol + $d;
+            if ($c >= 1) {
+                $tryCols[] = $c;
+            }
+        }
+        $tryCols = \array_values(\array_unique($tryCols));
+
+        foreach ($tryCols as $col) {
+            $coord = \strtoupper(self::cellAddr($col, $r));
+            if (isset($drawingsByCell[$coord])) {
+                $tmp = self::exportDrawingToTemp($drawingsByCell[$coord]);
+                if ($tmp !== null) {
+                    return $tmp;
+                }
+            }
+        }
+
+        foreach ($tryCols as $col) {
+            $coord = self::cellAddr($col, $r);
+            try {
+                $cell = $sheet->getCell($coord);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $val = $cell->getValue();
+            if ($val instanceof BaseDrawing) {
+                $tmp = self::exportDrawingToTemp($val);
+                if ($tmp !== null) {
+                    return $tmp;
+                }
+            }
+        }
+
+        return null;
     }
 
     /** @param positive-int $col 1-based 列号（A=1） */
@@ -390,7 +434,7 @@ class ProductStyleXlsxImportService
     }
 
     /**
-     * @param SheetDrawing|MemoryDrawing $drawing
+     * @param BaseDrawing|MemoryDrawing|SheetDrawing $drawing 含 Office「单元格内图片」绑定的 Drawing
      */
     private static function exportDrawingToTemp($drawing): ?string
     {
