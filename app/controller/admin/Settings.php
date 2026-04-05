@@ -69,6 +69,7 @@ class Settings extends BaseController
             }
             foreach (
                 [
+                    'volc_ark_model_id',
                     'volc_ark_endpoint_id',
                     'volc_ark_base_url',
                     'volc_ark_max_catalog',
@@ -100,6 +101,7 @@ class Settings extends BaseController
             || trim((string) (SystemConfigService::get('volc_ark_secret_key', '') ?? '')) !== ''
             || trim((string) (getenv('VOLC_SECRET_KEY') ?: '')) !== '';
         $volcArkSecretConfigured = trim((string) (SystemConfigService::get('volc_ark_secret_key', '') ?? '')) !== '';
+        $volcArkModelId = SystemConfigService::get('volc_ark_model_id', '') ?? '';
         $volcArkEndpoint = SystemConfigService::get('volc_ark_endpoint_id', '') ?? '';
         $volcArkBaseUrl = SystemConfigService::get('volc_ark_base_url', '') ?? '';
         $volcArkMaxCatalog = SystemConfigService::get('volc_ark_max_catalog', '') ?? '';
@@ -125,6 +127,7 @@ class Settings extends BaseController
             'volc_ark_enabled' => $volcArkEnabled,
             'volc_ark_access_configured' => $volcArkAccessConfigured,
             'volc_ark_secret_configured' => $volcArkSecretConfigured,
+            'volc_ark_model_id' => $volcArkModelId,
             'volc_ark_endpoint_id' => $volcArkEndpoint,
             'volc_ark_base_url' => $volcArkBaseUrl,
             'volc_ark_max_catalog' => $volcArkMaxCatalog,

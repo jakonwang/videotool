@@ -25,7 +25,7 @@ class ProductStyleVisionDescribeService
     }
 
     /**
-     * 异步导入：豆包先试「指纹」短 Prompt；无正文时再试豆包全量描述。
+     * 异步导入：豆包 **单次** 请求生成描述（合并原指纹+全量两步，显著缩短每行等待时间）。
      */
     public static function describeForImport(string $absolutePath): ?string
     {
@@ -35,13 +35,9 @@ class ProductStyleVisionDescribeService
         if (!VolcArkVisionConfig::get()['enabled']) {
             return null;
         }
-        $d = VolcArkVisionService::describeImportFingerprintImage($absolutePath);
-        if ($d !== null && trim($d) !== '') {
-            return trim($d);
-        }
-        $d2 = VolcArkVisionService::describeEarringImage($absolutePath);
+        $d = VolcArkVisionService::describeImportSinglePassImage($absolutePath);
 
-        return $d2 !== null && trim($d2) !== '' ? trim($d2) : null;
+        return $d !== null && trim($d) !== '' ? trim($d) : null;
     }
 
     /**

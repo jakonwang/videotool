@@ -7,17 +7,18 @@ use think\facade\Config;
 
 /**
  * 火山引擎方舟（豆包视觉）：合并 config/services.php 与 system_settings。
- * 鉴权：方舟 OpenAPI 使用 Bearer Token，请将控制台「API Key」填入 access_key（对应 VOLC_ACCESS_KEY）；secret 预留。
+ * 鉴权：`Authorization: Bearer <API Key>`。请求体 `model`：优先 VOLC_ARK_MODEL / 后台「模型 ID」，否则 endpoint_id（ep-）。见官方快速入门文档。
  */
 class VolcArkVisionConfig
 {
     /**
-     * @return array{
-     *   enabled:bool,
-     *   access_key:string,
-     *   secret_key:string,
-     *   endpoint_id:string,
-     *   base_url:string,
+ * @return array{
+ *   enabled:bool,
+ *   access_key:string,
+ *   secret_key:string,
+ *   model:string,
+ *   endpoint_id:string,
+ *   base_url:string,
      *   max_catalog_items:int,
      *   timeout_seconds:int,
      *   match_max_tokens:int,
@@ -45,6 +46,11 @@ class VolcArkVisionConfig
         if ($ep === '') {
             $ep = trim((string) (getenv('VOLC_ENDPOINT_ID') ?: ''));
         }
+        /** 与官方「快速入门」一致：chat/completions 的 model 填模型列表中的 Model ID；亦支持推理接入点 ep-。优先级：环境变量 VOLC_ARK_MODEL → 后台模型 ID → endpoint_id */
+        $modelFromDb = trim((string) SystemConfigService::get('volc_ark_model_id', '') ?: '');
+        $modelFromBase = trim((string) ($base['model_id'] ?? ''));
+        $modelFromEnv = trim((string) (getenv('VOLC_ARK_MODEL') ?: ''));
+        $model = $modelFromEnv !== '' ? $modelFromEnv : ($modelFromDb !== '' ? $modelFromDb : ($modelFromBase !== '' ? $modelFromBase : $ep));
         $url = trim((string) SystemConfigService::get('volc_ark_base_url', '') ?: ($base['base_url'] ?? ''));
         if ($url === '') {
             $url = trim((string) (getenv('VOLC_ARK_BASE_URL') ?: ''));
@@ -104,12 +110,13 @@ class VolcArkVisionConfig
             }
         }
 
-        $enabled = $enabledFlag === '1' && $bearer !== '' && $ep !== '';
+        $enabled = $enabledFlag === '1' && $bearer !== '' && $model !== '';
 
         return [
             'enabled' => $enabled,
             'access_key' => $bearer,
             'secret_key' => $sk,
+            'model' => $model,
             'endpoint_id' => $ep,
             'base_url' => $url,
             'max_catalog_items' => $maxCatalog,

@@ -265,7 +265,7 @@ class ProductStyleImportTaskRunner
         $hi = $headerMap['hot'] ?? null;
 
         $visionOn = ProductStyleVisionDescribeService::shouldDescribeOnImport();
-        $usleepMicro = (int) (Config::get('product_search.import_ai_usleep_microseconds') ?? 200000);
+        $usleepMicro = (int) (Config::get('product_search.import_ai_usleep_microseconds') ?? 0);
         if ($usleepMicro < 0) {
             $usleepMicro = 0;
         }
@@ -365,7 +365,7 @@ class ProductStyleImportTaskRunner
                     if ($aiDesc !== null && $aiDesc !== '') {
                         $task->vision_described_count = (int) $task->vision_described_count + 1;
                     } else {
-                        self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请在设置中启用豆包并填写 Endpoint+API Key；若已配置仍为空请查看 runtime/log 中 [volc_ark] 豆包 相关日志');
+                        self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请确认豆包已启用且已保存；查看 runtime/log 中 [volc_ark] 的 ark_error/body_snip；或命令行执行 php scripts/volc_ark_ping.php 做文本连通性测试');
                     }
                 } catch (\Throwable $e) {
                     Log::warning('import AI describe: ' . $e->getMessage());
@@ -477,7 +477,7 @@ class ProductStyleImportTaskRunner
                 if ($aiDesc !== null && $aiDesc !== '') {
                     $task->vision_described_count = (int) $task->vision_described_count + 1;
                 } else {
-                    self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请在设置中启用豆包并填写 Endpoint+API Key；若已配置仍为空请查看 runtime/log 中 [volc_ark] 豆包 相关日志');
+                    self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请确认豆包已启用且已保存；查看 runtime/log 中 [volc_ark] 的 ark_error/body_snip；或命令行执行 php scripts/volc_ark_ping.php 做文本连通性测试');
                 }
             } catch (\Throwable $e) {
                 Log::warning('import AI describe: ' . $e->getMessage());
@@ -555,7 +555,7 @@ class ProductStyleImportTaskRunner
         $highestRow = (int) ($meta['highest_row'] ?? 1);
 
         $visionOn = ProductStyleVisionDescribeService::shouldDescribeOnImport();
-        $usleepMicro = (int) (Config::get('product_search.import_ai_usleep_microseconds') ?? 200000);
+        $usleepMicro = (int) (Config::get('product_search.import_ai_usleep_microseconds') ?? 0);
         if ($usleepMicro < 0) {
             $usleepMicro = 0;
         }

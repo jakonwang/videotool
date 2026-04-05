@@ -472,7 +472,7 @@
             <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">诊断：{{ pythonDiag }}</div>
           </div>
           <div>支持 <strong>CSV / TXT / Excel（.xlsx、.xls）</strong>，均为<strong>异步导入</strong>（上传后立即返回 <code>task_id</code>，每约 2 秒推进一行，避免网关 502）。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。Excel 每步会加载工作簿，超大表请拆文件或改 CSV。异步 tick 依赖 PHP-FPM，请保证 <code>request_terminate_timeout</code> 足够大（见文档）。</div>
-          <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">已启用 <strong>豆包视觉</strong>：拍照寻款与（可选）导入描述走火山方舟；请在 <strong>设置</strong> 维护 Endpoint 与 API Key。服务端日志可搜 <code>[volc_ark] 豆包</code> 确认是否发起请求。</div>
+          <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">已启用 <strong>豆包视觉</strong>：拍照寻款与（可选）导入描述走火山方舟；请在 <strong>设置</strong> 维护 API Key 与 model（模型 ID 或 ep-）。服务端日志可搜 <code>[volc_ark]</code>。</div>
           <div v-if="visionDescribeOnImport && !visionAnyProviderReady" style="margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;line-height:1.55;">
             <strong>无法调用豆包：</strong>已勾选「导入时生成描述」，但当前<strong>未在设置中启用豆包或未填写 Endpoint + API Key</strong>。导入仍会建向量，但 <strong>AI 特征列为空</strong>。请到 <strong>系统 → 设置</strong> 完成豆包配置。
           </div>
