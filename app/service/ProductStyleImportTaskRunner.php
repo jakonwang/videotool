@@ -375,138 +375,131 @@ class ProductStyleImportTaskRunner
             $usleepMicro = 0;
         }
 
-        $skipped = 0;
-        while ($skipped < self::MAX_SKIP_EMPTY) {
-            if ((int) $task->inserted_count + (int) $task->updated_count >= self::MAX_SUCCESS_ROWS) {
-                self::appendLog($task, '已达单任务成功条数上限 ' . self::MAX_SUCCESS_ROWS . '，已结束');
-                self::finalizeCompleted($task);
+        if ((int) $task->inserted_count + (int) $task->updated_count >= self::MAX_SUCCESS_ROWS) {
+            self::appendLog($task, '已达单任务成功条数上限 ' . self::MAX_SUCCESS_ROWS . '，已结束');
+            self::finalizeCompleted($task);
 
-                return self::formatSnapshot($task);
-            }
+            return self::formatSnapshot($task);
+        }
 
-            $lineIdx = (int) $task->line_idx;
-            if ($lineIdx > $highestRow) {
-                self::finalizeCompleted($task);
+        $lineStart = (int) $task->line_idx;
+        if ($lineStart > $highestRow) {
+            self::finalizeCompleted($task);
 
-                return self::formatSnapshot($task);
-            }
+            return self::formatSnapshot($task);
+        }
 
-            $rec = ProductStyleXlsxImportService::readDataRowAt($absPath, $lineIdx);
-            $task->line_idx = $lineIdx + 1;
-            $task->save();
+        $pack = ProductStyleXlsxImportService::readNextSubstantiveRowSingleLoad($absPath, $lineStart, $highestRow);
+        $task->line_idx = $pack['next_line_idx'];
+        $task->save();
 
-            if ($rec === null) {
-                $skipped++;
+        if ($pack['rec'] === null) {
+            self::finalizeCompleted($task);
 
-                continue;
-            }
+            return self::formatSnapshot($task);
+        }
 
-            $rowIndex = (int) $rec['row'];
-            $code = $rec['code'];
-            $imgTemp = $rec['imageTemp'];
-            $imgRaw = $rec['imageRaw'];
-            $hot = $rec['hot'];
+        $rec = $pack['rec'];
+        self::appendLog($task, '[' . \date('H:i:s') . '] 开始处理第 ' . (int) $rec['row'] . ' 行（本地向量' . ($visionOn ? ' + 豆包' : '') . '，请稍候）');
 
-            if ($code === '') {
-                self::bumpExcelProcessedRows($task);
+        $rowIndex = (int) $rec['row'];
+        $code = $rec['code'];
+        $imgTemp = $rec['imageTemp'];
+        $imgRaw = $rec['imageRaw'];
+        $hot = $rec['hot'];
 
-                return self::formatSnapshot($task);
-            }
-
-            if (($imgTemp === null || !\is_file($imgTemp) || !\is_readable($imgTemp)) && \trim($imgRaw) === '') {
-                $task->failed_count = (int) $task->failed_count + 1;
-                $task->save();
-                self::appendLog($task, '第' . $rowIndex . '行：图片列为空且无嵌入图');
-                self::bumpExcelProcessedRows($task);
-
-                return self::formatSnapshot($task);
-            }
-
-            $excelEmbedSource = null;
-            if ($imgTemp !== null && \is_file($imgTemp) && \is_readable($imgTemp)) {
-                $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
-                $excelEmbedSource = $imgTemp;
-            } else {
-                $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
-            }
-            if (!$resolved['ok'] || $resolved['temp'] === '') {
-                $task->failed_count = (int) $task->failed_count + 1;
-                $task->save();
-                self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）图片无法解析');
-                self::bumpExcelProcessedRows($task);
-
-                return self::formatSnapshot($task);
-            }
-
-            $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
-            if (!\is_array($vec)) {
-                if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
-                    @\unlink($resolved['temp']);
-                }
-                $task->failed_count = (int) $task->failed_count + 1;
-                $task->save();
-                self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）特征提取失败');
-                self::bumpExcelProcessedRows($task);
-
-                return self::formatSnapshot($task);
-            }
-
-            $imageRef = $resolved['ref'];
-            if ($excelEmbedSource !== null && \is_file($excelEmbedSource)) {
-                $saved = ProductStyleImportService::persistStyleImageToPublic($excelEmbedSource, $publicRoot);
-                if ($saved !== null) {
-                    $imageRef = $saved;
-                }
-            }
-
-            $aiDesc = null;
-            if ($visionOn) {
-                try {
-                    $aiDesc = ProductStyleVisionDescribeService::describeForImport($resolved['temp']);
-                    if ($aiDesc !== null && $aiDesc !== '') {
-                        $task->vision_described_count = (int) $task->vision_described_count + 1;
-                    } else {
-                        self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请在设置中启用豆包并填写 Endpoint+API Key；若已配置仍为空请查看 runtime/log 中 [volc_ark] 豆包 相关日志');
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('import AI describe: ' . $e->getMessage());
-                    self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' AI 异常（已跳过描述）：' . \mb_substr($e->getMessage(), 0, 80));
-                }
-                if ($usleepMicro > 0) {
-                    \usleep($usleepMicro);
-                }
-            }
-
-            $u = ProductStyleIndexRowService::upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
-            ProductStyleIndexRowService::syncProductAiDescription($code, $aiDesc);
-            if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
-                @\unlink($resolved['temp']);
-            }
-
-            if ($u['inserted']) {
-                $task->inserted_count = (int) $task->inserted_count + 1;
-            } else {
-                $task->updated_count = (int) $task->updated_count + 1;
-            }
-            $task->save();
-
-            $st = $u['inserted'] ? '新增' : '更新';
-            $aiSt = ($visionOn && $aiDesc !== null && $aiDesc !== '') ? '，AI 描述已写入' : '';
-            self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）' . $st . '成功' . $aiSt);
-
-            if (((int) $task->inserted_count + (int) $task->updated_count) % 5 === 0) {
-                \gc_collect_cycles();
-            }
-
+        if ($code === '') {
             self::bumpExcelProcessedRows($task);
 
             return self::formatSnapshot($task);
         }
 
-        self::appendLog($task, 'Excel 连续空行过多，已中止');
-        $task->status = 'failed';
-        $task->error_message = '文件异常：空行过多';
+        if (($imgTemp === null || !\is_file($imgTemp) || !\is_readable($imgTemp)) && \trim($imgRaw) === '') {
+            $task->failed_count = (int) $task->failed_count + 1;
+            $task->save();
+            self::appendLog($task, '第' . $rowIndex . '行：图片列为空且无嵌入图');
+            self::bumpExcelProcessedRows($task);
+
+            return self::formatSnapshot($task);
+        }
+
+        $excelEmbedSource = null;
+        if ($imgTemp !== null && \is_file($imgTemp) && \is_readable($imgTemp)) {
+            $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
+            $excelEmbedSource = $imgTemp;
+        } else {
+            $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
+        }
+        if (!$resolved['ok'] || $resolved['temp'] === '') {
+            $task->failed_count = (int) $task->failed_count + 1;
+            $task->save();
+            self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）图片无法解析');
+            self::bumpExcelProcessedRows($task);
+
+            return self::formatSnapshot($task);
+        }
+
+        $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
+        if (!\is_array($vec)) {
+            if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
+                @\unlink($resolved['temp']);
+            }
+            $task->failed_count = (int) $task->failed_count + 1;
+            $task->save();
+            self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）特征提取失败');
+            self::bumpExcelProcessedRows($task);
+
+            return self::formatSnapshot($task);
+        }
+
+        $imageRef = $resolved['ref'];
+        if ($excelEmbedSource !== null && \is_file($excelEmbedSource)) {
+            $saved = ProductStyleImportService::persistStyleImageToPublic($excelEmbedSource, $publicRoot);
+            if ($saved !== null) {
+                $imageRef = $saved;
+            }
+        }
+
+        $aiDesc = null;
+        if ($visionOn) {
+            try {
+                $aiDesc = ProductStyleVisionDescribeService::describeForImport($resolved['temp']);
+                if ($aiDesc !== null && $aiDesc !== '') {
+                    $task->vision_described_count = (int) $task->vision_described_count + 1;
+                } else {
+                    self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请在设置中启用豆包并填写 Endpoint+API Key；若已配置仍为空请查看 runtime/log 中 [volc_ark] 豆包 相关日志');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('import AI describe: ' . $e->getMessage());
+                self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' AI 异常（已跳过描述）：' . \mb_substr($e->getMessage(), 0, 80));
+            }
+            if ($usleepMicro > 0) {
+                \usleep($usleepMicro);
+            }
+        }
+
+        $u = ProductStyleIndexRowService::upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
+        ProductStyleIndexRowService::syncProductAiDescription($code, $aiDesc);
+        if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
+            @\unlink($resolved['temp']);
+        }
+
+        if ($u['inserted']) {
+            $task->inserted_count = (int) $task->inserted_count + 1;
+        } else {
+            $task->updated_count = (int) $task->updated_count + 1;
+        }
         $task->save();
+
+        $st = $u['inserted'] ? '新增' : '更新';
+        $aiSt = ($visionOn && $aiDesc !== null && $aiDesc !== '') ? '，AI 描述已写入' : '';
+        self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）' . $st . '成功' . $aiSt);
+
+        if (((int) $task->inserted_count + (int) $task->updated_count) % 5 === 0) {
+            \gc_collect_cycles();
+        }
+
+        self::bumpExcelProcessedRows($task);
 
         return self::formatSnapshot($task);
     }
@@ -540,6 +533,23 @@ class ProductStyleImportTaskRunner
         $task->use_default_header = 0;
         $task->save();
         self::appendLog($task, 'Excel 已就绪：物理行 2～' . $hr . '，有效数据行 ' . $task->total_rows . '（空行已排除）');
+        self::appendVisionImportHint($task);
+    }
+
+    /** 任务开始时说明为何会有/无 AI 特征列，便于对照设置与 runtime/log */
+    private static function appendVisionImportHint(ProductStyleImportTask $task): void
+    {
+        if (!ProductStyleVisionDescribeService::shouldDescribeOnImport()) {
+            self::appendLog($task, '导入 AI 特征：未开启——请在「设置 → 豆包视觉」勾选「导入时生成描述」并保存（仅保存其它项不会自动保持勾选）');
+
+            return;
+        }
+        if (!VolcArkVisionConfig::get()['enabled']) {
+            self::appendLog($task, '导入 AI 特征：豆包未就绪——请勾选「启用豆包」并填写 Endpoint ID 与 API Key（Access 或 Secret 任一栏填 Key 均可）');
+
+            return;
+        }
+        self::appendLog($task, '导入 AI 特征：豆包已就绪；每行处理时会请求方舟（详见 runtime/log 中 [volc_ark] 豆包）');
     }
 
     /** Excel 异步：每处理完一条有效数据行（成功或失败）+1，与 total_rows（有效行总数）对齐 */
@@ -611,6 +621,7 @@ class ProductStyleImportTaskRunner
         $task->total_rows = $total;
         $task->save();
         self::appendLog($task, '已解析表头，数据行约 ' . $total . ' 行');
+        self::appendVisionImportHint($task);
     }
 
     /**

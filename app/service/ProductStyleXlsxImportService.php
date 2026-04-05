@@ -138,6 +138,57 @@ class ProductStyleXlsxImportService
     }
 
     /**
+     * 异步 tick 专用：**只加载一次**工作簿，从 startRow 顺序扫到 highestRow，返回第一条有效行。
+     * 避免旧实现每扫一行空行就 {@see readDataRowAt} 全表 load 导致的极慢（数百次磁盘解压）。
+     *
+     * @return array{rec: ?array{row: int, code: string, hot: string, imageTemp: ?string, imageRaw: string}, next_line_idx: int}
+     */
+    public static function readNextSubstantiveRowSingleLoad(string $path, int $startRow, int $highestRow): array
+    {
+        if (!\class_exists(IOFactory::class)) {
+            return ['rec' => null, 'next_line_idx' => $startRow];
+        }
+        $startRow = \max(2, $startRow);
+        if ($startRow > $highestRow) {
+            return ['rec' => null, 'next_line_idx' => $highestRow + 1];
+        }
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(false);
+        $spreadsheet = $reader->load($path);
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
+            $drawingsByCell = self::indexDrawingsByCell($sheet);
+
+            $highestColumn = $sheet->getHighestColumn();
+            $headerMatrix = $sheet->rangeToArray('A1:' . $highestColumn . '1', null, true, false);
+            $headerRow = $headerMatrix[0] ?? [];
+            $headerCells = \array_map(static function ($v) {
+                return \trim((string) ($v ?? ''));
+            }, $headerRow);
+
+            $headerMap = ProductStyleImportService::mapHeader($headerCells);
+            if ($headerMap === null) {
+                $headerMap = ['code' => 0, 'image' => 1, 'hot' => 2];
+            }
+
+            $codeCol = $headerMap['code'] + 1;
+            $imgCol = $headerMap['image'] + 1;
+            $hotCol = isset($headerMap['hot']) ? $headerMap['hot'] + 1 : null;
+
+            for ($r = $startRow; $r <= $highestRow; $r++) {
+                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r);
+                if ($rec !== null) {
+                    return ['rec' => $rec, 'next_line_idx' => $r + 1];
+                }
+            }
+
+            return ['rec' => null, 'next_line_idx' => $highestRow + 1];
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    /**
      * @return \Generator<int, array{row: int, code: string, hot: string, imageTemp: ?string, imageRaw: string}>
      */
     public static function iterateRows(string $path): \Generator

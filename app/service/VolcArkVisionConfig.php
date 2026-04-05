@@ -38,6 +38,8 @@ class VolcArkVisionConfig
         if ($sk === '') {
             $sk = trim((string) (getenv('VOLC_SECRET_KEY') ?: ''));
         }
+        /** 方舟 HTTP Bearer：优先 Access Key 框；空则用 Secret 框（常见误把 API Key 只填在「Secret」） */
+        $bearer = $ak !== '' ? $ak : $sk;
         $ep = trim((string) SystemConfigService::get('volc_ark_endpoint_id', '') ?: ($base['endpoint_id'] ?? ''));
         if ($ep === '') {
             $ep = trim((string) (getenv('VOLC_ENDPOINT_ID') ?: ''));
@@ -92,11 +94,11 @@ class VolcArkVisionConfig
             $retry = 5;
         }
 
-        $enabled = $enabledFlag === '1' && $ak !== '' && $ep !== '';
+        $enabled = $enabledFlag === '1' && $bearer !== '' && $ep !== '';
 
         return [
             'enabled' => $enabled,
-            'access_key' => $ak,
+            'access_key' => $bearer,
             'secret_key' => $sk,
             'endpoint_id' => $ep,
             'base_url' => $url,

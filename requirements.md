@@ -405,14 +405,14 @@
 - 说明：`tools/product_style_search/README.md`
 
 ### 配置
-- **导入时是否生成描述**：后台 **设置 → 豆包视觉** 勾选「导入时生成描述」；存储键名仍为 **`openai_describe_on_import`**（历史兼容），由 `VisionOpenAIConfig::get()['describe_on_import']` 读取。
-- **`config/services.php`**：`volc_ark`（`access_key`/`VOLC_ACCESS_KEY`、`endpoint_id`/`VOLC_ENDPOINT_ID`、`base_url`/`VOLC_ARK_BASE_URL`、`max_catalog_items`、超时与 token 等）。**单次寻款带入条数** 可在后台「豆包视觉」填写（`volc_ark_max_catalog`）。
+- **导入时是否生成描述**：后台 **设置 → 豆包视觉** 勾选「导入时生成描述」并**保存**；存储键名仍为 **`openai_describe_on_import`**（历史兼容），由 `VisionOpenAIConfig::get()['describe_on_import']` 读取。表单对「导入描述」「启用豆包」使用 **hidden=0 + checkbox=1**，避免只改其它配置保存时，因 HTML 不提交未勾选框而误写入 **关闭**。**方舟 API Key**：优先读 **Access Key** 框；若为空则使用 **Secret Key** 框（与 Access 二选一即可）。
+- **`config/services.php`**：`volc_ark`（`access_key`/`VOLC_ACCESS_KEY`、`secret_key`/`VOLC_SECRET_KEY`、`endpoint_id`/`VOLC_ENDPOINT_ID`、`base_url`/`VOLC_ARK_BASE_URL`、`max_catalog_items`、超时与 token 等）。**单次寻款带入条数** 可在后台「豆包视觉」填写（`volc_ark_max_catalog`）。
 - 环境变量示例：`VOLC_ACCESS_KEY`、`VOLC_ENDPOINT_ID`、`VOLC_ARK_BASE_URL`；若仍需阿里云/Google 旧数据，可继续在库中保留 `aliyun_is_*`、`google_ps_*` 等键（**设置页已不提供编辑**）。
 
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
 - `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**（恒为 `false`，兼容旧前端）、**`vision_describe_on_import`**、**`vision_any_provider_ready`**（**仅豆包**：与 `volc_ark_enabled` 一致）、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**、**`google_ps_enabled`**、**`volc_ark_enabled`**
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；**`.csv` / `.txt` / `.xlsx` / `.xls` / `.xlsm`** 均为**异步任务**。上传成功后立即返回 **`data.mode=async`**、**`data.task_id`**。**AI 描述**：须在 **设置** 勾选「导入时生成描述」并 **启用豆包 + Endpoint + API Key**；异步路径 **`describeForImport`**：豆包指纹 **`describeImportFingerprintImage`** → 全量 **`describeEarringImage`**。**Excel** 依赖 **`phpoffice/phpspreadsheet`**。任务 **`total_rows` / 进度百分比** 按 **有效数据行** 计数（与单元格解析一致：编号、图片列文本、嵌入图**全空**的行不计入），不再用 `getHighestRow()` 把尾部空行算进分母。**导入任务不再**写入 Google 索引、**不再**入队阿里云图搜；`POST …/syncAliyunQueue` 返回提示已停用。**HTTP 413**：调 Nginx 与 PHP 上传上限。
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；**`.csv` / `.txt` / `.xlsx` / `.xls` / `.xlsm`** 均为**异步任务**。上传成功后立即返回 **`data.mode=async`**、**`data.task_id`**。**AI 描述**：须在 **设置** 勾选「导入时生成描述」并 **启用豆包 + Endpoint + API Key**；异步路径 **`describeForImport`**：豆包指纹 **`describeImportFingerprintImage`** → 全量 **`describeEarringImage`**。**Excel** 依赖 **`phpoffice/phpspreadsheet`**。任务 **`total_rows` / 进度百分比** 按 **有效数据行** 计数（与单元格解析一致：编号、图片列文本、嵌入图**全空**的行不计入），不再用 `getHighestRow()` 把尾部空行算进分母。**异步 tick** 对 xlsx 使用 **`readNextSubstantiveRowSingleLoad`**：每次 HTTP 只 **完整加载工作簿一次** 再顺序扫行；旧版每遇空行就 `load` 一次，大表极慢。**导入任务不再**写入 Google 索引、**不再**入队阿里云图搜；`POST …/syncAliyunQueue` 返回提示已停用。**HTTP 413**：调 Nginx 与 PHP 上传上限。
 - `GET /admin.php/product_search/importTaskStatus`：查询参数 **`task_id`**，只读任务进度与日志（不推进）。
 - `POST /admin.php/product_search/importTaskTick`：JSON 或表单 **`task_id`**，**推进一行**（或完成表头解析/收尾），返回 `status`、`total_rows`、`processed_rows`、`percent`、`logs`（数组）、`done` 等。前端每 **2 秒**轮询一次直至 `done=true`。**PHP-FPM** 请将 **`request_terminate_timeout`** 设为 **`0`** 或明显大于单次 tick 最慢耗时（含 Python 与豆包），否则长任务可能在 tick 阶段被中断。
 - `POST /admin.php/product_search/syncAliyunQueue`：**已停用**（固定返回错误说明；导入不再使用阿里云队列）。

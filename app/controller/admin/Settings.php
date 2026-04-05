@@ -43,10 +43,18 @@ class Settings extends BaseController
                 SystemConfigService::set($k, trim((string) $this->request->post($k, '')));
             }
 
-            /** 导入时是否调用豆包生成 ai_description（键名沿用 openai_describe_on_import） */
-            SystemConfigService::set('openai_describe_on_import', $this->request->post('openai_describe_on_import') === '1' ? '1' : '0');
+            /** 导入时是否调用豆包生成 ai_description（键名沿用 openai_describe_on_import；表单含 hidden=0 + checkbox=1 避免未勾选时不提交导致误关） */
+            $postDescribe = $this->request->post('openai_describe_on_import');
+            $describeOn = \is_array($postDescribe)
+                ? \in_array('1', $postDescribe, true)
+                : ($postDescribe === '1' || $postDescribe === 1);
+            SystemConfigService::set('openai_describe_on_import', $describeOn ? '1' : '0');
 
-            SystemConfigService::set('volc_ark_enabled', $this->request->post('volc_ark_enabled') === '1' ? '1' : '0');
+            $postVolc = $this->request->post('volc_ark_enabled');
+            $volcOn = \is_array($postVolc)
+                ? \in_array('1', $postVolc, true)
+                : ($postVolc === '1' || $postVolc === 1);
+            SystemConfigService::set('volc_ark_enabled', $volcOn ? '1' : '0');
             $vAk = trim((string) $this->request->post('volc_ark_access_key', ''));
             if ($vAk !== '') {
                 SystemConfigService::set('volc_ark_access_key', $vAk);
@@ -88,7 +96,9 @@ class Settings extends BaseController
         $openaiDescribeOnImport = $openaiDescribeFlag === '' || $openaiDescribeFlag === '1';
         $volcArkEnabled = SystemConfigService::get('volc_ark_enabled', '0') === '1';
         $volcArkAccessConfigured = trim((string) (SystemConfigService::get('volc_ark_access_key', '') ?? '')) !== ''
-            || trim((string) (getenv('VOLC_ACCESS_KEY') ?: '')) !== '';
+            || trim((string) (getenv('VOLC_ACCESS_KEY') ?: '')) !== ''
+            || trim((string) (SystemConfigService::get('volc_ark_secret_key', '') ?? '')) !== ''
+            || trim((string) (getenv('VOLC_SECRET_KEY') ?: '')) !== '';
         $volcArkSecretConfigured = trim((string) (SystemConfigService::get('volc_ark_secret_key', '') ?? '')) !== '';
         $volcArkEndpoint = SystemConfigService::get('volc_ark_endpoint_id', '') ?? '';
         $volcArkBaseUrl = SystemConfigService::get('volc_ark_base_url', '') ?? '';

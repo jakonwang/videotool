@@ -118,10 +118,12 @@
                     <h5 class="mb-3 text-muted">豆包视觉（寻款）</h5>
                     <p class="small text-muted">拍照寻款与导入生成描述均走火山方舟 OpenAPI（兼容 Chat Completions）。在控制台创建 <strong>Doubao-vision</strong> 接入点，将 <strong>Endpoint ID</strong>（<code>ep-xxxx</code>）与 <strong>API Key</strong>（Bearer）填入下方。调用成功可在 <code>runtime/log</code> 中检索 <code>[volc_ark] 豆包</code> 日志。</p>
                     <div class="form-group">
+                        <input type="hidden" name="volc_ark_enabled" value="0">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" id="volc_ark_enabled" name="volc_ark_enabled" value="1" {if $volc_ark_enabled}checked{/if}>
                             <label class="custom-control-label" for="volc_ark_enabled">启用豆包视觉寻款（需 API Key + Endpoint ID）</label>
                         </div>
+                        <small class="form-text text-muted">未勾选时也会随表单提交「关闭」，避免只改七牛等项时误关豆包。</small>
                     </div>
                     <div class="form-group">
                         <label for="volc_ark_access_key">Access Key（方舟 API Key，作 Bearer）</label>
@@ -152,10 +154,12 @@
                         <input type="text" name="volc_ark_max_catalog" id="volc_ark_max_catalog" class="form-control" value="{$volc_ark_max_catalog|default=''}" placeholder="留空则 250">
                     </div>
                     <div class="form-group mt-3 mb-0">
+                        <input type="hidden" name="openai_describe_on_import" value="0">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" id="openai_describe_on_import" name="openai_describe_on_import" value="1" {if $openai_describe_on_import}checked{/if}>
                             <label class="custom-control-label" for="openai_describe_on_import">导入 CSV/Excel 时为每行参考图自动生成 AI 描述（豆包，按行计费）</label>
                         </div>
+                        <small class="form-text text-muted">务必勾选并保存；未勾选时也会随表单提交「关闭」，否则导入只写向量、不写 AI 特征列。</small>
                     </div>
                     <div class="d-flex justify-content-end mt-3">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
