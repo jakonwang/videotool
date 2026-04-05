@@ -44,7 +44,7 @@ class VolcArkVisionService
                 ],
             ],
         ];
-        $raw = self::chatCompletionRaw($cfg, $body);
+        $raw = self::chatCompletionRaw($cfg, $body, 'describe_earring');
         $text = self::parseChatCompletionText($raw);
         if ($text === null) {
             return null;
@@ -86,7 +86,7 @@ class VolcArkVisionService
                 ],
             ],
         ];
-        $raw = self::chatCompletionRaw($cfg, $body);
+        $raw = self::chatCompletionRaw($cfg, $body, 'describe_import_fingerprint');
         $text = self::parseChatCompletionText($raw);
         if ($text === null) {
             return null;
@@ -172,7 +172,7 @@ TXT;
             if ($i > 0) {
                 usleep(400000);
             }
-            $raw = self::chatCompletionRaw($cfg, $body);
+            $raw = self::chatCompletionRaw($cfg, $body, 'match_catalog');
             $lastRaw = $raw;
             if ($raw === null) {
                 continue;
@@ -227,9 +227,16 @@ TXT;
      * @param array<string, mixed> $cfg
      * @param array<string, mixed> $body
      */
-    private static function chatCompletionRaw(array $cfg, array $body): ?string
+    private static function chatCompletionRaw(array $cfg, array $body, string $purpose = 'chat'): ?string
     {
         $url = $cfg['base_url'] . '/chat/completions';
+        $endpointId = (string) ($cfg['endpoint_id'] ?? '');
+        Log::info('[volc_ark] 豆包请求开始', [
+            'purpose' => $purpose,
+            'endpoint_id' => $endpointId,
+            'base_url' => (string) ($cfg['base_url'] ?? ''),
+            'url' => $url,
+        ]);
         try {
             $client = new Client([
                 'timeout' => $cfg['timeout_seconds'],
@@ -247,14 +254,36 @@ TXT;
             $code = $res->getStatusCode();
             $raw = (string) $res->getBody();
             if ($code < 200 || $code >= 300) {
-                Log::warning('Volc Ark HTTP ' . $code . ' ' . substr($raw, 0, 600));
+                Log::warning('[volc_ark] 豆包 HTTP 失败', [
+                    'purpose' => $purpose,
+                    'endpoint_id' => $endpointId,
+                    'http' => $code,
+                    'body_snip' => mb_substr($raw, 0, 600),
+                ]);
 
                 return null;
             }
 
+            $replyText = self::parseChatCompletionText($raw);
+            $preview = $replyText !== null && $replyText !== ''
+                ? mb_substr(preg_replace("/\s+/u", ' ', $replyText), 0, 120)
+                : null;
+            Log::info('[volc_ark] 豆包请求成功', [
+                'purpose' => $purpose,
+                'endpoint_id' => $endpointId,
+                'http' => $code,
+                'raw_bytes' => strlen($raw),
+                'reply_text_len' => $replyText !== null ? mb_strlen($replyText) : 0,
+                'reply_preview' => $preview,
+            ]);
+
             return $raw;
         } catch (GuzzleException $e) {
-            Log::warning('Volc Ark guzzle: ' . $e->getMessage());
+            Log::warning('[volc_ark] 豆包网络异常', [
+                'purpose' => $purpose,
+                'endpoint_id' => $endpointId,
+                'error' => $e->getMessage(),
+            ]);
 
             return null;
         }

@@ -196,7 +196,7 @@ videotool/
 ### 5分钟快速部署
 
 1. **解压项目文件**
-2. **安装依赖**: `composer install`（要求 **PHP ≥ 8.1**；后台「寻款」**Excel 嵌入图导入**依赖 `phpoffice/phpspreadsheet` 5.x；**拍照寻款**可选 **OpenAI Vision**（`guzzlehttp/guzzle` 调 API）或 **阿里云图搜**（`alibabacloud/imagesearch-20201214`）；需 `ext-zip`、`ext-xml`、`ext-gd` 等。OpenAI 可在 `.env` 配置 `OPENAI_API_KEY` 或在后台「设置」填写）
+2. **安装依赖**: `composer install`（要求 **PHP ≥ 8.1**；后台「寻款」**Excel 嵌入图导入**依赖 `phpoffice/phpspreadsheet` 5.x；**拍照寻款与导入 AI 描述**使用 **火山方舟豆包**（`guzzlehttp/guzzle`）；可选依赖含阿里云图搜等，见 `composer.json`；需 `ext-zip`、`ext-xml`、`ext-gd` 等。豆包可在环境变量 `VOLC_ACCESS_KEY` / `VOLC_ENDPOINT_ID` 或后台 **设置 → 豆包视觉** 配置）
 3. **配置数据库**: 编辑 `config/database.php`
 4. **导入数据库**: `mysql -u root -p videotool < database/schema.sql`  
    - 已有库升级商品/达人链：**推荐**在项目根目录执行  

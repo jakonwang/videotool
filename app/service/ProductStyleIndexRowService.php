@@ -8,7 +8,7 @@ use think\facade\Db;
 use think\facade\Log;
 
 /**
- * 寻款索引单行写入与 Google 同步（供同步导入与异步任务共用）
+ * 寻款索引单行写入；`syncGoogleProductSearchIndex` 保留供运维/脚本调用，导入任务已不触发。
  */
 class ProductStyleIndexRowService
 {

@@ -115,15 +115,11 @@ mysql -u root -p videotool < database/schema.sql
 
 **寻款 CSV 异步导入任务表：** 后台 **CSV/TXT** 导入会创建 `product_style_import_tasks` 任务并轮询 `importTaskTick`。新环境或旧库升级请执行：`php database/run_migration_product_style_import_tasks.php`（Windows：`php database\run_migration_product_style_import_tasks.php`）。详见 `requirements.md`。
 
-**寻款 Google Product Search（可选）：** `composer install` 会安装 `google/cloud-vision` 与 `google/cloud-storage`。在 GCP 创建 **Product Set** 后可执行：  
-`php scripts/google_create_product_set.php --project=项目ID --location=us-east1 --set-id=集合短ID --display-name=显示名 --key-file=密钥JSON绝对路径`  
-（密钥须放在 **Web 的 `public` 目录之外**；亦可用环境变量 `GOOGLE_APPLICATION_CREDENTIALS`。）后台 **设置 → Google Product Search** 填写 Project、Location、Product Set、**GCS Bucket**（参考图桶）等并启用；详见 `requirements.md`。
+**寻款拍照 / 导入描述（豆包，必选能力）：** 无需额外 Composer 包，使用 Guzzle 调方舟 OpenAPI。环境变量示例：`VOLC_ACCESS_KEY`（方舟 **API Key**，Bearer）、`VOLC_ENDPOINT_ID`（接入点 **ep-** ID）、`VOLC_ARK_BASE_URL`（默认 `https://ark.cn-beijing.volces.com/api/v3`）。后台 **设置 → 豆包视觉** 填写并启用。调用后可在 **`runtime/log`** 检索 **`[volc_ark] 豆包`** 确认是否请求成功；详见 `requirements.md`。
 
-**注意：** 若接口返回 `Product Search is in maintenance mode`，为 Google 对经典 Product Search 的准入限制，并非部署错误；请先关闭 Google 寻款，改用 OpenAI 或阿里云图搜，或按 `requirements.md` 中链接申请/评估 Vision Warehouse。
+**历史：Google / 阿里云图搜：** `composer install` 仍可能安装相关包。**异步导入已不再**调用 Google 索引与阿里云入队；如需清理旧队列数据可直连数据库。**后台设置页已仅保留豆包**，详见 `requirements.md`。
 
-**寻款火山方舟（豆包视觉，可选）：** 无需额外 Composer 包，使用 Guzzle 调方舟 OpenAPI。环境变量示例：`VOLC_ACCESS_KEY`（方舟 **API Key**，Bearer）、`VOLC_ENDPOINT_ID`（接入点 **ep-** ID）、`VOLC_ARK_BASE_URL`（默认 `https://ark.cn-beijing.volces.com/api/v3`）。后台 **设置 → 火山方舟 · 豆包视觉** 可覆盖；详见 `requirements.md`。
-
-**寻款 OpenAI Vision 字段：** 执行 `php database/run_migration_openai_vision_columns.php`（Linux 务必用正斜杠：`php database/run_migration_openai_vision_columns.php`），为 `products`、`product_style_items` 增加 `ai_description`。
+**寻款 `ai_description` 字段：** 执行 `php database/run_migration_openai_vision_columns.php`（Linux 务必用正斜杠：`php database/run_migration_openai_vision_columns.php`），为 `products`、`product_style_items` 增加 `ai_description`（字段名历史沿用，内容由豆包生成）。
 
 **如果遇到字符集错误（emoji无法插入）：**
 

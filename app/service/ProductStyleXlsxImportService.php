@@ -42,6 +42,58 @@ class ProductStyleXlsxImportService
     }
 
     /**
+     * 一次加载：最高物理行号 + **有效数据行数**（与 {@see extractDataRow} 一致：编号/图片/嵌入图全空则不计入，排除 Excel 尾部大量空行带来的虚高）。
+     *
+     * @return array{ok:bool, highest_row:int, substantive_rows:int, error?:string}
+     */
+    public static function analyzeSheet(string $path): array
+    {
+        if (!\class_exists(IOFactory::class)) {
+            return ['ok' => false, 'highest_row' => 0, 'substantive_rows' => 0, 'error' => '未安装 PhpSpreadsheet，请执行 composer install'];
+        }
+        try {
+            $reader = IOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(false);
+            $spreadsheet = $reader->load($path);
+            try {
+                $sheet = $spreadsheet->getActiveSheet();
+                $highestRow = \max(1, (int) $sheet->getHighestRow());
+                $drawingsByCell = self::indexDrawingsByCell($sheet);
+
+                $highestColumn = $sheet->getHighestColumn();
+                $headerMatrix = $sheet->rangeToArray('A1:' . $highestColumn . '1', null, true, false);
+                $headerRow = $headerMatrix[0] ?? [];
+                $headerCells = \array_map(static function ($v) {
+                    return \trim((string) ($v ?? ''));
+                }, $headerRow);
+
+                $headerMap = ProductStyleImportService::mapHeader($headerCells);
+                if ($headerMap === null) {
+                    $headerMap = ['code' => 0, 'image' => 1, 'hot' => 2];
+                }
+
+                $codeCol = $headerMap['code'] + 1;
+                $imgCol = $headerMap['image'] + 1;
+                $hotCol = isset($headerMap['hot']) ? $headerMap['hot'] + 1 : null;
+
+                $n = 0;
+                for ($r = 2; $r <= $highestRow; $r++) {
+                    $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r);
+                    if ($rec !== null) {
+                        $n++;
+                    }
+                }
+
+                return ['ok' => true, 'highest_row' => $highestRow, 'substantive_rows' => $n];
+            } finally {
+                $spreadsheet->disconnectWorksheets();
+            }
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'highest_row' => 0, 'substantive_rows' => 0, 'error' => 'Excel 读取失败：' . $e->getMessage()];
+        }
+    }
+
+    /**
      * 读取指定 Excel 行（1-based 行号，数据从第 2 行起）。与 {@see iterateRows} 单行语义一致。
      * 若该行在同步导入中会被 continue 跳过，则返回 null。
      *

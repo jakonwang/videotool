@@ -165,6 +165,8 @@ class ProductStyleImportTaskRunner
 
                 return self::formatSnapshot($task);
             }
+
+            return self::formatSnapshot($task);
         }
 
         if ($task->status === 'completed') {
@@ -184,7 +186,7 @@ class ProductStyleImportTaskRunner
         $ii = $headerMap['image'];
         $hi = $headerMap['hot'] ?? null;
 
-        $visionOn = VisionOpenAIConfig::get()['describe_on_import'];
+        $visionOn = ProductStyleVisionDescribeService::shouldDescribeOnImport();
         $usleepMicro = (int) (Config::get('product_search.import_ai_usleep_microseconds') ?? 200000);
         if ($usleepMicro < 0) {
             $usleepMicro = 0;
@@ -284,6 +286,8 @@ class ProductStyleImportTaskRunner
                     $aiDesc = ProductStyleVisionDescribeService::describeForImport($resolved['temp']);
                     if ($aiDesc !== null && $aiDesc !== '') {
                         $task->vision_described_count = (int) $task->vision_described_count + 1;
+                    } else {
+                        self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请在设置中启用豆包并填写 Endpoint+API Key；若已配置仍为空请查看 runtime/log 中 [volc_ark] 豆包 相关日志');
                     }
                 } catch (\Throwable $e) {
                     Log::warning('import AI describe: ' . $e->getMessage());
@@ -296,15 +300,6 @@ class ProductStyleImportTaskRunner
 
             $u = ProductStyleIndexRowService::upsertStyleItem($code, $resolved['ref'], $hot, $vec, $aiDesc);
             ProductStyleIndexRowService::syncProductAiDescription($code, $aiDesc);
-            $g = ProductStyleIndexRowService::syncGoogleProductSearchIndex($code, $resolved['temp']);
-            if ($g['action'] === 'synced') {
-                $task->google_synced_count = (int) $task->google_synced_count + 1;
-            } elseif ($g['action'] === 'failed') {
-                $task->google_failed_count = (int) $task->google_failed_count + 1;
-            }
-
-            $picName = ProductStyleAliyunQueueService::makePicName($resolved['ref'], $resolved['temp']);
-            ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
             if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
                 @\unlink($resolved['temp']);
             }
@@ -319,7 +314,7 @@ class ProductStyleImportTaskRunner
             $task->save();
 
             $st = $u['inserted'] ? '新增' : '更新';
-            $aiSt = ($visionOn && $aiDesc !== null && $aiDesc !== '') ? '，AI 指纹已写入' : '';
+            $aiSt = ($visionOn && $aiDesc !== null && $aiDesc !== '') ? '，AI 描述已写入' : '';
             self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowLabel . '行）' . $st . '成功' . $aiSt);
 
             if ((int) $task->processed_rows % 5 === 0) {
@@ -356,6 +351,8 @@ class ProductStyleImportTaskRunner
 
                 return self::formatSnapshot($task);
             }
+
+            return self::formatSnapshot($task);
         }
 
         if ($task->status === 'completed') {
@@ -372,7 +369,7 @@ class ProductStyleImportTaskRunner
         }
         $highestRow = (int) ($meta['highest_row'] ?? 1);
 
-        $visionOn = VisionOpenAIConfig::get()['describe_on_import'];
+        $visionOn = ProductStyleVisionDescribeService::shouldDescribeOnImport();
         $usleepMicro = (int) (Config::get('product_search.import_ai_usleep_microseconds') ?? 200000);
         if ($usleepMicro < 0) {
             $usleepMicro = 0;
@@ -396,7 +393,6 @@ class ProductStyleImportTaskRunner
 
             $rec = ProductStyleXlsxImportService::readDataRowAt($absPath, $lineIdx);
             $task->line_idx = $lineIdx + 1;
-            $task->processed_rows = \min((int) $task->total_rows, \max(0, (int) $task->line_idx - 2));
             $task->save();
 
             if ($rec === null) {
@@ -412,6 +408,8 @@ class ProductStyleImportTaskRunner
             $hot = $rec['hot'];
 
             if ($code === '') {
+                self::bumpExcelProcessedRows($task);
+
                 return self::formatSnapshot($task);
             }
 
@@ -419,6 +417,7 @@ class ProductStyleImportTaskRunner
                 $task->failed_count = (int) $task->failed_count + 1;
                 $task->save();
                 self::appendLog($task, '第' . $rowIndex . '行：图片列为空且无嵌入图');
+                self::bumpExcelProcessedRows($task);
 
                 return self::formatSnapshot($task);
             }
@@ -434,6 +433,7 @@ class ProductStyleImportTaskRunner
                 $task->failed_count = (int) $task->failed_count + 1;
                 $task->save();
                 self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）图片无法解析');
+                self::bumpExcelProcessedRows($task);
 
                 return self::formatSnapshot($task);
             }
@@ -446,6 +446,7 @@ class ProductStyleImportTaskRunner
                 $task->failed_count = (int) $task->failed_count + 1;
                 $task->save();
                 self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）特征提取失败');
+                self::bumpExcelProcessedRows($task);
 
                 return self::formatSnapshot($task);
             }
@@ -464,6 +465,8 @@ class ProductStyleImportTaskRunner
                     $aiDesc = ProductStyleVisionDescribeService::describeForImport($resolved['temp']);
                     if ($aiDesc !== null && $aiDesc !== '') {
                         $task->vision_described_count = (int) $task->vision_described_count + 1;
+                    } else {
+                        self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . ' 未生成 AI 描述：请在设置中启用豆包并填写 Endpoint+API Key；若已配置仍为空请查看 runtime/log 中 [volc_ark] 豆包 相关日志');
                     }
                 } catch (\Throwable $e) {
                     Log::warning('import AI describe: ' . $e->getMessage());
@@ -476,15 +479,6 @@ class ProductStyleImportTaskRunner
 
             $u = ProductStyleIndexRowService::upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
             ProductStyleIndexRowService::syncProductAiDescription($code, $aiDesc);
-            $g = ProductStyleIndexRowService::syncGoogleProductSearchIndex($code, $resolved['temp']);
-            if ($g['action'] === 'synced') {
-                $task->google_synced_count = (int) $task->google_synced_count + 1;
-            } elseif ($g['action'] === 'failed') {
-                $task->google_failed_count = (int) $task->google_failed_count + 1;
-            }
-
-            $picName = ProductStyleAliyunQueueService::makePicName($imageRef, $resolved['temp']);
-            ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
             if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
                 @\unlink($resolved['temp']);
             }
@@ -497,12 +491,14 @@ class ProductStyleImportTaskRunner
             $task->save();
 
             $st = $u['inserted'] ? '新增' : '更新';
-            $aiSt = ($visionOn && $aiDesc !== null && $aiDesc !== '') ? '，AI 指纹已写入' : '';
+            $aiSt = ($visionOn && $aiDesc !== null && $aiDesc !== '') ? '，AI 描述已写入' : '';
             self::appendLog($task, '[' . \date('H:i:s') . '] 款式 ' . $code . '（第' . $rowIndex . '行）' . $st . '成功' . $aiSt);
 
             if (((int) $task->inserted_count + (int) $task->updated_count) % 5 === 0) {
                 \gc_collect_cycles();
             }
+
+            self::bumpExcelProcessedRows($task);
 
             return self::formatSnapshot($task);
         }
@@ -525,24 +521,32 @@ class ProductStyleImportTaskRunner
 
             return;
         }
-        $scan = ProductStyleXlsxImportService::scanSheetMeta($absPath);
-        if (!$scan['ok']) {
+        $analysis = ProductStyleXlsxImportService::analyzeSheet($absPath);
+        if (!$analysis['ok']) {
             $task->status = 'failed';
-            $task->error_message = (string) ($scan['error'] ?? 'Excel 无法读取');
+            $task->error_message = (string) ($analysis['error'] ?? 'Excel 无法读取');
             $task->save();
             self::appendLog($task, $task->error_message);
 
             return;
         }
-        $hr = (int) $scan['highest_row'];
+        $hr = (int) $analysis['highest_row'];
+        $substantive = (int) ($analysis['substantive_rows'] ?? 0);
         $task->header_resolved = 1;
         $task->header_json = \json_encode(['excel' => 1, 'highest_row' => $hr], JSON_UNESCAPED_UNICODE);
-        $task->total_rows = \max(0, $hr - 1);
+        $task->total_rows = \max(0, $substantive);
         $task->line_idx = 2;
         $task->processed_rows = 0;
         $task->use_default_header = 0;
         $task->save();
-        self::appendLog($task, 'Excel 已就绪，数据行 2～' . $hr . '（共 ' . $task->total_rows . ' 行）');
+        self::appendLog($task, 'Excel 已就绪：物理行 2～' . $hr . '，有效数据行 ' . $task->total_rows . '（空行已排除）');
+    }
+
+    /** Excel 异步：每处理完一条有效数据行（成功或失败）+1，与 total_rows（有效行总数）对齐 */
+    private static function bumpExcelProcessedRows(ProductStyleImportTask $task): void
+    {
+        $task->processed_rows = (int) $task->processed_rows + 1;
+        $task->save();
     }
 
     /**
@@ -661,13 +665,6 @@ class ProductStyleImportTaskRunner
         if ($task->status === 'completed') {
             return;
         }
-        try {
-            $aliyunSync = ProductStyleAliyunQueueService::drain(800, 300);
-            self::appendLog($task, '本批阿里云同步：成功 ' . ($aliyunSync['ok'] ?? 0) . ' 失败 ' . ($aliyunSync['fail'] ?? 0));
-        } catch (\Throwable $e) {
-            Log::warning('import finalize drain: ' . $e->getMessage());
-            self::appendLog($task, '阿里云队列收尾：' . mb_substr($e->getMessage(), 0, 120));
-        }
         $task->status = 'completed';
         $task->save();
     }
@@ -742,7 +739,7 @@ class ProductStyleImportTaskRunner
             'google_failed' => (int) $task->google_failed_count,
             'logs' => $logs,
             'error_message' => (string) ($task->error_message ?? ''),
-            'aliyun_pending' => ProductStyleAliyunQueueService::pendingCount(),
+            'aliyun_pending' => 0,
             'done' => \in_array($task->status, ['completed', 'failed'], true),
         ];
     }

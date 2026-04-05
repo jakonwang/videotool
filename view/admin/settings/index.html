@@ -115,44 +115,8 @@
 
                     <div class="card shadow-sm mb-3">
                         <div class="card-body">
-                    <h5 class="mb-3 text-muted">OpenAI Vision（寻款，推荐）</h5>
-                    <p class="small text-muted">填写 API Key 后，<strong>拍照寻款</strong>优先使用 <code>gpt-4o-mini</code> 看图+语义匹配库内「编号+特征」；按次计费、无月费。导入表格时可选择是否为每行参考图自动生成一句视觉描述（会按行调用 API）。</p>
-                    <div class="form-group">
-                        <label for="openai_api_key">API Key</label>
-                        <input type="password" name="openai_api_key" id="openai_api_key" class="form-control" value="" autocomplete="new-password" placeholder="{if $openai_key_configured}已保存，留空不修改{else /}sk-...{/if}">
-                        <div class="custom-control custom-checkbox mt-2">
-                            <input type="checkbox" class="custom-control-input" id="openai_api_key_clear" name="openai_api_key_clear" value="1">
-                            <label class="custom-control-label" for="openai_api_key_clear">清空后台中的 API Key</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="openai_base_url">Base URL（可选）</label>
-                        <input type="text" name="openai_base_url" id="openai_base_url" class="form-control" value="{$openai_base_url|default=''}" placeholder="默认 https://api.openai.com/v1，代理或兼容接口时填写">
-                    </div>
-                    <div class="form-group">
-                        <label for="openai_model">模型</label>
-                        <input type="text" name="openai_model" id="openai_model" class="form-control" value="{$openai_model|default=''}" placeholder="留空则 gpt-4o-mini">
-                    </div>
-                    <div class="form-group">
-                        <label for="openai_max_catalog">单次寻款带入库内条数上限</label>
-                        <input type="text" name="openai_max_catalog" id="openai_max_catalog" class="form-control" value="{$openai_max_catalog|default=''}" placeholder="留空则 250（仅包含有 AI 描述的行）">
-                    </div>
-                    <div class="form-group mb-0">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="openai_describe_on_import" name="openai_describe_on_import" value="1" {if $openai_describe_on_import}checked{/if}>
-                            <label class="custom-control-label" for="openai_describe_on_import">导入 CSV/Excel 时为每行参考图自动生成 AI 视觉描述（<strong>豆包优先</strong>，未配方舟则用 OpenAI；按行计费）</label>
-                        </div>
-                    </div>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
-                    </div>
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-body">
-                    <h5 class="mb-3 text-muted">火山方舟 · 豆包视觉（寻款）</h5>
-                    <p class="small text-muted">国内网络直连，拍照寻款走方舟 OpenAPI（兼容 OpenAI Chat Completions）。在火山控制台创建 <strong>Doubao-vision</strong> 接入点，将 <strong>Endpoint ID</strong>（形如 <code>ep-xxxx</code>）填入下方；<strong>API Key</strong> 填入 Access Key（Bearer）。未启用 Google 且启用本项时，优先于 OpenAI。</p>
+                    <h5 class="mb-3 text-muted">豆包视觉（寻款）</h5>
+                    <p class="small text-muted">拍照寻款与导入生成描述均走火山方舟 OpenAPI（兼容 Chat Completions）。在控制台创建 <strong>Doubao-vision</strong> 接入点，将 <strong>Endpoint ID</strong>（<code>ep-xxxx</code>）与 <strong>API Key</strong>（Bearer）填入下方。调用成功可在 <code>runtime/log</code> 中检索 <code>[volc_ark] 豆包</code> 日志。</p>
                     <div class="form-group">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" id="volc_ark_enabled" name="volc_ark_enabled" value="1" {if $volc_ark_enabled}checked{/if}>
@@ -187,123 +151,11 @@
                         <label for="volc_ark_max_catalog">单次寻款带入条数上限</label>
                         <input type="text" name="volc_ark_max_catalog" id="volc_ark_max_catalog" class="form-control" value="{$volc_ark_max_catalog|default=''}" placeholder="留空则 250">
                     </div>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
-                    </div>
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-body">
-                    <h5 class="mb-3 text-muted">Google Product Search（寻款）</h5>
-                    <div class="alert alert-warning small mb-3" role="alert">
-                        <strong>重要（2025 起常见）：</strong>Google 已将经典 <strong>Product Search</strong> 置于<strong>维护/受限</strong>状态。新账号或未获白名单时，接口可能返回
-                        <code>Product Search is in maintenance mode</code>，属<strong>官方策略</strong>而非本系统配置错误。
-                        可选：<a href="https://forms.gle/QPLzMdwSMcR2pPsq5" target="_blank" rel="noopener">向 Google 申请继续使用 Product Search</a>；
-                        长期方案见 <a href="https://cloud.google.com/vision-ai/docs/warehouse-overview" target="_blank" rel="noopener">Vision Warehouse（图搜替代）</a>。
-                        在此之前请<strong>关闭本项</strong>，改用设置中的 <strong>OpenAI Vision</strong> 或 <strong>阿里云图搜</strong>。
-                    </div>
-                    <p class="small text-muted">启用后，<strong>拍照寻款</strong>优先走 Google Cloud Vision 商品图搜；导入 CSV/Excel 时会将参考图写入 <strong>GCS</strong> 并注册到指定 <strong>Product Set</strong>。类目默认 <code>homegoods-v2</code>（饰品场景）。首次请在 GCP 控制台开通 Vision API，并执行 <code>php scripts/google_create_product_set.php</code> 创建 ProductSet。</p>
-                    <p class="small text-danger font-weight-bold">密钥 JSON 必须放在<strong>项目根目录之外</strong>的绝对路径（不可位于 <code>public</code> 下），切勿提交到 Git 或暴露 URL。</p>
-                    <div class="form-group">
+                    <div class="form-group mt-3 mb-0">
                         <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="google_ps_enabled" name="google_ps_enabled" value="1" {if $google_ps_enabled}checked{/if}>
-                            <label class="custom-control-label" for="google_ps_enabled">启用 Google 寻款（需填 project、区域、Product Set、GCS Bucket 与密钥路径）</label>
+                            <input type="checkbox" class="custom-control-input" id="openai_describe_on_import" name="openai_describe_on_import" value="1" {if $openai_describe_on_import}checked{/if}>
+                            <label class="custom-control-label" for="openai_describe_on_import">导入 CSV/Excel 时为每行参考图自动生成 AI 描述（豆包，按行计费）</label>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_key_file">服务账号 JSON 绝对路径</label>
-                        <input type="text" name="google_ps_key_file" id="google_ps_key_file" class="form-control" value="" autocomplete="off" placeholder="{if $google_ps_key_configured}已保存，留空不修改；或填写新路径{else /}例：D:\secrets\xxx.json 或 /var/www/keys/vision.json{/if}">
-                        <div class="custom-control custom-checkbox mt-2">
-                            <input type="checkbox" class="custom-control-input" id="google_ps_key_file_clear" name="google_ps_key_file_clear" value="1">
-                            <label class="custom-control-label" for="google_ps_key_file_clear">清空后台保存的路径（改用环境变量 GOOGLE_APPLICATION_CREDENTIALS 亦可）</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_project_id">GCP Project ID</label>
-                        <input type="text" name="google_ps_project_id" id="google_ps_project_id" class="form-control" value="{$google_ps_project_id|default=''}" placeholder="与控制台项目 ID 一致">
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_location">Location（区域）</label>
-                        <input type="text" name="google_ps_location" id="google_ps_location" class="form-control" value="{$google_ps_location|default=''}" placeholder="如 us-east1、asia-east1（须与 Product Search 控制台区域一致）">
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_product_set_id">Product Set ID</label>
-                        <input type="text" name="google_ps_product_set_id" id="google_ps_product_set_id" class="form-control" value="{$google_ps_product_set_id|default=''}" placeholder="自建 ProductSet 的资源短 ID">
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_gcs_bucket">GCS Bucket（参考图存储）</label>
-                        <input type="text" name="google_ps_gcs_bucket" id="google_ps_gcs_bucket" class="form-control" value="{$google_ps_gcs_bucket|default=''}" placeholder="须与本项目服务账号同 GCP 项目，且 Vision 可读">
-                        <small class="form-text text-muted">导入时会上传 <code>gs://bucket/...</code>，索引完成后对象可保留或自行配置生命周期。</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_gcs_prefix">对象前缀（可选）</label>
-                        <input type="text" name="google_ps_gcs_prefix" id="google_ps_gcs_prefix" class="form-control" value="{$google_ps_gcs_prefix|default=''}" placeholder="留空则默认 vision_product_search_refs">
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_product_category">product_category</label>
-                        <input type="text" name="google_ps_product_category" id="google_ps_product_category" class="form-control" value="{$google_ps_product_category|default=''}" placeholder="留空则 homegoods-v2">
-                    </div>
-                    <div class="form-group">
-                        <label for="google_ps_match_score_min">完全匹配最低分（0～1）</label>
-                        <input type="text" name="google_ps_match_score_min" id="google_ps_match_score_min" class="form-control" value="{$google_ps_match_score_min|default=''}" placeholder="留空则 0.5；低于此分时提示「未找到完全匹配款式」">
-                    </div>
-                    <div class="form-group mb-0">
-                        <label for="google_ps_search_top_k">返回条数上限</label>
-                        <input type="text" name="google_ps_search_top_k" id="google_ps_search_top_k" class="form-control" value="{$google_ps_search_top_k|default=''}" placeholder="留空则 5，最大 20">
-                    </div>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
-                    </div>
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-body">
-                    <h5 class="mb-3 text-muted">阿里云图像搜索（寻款）</h5>
-                    <p class="small text-muted">用于「拍照寻款」以图搜款；导入 CSV/Excel 时会将图片同步到阿里云商品图搜实例。AK/SK 建议使用 RAM 子账号最小权限。</p>
-                    <div class="form-group">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="aliyun_is_enabled" name="aliyun_is_enabled" value="1" {if $aliyun_is_enabled}checked{/if}>
-                            <label class="custom-control-label" for="aliyun_is_enabled">启用阿里云图搜（需填写下列 Endpoint、实例名与密钥）</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyun_is_access_key_id">AccessKey ID</label>
-                        <input type="text" name="aliyun_is_access_key_id" id="aliyun_is_access_key_id" class="form-control" value="" autocomplete="off" placeholder="{if $aliyun_access_configured}已保存，留空不修改{else /}必填{/if}">
-                        <div class="custom-control custom-checkbox mt-2">
-                            <input type="checkbox" class="custom-control-input" id="aliyun_is_access_clear" name="aliyun_is_access_clear" value="1">
-                            <label class="custom-control-label" for="aliyun_is_access_clear">清空后台中的 AccessKey ID</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyun_is_access_key_secret">AccessKey Secret</label>
-                        <input type="password" name="aliyun_is_access_key_secret" id="aliyun_is_access_key_secret" class="form-control" value="" autocomplete="new-password" placeholder="{if $aliyun_secret_configured}已保存，留空不修改{else /}必填{/if}">
-                        <div class="custom-control custom-checkbox mt-2">
-                            <input type="checkbox" class="custom-control-input" id="aliyun_is_secret_clear" name="aliyun_is_secret_clear" value="1">
-                            <label class="custom-control-label" for="aliyun_is_secret_clear">清空 Secret</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyun_is_endpoint">Endpoint</label>
-                        <input type="text" name="aliyun_is_endpoint" id="aliyun_is_endpoint" class="form-control" value="{$aliyun_is_endpoint|default=''}" placeholder="例：imagesearch.cn-shanghai.aliyuncs.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyun_is_instance_name">实例名称 InstanceName</label>
-                        <input type="text" name="aliyun_is_instance_name" id="aliyun_is_instance_name" class="form-control" value="{$aliyun_is_instance_name|default=''}" placeholder="控制台实例信息中的名称">
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyun_is_region_id">RegionId（可选）</label>
-                        <input type="text" name="aliyun_is_region_id" id="aliyun_is_region_id" class="form-control" value="{$aliyun_is_region_id|default=''}" placeholder="一般可从 Endpoint 自动解析，留空即可">
-                    </div>
-                    <div class="form-group">
-                        <label for="aliyun_is_category_id">类目 CategoryId</label>
-                        <input type="text" name="aliyun_is_category_id" id="aliyun_is_category_id" class="form-control" value="{$aliyun_is_category_id|default=''}" placeholder="留空则默认 5（配饰，适合耳环等饰品）">
-                        <small class="form-text text-muted">官方类目表见阿里云文档「图像搜索图片类目与ID列表」。</small>
-                    </div>
-                    <div class="form-group mb-0">
-                        <label for="aliyun_is_search_num">搜索返回条数 Num</label>
-                        <input type="text" name="aliyun_is_search_num" id="aliyun_is_search_num" class="form-control" value="{$aliyun_is_search_num|default=''}" placeholder="留空则默认 5">
                     </div>
                     <div class="d-flex justify-content-end mt-3">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
@@ -331,10 +183,6 @@
                         AdminUI.showToast('success', res.msg || '已保存');
                         $('#qiniu_access_key').val('');
                         $('#qiniu_secret_key').val('');
-                        $('#aliyun_is_access_key_id').val('');
-                        $('#aliyun_is_access_key_secret').val('');
-                        $('#openai_api_key').val('');
-                        $('#google_ps_key_file').val('');
                         $('#volc_ark_access_key').val('');
                         $('#volc_ark_secret_key').val('');
                         setTimeout(function () { location.reload(); }, 500);

@@ -5,10 +5,7 @@ namespace app\controller\admin;
 
 use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
-use app\service\AliyunImageSearchConfig;
-use app\service\GoogleProductSearchConfig;
 use app\service\VolcArkVisionConfig;
-use app\service\ProductStyleAliyunQueueService;
 use app\service\ProductStyleEmbeddingService;
 use app\service\VisionOpenAIConfig;
 use think\facade\Db;
@@ -98,6 +95,8 @@ class ProductSearch extends BaseController
             $visionDescCount = 0;
         }
 
+        $volcCfg = VolcArkVisionConfig::get();
+
         return $this->jsonOk([
             'items' => $items,
             'total' => (int) $list->total(),
@@ -105,44 +104,26 @@ class ProductSearch extends BaseController
             'page_size' => (int) $list->listRows(),
             'python_ok' => $pythonOk,
             'python_diag' => $pythonDiag,
-            'vision_openai_enabled' => $visionCfg['enabled'],
+            /** 兼容旧前端字段：寻款仅使用豆包，此处恒为 false */
+            'vision_openai_enabled' => false,
             'vision_describe_on_import' => $visionCfg['describe_on_import'],
+            /** 豆包（火山方舟）已启用且配置完整时导入可写 ai_description */
+            'vision_any_provider_ready' => $volcCfg['enabled'],
             'vision_items_with_desc' => $visionDescCount,
-            'aliyun_is_enabled' => AliyunImageSearchConfig::get()['enabled'],
-            'aliyun_is_pending' => ProductStyleAliyunQueueService::pendingCount(),
-            'google_ps_enabled' => GoogleProductSearchConfig::get()['enabled'],
-            'volc_ark_enabled' => VolcArkVisionConfig::get()['enabled'],
+            /** 导入已不再入队阿里云 / 同步 Google，恒为关闭 */
+            'aliyun_is_enabled' => false,
+            'aliyun_is_pending' => 0,
+            'google_ps_enabled' => false,
+            'volc_ark_enabled' => $volcCfg['enabled'],
         ]);
     }
 
     /**
-     * 手动消费阿里云图传队列（导入未完成同步时可点此重试）
+     * 已停用：导入不再入队阿里云图搜。
      */
     public function syncAliyunQueue()
     {
-        if (!$this->request->isPost()) {
-            return $this->jsonErr('仅支持 POST');
-        }
-        $max = (int) $this->request->post('max', 300);
-        $sec = (int) $this->request->post('seconds', 180);
-        if ($max < 1) {
-            $max = 300;
-        }
-        if ($max > 2000) {
-            $max = 2000;
-        }
-        if ($sec < 10) {
-            $sec = 10;
-        }
-        if ($sec > 600) {
-            $sec = 600;
-        }
-        $sync = ProductStyleAliyunQueueService::drain($max, $sec);
-
-        return $this->jsonOk([
-            'sync' => $sync,
-            'pending' => ProductStyleAliyunQueueService::pendingCount(),
-        ], '同步批次完成');
+        return $this->jsonErr('阿里云图传入队已关闭（寻款仅使用豆包）');
     }
 
     private function checkPythonEmbed(): bool

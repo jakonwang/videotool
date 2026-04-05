@@ -72,57 +72,59 @@
       const tableRef = ref(null);
       const selectedRows = ref([]);
       const batchDeleting = ref(false);
-      const aliyunEnabled = ref(false);
-      const aliyunPending = ref(0);
-      const syncingAliyun = ref(false);
-      const visionEnabled = ref(false);
       const visionDescribeOnImport = ref(false);
       const visionDescCount = ref(0);
-      const googlePsEnabled = ref(false);
       const volcArkEnabled = ref(false);
+      const visionAnyProviderReady = ref(true);
       const importDialogVisible = ref(false);
       const importTaskId = ref(0);
       const importPercent = ref(0);
       const importStatusText = ref('');
       const importLogs = ref([]);
       const importDone = ref(false);
-      const importTickLoading = ref(false);
+      const importPollError = ref('');
       let importPollTimer = null;
 
       function stopImportPolling() {
         if (importPollTimer) {
-          clearInterval(importPollTimer);
+          clearTimeout(importPollTimer);
           importPollTimer = null;
         }
       }
 
-      async function pollImportTick() {
+      async function pollImportTickOnce() {
         if (!importTaskId.value || importDone.value) return;
-        if (importTickLoading.value) return;
-        importTickLoading.value = true;
+        importPollError.value = '';
         try {
+          const fd = new URLSearchParams();
+          fd.set('task_id', String(importTaskId.value));
           const res = await fetch('/admin.php/product_search/importTaskTick', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
-            body: JSON.stringify({ task_id: importTaskId.value }),
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: fd.toString(),
           });
           const text = await res.text();
           let json = null;
           try {
             json = JSON.parse(text);
           } catch (e) {
-            ElMessage.error('进度接口返回非 JSON（HTTP ' + res.status + '）');
+            const errMsg = '进度接口返回非 JSON（HTTP ' + res.status + '）';
+            importPollError.value = errMsg + (text ? ' ' + String(text).replace(/\s+/g, ' ').slice(0, 200) : '');
+            ElMessage.error(errMsg);
             stopImportPolling();
             return;
           }
           if (json && json.code === 401) {
+            importPollError.value = '未登录或会话过期';
             ElMessage.error('未登录或会话过期');
             stopImportPolling();
             return;
           }
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || '推进任务失败');
+            const m = (json && json.msg) || '推进任务失败';
+            importPollError.value = m;
+            ElMessage.error(m);
             stopImportPolling();
             return;
           }
@@ -149,20 +151,28 @@
             const input = document.getElementById('csvFileInput');
             if (input) input.value = '';
             fetchList();
+            return;
           }
         } catch (e) {
-          ElMessage.error(e.message || '轮询失败');
+          const m = e.message || '轮询失败';
+          importPollError.value = m;
+          ElMessage.error(m);
           stopImportPolling();
-        } finally {
-          importTickLoading.value = false;
         }
       }
 
       function startImportPolling() {
         stopImportPolling();
         importDone.value = false;
-        pollImportTick();
-        importPollTimer = setInterval(pollImportTick, 2000);
+        importPollError.value = '';
+        const loop = async () => {
+          if (!importDialogVisible.value || !importTaskId.value || importDone.value) return;
+          await pollImportTickOnce();
+          if (!importDone.value && importDialogVisible.value && importTaskId.value) {
+            importPollTimer = setTimeout(loop, 2000);
+          }
+        };
+        loop();
       }
 
       async function fetchList() {
@@ -182,13 +192,12 @@
           total.value = (json.data && json.data.total) ? json.data.total : 0;
           pythonOk.value = !!(json.data && json.data.python_ok);
           pythonDiag.value = (json.data && json.data.python_diag) ? String(json.data.python_diag) : '';
-          aliyunEnabled.value = !!(json.data && json.data.aliyun_is_enabled);
-          aliyunPending.value = (json.data && json.data.aliyun_is_pending != null) ? Number(json.data.aliyun_is_pending) : 0;
-          visionEnabled.value = !!(json.data && json.data.vision_openai_enabled);
           visionDescribeOnImport.value = !!(json.data && json.data.vision_describe_on_import);
           visionDescCount.value = (json.data && json.data.vision_items_with_desc != null) ? Number(json.data.vision_items_with_desc) : 0;
-          googlePsEnabled.value = !!(json.data && json.data.google_ps_enabled);
           volcArkEnabled.value = !!(json.data && json.data.volc_ark_enabled);
+          visionAnyProviderReady.value = json.data && json.data.vision_any_provider_ready != null
+            ? !!json.data.vision_any_provider_ready
+            : true;
         } catch (e) {
           ElMessage.error(e.message || '加载失败');
         } finally {
@@ -248,7 +257,7 @@
               importTaskId.value = Number(d.task_id);
               importPercent.value = 0;
               importLogs.value = [];
-              importStatusText.value = '排队中…';
+              importStatusText.value = '正在连接任务…';
               importDialogVisible.value = true;
               startImportPolling();
               return;
@@ -259,15 +268,6 @@
               ' 条，失败' + (d.failed || 0) + ' 条';
             if (d.vision && d.vision.described_rows != null && d.vision.described_rows > 0) {
               msg += '；AI 描述生成 ' + d.vision.described_rows + ' 行';
-            }
-            if (d.aliyun && d.aliyun.sync_batch) {
-              const s = d.aliyun.sync_batch;
-              msg += '；阿里云已传' + (s.ok || 0) + ' 失败' + (s.fail || 0);
-              if (d.aliyun.pending > 0) msg += '，队列剩余 ' + d.aliyun.pending + '（可点「同步阿里云」）';
-            }
-            if (d.google_ps && d.google_ps.enabled) {
-              msg += '；Google 索引成功 ' + (d.google_ps.synced_rows || 0) + ' 行';
-              if (d.google_ps.failed_rows > 0) msg += '，失败 ' + d.google_ps.failed_rows + '（见控制台 errors）';
             }
             ElMessage.success(msg);
             if (d.errors && d.errors.length) console.warn(d.errors);
@@ -285,6 +285,7 @@
 
       function closeImportDialog() {
         stopImportPolling();
+        importPollError.value = '';
         importDialogVisible.value = false;
       }
 
@@ -436,40 +437,15 @@
         }
       }
 
-      async function doSyncAliyun() {
-        syncingAliyun.value = true;
-        try {
-          const fd = new URLSearchParams();
-          fd.set('max', '400');
-          fd.set('seconds', '240');
-          const res = await fetch('/admin.php/product_search/syncAliyunQueue', {
-            method: 'POST',
-            body: fd.toString(),
-            credentials: 'same-origin',
-            headers: { ...apiFetchHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-          });
-          const j = parseJsonBody(res, await res.text());
-          if (j && j.code === 401) throw new Error('未登录或会话过期');
-          if (!j || j.code !== 0) throw new Error((j && j.msg) || '同步失败');
-          const s = (j.data && j.data.sync) ? j.data.sync : {};
-          aliyunPending.value = (j.data && j.data.pending != null) ? Number(j.data.pending) : 0;
-          ElMessage.success('同步批次：成功 ' + (s.ok || 0) + '，失败 ' + (s.fail || 0) + '，剩余队列 ' + aliyunPending.value);
-        } catch (e) {
-          ElMessage.error(e.message || '同步失败');
-        } finally {
-          syncingAliyun.value = false;
-        }
-      }
-
       onMounted(() => { fetchList(); });
       onUnmounted(() => { stopImportPolling(); });
 
       return {
         loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
-        importDialogVisible, importTaskId, importPercent, importStatusText, importLogs, importDone, importTickLoading,
+        importDialogVisible, importTaskId, importPercent, importStatusText, importLogs, importDone, importPollError,
         closeImportDialog,
-        tableRef, selectedRows, batchDeleting, aliyunEnabled, aliyunPending, syncingAliyun, doSyncAliyun,
-        visionEnabled, visionDescribeOnImport, visionDescCount, googlePsEnabled, volcArkEnabled,
+        tableRef, selectedRows, batchDeleting,
+        visionDescribeOnImport, visionDescCount, volcArkEnabled, visionAnyProviderReady,
         editVisible, editSaving, editImageInputKey, editForm,
         fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang,
         imageDisplayUrl, isImagePreviewable,
@@ -496,17 +472,16 @@
             <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">诊断：{{ pythonDiag }}</div>
           </div>
           <div>支持 <strong>CSV / TXT / Excel（.xlsx、.xls）</strong>，均为<strong>异步导入</strong>（上传后立即返回 <code>task_id</code>，每约 2 秒推进一行，避免网关 502）。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。Excel 每步会加载工作簿，超大表请拆文件或改 CSV。异步 tick 依赖 PHP-FPM，请保证 <code>request_terminate_timeout</code> 足够大（见文档）。</div>
-          <div v-if="googlePsEnabled" style="margin-top:8px;color:#7c3aed;">已启用 <strong>Google Product Search</strong>：拍照寻款<strong>优先</strong>走 Google；导入会写入 GCS 并注册参考图（索引有延迟）。密钥须放在 public 外，见 <strong>设置</strong>。</div>
-          <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">已启用 <strong>火山方舟豆包视觉</strong>：未开 Google 时拍照寻款走国内方舟 API（需在 <strong>设置</strong> 填 Endpoint 与 API Key）。</div>
-          <div v-if="volcArkEnabled || visionEnabled" style="margin-top:8px;color:#0f766e;">
-            <span v-if="volcArkEnabled"><strong>方舟豆包</strong> 可用于导入时生成 <code>ai_description</code>（优先于 OpenAI）。</span>
-            <span v-if="visionEnabled"><strong>OpenAI</strong> 可作识图备选或仅 OpenAI 时生成描述。</span>
-            库内已有 AI 描述 <strong>{{ visionDescCount }}</strong> 条。
-            <span v-if="visionDescribeOnImport">已在设置中开启「导入时生成描述」。</span>
-            <span v-else>若需导入自动写描述，请在 <strong>设置</strong> 勾选「导入时生成视觉描述」。</span>
+          <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">已启用 <strong>豆包视觉</strong>：拍照寻款与（可选）导入描述走火山方舟；请在 <strong>设置</strong> 维护 Endpoint 与 API Key。服务端日志可搜 <code>[volc_ark] 豆包</code> 确认是否发起请求。</div>
+          <div v-if="visionDescribeOnImport && !visionAnyProviderReady" style="margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;line-height:1.55;">
+            <strong>无法调用豆包：</strong>已勾选「导入时生成描述」，但当前<strong>未在设置中启用豆包或未填写 Endpoint + API Key</strong>。导入仍会建向量，但 <strong>AI 特征列为空</strong>。请到 <strong>系统 → 设置</strong> 完成豆包配置。
           </div>
-          <div v-if="aliyunEnabled" style="margin-top:8px;color:#1e40af;">已启用 <strong>阿里云图像搜索</strong>（未配 Google/OpenAI 时使用）：导入会入队同步；队列剩余 <strong>{{ aliyunPending }}</strong> 条可点「同步阿里云」。</div>
-          <div v-if="!googlePsEnabled && !visionEnabled && !volcArkEnabled && !aliyunEnabled" style="margin-top:8px;color:#64748b;">请在 <strong>系统 → 设置</strong> 启用 <strong>Google</strong> / <strong>火山方舟</strong> / <strong>OpenAI</strong> / <strong>阿里云图搜</strong> 至少一项；新环境需执行 <code>database/run_migration_openai_vision_columns.php</code>（Linux 用正斜杠路径）。</div>
+          <div v-if="volcArkEnabled" style="margin-top:8px;color:#0f766e;">
+            <strong>豆包</strong> 可用于导入时生成 <code>ai_description</code>。库内已有 AI 描述 <strong>{{ visionDescCount }}</strong> 条。
+            <span v-if="visionDescribeOnImport">已在设置中开启「导入时生成描述」。</span>
+            <span v-else>若需导入自动写描述，请在 <strong>设置</strong> 勾选「导入时生成描述」。</span>
+          </div>
+          <div v-if="!volcArkEnabled" style="margin-top:8px;color:#64748b;">拍照寻款需在 <strong>系统 → 设置</strong> 启用 <strong>豆包视觉</strong> 并填写 Endpoint 与 API Key；新环境需执行 <code>database/run_migration_openai_vision_columns.php</code>（Linux 用正斜杠路径）。</div>
         </div>
 
         <div class="admin-filter-section">
@@ -516,7 +491,6 @@
               <el-button type="primary" @click="()=>{page=1;fetchList();}">筛选</el-button>
               <input id="csvFileInput" type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:240px;" />
               <el-button type="success" :loading="importing" @click="doImport">导入</el-button>
-              <el-button type="primary" plain :loading="syncingAliyun" :disabled="!aliyunEnabled" @click="doSyncAliyun">同步阿里云</el-button>
               <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">批量删除</el-button>
             </div>
           </div>
@@ -568,6 +542,7 @@
 
         <el-dialog v-model="importDialogVisible" title="导入进度" width="560px" destroy-on-close align-center @closed="closeImportDialog">
           <div style="margin-bottom:12px;font-size:13px;color:#475569;">任务 {{ importTaskId }} · {{ importStatusText }}</div>
+          <div v-if="importPollError" style="margin-bottom:10px;font-size:12px;color:#b91c1c;line-height:1.5;">{{ importPollError }}</div>
           <el-progress :percentage="importPercent" :status="importDone ? 'success' : undefined" />
           <div style="margin-top:14px;font-size:12px;color:#64748b;margin-bottom:6px;">日志</div>
           <div class="import-log-viewer">
@@ -575,7 +550,7 @@
             <div v-if="!importLogs.length" class="log-line" style="color:#94a3b8;">等待处理…</div>
           </div>
           <template #footer>
-            <el-button @click="closeImportDialog" :disabled="importTickLoading && !importDone">关闭</el-button>
+            <el-button @click="closeImportDialog">关闭</el-button>
           </template>
         </el-dialog>
 
