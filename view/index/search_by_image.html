@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>拍照寻款</title>
-  <script>window.__H5_API_ENTRY__={$h5_api_entry_js|raw};</script>
+  <script>{if isset($h5_api_entry_js) && $h5_api_entry_js != ''}window.__H5_API_ENTRY__={$h5_api_entry_js|raw};{else /}window.__H5_API_ENTRY__='/index.php';{/if}</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <style>
@@ -124,6 +124,9 @@ createApp({
     /** 豆包等视觉模型需要一定清晰度，压缩目标约 1MB 内 */
     const MAX_UPLOAD_BYTES = 1024 * 1024;
     const SEARCH_MAX_EDGE = 1600;
+    const API_ENTRY = (typeof window !== 'undefined' && window.__H5_API_ENTRY__ != null && String(window.__H5_API_ENTRY__).trim() !== '')
+      ? String(window.__H5_API_ENTRY__).trim()
+      : '/index.php';
 
     /** 上传前压缩：限制长边与体积，减轻网络延迟 */
     function compressImageBlob(blob, maxEdge) {

@@ -431,7 +431,7 @@
 - `GET /index.php/api/product_search/searchByCode?q=`：编号 **LIKE** 模糊匹配（仍由 `ProductSearch` 提供）。
 
 ### H5 页面
-- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询 / **可选补充说明**；以图寻款上传前 **前端压缩**（长边约 **1600**、体积目标约 **1MB** 以内）；加载态 **「AI 正在比对款式…」**；若 **`data.fallback`** 为真会显示关键词回退说明。H5 请求 API 使用 **`Request::baseFile()`** 动态拼接路径，**子目录部署**（如 `…/public/index.php/searchByImage`）时不再误用站点根 `/index.php/api/...`。**寻款清单**：除有 **AI 描述** 或 **爆款类型** 外，**仅有参考图**（`image_ref`）的上架款也会入清单（匹配弱于有描述，优于完全搜不到）。
+- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询 / **可选补充说明**；以图寻款上传前 **前端压缩**（长边约 **1600**、体积目标约 **1MB** 以内）；加载态 **「AI 正在比对款式…」**；若 **`data.fallback`** 为真会显示关键词回退说明。H5 请求 API 使用 **`Request::baseFile()`** 动态拼接路径，**子目录部署**（如 `…/public/index.php/searchByImage`）时不再误用站点根 `/index.php/api/...`。**寻款清单**：除有 **AI 描述** 或 **爆款类型** 外，**仅有参考图**（`image_ref`）的上架款也会入清单（匹配弱于有描述，优于完全搜不到）。页面由 **`SearchByImage@index`** 注入 **`window.__H5_API_ENTRY__`**（`json_encode(baseFile())`）；Vue `setup()` 内定义 **`const API_ENTRY`** 读取该值，缺省为 **`/index.php`**，避免出现 **`API_ENTRY is not defined`**；若模板未走该控制器，头脚本也会回退 **`/index.php`**。
 
 ### CSV / Excel 列说明
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
