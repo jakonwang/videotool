@@ -13,6 +13,8 @@
     .hint-box code { font-size: 12px; }
     .style-img-cell { display: flex; align-items: center; min-height: 68px; }
     .style-img-fallback { font-size: 12px; color: #6b7280; word-break: break-all; line-height: 1.45; max-width: 200px; }
+    .import-log-viewer { background: #0f172a; color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.55; max-height: 240px; overflow-y: auto; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; }
+    .import-log-viewer .log-line { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
 </style>
 {/block}
 
@@ -27,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
-  const { createApp, reactive, ref, computed, onMounted } = Vue;
+  const { createApp, reactive, ref, computed, onMounted, onUnmounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
@@ -78,6 +80,90 @@
       const visionDescCount = ref(0);
       const googlePsEnabled = ref(false);
       const volcArkEnabled = ref(false);
+      const importDialogVisible = ref(false);
+      const importTaskId = ref(0);
+      const importPercent = ref(0);
+      const importStatusText = ref('');
+      const importLogs = ref([]);
+      const importDone = ref(false);
+      const importTickLoading = ref(false);
+      let importPollTimer = null;
+
+      function stopImportPolling() {
+        if (importPollTimer) {
+          clearInterval(importPollTimer);
+          importPollTimer = null;
+        }
+      }
+
+      async function pollImportTick() {
+        if (!importTaskId.value || importDone.value) return;
+        if (importTickLoading.value) return;
+        importTickLoading.value = true;
+        try {
+          const res = await fetch('/admin.php/product_search/importTaskTick', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ task_id: importTaskId.value }),
+          });
+          const text = await res.text();
+          let json = null;
+          try {
+            json = JSON.parse(text);
+          } catch (e) {
+            ElMessage.error('进度接口返回非 JSON（HTTP ' + res.status + '）');
+            stopImportPolling();
+            return;
+          }
+          if (json && json.code === 401) {
+            ElMessage.error('未登录或会话过期');
+            stopImportPolling();
+            return;
+          }
+          if (!json || json.code !== 0) {
+            ElMessage.error((json && json.msg) || '推进任务失败');
+            stopImportPolling();
+            return;
+          }
+          const d = json.data || {};
+          importPercent.value = d.percent != null ? Number(d.percent) : 0;
+          importStatusText.value = (d.status || '') + ' · 已处理 ' + (d.processed_rows != null ? d.processed_rows : 0) + '/' + (d.total_rows != null ? d.total_rows : '?');
+          importLogs.value = Array.isArray(d.logs) ? d.logs.slice(-80) : [];
+          if (d.done) {
+            importDone.value = true;
+            stopImportPolling();
+            const msg =
+              '导入结束：新增 ' +
+              (d.inserted != null ? d.inserted : 0) +
+              '，更新 ' +
+              (d.updated != null ? d.updated : 0) +
+              '，失败 ' +
+              (d.failed != null ? d.failed : 0) +
+              (d.error_message ? '。' + d.error_message : '');
+            if (d.status === 'failed') {
+              ElMessage.error(msg);
+            } else {
+              ElMessage.success(msg);
+            }
+            const input = document.getElementById('csvFileInput');
+            if (input) input.value = '';
+            fetchList();
+          }
+        } catch (e) {
+          ElMessage.error(e.message || '轮询失败');
+          stopImportPolling();
+        } finally {
+          importTickLoading.value = false;
+        }
+      }
+
+      function startImportPolling() {
+        stopImportPolling();
+        importDone.value = false;
+        pollImportTick();
+        importPollTimer = setInterval(pollImportTick, 2000);
+      }
 
       async function fetchList() {
         loading.value = true;
@@ -158,6 +244,15 @@
           }
           if (json && json.code === 0) {
             const d = json.data || {};
+            if (d.mode === 'async' && d.task_id != null) {
+              importTaskId.value = Number(d.task_id);
+              importPercent.value = 0;
+              importLogs.value = [];
+              importStatusText.value = '排队中…';
+              importDialogVisible.value = true;
+              startImportPolling();
+              return;
+            }
             let msg = (json.msg || '完成') +
               ' 新增' + (d.imported != null ? d.imported : 0) +
               ' 条，更新' + (d.updated != null ? d.updated : 0) +
@@ -186,6 +281,11 @@
         } finally {
           importing.value = false;
         }
+      }
+
+      function closeImportDialog() {
+        stopImportPolling();
+        importDialogVisible.value = false;
       }
 
       async function doDelete(row) {
@@ -362,9 +462,12 @@
       }
 
       onMounted(() => { fetchList(); });
+      onUnmounted(() => { stopImportPolling(); });
 
       return {
         loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
+        importDialogVisible, importTaskId, importPercent, importStatusText, importLogs, importDone, importTickLoading,
+        closeImportDialog,
         tableRef, selectedRows, batchDeleting, aliyunEnabled, aliyunPending, syncingAliyun, doSyncAliyun,
         visionEnabled, visionDescribeOnImport, visionDescCount, googlePsEnabled, volcArkEnabled,
         editVisible, editSaving, editImageInputKey, editForm,
@@ -392,7 +495,7 @@
             首次运行会下载 MobileNet 权重。Web 进程（如 Apache）的 PATH 常与 CMD 不同；请在 <code>config/product_search.php</code> 的 <code>python_bin</code> 或环境变量 <code>PRODUCT_SEARCH_PYTHON</code> 填写 <strong>python.exe 绝对路径</strong>（Windows）或 <code>which python3</code> 路径（Linux）。
             <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">诊断：{{ pythonDiag }}</div>
           </div>
-          <div>支持 <strong>CSV / Excel（.xlsx、.xls）</strong>。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。若 <strong>HTTP 502</strong> 或导入到一半失败，多为<strong>超时/内存</strong>：调大 Nginx <code>fastcgi_read_timeout</code>、PHP-FPM <code>request_terminate_timeout</code>，或<strong>拆成多个表分批导入</strong>。</div>
+          <div>支持 <strong>CSV / TXT / Excel（.xlsx、.xls）</strong>，均为<strong>异步导入</strong>（上传后立即返回 <code>task_id</code>，每约 2 秒推进一行，避免网关 502）。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。Excel 每步会加载工作簿，超大表请拆文件或改 CSV。异步 tick 依赖 PHP-FPM，请保证 <code>request_terminate_timeout</code> 足够大（见文档）。</div>
           <div v-if="googlePsEnabled" style="margin-top:8px;color:#7c3aed;">已启用 <strong>Google Product Search</strong>：拍照寻款<strong>优先</strong>走 Google；导入会写入 GCS 并注册参考图（索引有延迟）。密钥须放在 public 外，见 <strong>设置</strong>。</div>
           <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">已启用 <strong>火山方舟豆包视觉</strong>：未开 Google 时拍照寻款走国内方舟 API（需在 <strong>设置</strong> 填 Endpoint 与 API Key）。</div>
           <div v-if="volcArkEnabled || visionEnabled" style="margin-top:8px;color:#0f766e;">
@@ -462,6 +565,19 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <el-dialog v-model="importDialogVisible" title="导入进度" width="560px" destroy-on-close align-center @closed="closeImportDialog">
+          <div style="margin-bottom:12px;font-size:13px;color:#475569;">任务 {{ importTaskId }} · {{ importStatusText }}</div>
+          <el-progress :percentage="importPercent" :status="importDone ? 'success' : undefined" />
+          <div style="margin-top:14px;font-size:12px;color:#64748b;margin-bottom:6px;">日志</div>
+          <div class="import-log-viewer">
+            <div v-for="(log, idx) in importLogs" :key="idx" class="log-line">[{{ log.t || '—' }}] {{ log.m || '' }}</div>
+            <div v-if="!importLogs.length" class="log-line" style="color:#94a3b8;">等待处理…</div>
+          </div>
+          <template #footer>
+            <el-button @click="closeImportDialog" :disabled="importTickLoading && !importDone">关闭</el-button>
+          </template>
+        </el-dialog>
 
         <el-dialog v-model="editVisible" title="编辑索引" width="520px" destroy-on-close align-center>
           <el-form label-width="96px" @submit.prevent>

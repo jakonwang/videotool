@@ -55,6 +55,48 @@ class VolcArkVisionService
     }
 
     /**
+     * 寻款批量导入专用：输出「核心视觉指纹」（颜色、材质、造型、挂钩/耳针类型等），短句利于向量侧与检索。
+     */
+    public static function describeImportFingerprintImage(string $absolutePath): ?string
+    {
+        $cfg = VolcArkVisionConfig::get();
+        if (!$cfg['enabled'] || !is_file($absolutePath) || !is_readable($absolutePath)) {
+            return null;
+        }
+        $dataUrl = self::fileToDataUrl($absolutePath);
+        if ($dataUrl === null) {
+            return null;
+        }
+        $maxTok = min(220, max(96, (int) $cfg['describe_max_tokens']));
+        $body = [
+            'model' => $cfg['endpoint_id'],
+            'max_tokens' => $maxTok,
+            'temperature' => 0.2,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => '你是珠宝/饰品图像指纹标注员。只输出一行中文，30～90 字。必须包含：主色与金属光泽、材质（合金/银/锆石/珍珠等）、整体造型轮廓、佩戴结构（耳针/耳钩/耳圈/吊坠扣/链扣等）。不要编号、价格、营销语、品牌名。',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => '请提取这张饰品参考图的「核心视觉指纹」，一行输出，便于以文搜图与去重。'],
+                        ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
+                    ],
+                ],
+            ],
+        ];
+        $raw = self::chatCompletionRaw($cfg, $body);
+        $text = self::parseChatCompletionText($raw);
+        if ($text === null) {
+            return null;
+        }
+        $text = preg_replace("/\s+/u", ' ', trim($text));
+
+        return $text !== '' ? mb_substr($text, 0, 500) : null;
+    }
+
+    /**
      * @param list<array{code:string,desc:string,hot:string}> $catalog
      * @return array{ok:bool, matches?: list<array{product_code:string, score:float, reason:string}>, error?:string, raw?:string, fallback_keyword?:bool}
      */

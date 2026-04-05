@@ -115,6 +115,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // 图片搜款式
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
     Route::post('product_search/importCsv', 'app\controller\admin\ProductSearch@importCsv');
+    Route::get('product_search/importTaskStatus', 'app\controller\admin\ProductSearch@importTaskStatus');
+    Route::post('product_search/importTaskTick', 'app\controller\admin\ProductSearch@importTaskTick');
     Route::post('product_search/syncAliyunQueue', 'app\controller\admin\ProductSearch@syncAliyunQueue');
     Route::post('product_search/batchDelete', 'app\controller\admin\ProductSearch@deleteBatch');
     Route::post('product_search/update/<id>', 'app\controller\admin\ProductSearch@updateItem');

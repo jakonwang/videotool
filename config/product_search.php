@@ -6,4 +6,6 @@ return [
     'top_k' => 3,
     /** @var int 导入时单张图下载超时（秒） */
     'fetch_image_timeout' => 30,
+    /** @var int 异步导入每行 AI 调用后的休眠（微秒），降低豆包/OpenAI 频率限制风险；0 表示不休眠 */
+    'import_ai_usleep_microseconds' => (int) (env('PRODUCT_STYLE_IMPORT_AI_USLEEP', 200000)),
 ];

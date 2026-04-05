@@ -113,6 +113,8 @@ mysql -u root -p videotool < database/schema.sql
 
 **寻款阿里云队列表：** 使用阿里云图搜导入同步时，执行 `php database/run_migration_product_style_is_queue.php`（Windows：`php database\run_migration_product_style_is_queue.php`），并执行 `composer install` 安装 `alibabacloud/imagesearch-20201214`。
 
+**寻款 CSV 异步导入任务表：** 后台 **CSV/TXT** 导入会创建 `product_style_import_tasks` 任务并轮询 `importTaskTick`。新环境或旧库升级请执行：`php database/run_migration_product_style_import_tasks.php`（Windows：`php database\run_migration_product_style_import_tasks.php`）。详见 `requirements.md`。
+
 **寻款 Google Product Search（可选）：** `composer install` 会安装 `google/cloud-vision` 与 `google/cloud-storage`。在 GCP 创建 **Product Set** 后可执行：  
 `php scripts/google_create_product_set.php --project=项目ID --location=us-east1 --set-id=集合短ID --display-name=显示名 --key-file=密钥JSON绝对路径`  
 （密钥须放在 **Web 的 `public` 目录之外**；亦可用环境变量 `GOOGLE_APPLICATION_CREDENTIALS`。）后台 **设置 → Google Product Search** 填写 Project、Location、Product Set、**GCS Bucket**（参考图桶）等并启用；详见 `requirements.md`。

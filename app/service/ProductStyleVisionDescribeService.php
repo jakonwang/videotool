@@ -28,4 +28,25 @@ class ProductStyleVisionDescribeService
 
         return null;
     }
+
+    /**
+     * 异步 CSV 导入：豆包用短「指纹」Prompt；未命中时回退 OpenAI 全量描述（若已启用）。
+     */
+    public static function describeForImport(string $absolutePath): ?string
+    {
+        if (!is_file($absolutePath) || !is_readable($absolutePath)) {
+            return null;
+        }
+        if (VolcArkVisionConfig::get()['enabled']) {
+            $d = VolcArkVisionService::describeImportFingerprintImage($absolutePath);
+            if ($d !== null && trim($d) !== '') {
+                return trim($d);
+            }
+        }
+        if (VisionOpenAIConfig::get()['enabled']) {
+            return VisionSearchService::describeEarringImage($absolutePath);
+        }
+
+        return null;
+    }
 }

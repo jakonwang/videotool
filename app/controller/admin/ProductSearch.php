@@ -7,7 +7,6 @@ use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
 use app\service\AliyunImageSearchConfig;
 use app\service\GoogleProductSearchConfig;
-use app\service\GoogleProductSearchService;
 use app\service\VolcArkVisionConfig;
 use app\service\ProductStyleAliyunQueueService;
 use app\service\ProductStyleEmbeddingService;
@@ -15,7 +14,8 @@ use app\service\VisionOpenAIConfig;
 use think\facade\Db;
 use app\service\ProductStyleVisionDescribeService;
 use app\service\ProductStyleImportService;
-use app\service\ProductStyleXlsxImportService;
+use app\service\ProductStyleImportTaskRunner;
+use app\service\ProductStyleIndexRowService;
 use think\facade\Log;
 use think\facade\View;
 
@@ -32,70 +32,6 @@ class ProductSearch extends BaseController
     private function jsonErr(string $msg, int $code = 1, $data = null)
     {
         return json(['code' => $code, 'msg' => $msg, 'data' => $data]);
-    }
-
-    /**
-     * Excel/大批量导入逐行调 Python，默认 PHP/Nginx 易超时或内存不足导致 502；在允许时放宽执行时间与内存。
-     */
-    private function prepareLongRunningImport(): void
-    {
-        if (\function_exists('set_time_limit')) {
-            @\set_time_limit(0);
-        }
-        @\ini_set('max_execution_time', '0');
-        $cur = (string) \ini_get('memory_limit');
-        if ($cur !== '-1' && $cur !== '') {
-            @\ini_set('memory_limit', '512M');
-        }
-    }
-
-    /**
-     * 按 product_code 插入或更新：同一编号重复导入不新增行，仅更新参考图、爆款类型、向量与可选 ai_description。
-     *
-     * @return array{inserted:bool, updated:bool}
-     */
-    private function upsertStyleItem(string $code, string $imageRef, string $hotType, array $embeddingVec, ?string $aiDescription = null): array
-    {
-        $code = trim($code);
-        $embJson = json_encode($embeddingVec, JSON_UNESCAPED_UNICODE);
-        $row = ItemModel::where('product_code', $code)->find();
-        if ($row) {
-            $data = [
-                'image_ref' => $imageRef,
-                'hot_type' => $hotType,
-                'embedding' => $embJson,
-                'status' => 1,
-            ];
-            if ($aiDescription !== null && $aiDescription !== '') {
-                $data['ai_description'] = $aiDescription;
-            }
-            $row->save($data);
-
-            return ['inserted' => false, 'updated' => true];
-        }
-
-        ItemModel::create([
-            'product_code' => $code,
-            'image_ref' => $imageRef,
-            'hot_type' => $hotType,
-            'ai_description' => $aiDescription ?? '',
-            'embedding' => $embJson,
-            'status' => 1,
-        ]);
-
-        return ['inserted' => true, 'updated' => false];
-    }
-
-    private function syncProductAiDescription(string $productCode, ?string $desc): void
-    {
-        if ($desc === null || $desc === '') {
-            return;
-        }
-        try {
-            Db::name('products')->where('name', $productCode)->update(['ai_description' => $desc]);
-        } catch (\Throwable $e) {
-            Log::warning('syncProductAiDescription: ' . $e->getMessage());
-        }
     }
 
     public function index()
@@ -232,7 +168,7 @@ class ProductSearch extends BaseController
     }
 
     /**
-     * POST 文件：CSV/TXT（链接、路径、Base64）或 Excel（xlsx/xls，图片列支持单元格嵌入图）
+     * POST 文件：CSV/TXT 异步任务；Excel（xlsx/xls）仍为同步长请求（大表建议转 CSV）
      */
     public function importCsv()
     {
@@ -242,6 +178,69 @@ class ProductSearch extends BaseController
             Log::error('product_search importCsv: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
 
             return $this->jsonErr('导入失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * GET：仅查询任务进度（不推进）
+     */
+    public function importTaskStatus()
+    {
+        try {
+            $id = (int) $this->request->param('task_id', 0);
+            if ($id <= 0) {
+                return $this->jsonErr('无效 task_id');
+            }
+            ProductStyleImportTaskRunner::bumpMemoryAndTime();
+            $snap = ProductStyleImportTaskRunner::snapshot($id);
+            if ($snap === null) {
+                return $this->jsonErr('任务不存在');
+            }
+
+            return $this->jsonOk($snap);
+        } catch (\Throwable $e) {
+            Log::error('importTaskStatus: ' . $e->getMessage());
+
+            return $this->jsonErr('查询失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * POST：推进一行（JSON 或表单 task_id）
+     */
+    public function importTaskTick()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('仅支持 POST');
+            }
+            $id = 0;
+            $raw = (string) $this->request->getContent();
+            if ($raw !== '') {
+                $j = json_decode($raw, true);
+                if (is_array($j) && isset($j['task_id'])) {
+                    $id = (int) $j['task_id'];
+                }
+            }
+            if ($id <= 0) {
+                $id = (int) $this->request->post('task_id', 0);
+            }
+            if ($id <= 0) {
+                $id = (int) $this->request->param('task_id', 0);
+            }
+            if ($id <= 0) {
+                return $this->jsonErr('无效 task_id');
+            }
+            $r = ProductStyleImportTaskRunner::tick($id);
+            if (isset($r['_error'])) {
+                return $this->jsonErr((string) $r['_error']);
+            }
+
+            return $this->jsonOk($r);
+        } catch (\Throwable $e) {
+            Log::error('importTaskTick: ' . $e->getMessage());
+
+            return $this->jsonErr('处理失败：' . $e->getMessage());
         }
     }
 
@@ -263,310 +262,23 @@ class ProductSearch extends BaseController
             return $this->jsonErr('无法读取上传文件');
         }
 
-        $this->prepareLongRunningImport();
-
-        $publicRoot = root_path() . 'public';
-
-        if (in_array($ext, ['xlsx', 'xls', 'xlsm'], true)) {
-            return $this->importExcelSpreadsheet($tmp, $publicRoot);
-        }
-        if (!in_array($ext, ['csv', 'txt'], true)) {
+        if (!in_array($ext, ['csv', 'txt', 'xlsx', 'xls', 'xlsm'], true)) {
             return $this->jsonErr('仅支持 .csv / .txt / .xlsx / .xls / .xlsm');
         }
-        $handle = fopen($tmp, 'rb');
-        if ($handle === false) {
-            return $this->jsonErr('无法打开文件');
-        }
-        $bom = fread($handle, 3);
-        if ($bom !== "\xEF\xBB\xBF") {
-            rewind($handle);
-        }
 
-        $rowIndex = 0;
-        $headerMap = null;
-        $inserted = 0;
-        $updated = 0;
-        $fail = 0;
-        $errors = [];
-        $maxImports = 5000;
-        $visionDescribed = 0;
-        $googleSynced = 0;
-        $googleFailed = 0;
-        $googleErrors = [];
-
-        while (($row = fgetcsv($handle)) !== false) {
-            $rowIndex++;
-            if ($row === [null] || $row === false) {
-                continue;
-            }
-            $row = array_map(static function ($c) {
-                return trim((string) $c);
-            }, $row);
-            if (count($row) === 1 && $row[0] === '') {
-                continue;
-            }
-
-            if ($headerMap === null) {
-                $detected = ProductStyleImportService::mapHeader($row);
-                if ($detected !== null) {
-                    $headerMap = $detected;
-                    continue;
-                }
-                $headerMap = ['code' => 0, 'image' => 1, 'hot' => 2];
-                if (!isset($row[0], $row[1])) {
-                    fclose($handle);
-
-                    return $this->jsonErr('CSV 首行需为表头（含「产品编号」「图片」列），或前两列为编号+图片');
-                }
-            }
-
-            $ci = $headerMap['code'];
-            $ii = $headerMap['image'];
-            $hi = $headerMap['hot'] ?? null;
-            if (!isset($row[$ci], $row[$ii])) {
-                $fail++;
-                if (count($errors) < 30) {
-                    $errors[] = "第{$rowIndex}行：列不完整";
-                }
-                continue;
-            }
-            $code = trim((string) $row[$ci]);
-            $imgRaw = (string) $row[$ii];
-            $hot = $hi !== null && isset($row[$hi]) ? trim((string) $row[$hi]) : '';
-            if ($code === '' || $imgRaw === '') {
-                continue;
-            }
-
-            $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
-            if (!$resolved['ok'] || $resolved['temp'] === '') {
-                $fail++;
-                if (count($errors) < 30) {
-                    $errors[] = "第{$rowIndex}行 {$code}：图片无法下载或路径无效";
-                }
-                continue;
-            }
-
-            $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
-            if (!is_array($vec)) {
-                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
-                    @unlink($resolved['temp']);
-                }
-                $fail++;
-                if (count($errors) < 30) {
-                    $errors[] = "第{$rowIndex}行 {$code}：特征提取失败（请检查 Python 与 torch）";
-                }
-                continue;
-            }
-
-            $aiDesc = null;
-            $vCfg = VisionOpenAIConfig::get();
-            if ($vCfg['describe_on_import']) {
-                $aiDesc = ProductStyleVisionDescribeService::describeEarring($resolved['temp']);
-                if ($aiDesc !== null && $aiDesc !== '') {
-                    $visionDescribed++;
-                }
-            }
-            $u = $this->upsertStyleItem($code, $resolved['ref'], $hot, $vec, $aiDesc);
-            $this->syncProductAiDescription($code, $aiDesc);
-            $this->syncGoogleProductSearchIndex($code, $resolved['temp'], $googleSynced, $googleFailed, $googleErrors);
-            $picName = ProductStyleAliyunQueueService::makePicName($resolved['ref'], $resolved['temp']);
-            ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
-            if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
-                @unlink($resolved['temp']);
-            }
-            if ($u['inserted']) {
-                $inserted++;
-            } else {
-                $updated++;
-            }
-            $success = $inserted + $updated;
-            if ($success % 5 === 0) {
-                \gc_collect_cycles();
-            }
-            if ($success >= $maxImports) {
-                break;
-            }
-        }
-        fclose($handle);
-
-        $aliyunSync = ProductStyleAliyunQueueService::drain(800, 300);
-
-        return $this->jsonOk([
-            'imported' => $inserted,
-            'updated' => $updated,
-            'failed' => $fail,
-            'errors' => $errors,
-            'vision' => [
-                'openai_enabled' => VisionOpenAIConfig::get()['enabled'],
-                'volc_ark_enabled' => VolcArkVisionConfig::get()['enabled'],
-                'describe_on_import' => VisionOpenAIConfig::get()['describe_on_import'],
-                'described_rows' => $visionDescribed,
-            ],
-            'aliyun' => [
-                'sync_batch' => $aliyunSync,
-                'pending' => ProductStyleAliyunQueueService::pendingCount(),
-            ],
-            'google_ps' => [
-                'enabled' => GoogleProductSearchConfig::get()['enabled'],
-                'synced_rows' => $googleSynced,
-                'failed_rows' => $googleFailed,
-                'errors' => $googleErrors,
-            ],
-        ], '导入完成');
-    }
-
-    /**
-     * @param int $synced
-     * @param int $failed
-     * @param string[] $errors
-     */
-    private function syncGoogleProductSearchIndex(string $productCode, string $localPath, int &$synced, int &$failed, array &$errors): void
-    {
-        if (!GoogleProductSearchConfig::get()['enabled']) {
-            return;
-        }
-        $r = GoogleProductSearchService::syncReferenceFromLocalFile($productCode, $localPath);
-        if (!empty($r['skipped'])) {
-            return;
-        }
-        if ($r['ok'] ?? false) {
-            $synced++;
-
-            return;
-        }
-        $failed++;
-        if (count($errors) < 20) {
-            $errors[] = $productCode . '：' . (string) ($r['error'] ?? '同步失败');
-        }
-    }
-
-    private function importExcelSpreadsheet(string $tmp, string $publicRoot)
-    {
-        if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
-            return $this->jsonErr('未安装 Excel 解析依赖，请在项目根目录执行 composer install（需 phpoffice/phpspreadsheet）');
-        }
-
-        $inserted = 0;
-        $updated = 0;
-        $fail = 0;
-        $errors = [];
-        $maxImports = 5000;
-        $visionDescribed = 0;
-        $googleSynced = 0;
-        $googleFailed = 0;
-        $googleErrors = [];
-
+        ProductStyleImportTaskRunner::bumpMemoryAndTime();
         try {
-            foreach (ProductStyleXlsxImportService::iterateRows($tmp) as $rec) {
-                $rowIndex = (int) $rec['row'];
-                $code = $rec['code'];
-                if ($code === '') {
-                    continue;
-                }
-                $imgTemp = $rec['imageTemp'];
-                $imgRaw = $rec['imageRaw'];
-                $hot = $rec['hot'];
-
-                if (($imgTemp === null || !is_file($imgTemp) || !is_readable($imgTemp)) && trim($imgRaw) === '') {
-                    $fail++;
-                    if (count($errors) < 30) {
-                        $errors[] = "第{$rowIndex}行 {$code}：图片列为空且无嵌入图（请确认图片插在「图片」列对应单元格内）";
-                    }
-                    continue;
-                }
-
-                $excelEmbedSource = null;
-                if ($imgTemp !== null && is_file($imgTemp) && is_readable($imgTemp)) {
-                    $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
-                    $excelEmbedSource = $imgTemp;
-                } else {
-                    $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
-                }
-                if (!$resolved['ok'] || $resolved['temp'] === '') {
-                    $fail++;
-                    if (count($errors) < 30) {
-                        $errors[] = "第{$rowIndex}行 {$code}：图片无法解析（嵌入图失败或链接/路径无效）";
-                    }
-                    continue;
-                }
-
-                $vec = ProductStyleEmbeddingService::embedFile($resolved['temp']);
-                if (!is_array($vec)) {
-                    if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
-                        @unlink($resolved['temp']);
-                    }
-                    $fail++;
-                    if (count($errors) < 30) {
-                        $errors[] = "第{$rowIndex}行 {$code}：特征提取失败（请检查 Python 与 torch）";
-                    }
-                    continue;
-                }
-
-                $imageRef = $resolved['ref'];
-                if ($excelEmbedSource !== null && is_file($excelEmbedSource)) {
-                    $saved = ProductStyleImportService::persistStyleImageToPublic($excelEmbedSource, $publicRoot);
-                    if ($saved !== null) {
-                        $imageRef = $saved;
-                    }
-                }
-
-                $aiDesc = null;
-                $vCfg = VisionOpenAIConfig::get();
-                if ($vCfg['describe_on_import']) {
-                    $aiDesc = ProductStyleVisionDescribeService::describeEarring($resolved['temp']);
-                    if ($aiDesc !== null && $aiDesc !== '') {
-                        $visionDescribed++;
-                    }
-                }
-                $u = $this->upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
-                $this->syncProductAiDescription($code, $aiDesc);
-                $this->syncGoogleProductSearchIndex($code, $resolved['temp'], $googleSynced, $googleFailed, $googleErrors);
-                $picName = ProductStyleAliyunQueueService::makePicName($imageRef, $resolved['temp']);
-                ProductStyleAliyunQueueService::enqueue($code, $resolved['temp'], $picName, $hot);
-                if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
-                    @unlink($resolved['temp']);
-                }
-                if ($u['inserted']) {
-                    $inserted++;
-                } else {
-                    $updated++;
-                }
-                $success = $inserted + $updated;
-                if ($success % 5 === 0) {
-                    \gc_collect_cycles();
-                }
-                if ($success >= $maxImports) {
-                    break;
-                }
-            }
+            $taskId = ProductStyleImportTaskRunner::createFromUploadedFile($tmp, $ext);
         } catch (\Throwable $e) {
-            return $this->jsonErr('Excel 解析失败：' . $e->getMessage());
+            Log::warning('create import task: ' . $e->getMessage());
+
+            return $this->jsonErr('创建导入任务失败：' . $e->getMessage() . '（若首次使用请先执行 database/run_migration_product_style_import_tasks.php 建表；Excel 需已 composer install phpoffice/phpspreadsheet）');
         }
 
-        $aliyunSync = ProductStyleAliyunQueueService::drain(800, 300);
-
         return $this->jsonOk([
-            'imported' => $inserted,
-            'updated' => $updated,
-            'failed' => $fail,
-            'errors' => $errors,
-            'vision' => [
-                'openai_enabled' => VisionOpenAIConfig::get()['enabled'],
-                'volc_ark_enabled' => VolcArkVisionConfig::get()['enabled'],
-                'describe_on_import' => VisionOpenAIConfig::get()['describe_on_import'],
-                'described_rows' => $visionDescribed,
-            ],
-            'aliyun' => [
-                'sync_batch' => $aliyunSync,
-                'pending' => ProductStyleAliyunQueueService::pendingCount(),
-            ],
-            'google_ps' => [
-                'enabled' => GoogleProductSearchConfig::get()['enabled'],
-                'synced_rows' => $googleSynced,
-                'failed_rows' => $googleFailed,
-                'errors' => $googleErrors,
-            ],
-        ], '导入完成');
+            'mode' => 'async',
+            'task_id' => $taskId,
+        ], '任务已创建');
     }
 
     public function delete()
@@ -718,7 +430,7 @@ class ProductSearch extends BaseController
 
             $row->save($update);
             if (isset($update['ai_description']) && (string) $update['ai_description'] !== '') {
-                $this->syncProductAiDescription($productCode, (string) $update['ai_description']);
+                ProductStyleIndexRowService::syncProductAiDescription($productCode, (string) $update['ai_description']);
             }
 
             return $this->jsonOk([], '已保存');

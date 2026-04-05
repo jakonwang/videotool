@@ -402,7 +402,7 @@
 - 路径：`tools/product_style_search/`
 - **PHP**：寻款 **Excel 导入** 依赖 `phpoffice/phpspreadsheet` **5.4+**；**OpenAI** 使用 **`guzzlehttp/guzzle`** 调 REST；**阿里云图搜（可选）** 依赖 **`alibabacloud/imagesearch-20201214`**；**Google Product Search（可选）** 依赖 **`google/cloud-vision` ^1.7** 与 **`google/cloud-storage`**（参考图须 **gs://**，由导入逻辑上传）。要求 **PHP ≥ 8.1**（需 `ext-zip`、`ext-xml`、`ext-gd` 等）。部署后务必执行 `composer install` / `composer update`。
 - 依赖：在项目根执行 `pip install -r tools/product_style_search/requirements.txt`（`torch`、`torchvision`、`Pillow`）；建议用与 Web 将调用的同一解释器，例如 `py -3 -m pip install -r tools/product_style_search/requirements.txt`（Windows）或 `python3 -m pip ...`（Linux）。
-- 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
+- 配置：`config/product_search.php` 中 `python_bin`（由 `PRODUCT_SEARCH_PYTHON` 覆盖）、**`import_ai_usleep_microseconds`**（异步导入每行 AI 后的微秒级休眠，默认 `200000`，可用环境变量 **`PRODUCT_STYLE_IMPORT_AI_USLEEP`** 覆盖；`0` 表示不休眠）。**未配置环境变量时**：Windows 在代码侧使用 `py -3`，Linux/macOS **默认即为 `python3`**。**Web 进程的 PATH 往往与 shell 不同**，若仍提示「环境未就绪」，请设置 `PRODUCT_SEARCH_PYTHON` 为解释器绝对路径（Linux 常见：`/usr/bin/python3`；Windows：`…\python.exe`）。
 - 自检：用**与 PHP 相同身份**在命令行执行一次 `python embed_image.py 某张.jpg`（路径按你的配置），应输出一行 JSON 数组。`ProductStyleEmbeddingService` 会依次尝试 **`exec` → `proc_open` → `shell_exec`** 拉取子进程输出；若 `php.ini` 的 **`disable_functions` 把三者都禁用**，则无法从 PHP 调 Python，需在配置中**至少放行其一**（常见仅禁用 `exec` 时，`proc_open` 仍可用）。
 - 说明：`tools/product_style_search/README.md`
 
@@ -414,7 +414,9 @@
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
 - `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**、**`google_ps_enabled`**、**`volc_ark_enabled`**
-- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。**若 OpenAI 已配置且开启导入描述**：每行成功后再调 Vision 写 **`ai_description`**（按行计费）。响应 **`data.vision`**：`openai_enabled`、`describe_on_import`、`described_rows`。**若已启用阿里云图搜**：仍 **入队** 并 **drain**，见 **`data.aliyun`**。**若已启用 Google Product Search**：每行尝试 **GCS + Vision 索引**，见 **`data.google_ps`**（`synced_rows`、`failed_rows`、`errors`）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
+- `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；**`.csv` / `.txt` / `.xlsx` / `.xls` / `.xlsm`** 均为**异步任务**。上传成功后立即返回 **`data.mode=async`**、**`data.task_id`**，不阻塞 Nginx；每行在 **`importTaskTick`** 中执行。需先建表 **`product_style_import_tasks`**：Windows `php database\run_migration_product_style_import_tasks.php`，Linux `php database/run_migration_product_style_import_tasks.php`。任务文件在 **`runtime/style_import_tasks/`**。**豆包** 在异步路径使用 **`describeForImport`**（含 **`describeImportFingerprintImage`** 指纹描述）；**Excel** 依赖 **`phpoffice/phpspreadsheet`**（`composer install`）。**Excel** 每次 tick 会**重新加载工作簿**解析一行，超大表建议拆文件。**通用**：CSV 编码建议 UTF-8（带 BOM）；**导入按 `product_code` 幂等**；**阿里云** 入队，任务完成时 **drain**；**Google Product Search** 在每行 tick 内索引。**HTTP 413**：调 Nginx 与 PHP 上传上限。
+- `GET /admin.php/product_search/importTaskStatus`：查询参数 **`task_id`**，只读任务进度与日志（不推进）。
+- `POST /admin.php/product_search/importTaskTick`：JSON 或表单 **`task_id`**，**推进一行**（或完成表头解析/收尾），返回 `status`、`total_rows`、`processed_rows`、`percent`、`logs`（数组）、`done` 等。前端每 **2 秒**轮询一次直至 `done=true`。**PHP-FPM** 请将 **`request_terminate_timeout`** 设为 **`0`** 或明显大于单次 tick 最慢耗时（含 Python 与豆包），否则长任务可能在 tick 阶段被中断。
 - `POST /admin.php/product_search/syncAliyunQueue`：表单字段 `max`（单次最多处理条数，默认 300，上限 2000）、`seconds`（时间上限秒，默认 180，上限 600）；用于消费队列。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
 - `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
@@ -447,7 +449,7 @@
 - 向量（本地）仍为 **全表线性扫描**（适合万级以内）；**拍照流程默认不走本地余弦**，除非未配 Google、OpenAI 与阿里云。
 - 导入仍依赖 Python 抽特征时，请保证 `embed_image.py` 可用。
 - **后台寻款批量导入**、手机拍照寻款：若 **HTTP 413**，先调 Nginx `client_max_body_size`，再调 PHP `upload_max_filesize` 与 `post_max_size`（三者均要覆盖最大单文件体积）。
-- **HTTP 502**（Nginx Bad Gateway）常见于 **导入 Excel 中途**：每行要调 Python 抽特征，总时间易超过 **Nginx `fastcgi_read_timeout`** 或 **PHP-FPM `request_terminate_timeout`**，或 **内存** 爆掉导致子进程退出。处理：Nginx 对 `admin.php` 增加 `fastcgi_read_timeout 600s;`、`fastcgi_send_timeout 600s;`；`php.ini` 提高 `max_execution_time`、`memory_limit`（如 512M）；`www.conf` 中 `request_terminate_timeout = 600` 或 `0`。仍失败则 **拆分 Excel 分批导入**。代码侧导入入口会尝试 `set_time_limit(0)` 与提高 `memory_limit`（受宿主策略限制）。
+- **HTTP 502**（Nginx Bad Gateway）常见于 **同步导入 Excel** 或 **未使用异步 CSV 时**的长请求：总时间超过 **Nginx `fastcgi_read_timeout`**、**PHP-FPM `request_terminate_timeout`**，或 **内存** 不足。**CSV 请优先走异步导入**（上传即返回 `task_id`）。**Excel** 仍建议：Nginx `fastcgi_read_timeout` / `fastcgi_send_timeout` 加大；`php.ini` 提高 `max_execution_time`、`memory_limit`（如 512M）；`www.conf` 中 `request_terminate_timeout = 600` 或 `0`；或 **拆表分批**。代码侧 `importCsv` / `tick` / Excel 入口会尝试 `set_time_limit(0)` 与 `memory_limit=512M`（受宿主策略限制）。
 
 ## 桌面端：发卡与版本、公开下载（2026-04）
 
