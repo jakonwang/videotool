@@ -39,7 +39,7 @@ class Search extends BaseController
         if (!VolcArkVisionConfig::get()['enabled']) {
             return $this->jsonOut([
                 'code' => 1,
-                'msg' => '未启用寻款引擎：请在后台「设置」启用火山方舟豆包并填写 Endpoint ID 与 API Key',
+                'msg' => '未启用寻款引擎：请在后台「设置」启用豆包并填写 API Key 与 model（或 ep-）',
                 'data' => null,
             ]);
         }
@@ -68,8 +68,13 @@ class Search extends BaseController
             }
             $desc = trim((string) ($row->ai_description ?? ''));
             $hot = trim((string) ($row->hot_type ?? ''));
+            $imageRef = trim((string) ($row->image_ref ?? ''));
             if ($desc === '' && $hot === '') {
-                continue;
+                if ($imageRef === '') {
+                    continue;
+                }
+                /** 仅有主图、无 AI 描述与爆款时仍入清单，避免「有货却搜不到」；豆包仅见文字行，匹配弱于有描述条目 */
+                $desc = '（编号' . $code . '：已入库参考图，文字特征未填；请结合实拍在清单内择优）';
             }
             $catalog[] = [
                 'code' => $code,
@@ -82,7 +87,7 @@ class Search extends BaseController
         if ($catalog === []) {
             return $this->jsonOut([
                 'code' => 1,
-                'msg' => '库内无可用描述：请先在导入表格中填写「爆款类型」或通过豆包导入生成「视觉特征」，再使用寻款。',
+                'msg' => '库内无可用索引：上架款式需至少有「AI 描述」「爆款类型」或「参考图」之一；请检查导入是否成功、商品是否上架（status=1）。',
                 'data' => ['engine' => 'volc_ark', 'catalog_size' => 0],
             ]);
         }

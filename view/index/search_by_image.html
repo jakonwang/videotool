@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>拍照寻款</title>
+  <script>window.__H5_API_ENTRY__={$h5_api_entry_js|raw};</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <style>
@@ -193,7 +194,7 @@ createApp({
       }
       loading.value = true;
       try {
-        const res = await fetch('/index.php/api/product_search/searchByCode?' + new URLSearchParams({ q, limit: '10' }));
+        const res = await fetch(API_ENTRY + '/api/product_search/searchByCode?' + new URLSearchParams({ q, limit: '10' }));
         const json = await res.json();
         if (!json || json.code !== 0) throw new Error((json && json.msg) || '查询失败');
         codeResults.value = (json.data && json.data.items) ? json.data.items : [];
@@ -217,7 +218,7 @@ createApp({
         fd.append('file', toSend, 'query.jpg');
         const h = extraHint.value.trim();
         if (h) fd.append('hint', h);
-        const res = await fetch('/index.php/api/product_search/searchByImage', {
+        const res = await fetch(API_ENTRY + '/api/product_search/searchByImage', {
           method: 'POST',
           body: fd,
           credentials: 'same-origin',
@@ -232,7 +233,11 @@ createApp({
         if (!json || json.code !== 0) {
           if (json && json.code === 429) throw new Error(json.msg || '请求过于频繁，请稍后再试');
           if (json && json.code === 504) throw new Error(json.msg || '服务超时，请稍后再试');
-          throw new Error((json && json.msg) || '搜索失败');
+          let m = (json && json.msg) || '搜索失败';
+          if (json && json.data && json.data.catalog_size !== undefined) {
+            m += '（当前可比对索引约 ' + json.data.catalog_size + ' 条）';
+          }
+          throw new Error(m);
         }
         imgResults.value = (json.data && json.data.items) ? json.data.items : [];
         if (json.data && json.data.fallback && json.data.fallback_reason) {
