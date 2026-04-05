@@ -376,9 +376,11 @@
 ## 图片搜款式「寻款」（2026-04；可选 Google Product Search）
 
 ### 目标
-- 从 **CSV / Excel** 导入「产品编号 + 参考图 + 可选爆款类型」：仍使用 **本地 Python**（MobileNetV2）生成向量写入 MySQL（兼容列表与历史数据）。若 **后台已配置 OpenAI** 且勾选 **导入时生成描述**，则对每行参考图调用 **`gpt-4o-mini` Vision** 生成一句中文 **视觉特征** 写入 **`product_style_items.ai_description`**，并同步到 **`products.ai_description`**（当存在 `products.name` 与产品编号一致时）。
+- 从 **CSV / Excel** 导入「产品编号 + 参考图 + 可选爆款类型」：仍使用 **本地 Python**（MobileNetV2）生成向量写入 MySQL（兼容列表与历史数据）。若 **设置中勾选「导入时生成视觉描述」**，则对每行参考图自动生成 **`ai_description`**：**优先火山方舟豆包视觉**，失败或未配置时 **回退 OpenAI `gpt-4o-mini` Vision**；写入 **`product_style_items.ai_description`**，并同步到 **`products.ai_description`**（当存在同名商品时）。
 - **Google Cloud Vision Product Search（可选）**：后台 **设置** 启用并填写 Project、Location、Product Set、**GCS Bucket** 与**密钥 JSON 绝对路径**（须**不在 `public` 目录下**）后，导入时每行会 **上传参考图至 GCS**，并调用 **`createProduct` + `addProductToProductSet` + `createReferenceImage`**（`product_category` 默认 **`homegoods-v2`**）；**拍照寻款**优先走 **`ImageAnnotatorClient::productSearch`**。返回 **`score` / `similarity`**（0～1）；若最高分低于配置阈值（默认 **0.5**），`msg` 为 **「未找到完全匹配款式」**（仍可能返回 Top 结果便于人工核对）。**运维脚本**：`php scripts/google_create_product_set.php --project=... --location=... --set-id=...`（可加 `--key-file=` 或环境变量 `GOOGLE_APPLICATION_CREDENTIALS`）。
-- **H5 拍照寻款**：未启用 Google 时，**仅用户点击拍照/选图搜索时**调用 OpenAI（每请求约一次 chat+图）；将库内「编号|特征|爆款」列表与用户实拍图一并交给模型，返回 **最多 5 条** `product_code` + 置信度 + 简短理由，再与本地表合并展示。**未配置 OpenAI** 时，若启用了阿里云图搜则 **回退** 为 `SearchImageByPic`。支持 **编号模糊查询**（`searchByCode`，不走向量）。
+- **⚠️ Google 侧限制（必读）**：自 2025 年起，官方对经典 **Product Search** 进入 **maintenance / 准入限制**，许多项目调用会收到 `INVALID_ARGUMENT`：`Product Search is in maintenance mode...`，并引导使用 **Vision Warehouse**（[文档](https://cloud.google.com/vision-ai/docs/warehouse-overview)）或 [申请继续使用 Product Search](https://forms.gle/QPLzMdwSMcR2pPsq5)。**该报错与服务器配置无关**；未获白名单前请 **关闭后台 Google 寻款**，改用 **OpenAI Vision** 或 **阿里云图搜**。若未来需继续用 Google 图搜，需评估迁移至 Vision Warehouse（与本仓库当前 `google/cloud-vision` Product Search 接口不同，需另做集成）。
+- **火山引擎方舟 · 豆包视觉（可选，国内推荐）**：在方舟创建 **Doubao-vision-pro / lite** 接入点，将 **Endpoint ID**、**API Key** 写入 **`config/services.php`** 的 **`volc_ark`** 或后台 **设置** 并启用。拍照寻款使用 **OpenAI 兼容** `POST .../chat/completions`（`model`=接入点 ID），Prompt 为「仓库对货助手」+ 库内「编号|描述|爆款」清单 + 实拍图 **Base64**；识款与 **AI 描述**均按**饰品全品类**优化（耳环、手链、项链、吊坠、戒指等），非仅限耳环。支持 **`hint` 文字补充**与失败时 **关键词模糊回退**（`ProductStyleKeywordSearchService`）。依赖已有 **Guzzle**，无需额外 SDK。
+- **H5 拍照寻款**：未启用 Google / 豆包时，可调用 **OpenAI**；将库内「编号|特征|爆款」列表与用户实拍图一并交给模型。**未配置 OpenAI** 时，若启用了阿里云图搜则 **回退** 为 `SearchImageByPic`。支持 **编号模糊查询**（`searchByCode`，不走向量）。
 - 可选：导入行仍 **入队阿里云** AddImage（与 OpenAI / Google 独立，可在设置中关闭阿里云以省云费用）。
 
 ### 数据库
@@ -411,7 +413,7 @@
 
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）
-- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**、**`google_ps_enabled`**
+- `GET /admin.php/product_search/list`：列表 JSON（`keyword`、`page`、`page_size`），并返回 `python_ok`、`python_diag`、**`vision_openai_enabled`**、**`vision_items_with_desc`**、**`aliyun_is_enabled`**、**`aliyun_is_pending`**、**`google_ps_enabled`**、**`volc_ark_enabled`**
 - `POST /admin.php/product_search/importCsv`：`multipart` 字段 `file`；支持 **`.csv` / `.txt` / `.xlsx` / `.xls`**。CSV 图片列为链接、路径或 Base64；**Excel 可将图片嵌入「图片」列单元格**（依赖 `phpoffice/phpspreadsheet`，部署需执行 `composer install`）。CSV 编码建议 UTF-8（带 BOM 亦可）。**导入按 `product_code` 幂等**：已存在的编号**不会新增行**，会**更新**参考图、爆款类型与向量（同文件内同一编号多行时，**后出现的行覆盖前行**）。**若 OpenAI 已配置且开启导入描述**：每行成功后再调 Vision 写 **`ai_description`**（按行计费）。响应 **`data.vision`**：`openai_enabled`、`describe_on_import`、`described_rows`。**若已启用阿里云图搜**：仍 **入队** 并 **drain**，见 **`data.aliyun`**。**若已启用 Google Product Search**：每行尝试 **GCS + Vision 索引**，见 **`data.google_ps`**（`synced_rows`、`failed_rows`、`errors`）。**异常**会捕获并返回 JSON（`code!=0`、`msg`），避免裸 500；若仍见 HTTP 500 多为致命错误或未进入控制器，查 `runtime/log`。**HTTP 413** 为请求体超限，**在到达 PHP 之前**被 Nginx 拒绝：需在 `server`/`location` 设置 `client_max_body_size 256m;`（示例）并重载 Nginx，且 `php.ini` 中 `upload_max_filesize`、`post_max_size` 须 **≥ 上传文件大小**。
 - `POST /admin.php/product_search/syncAliyunQueue`：表单字段 `max`（单次最多处理条数，默认 300，上限 2000）、`seconds`（时间上限秒，默认 180，上限 600）；用于消费队列。
 - `POST /admin.php/product_search/delete/<id>`：删除一条索引
@@ -420,19 +422,19 @@
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
 ### 开放 API（无需登录，供仓库手机端 H5）
-- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；`multipart/form-data`，字段名 `file`。**优先级**：后台启用 **Google Product Search** → `data.engine`=`google_ps`（`items` 含 **`score`** 与 **`similarity`**、`best_score`、`low_confidence`）；否则已配置 **OpenAI** → `openai_vision`（`data.catalog_size`）；否则若启用 **阿里云** → `aliyun_is`；否则 `code=1`。**Vision 成功**时 `items` 每项含 `product_code`、`image_ref`、`hot_type`、`similarity`（0～1）、**`match_reason`**、**`product`**。**阿里云**时仍可有 `aliyun_pic_name`。**限流/超时**：阿里云路径下 `code` 可能为 429/504。
+- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；`multipart/form-data`，字段名 **`file`**；可选字段 **`hint`**（用户文字补充，与豆包多轮/关键词回退相关）。**优先级**：**Google Product Search**（若启用）→ **`volc_ark`（火山方舟豆包视觉）**（若启用）→ **OpenAI Vision**（若配置 Key）→ **阿里云** `aliyun_is`。豆包路径：`data.engine`=`volc_ark` 或失败回退时 `volc_ark_keyword`（`data.fallback`=true）；Google：`google_ps`；OpenAI：`openai_vision`。**Vision 成功**时 `items` 含 `product_code`、`similarity`、`match_reason`、`product` 等。**配置**：`config/services.php` 中 **`volc_ark`**（`VOLC_ACCESS_KEY`、`VOLC_SECRET_KEY` 预留、`VOLC_ENDPOINT_ID`、`VOLC_ARK_BASE_URL` 等）及后台 **设置 → 火山方舟 · 豆包视觉**。
 - `POST /index.php/api/search/searchByImage`：同上（别名路径）。
 - `GET /index.php/api/product_search/searchByCode?q=`：编号 **LIKE** 模糊匹配（仍由 `ProductSearch` 提供）。
 
 ### H5 页面
-- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询；以图寻款上传前 **前端压缩**（长边 **640**、JPEG 质量递减直至约 **2MB** 以内）；加载态文案 **「AI 正在比对款式…」**；结果区展示 **匹配说明 `match_reason`**（Vision）、**Top 至多 5 条** 与 **商品表关联信息**；Google 路径下若 **`low_confidence`** 会提示 **未找到完全匹配款式**。
+- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询 / **可选补充说明**；以图寻款上传前 **前端压缩**（长边约 **1600**、体积目标约 **1MB** 以内，兼顾豆包视觉清晰度）；加载态 **「AI 正在比对款式…」**；若 **`data.fallback`** 为真会显示关键词回退说明。Google 路径下 **`low_confidence`** 时提示 **未找到完全匹配款式**。
 
 ### CSV / Excel 列说明
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
 - CSV 无数表头时按前两列为「编号、图片」解析；Excel 始终使用第一行为表头。
 - **CSV**：图片列可为 `http(s)`、以 `/` 开头的站内路径、或 `data:image/...;base64,...`。
 - **Excel**：将商品图**插入**到「图片」列对应行的单元格（浮动图，锚定在该格即可），无需填写 URL；亦可与 CSV 相同在单元格内填链接文本作为备选。导入成功后嵌入图会**复制**到 `public/uploads/product_style/`，`image_ref` 存为站内路径（如 `/uploads/product_style/ps_xxx.jpg`），列表与 H5 可展示；若目录不可写则仍回退为占位文案「(Excel嵌入图)」。
-- 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`。
+- 从 Excel 另存 CSV 的说明见：`docs/耳环款式CSV说明.md`（文档面向饰品全品类，表名历史原因保留「耳环」）。
 
 ### 已适配页面
 - 后台：`view/admin/product_search/index.html`（**编辑**编号/爆款/参考图；多选 + **批量删除**；「参考图」缩略图与预览）

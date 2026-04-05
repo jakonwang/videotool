@@ -80,6 +80,29 @@ class Settings extends BaseController
             }
             SystemConfigService::set('openai_describe_on_import', $this->request->post('openai_describe_on_import') === '1' ? '1' : '0');
 
+            SystemConfigService::set('volc_ark_enabled', $this->request->post('volc_ark_enabled') === '1' ? '1' : '0');
+            $vAk = trim((string) $this->request->post('volc_ark_access_key', ''));
+            if ($vAk !== '') {
+                SystemConfigService::set('volc_ark_access_key', $vAk);
+            } elseif ($this->request->post('volc_ark_access_clear') === '1') {
+                SystemConfigService::set('volc_ark_access_key', '');
+            }
+            $vSk = trim((string) $this->request->post('volc_ark_secret_key', ''));
+            if ($vSk !== '') {
+                SystemConfigService::set('volc_ark_secret_key', $vSk);
+            } elseif ($this->request->post('volc_ark_secret_clear') === '1') {
+                SystemConfigService::set('volc_ark_secret_key', '');
+            }
+            foreach (
+                [
+                    'volc_ark_endpoint_id',
+                    'volc_ark_base_url',
+                    'volc_ark_max_catalog',
+                ] as $vk
+            ) {
+                SystemConfigService::set($vk, trim((string) $this->request->post($vk, '')));
+            }
+
             SystemConfigService::set('google_ps_enabled', $this->request->post('google_ps_enabled') === '1' ? '1' : '0');
             $gKey = trim((string) $this->request->post('google_ps_key_file', ''));
             if ($gKey !== '') {
@@ -131,6 +154,13 @@ class Settings extends BaseController
         $openaiMaxCatalog = SystemConfigService::get('openai_max_catalog', '') ?? '';
         $openaiDescribeFlag = SystemConfigService::get('openai_describe_on_import', '');
         $openaiDescribeOnImport = $openaiDescribeFlag === '' || $openaiDescribeFlag === '1';
+        $volcArkEnabled = SystemConfigService::get('volc_ark_enabled', '0') === '1';
+        $volcArkAccessConfigured = trim((string) (SystemConfigService::get('volc_ark_access_key', '') ?? '')) !== ''
+            || trim((string) (getenv('VOLC_ACCESS_KEY') ?: '')) !== '';
+        $volcArkSecretConfigured = trim((string) (SystemConfigService::get('volc_ark_secret_key', '') ?? '')) !== '';
+        $volcArkEndpoint = SystemConfigService::get('volc_ark_endpoint_id', '') ?? '';
+        $volcArkBaseUrl = SystemConfigService::get('volc_ark_base_url', '') ?? '';
+        $volcArkMaxCatalog = SystemConfigService::get('volc_ark_max_catalog', '') ?? '';
         $googlePsEnabled = SystemConfigService::get('google_ps_enabled', '0') === '1';
         $googlePsKeyConfigured = trim((string) (SystemConfigService::get('google_ps_key_file', '') ?? '')) !== ''
             || trim((string) (getenv('GOOGLE_APPLICATION_CREDENTIALS') ?: '')) !== '';
@@ -173,6 +203,12 @@ class Settings extends BaseController
             'openai_model' => $openaiModel,
             'openai_max_catalog' => $openaiMaxCatalog,
             'openai_describe_on_import' => $openaiDescribeOnImport,
+            'volc_ark_enabled' => $volcArkEnabled,
+            'volc_ark_access_configured' => $volcArkAccessConfigured,
+            'volc_ark_secret_configured' => $volcArkSecretConfigured,
+            'volc_ark_endpoint_id' => $volcArkEndpoint,
+            'volc_ark_base_url' => $volcArkBaseUrl,
+            'volc_ark_max_catalog' => $volcArkMaxCatalog,
             'google_ps_enabled' => $googlePsEnabled,
             'google_ps_key_configured' => $googlePsKeyConfigured,
             'google_ps_project_id' => $googlePsProject,

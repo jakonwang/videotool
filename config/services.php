@@ -47,4 +47,19 @@ return [
         'match_score_min' => (float) env('GOOGLE_PS_MATCH_SCORE_MIN', 0.5),
         'search_top_k' => (int) env('GOOGLE_PS_SEARCH_TOP_K', 5),
     ],
+    /**
+     * 火山引擎方舟（豆包视觉）：OpenAI 兼容 Chat Completions，model 填接入点 Endpoint ID。
+     * 鉴权：Bearer = 控制台 API Key（建议写入 VOLC_ACCESS_KEY 或后台「Access Key」）。
+     */
+    'volc_ark' => [
+        'access_key' => env('VOLC_ACCESS_KEY', ''),
+        'secret_key' => env('VOLC_SECRET_KEY', ''),
+        'endpoint_id' => env('VOLC_ENDPOINT_ID', ''),
+        'base_url' => rtrim((string) env('VOLC_ARK_BASE_URL', 'https://ark.cn-beijing.volces.com/api/v3'), '/'),
+        'max_catalog_items' => (int) env('VOLC_ARK_MAX_CATALOG', 250),
+        'timeout_seconds' => (int) env('VOLC_ARK_TIMEOUT', 120),
+        'match_max_tokens' => (int) env('VOLC_ARK_MATCH_MAX_TOKENS', 1024),
+        'describe_max_tokens' => (int) env('VOLC_ARK_DESCRIBE_MAX_TOKENS', 220),
+        'retry_times' => (int) env('VOLC_ARK_RETRY', 2),
+    ],
 ];

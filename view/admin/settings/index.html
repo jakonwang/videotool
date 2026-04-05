@@ -140,7 +140,7 @@
                     <div class="form-group mb-0">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" id="openai_describe_on_import" name="openai_describe_on_import" value="1" {if $openai_describe_on_import}checked{/if}>
-                            <label class="custom-control-label" for="openai_describe_on_import">导入 CSV/Excel 时为每行参考图自动生成 AI 描述（按行计费）</label>
+                            <label class="custom-control-label" for="openai_describe_on_import">导入 CSV/Excel 时为每行参考图自动生成 AI 视觉描述（<strong>豆包优先</strong>，未配方舟则用 OpenAI；按行计费）</label>
                         </div>
                     </div>
                     <div class="d-flex justify-content-end mt-3">
@@ -151,7 +151,58 @@
 
                     <div class="card shadow-sm mb-3">
                         <div class="card-body">
+                    <h5 class="mb-3 text-muted">火山方舟 · 豆包视觉（寻款）</h5>
+                    <p class="small text-muted">国内网络直连，拍照寻款走方舟 OpenAPI（兼容 OpenAI Chat Completions）。在火山控制台创建 <strong>Doubao-vision</strong> 接入点，将 <strong>Endpoint ID</strong>（形如 <code>ep-xxxx</code>）填入下方；<strong>API Key</strong> 填入 Access Key（Bearer）。未启用 Google 且启用本项时，优先于 OpenAI。</p>
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="volc_ark_enabled" name="volc_ark_enabled" value="1" {if $volc_ark_enabled}checked{/if}>
+                            <label class="custom-control-label" for="volc_ark_enabled">启用豆包视觉寻款（需 API Key + Endpoint ID）</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="volc_ark_access_key">Access Key（方舟 API Key，作 Bearer）</label>
+                        <input type="password" name="volc_ark_access_key" id="volc_ark_access_key" class="form-control" value="" autocomplete="new-password" placeholder="{if $volc_ark_access_configured}已保存，留空不修改{else /}控制台复制的 API Key{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="volc_ark_access_clear" name="volc_ark_access_clear" value="1">
+                            <label class="custom-control-label" for="volc_ark_access_clear">清空后台保存的 Access Key</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="volc_ark_secret_key">Secret Key（可选，预留）</label>
+                        <input type="password" name="volc_ark_secret_key" id="volc_ark_secret_key" class="form-control" value="" autocomplete="new-password" placeholder="{if $volc_ark_secret_configured}已保存，留空不修改{else /}当前方舟 HTTP 接口通常仅需 API Key，可留空{/if}">
+                        <div class="custom-control custom-checkbox mt-2">
+                            <input type="checkbox" class="custom-control-input" id="volc_ark_secret_clear" name="volc_ark_secret_clear" value="1">
+                            <label class="custom-control-label" for="volc_ark_secret_clear">清空 Secret</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="volc_ark_endpoint_id">Endpoint ID（接入点）</label>
+                        <input type="text" name="volc_ark_endpoint_id" id="volc_ark_endpoint_id" class="form-control" value="{$volc_ark_endpoint_id|default=''}" placeholder="ep- 开头的接入点 ID，对应 Doubao-vision-pro / lite 实例">
+                    </div>
+                    <div class="form-group">
+                        <label for="volc_ark_base_url">Base URL（可选）</label>
+                        <input type="text" name="volc_ark_base_url" id="volc_ark_base_url" class="form-control" value="{$volc_ark_base_url|default=''}" placeholder="留空则 https://ark.cn-beijing.volces.com/api/v3">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="volc_ark_max_catalog">单次寻款带入条数上限</label>
+                        <input type="text" name="volc_ark_max_catalog" id="volc_ark_max_catalog" class="form-control" value="{$volc_ark_max_catalog|default=''}" placeholder="留空则 250">
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> 保存全部</button>
+                    </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
                     <h5 class="mb-3 text-muted">Google Product Search（寻款）</h5>
+                    <div class="alert alert-warning small mb-3" role="alert">
+                        <strong>重要（2025 起常见）：</strong>Google 已将经典 <strong>Product Search</strong> 置于<strong>维护/受限</strong>状态。新账号或未获白名单时，接口可能返回
+                        <code>Product Search is in maintenance mode</code>，属<strong>官方策略</strong>而非本系统配置错误。
+                        可选：<a href="https://forms.gle/QPLzMdwSMcR2pPsq5" target="_blank" rel="noopener">向 Google 申请继续使用 Product Search</a>；
+                        长期方案见 <a href="https://cloud.google.com/vision-ai/docs/warehouse-overview" target="_blank" rel="noopener">Vision Warehouse（图搜替代）</a>。
+                        在此之前请<strong>关闭本项</strong>，改用设置中的 <strong>OpenAI Vision</strong> 或 <strong>阿里云图搜</strong>。
+                    </div>
                     <p class="small text-muted">启用后，<strong>拍照寻款</strong>优先走 Google Cloud Vision 商品图搜；导入 CSV/Excel 时会将参考图写入 <strong>GCS</strong> 并注册到指定 <strong>Product Set</strong>。类目默认 <code>homegoods-v2</code>（饰品场景）。首次请在 GCP 控制台开通 Vision API，并执行 <code>php scripts/google_create_product_set.php</code> 创建 ProductSet。</p>
                     <p class="small text-danger font-weight-bold">密钥 JSON 必须放在<strong>项目根目录之外</strong>的绝对路径（不可位于 <code>public</code> 下），切勿提交到 Git 或暴露 URL。</p>
                     <div class="form-group">
@@ -284,6 +335,8 @@
                         $('#aliyun_is_access_key_secret').val('');
                         $('#openai_api_key').val('');
                         $('#google_ps_key_file').val('');
+                        $('#volc_ark_access_key').val('');
+                        $('#volc_ark_secret_key').val('');
                         setTimeout(function () { location.reload(); }, 500);
                     } else {
                         AdminUI.showToast('error', res.msg || '失败');

@@ -8,11 +8,12 @@ use app\model\ProductStyleItem as ItemModel;
 use app\service\AliyunImageSearchConfig;
 use app\service\GoogleProductSearchConfig;
 use app\service\GoogleProductSearchService;
+use app\service\VolcArkVisionConfig;
 use app\service\ProductStyleAliyunQueueService;
 use app\service\ProductStyleEmbeddingService;
 use app\service\VisionOpenAIConfig;
-use app\service\VisionSearchService;
 use think\facade\Db;
+use app\service\ProductStyleVisionDescribeService;
 use app\service\ProductStyleImportService;
 use app\service\ProductStyleXlsxImportService;
 use think\facade\Log;
@@ -169,10 +170,12 @@ class ProductSearch extends BaseController
             'python_ok' => $pythonOk,
             'python_diag' => $pythonDiag,
             'vision_openai_enabled' => $visionCfg['enabled'],
+            'vision_describe_on_import' => $visionCfg['describe_on_import'],
             'vision_items_with_desc' => $visionDescCount,
             'aliyun_is_enabled' => AliyunImageSearchConfig::get()['enabled'],
             'aliyun_is_pending' => ProductStyleAliyunQueueService::pendingCount(),
             'google_ps_enabled' => GoogleProductSearchConfig::get()['enabled'],
+            'volc_ark_enabled' => VolcArkVisionConfig::get()['enabled'],
         ]);
     }
 
@@ -357,8 +360,8 @@ class ProductSearch extends BaseController
 
             $aiDesc = null;
             $vCfg = VisionOpenAIConfig::get();
-            if ($vCfg['enabled'] && $vCfg['describe_on_import']) {
-                $aiDesc = VisionSearchService::describeEarringImage($resolved['temp']);
+            if ($vCfg['describe_on_import']) {
+                $aiDesc = ProductStyleVisionDescribeService::describeEarring($resolved['temp']);
                 if ($aiDesc !== null && $aiDesc !== '') {
                     $visionDescribed++;
                 }
@@ -395,6 +398,7 @@ class ProductSearch extends BaseController
             'errors' => $errors,
             'vision' => [
                 'openai_enabled' => VisionOpenAIConfig::get()['enabled'],
+                'volc_ark_enabled' => VolcArkVisionConfig::get()['enabled'],
                 'describe_on_import' => VisionOpenAIConfig::get()['describe_on_import'],
                 'described_rows' => $visionDescribed,
             ],
@@ -508,8 +512,8 @@ class ProductSearch extends BaseController
 
                 $aiDesc = null;
                 $vCfg = VisionOpenAIConfig::get();
-                if ($vCfg['enabled'] && $vCfg['describe_on_import']) {
-                    $aiDesc = VisionSearchService::describeEarringImage($resolved['temp']);
+                if ($vCfg['describe_on_import']) {
+                    $aiDesc = ProductStyleVisionDescribeService::describeEarring($resolved['temp']);
                     if ($aiDesc !== null && $aiDesc !== '') {
                         $visionDescribed++;
                     }
@@ -548,6 +552,7 @@ class ProductSearch extends BaseController
             'errors' => $errors,
             'vision' => [
                 'openai_enabled' => VisionOpenAIConfig::get()['enabled'],
+                'volc_ark_enabled' => VolcArkVisionConfig::get()['enabled'],
                 'describe_on_import' => VisionOpenAIConfig::get()['describe_on_import'],
                 'described_rows' => $visionDescribed,
             ],
@@ -674,11 +679,9 @@ class ProductSearch extends BaseController
                 if (!is_array($vec)) {
                     return $this->jsonErr('特征提取失败，请检查 Python 环境');
                 }
-                if (VisionOpenAIConfig::get()['enabled']) {
-                    $aiNew = VisionSearchService::describeEarringImage($tmp);
-                    if ($aiNew !== null && $aiNew !== '') {
-                        $update['ai_description'] = $aiNew;
-                    }
+                $aiNew = ProductStyleVisionDescribeService::describeEarring($tmp);
+                if ($aiNew !== null && $aiNew !== '') {
+                    $update['ai_description'] = $aiNew;
                 }
                 $saved = ProductStyleImportService::persistStyleImageToPublic($tmp, $publicRoot);
                 $update['image_ref'] = $saved ?? ($imageRefInput !== '' ? $imageRefInput : (string) ($row->image_ref ?? ''));
@@ -702,11 +705,9 @@ class ProductSearch extends BaseController
 
                     return $this->jsonErr('特征提取失败，请检查 Python 环境');
                 }
-                if (VisionOpenAIConfig::get()['enabled']) {
-                    $aiNew = VisionSearchService::describeEarringImage($resolved['temp']);
-                    if ($aiNew !== null && $aiNew !== '') {
-                        $update['ai_description'] = $aiNew;
-                    }
+                $aiNew = ProductStyleVisionDescribeService::describeEarring($resolved['temp']);
+                if ($aiNew !== null && $aiNew !== '') {
+                    $update['ai_description'] = $aiNew;
                 }
                 if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
                     @unlink($resolved['temp']);

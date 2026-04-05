@@ -117,6 +117,10 @@ mysql -u root -p videotool < database/schema.sql
 `php scripts/google_create_product_set.php --project=项目ID --location=us-east1 --set-id=集合短ID --display-name=显示名 --key-file=密钥JSON绝对路径`  
 （密钥须放在 **Web 的 `public` 目录之外**；亦可用环境变量 `GOOGLE_APPLICATION_CREDENTIALS`。）后台 **设置 → Google Product Search** 填写 Project、Location、Product Set、**GCS Bucket**（参考图桶）等并启用；详见 `requirements.md`。
 
+**注意：** 若接口返回 `Product Search is in maintenance mode`，为 Google 对经典 Product Search 的准入限制，并非部署错误；请先关闭 Google 寻款，改用 OpenAI 或阿里云图搜，或按 `requirements.md` 中链接申请/评估 Vision Warehouse。
+
+**寻款火山方舟（豆包视觉，可选）：** 无需额外 Composer 包，使用 Guzzle 调方舟 OpenAPI。环境变量示例：`VOLC_ACCESS_KEY`（方舟 **API Key**，Bearer）、`VOLC_ENDPOINT_ID`（接入点 **ep-** ID）、`VOLC_ARK_BASE_URL`（默认 `https://ark.cn-beijing.volces.com/api/v3`）。后台 **设置 → 火山方舟 · 豆包视觉** 可覆盖；详见 `requirements.md`。
+
 **寻款 OpenAI Vision 字段：** 执行 `php database/run_migration_openai_vision_columns.php`（Linux 务必用正斜杠：`php database/run_migration_openai_vision_columns.php`），为 `products`、`product_style_items` 增加 `ai_description`。
 
 **如果遇到字符集错误（emoji无法插入）：**

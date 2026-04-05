@@ -89,7 +89,7 @@ class GoogleProductSearchService
         } catch (\Throwable $e) {
             Log::error('google_ps syncReference: ' . $e->getMessage());
 
-            return ['ok' => false, 'error' => $e->getMessage()];
+            return ['ok' => false, 'error' => self::formatGooglePsErrorMessage((string) $e->getMessage())];
         } finally {
             if ($psClient !== null) {
                 $psClient->close();
@@ -143,8 +143,9 @@ class GoogleProductSearchService
 
             if ($response->hasError()) {
                 $err = $response->getError();
+                $raw = $err ? $err->getMessage() : 'Vision 返回错误';
 
-                return ['ok' => false, 'error' => $err ? $err->getMessage() : 'Vision 返回错误'];
+                return ['ok' => false, 'error' => self::formatGooglePsErrorMessage($raw)];
             }
 
             $psr = $response->getProductSearchResults();
@@ -193,7 +194,7 @@ class GoogleProductSearchService
         } catch (\Throwable $e) {
             Log::error('google_ps search: ' . $e->getMessage());
 
-            return ['ok' => false, 'error' => $e->getMessage()];
+            return ['ok' => false, 'error' => self::formatGooglePsErrorMessage((string) $e->getMessage())];
         } finally {
             if ($annotator !== null) {
                 $annotator->close();
@@ -208,5 +209,17 @@ class GoogleProductSearchService
         }
 
         return '';
+    }
+
+    /**
+     * Google 对经典 Product Search 维护期返回的 INVALID_ARGUMENT 转中文说明。
+     */
+    private static function formatGooglePsErrorMessage(string $raw): string
+    {
+        if ($raw !== '' && str_contains($raw, 'maintenance mode') && str_contains($raw, 'Product Search')) {
+            return 'Google 已将经典 Product Search 设为维护/受限，当前项目通常无法调用（与服务器配置无关）。请先在后台关闭「Google 寻款」，改用 OpenAI Vision 或阿里云图搜；若坚持使用 Google，请提交准入申请或迁移 Vision Warehouse（见后台设置 → Google 区块说明）。';
+        }
+
+        return $raw;
     }
 }

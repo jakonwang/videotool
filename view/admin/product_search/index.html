@@ -74,8 +74,10 @@
       const aliyunPending = ref(0);
       const syncingAliyun = ref(false);
       const visionEnabled = ref(false);
+      const visionDescribeOnImport = ref(false);
       const visionDescCount = ref(0);
       const googlePsEnabled = ref(false);
+      const volcArkEnabled = ref(false);
 
       async function fetchList() {
         loading.value = true;
@@ -97,8 +99,10 @@
           aliyunEnabled.value = !!(json.data && json.data.aliyun_is_enabled);
           aliyunPending.value = (json.data && json.data.aliyun_is_pending != null) ? Number(json.data.aliyun_is_pending) : 0;
           visionEnabled.value = !!(json.data && json.data.vision_openai_enabled);
+          visionDescribeOnImport.value = !!(json.data && json.data.vision_describe_on_import);
           visionDescCount.value = (json.data && json.data.vision_items_with_desc != null) ? Number(json.data.vision_items_with_desc) : 0;
           googlePsEnabled.value = !!(json.data && json.data.google_ps_enabled);
+          volcArkEnabled.value = !!(json.data && json.data.volc_ark_enabled);
         } catch (e) {
           ElMessage.error(e.message || '加载失败');
         } finally {
@@ -362,7 +366,7 @@
       return {
         loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
         tableRef, selectedRows, batchDeleting, aliyunEnabled, aliyunPending, syncingAliyun, doSyncAliyun,
-        visionEnabled, visionDescCount, googlePsEnabled,
+        visionEnabled, visionDescribeOnImport, visionDescCount, googlePsEnabled, volcArkEnabled,
         editVisible, editSaving, editImageInputKey, editForm,
         fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang,
         imageDisplayUrl, isImagePreviewable,
@@ -390,9 +394,16 @@
           </div>
           <div>支持 <strong>CSV / Excel（.xlsx、.xls）</strong>。表头需能识别「编号/产品编号」与「图片」列（可选「爆款类型」）。CSV 中图片可为链接、站内路径或 Base64；<strong>Excel 可将图片插入「图片」列对应单元格</strong>（嵌入图，无需链接）。若上传报 <strong>HTTP 413</strong>，需在 Nginx 调大 <code>client_max_body_size</code>，并在 PHP 调大 <code>upload_max_filesize</code>、<code>post_max_size</code>。若 <strong>HTTP 502</strong> 或导入到一半失败，多为<strong>超时/内存</strong>：调大 Nginx <code>fastcgi_read_timeout</code>、PHP-FPM <code>request_terminate_timeout</code>，或<strong>拆成多个表分批导入</strong>。</div>
           <div v-if="googlePsEnabled" style="margin-top:8px;color:#7c3aed;">已启用 <strong>Google Product Search</strong>：拍照寻款<strong>优先</strong>走 Google；导入会写入 GCS 并注册参考图（索引有延迟）。密钥须放在 public 外，见 <strong>设置</strong>。</div>
-          <div v-if="visionEnabled" style="margin-top:8px;color:#0f766e;">已配置 <strong>OpenAI Vision</strong>：未启用 Google 时拍照寻款可走语义识图；库内已有 AI 描述 <strong>{{ visionDescCount }}</strong> 条。请在 <strong>设置</strong> 中可关闭「导入时生成描述」以节省导入阶段 API 费用。</div>
+          <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">已启用 <strong>火山方舟豆包视觉</strong>：未开 Google 时拍照寻款走国内方舟 API（需在 <strong>设置</strong> 填 Endpoint 与 API Key）。</div>
+          <div v-if="volcArkEnabled || visionEnabled" style="margin-top:8px;color:#0f766e;">
+            <span v-if="volcArkEnabled"><strong>方舟豆包</strong> 可用于导入时生成 <code>ai_description</code>（优先于 OpenAI）。</span>
+            <span v-if="visionEnabled"><strong>OpenAI</strong> 可作识图备选或仅 OpenAI 时生成描述。</span>
+            库内已有 AI 描述 <strong>{{ visionDescCount }}</strong> 条。
+            <span v-if="visionDescribeOnImport">已在设置中开启「导入时生成描述」。</span>
+            <span v-else>若需导入自动写描述，请在 <strong>设置</strong> 勾选「导入时生成视觉描述」。</span>
+          </div>
           <div v-if="aliyunEnabled" style="margin-top:8px;color:#1e40af;">已启用 <strong>阿里云图像搜索</strong>（未配 Google/OpenAI 时使用）：导入会入队同步；队列剩余 <strong>{{ aliyunPending }}</strong> 条可点「同步阿里云」。</div>
-          <div v-if="!googlePsEnabled && !visionEnabled && !aliyunEnabled" style="margin-top:8px;color:#64748b;">请在 <strong>系统 → 设置</strong> 启用 <strong>Google Product Search</strong>，或配置 <strong>OpenAI API Key</strong>，或启用阿里云图搜；新环境需执行 <code>database/run_migration_openai_vision_columns.php</code>（Linux 用正斜杠路径）。</div>
+          <div v-if="!googlePsEnabled && !visionEnabled && !volcArkEnabled && !aliyunEnabled" style="margin-top:8px;color:#64748b;">请在 <strong>系统 → 设置</strong> 启用 <strong>Google</strong> / <strong>火山方舟</strong> / <strong>OpenAI</strong> / <strong>阿里云图搜</strong> 至少一项；新环境需执行 <code>database/run_migration_openai_vision_columns.php</code>（Linux 用正斜杠路径）。</div>
         </div>
 
         <div class="admin-filter-section">
