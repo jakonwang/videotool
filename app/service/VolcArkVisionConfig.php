@@ -12,13 +12,13 @@ use think\facade\Config;
 class VolcArkVisionConfig
 {
     /**
- * @return array{
- *   enabled:bool,
- *   access_key:string,
- *   secret_key:string,
- *   model:string,
- *   endpoint_id:string,
- *   base_url:string,
+     * @return array{
+     *   enabled:bool,
+     *   access_key:string,
+     *   secret_key:string,
+     *   model:string,
+     *   endpoint_id:string,
+     *   base_url:string,
      *   max_catalog_items:int,
      *   timeout_seconds:int,
      *   match_max_tokens:int,
@@ -58,7 +58,7 @@ class VolcArkVisionConfig
         if ($url === '') {
             $url = 'https://ark.cn-beijing.volces.com/api/v3';
         }
-        $url = rtrim($url, '/');
+        $url = self::normalizeArkBaseUrl($url);
 
         $maxCatStr = trim((string) SystemConfigService::get('volc_ark_max_catalog', '') ?? '');
         $maxCatalog = $maxCatStr !== '' ? (int) $maxCatStr : (int) ($base['max_catalog_items'] ?? 250);
@@ -126,5 +126,24 @@ class VolcArkVisionConfig
             'retry_times' => $retry,
             'verify_ssl' => $verifySsl,
         ];
+    }
+
+    /**
+     * 请求时会再拼接 /chat/completions；若 Base URL 误填成完整接口地址则去掉后缀，避免 …/chat/completions/chat/completions 导致异常。
+     */
+    private static function normalizeArkBaseUrl(string $url): string
+    {
+        $url = rtrim(trim($url), '/');
+        if ($url === '') {
+            return 'https://ark.cn-beijing.volces.com/api/v3';
+        }
+        foreach (['/chat/completions', '/v1/chat/completions'] as $suffix) {
+            if (\str_ends_with($url, $suffix)) {
+                $url = rtrim(\substr($url, 0, -\strlen($suffix)), '/');
+                break;
+            }
+        }
+
+        return $url;
     }
 }

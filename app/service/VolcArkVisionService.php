@@ -383,8 +383,11 @@ TXT;
         if ($http === 401 || $http === 403) {
             return '鉴权失败：请确认方舟控制台 API Key 有效、已复制完整，且后台「豆包视觉」已保存。';
         }
+        if ($http === 500 && $arkErr !== null && \str_contains((string) $arkErr, 'InternalServiceError')) {
+            return '服务端 500：若 Base URL 含 /chat/completions 请改为仅到 /api/v3（更新代码后会自动纠正）；仍失败多为方舟侧抖动，稍后重试或换时段。';
+        }
         if ($http === 404) {
-            return '请求路径不存在：检查 VOLC_ARK_BASE_URL 是否为 https://ark.cn-beijing.volces.com/api/v3（无尾部斜杠、无多余路径）。';
+            return '请求路径不存在：检查 VOLC_ARK_BASE_URL 是否为 https://ark.cn-beijing.volces.com/api/v3（无尾部斜杠、勿含 /chat/completions）。';
         }
         $msg = (string) $arkErr;
         if ($msg !== '' && (\str_contains($msg, 'model') || \str_contains($msg, 'Model') || \str_contains($msg, 'endpoint'))) {
