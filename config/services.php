@@ -59,8 +59,12 @@ return [
         'endpoint_id' => env('VOLC_ENDPOINT_ID', ''),
         'base_url' => rtrim((string) env('VOLC_ARK_BASE_URL', 'https://ark.cn-beijing.volces.com/api/v3'), '/'),
         'max_catalog_items' => (int) env('VOLC_ARK_MAX_CATALOG', 250),
+        /** 全自动寻款：注入豆包 system 的候选条数（默认 50，与「最可能」预筛一致：按索引 id 倒序） */
+        'auto_match_catalog_limit' => (int) env('VOLC_ARK_AUTO_CATALOG', 50),
         'timeout_seconds' => (int) env('VOLC_ARK_TIMEOUT', 120),
         'match_max_tokens' => (int) env('VOLC_ARK_MATCH_MAX_TOKENS', 1024),
+        /** 全自动寻款仅输出编号或 NULL，宜小以省 token */
+        'auto_match_max_tokens' => (int) env('VOLC_ARK_AUTO_MATCH_MAX_TOKENS', 64),
         'describe_max_tokens' => (int) env('VOLC_ARK_DESCRIBE_MAX_TOKENS', 220),
         'retry_times' => (int) env('VOLC_ARK_RETRY', 2),
         /** HTTPS 证书校验；可被环境变量 VOLC_ARK_VERIFY_SSL 覆盖（见 VolcArkVisionConfig） */

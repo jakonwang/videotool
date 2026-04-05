@@ -17,7 +17,7 @@
 <div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col pb-10">
   <header class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3">
     <h1 class="text-lg font-bold text-slate-900">拍照寻款</h1>
-    <p class="text-xs text-slate-500 mt-0.5">拍摄或上传图；寻款使用火山方舟豆包。可补充文字提高命中率。</p>
+    <p class="text-xs text-slate-500 mt-0.5">拍摄或上传后自动识别编号并带出商品信息（上传前会中心裁剪突出主体）。</p>
   </header>
 
   <main class="flex-1 px-4 pt-4 space-y-4">
@@ -47,8 +47,8 @@
     </section>
 
     <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-      <label class="block text-sm font-medium text-slate-700 mb-2">补充说明（可选）</label>
-      <textarea v-model="extraHint" rows="2" placeholder="识别不准时可补充：如「水滴耳坠」「细链手链」「圆牌吊坠」… 会与实拍图一并发给模型" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea>
+      <label class="block text-sm font-medium text-slate-700 mb-2">补充说明（可选，一般不必填）</label>
+      <textarea v-model="extraHint" rows="2" placeholder="仅在极难识别时填写关键词，会与图一并提交" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea>
     </section>
 
     <section v-if="loading" class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
@@ -74,7 +74,7 @@
     </section>
 
     <section v-if="!loading && imgResults.length" class="space-y-2">
-      <h2 class="text-sm font-semibold text-slate-600 px-1">以图搜款（相似度 Top {{ imgResults.length }}，请二次确认）</h2>
+      <h2 class="text-sm font-semibold text-slate-600 px-1">自动识别结果</h2>
       <div v-for="(r,i) in imgResults" :key="'i'+i" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div class="px-3 py-1.5 bg-slate-50 text-xs text-slate-500 flex justify-between">
           <span>排名 {{ i + 1 }}</span>
@@ -127,6 +127,41 @@ createApp({
     const API_ENTRY = (typeof window !== 'undefined' && window.__H5_API_ENTRY__ != null && String(window.__H5_API_ENTRY__).trim() !== '')
       ? String(window.__H5_API_ENTRY__).trim()
       : '/index.php';
+
+    /** 中心正方形裁剪，弱化背景、突出主体（失败则原图） */
+    function centerCropSquareBlob(blob) {
+      return new Promise((resolve) => {
+        if (!blob || !blob.type || !blob.type.startsWith('image/')) {
+          resolve(blob);
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const im = new Image();
+        im.onload = () => {
+          URL.revokeObjectURL(url);
+          const w = im.naturalWidth || im.width;
+          const h = im.naturalHeight || im.height;
+          if (!w || !h) {
+            resolve(blob);
+            return;
+          }
+          const side = Math.min(w, h);
+          const sx = Math.floor((w - side) / 2);
+          const sy = Math.floor((h - side) / 2);
+          const c = document.createElement('canvas');
+          c.width = side;
+          c.height = side;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(im, sx, sy, side, side, 0, 0, side, side);
+          c.toBlob((b) => resolve(b || blob), 'image/jpeg', 0.92);
+        };
+        im.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve(blob);
+        };
+        im.src = url;
+      });
+    }
 
     /** 上传前压缩：限制长边与体积，减轻网络延迟 */
     function compressImageBlob(blob, maxEdge) {
@@ -216,7 +251,8 @@ createApp({
       codeResults.value = [];
       loading.value = true;
       try {
-        const toSend = await compressImageBlob(blob, SEARCH_MAX_EDGE);
+        const cropped = await centerCropSquareBlob(blob);
+        const toSend = await compressImageBlob(cropped, SEARCH_MAX_EDGE);
         const fd = new FormData();
         fd.append('file', toSend, 'query.jpg');
         const h = extraHint.value.trim();

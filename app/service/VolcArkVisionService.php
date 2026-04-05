@@ -150,10 +150,12 @@ class VolcArkVisionService
     }
 
     /**
-     * @param list<array{code:string,desc:string,hot:string}> $catalog
-     * @return array{ok:bool, matches?: list<array{product_code:string, score:float, reason:string}>, error?:string, raw?:string, fallback_keyword?:bool}
+     * 全自动寻款：system 注入候选清单，user 仅含实拍图；模型只输出一行编号或 NULL。
+     *
+     * @param list<array{code:string,desc:string,hot:string,thumb_url?:string}> $catalog 建议 ≤50 条
+     * @return array{ok:bool, code?:string, is_null?:bool, error?:string, raw?:string}
      */
-    public static function matchPhotoToCatalog(string $absolutePath, array $catalog, ?string $userHint = null): array
+    public static function matchPhotoAutoWarehouse(string $absolutePath, array $catalog, ?string $userHint = null): array
     {
         $cfg = VolcArkVisionConfig::get();
         if (!$cfg['enabled']) {
@@ -170,49 +172,57 @@ class VolcArkVisionService
             return ['ok' => false, 'error' => '图片编码失败'];
         }
 
+        $allowed = [];
         $lines = [];
         foreach ($catalog as $row) {
-            $code = $row['code'];
-            $desc = str_replace(["\r", "\n", '|'], ['', '', '／'], $row['desc']);
-            $hot = str_replace(["\r", "\n", '|'], ['', '', '／'], $row['hot']);
-            $desc = mb_substr(trim($desc), 0, 240);
-            $lines[] = $code . '|' . $desc . ($hot !== '' ? '|爆款:' . mb_substr($hot, 0, 80) : '');
+            $code = trim((string) ($row['code'] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+            $allowed[$code] = true;
+            $desc = str_replace(["\r", "\n", '|'], ['', '', '／'], (string) ($row['desc'] ?? ''));
+            $hot = str_replace(["\r", "\n", '|'], ['', '', '／'], (string) ($row['hot'] ?? ''));
+            $desc = mb_substr(trim($desc), 0, 220);
+            $thumb = isset($row['thumb_url']) ? trim((string) $row['thumb_url']) : '';
+            if ($thumb === '') {
+                $thumb = '-';
+            }
+            $hotPart = $hot !== '' ? mb_substr($hot, 0, 80) : '-';
+            $lines[] = $code . '|' . $desc . '|' . $thumb . '|' . $hotPart;
+        }
+        if ($lines === []) {
+            return ['ok' => false, 'error' => '库内无有效编号'];
         }
         $block = implode("\n", $lines);
 
-        $hintBlock = '';
-        if ($userHint !== null && trim($userHint) !== '') {
-            $hintBlock = "\n\n用户补充说明（请结合实拍与下列清单综合判断）：" . mb_substr(trim($userHint), 0, 300);
-        }
+        $systemText = <<<TXT
+你是一个自动化仓库扫描器。我会给你一张实物图，请在以下库中选出最相似的编号。禁止任何开场白，禁止要求补充描述，只需直接输出编号（如：A-114），如果找不到请输出「NULL」。
 
-        $instruction = <<<TXT
-你是一个仓库对货助手。请识别这张实拍图中的**饰品**（耳环、手链、项链、吊坠、戒指等）特征，并在以下产品清单中找到最匹配的编号。
+【库内候选】每行格式：编号|款式描述或备注|参考图完整 URL（无则 -）|爆款类型（无则 -）
+只能从下列已出现的编号中选择；禁止编造编号。若多候选接近，输出最相似的一个编号。
 
-清单格式：每行「产品编号|视觉特征描述|可选爆款备注」。只能从清单中已出现的编号里选择，禁止编造编号。结合品类、金属质感、造型、镶嵌与风格比对。
-
-{$hintBlock}
-
-**只输出一个 JSON 对象**，不要 markdown，不要其它文字。格式严格如下：
-{"matches":[{"product_code":"编号","score":0.95,"reason":"..."}],"note":"可选"}
-matches 最多 5 条，score 为 0～1 的浮点数，reason 为中文短语（36 字内，可说明品类与相似依据）。
-
-清单：
+候选清单：
 {$block}
 TXT;
 
+        $userText = '请只输出一行：清单内最相似产品编号，或单词 NULL。不要其它任何字符。';
+        if ($userHint !== null && trim($userHint) !== '') {
+            $userText .= ' 附加线索（可选）：' . mb_substr(trim($userHint), 0, 200);
+        }
+
         $body = [
             'model' => self::chatModel($cfg),
-            'max_tokens' => $cfg['match_max_tokens'],
-            'temperature' => 0.15,
+            'max_tokens' => (int) ($cfg['auto_match_max_tokens'] ?? 64),
+            'temperature' => 0.1,
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => '你是饰品仓库对货助手（耳环、手链、项链等）。只输出合法 JSON，键名使用英文 product_code、score、reason、matches、note。',
+                    'content' => $systemText,
                 ],
                 [
                     'role' => 'user',
                     'content' => [
-                        ['type' => 'text', 'text' => $instruction],
+                        ['type' => 'text', 'text' => $userText],
                         ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
                     ],
                 ],
@@ -225,48 +235,25 @@ TXT;
             if ($i > 0) {
                 usleep(400000);
             }
-            $raw = self::chatCompletionRaw($cfg, $body, 'match_catalog');
+            $raw = self::chatCompletionRaw($cfg, $body, 'match_auto_warehouse');
             $lastRaw = $raw;
             if ($raw === null) {
                 continue;
             }
-            $json = self::extractJsonObject($raw);
-            if ($json === null) {
-                Log::warning('volc_ark_match parse fail attempt ' . ($i + 1) . ': ' . substr($raw, 0, 400));
-                continue;
-            }
-            $matches = $json['matches'] ?? [];
-            if (!is_array($matches)) {
-                continue;
-            }
-            $out = [];
-            foreach ($matches as $m) {
-                if (!is_array($m)) {
-                    continue;
-                }
-                $code = trim((string) ($m['product_code'] ?? $m['Product_ID'] ?? $m['product_id'] ?? ''));
-                if ($code === '') {
-                    continue;
-                }
-                $score = (float) ($m['score'] ?? 0);
-                if ($score > 1) {
-                    $score = 1.0;
-                }
-                if ($score < 0) {
-                    $score = 0.0;
-                }
-                $out[] = [
-                    'product_code' => $code,
-                    'score' => $score,
-                    'reason' => mb_substr(trim((string) ($m['reason'] ?? '')), 0, 120),
-                ];
-                if (count($out) >= 5) {
-                    break;
-                }
-            }
-            usort($out, static fn ($a, $b) => $b['score'] <=> $a['score']);
+            $reply = self::parseChatCompletionText($raw);
+            if ($reply === null || trim($reply) === '') {
+                Log::warning('volc_ark_auto empty reply attempt ' . ($i + 1));
 
-            return ['ok' => true, 'matches' => $out];
+                continue;
+            }
+            $cls = self::classifyWarehouseReply($reply, $allowed);
+            if ($cls['kind'] === 'null') {
+                return ['ok' => true, 'is_null' => true];
+            }
+            if ($cls['kind'] === 'code' && isset($cls['code'])) {
+                return ['ok' => true, 'code' => (string) $cls['code']];
+            }
+            Log::warning('volc_ark_auto unparsed attempt ' . ($i + 1) . ': ' . mb_substr($reply, 0, 200));
         }
 
         return [
@@ -274,6 +261,45 @@ TXT;
             'error' => '豆包视觉请求失败或返回无法解析，请稍后重试',
             'raw' => $lastRaw !== null ? mb_substr((string) $lastRaw, 0, 200) : null,
         ];
+    }
+
+    /**
+     * @param array<string, true> $allowedMap
+     * @return array{kind:'code', code:string}|array{kind:'null'}|array{kind:'unparsed'}
+     */
+    private static function classifyWarehouseReply(string $text, array $allowedMap): array
+    {
+        $t = trim($text);
+        if ($t === '') {
+            return ['kind' => 'unparsed'];
+        }
+        if (preg_match('/```([\s\S]*?)```/', $t, $m)) {
+            $t = trim($m[1]);
+        }
+        $t = trim(preg_replace('/^\*+\s*/u', '', $t));
+        $lines = preg_split("/\r\n|\r|\n/", $t);
+        $first = trim((string) ($lines[0] ?? ''));
+        $first = trim($first, " \t\"'「」`：:*#");
+        if (preg_match('/^(NULL|NONE|N\/A|NA|无|没有|未找到)$/iu', $first)) {
+            return ['kind' => 'null'];
+        }
+        if (isset($allowedMap[$first])) {
+            return ['kind' => 'code', 'code' => $first];
+        }
+        $codes = array_keys($allowedMap);
+        usort($codes, static fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+        foreach ($codes as $c) {
+            if ($c !== '' && (str_contains($t, $c) || str_contains($first, $c))) {
+                return ['kind' => 'code', 'code' => $c];
+            }
+        }
+        foreach ($codes as $c) {
+            if ($c !== '' && strcasecmp($first, $c) === 0) {
+                return ['kind' => 'code', 'code' => $c];
+            }
+        }
+
+        return ['kind' => 'unparsed'];
     }
 
     /**
@@ -576,19 +602,4 @@ TXT;
         return 'data:' . $mime . ';base64,' . base64_encode($bin);
     }
 
-    private static function extractJsonObject(string $text): ?array
-    {
-        $text = trim($text);
-        if ($text === '') {
-            return null;
-        }
-        if (preg_match('/\{[\s\S]*\}/', $text, $m)) {
-            $dec = json_decode($m[0], true);
-            if (is_array($dec)) {
-                return $dec;
-            }
-        }
-
-        return null;
-    }
 }

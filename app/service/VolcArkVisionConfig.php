@@ -20,8 +20,10 @@ class VolcArkVisionConfig
      *   endpoint_id:string,
      *   base_url:string,
      *   max_catalog_items:int,
+     *   auto_match_catalog_limit:int,
      *   timeout_seconds:int,
      *   match_max_tokens:int,
+     *   auto_match_max_tokens:int,
      *   describe_max_tokens:int,
      *   retry_times:int,
      *   verify_ssl:bool
@@ -69,6 +71,17 @@ class VolcArkVisionConfig
             $maxCatalog = 500;
         }
 
+        $autoCat = (int) ($base['auto_match_catalog_limit'] ?? 50);
+        if ($autoCat < 10) {
+            $autoCat = 10;
+        }
+        if ($autoCat > 200) {
+            $autoCat = 200;
+        }
+        if ($autoCat > $maxCatalog) {
+            $autoCat = $maxCatalog;
+        }
+
         $timeout = (int) ($base['timeout_seconds'] ?? 120);
         if ($timeout < 30) {
             $timeout = 30;
@@ -83,6 +96,14 @@ class VolcArkVisionConfig
         }
         if ($matchTok > 8192) {
             $matchTok = 8192;
+        }
+
+        $autoMatchTok = (int) ($base['auto_match_max_tokens'] ?? 64);
+        if ($autoMatchTok < 16) {
+            $autoMatchTok = 16;
+        }
+        if ($autoMatchTok > 512) {
+            $autoMatchTok = 512;
         }
 
         $descTok = (int) ($base['describe_max_tokens'] ?? 220);
@@ -120,8 +141,10 @@ class VolcArkVisionConfig
             'endpoint_id' => $ep,
             'base_url' => $url,
             'max_catalog_items' => $maxCatalog,
+            'auto_match_catalog_limit' => $autoCat,
             'timeout_seconds' => $timeout,
             'match_max_tokens' => $matchTok,
+            'auto_match_max_tokens' => $autoMatchTok,
             'describe_max_tokens' => $descTok,
             'retry_times' => $retry,
             'verify_ssl' => $verifySsl,

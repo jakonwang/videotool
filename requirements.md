@@ -379,7 +379,7 @@
 - 从 **CSV / Excel** 导入「产品编号 + 参考图 + 可选爆款类型」：仍使用 **本地 Python**（MobileNetV2）生成向量写入 MySQL。若 **设置中勾选「导入时生成描述」**，则对每行参考图调用 **火山方舟豆包** 生成 **`ai_description`**，写入 **`product_style_items.ai_description`**，并同步到 **`products.ai_description`**（当存在同名商品时）。**仅豆包**，无 OpenAI / Google / 阿里云作为识图备选。
 - **火山引擎方舟 · 豆包视觉**：与官方 **[快速入门](https://www.volcengine.com/docs/82379/1399008?lang=zh)** 一致：**`Authorization: Bearer <API Key>`**，请求体 **`model`** 填 **[模型列表](https://www.volcengine.com/docs/82379/1330310?lang=zh)** 中的 **Model ID**，或控制台 **推理接入点 ID**（`ep-`）。**推荐模型：Doubao-1.5-vision-pro-32k**（常见 API ID：`doubao-1-5-vision-pro-32k`，**以控制台完整 ID 为准**，可能带日期后缀；旧版视觉模型已下线时请改为此类 ID）。`config/services.php` 中 **`volc_ark.model_id`** 默认即为上述 ID（可用 **`VOLC_ARK_MODEL`** 覆盖）。**model 解析顺序**：`VOLC_ARK_MODEL` → 后台「模型 ID」→ **`ep-`（有则优先于配置默认）** → 配置默认。拍照寻款与导入均走 **`POST {base_url}/chat/completions`**；**`runtime/log`** 中 **`model`** 为实际传入值。
 - **与官方 Python「多模态向量」示例的区别**：火山文档中 **`multimodal_embeddings`** 走的是 **向量** 接口，与本项目 **无关**。寻款需要 **对话/多模态理解**；若 **`model`** 填错或用了仅 Embedding 的资源，会 **HTTP 4xx**，见 **`ark_error`**。批量导入 **`describeForImport`** 为 **`describe_import_single`**（每行 **1 次**请求）。
-- **H5 拍照寻款**：**仅**在后台启用豆包时可用；支持 **`hint` 文字补充**与失败时 **关键词模糊回退**（`ProductStyleKeywordSearchService`）。仍支持 **编号模糊查询**（`searchByCode`，不走向量）。
+- **H5 拍照寻款（全自动）**：**仅**在后台启用豆包时可用。后端 **`VolcArkVisionService::matchPhotoAutoWarehouse`**：将 **最近 N 条**（默认 **50**，`VOLC_ARK_AUTO_CATALOG` / `config/services.php` → **`auto_match_catalog_limit`**，且 **不超过** 后台 **`volc_ark_max_catalog`/`max_catalog_items`**）上架索引写入 **system**，行内合并 **`products.ai_description`**（同名上架商品）与 **`product_style_items`** 描述/爆款，并附 **参考图绝对 URL**（无则 `-`）；**user** 仅含实拍图与极简指令，模型 **只输出一行编号或 `NULL`**（禁止索要补充描述）。识别成功后 **`Search`** 直接查库组装 **`items`（通常 1 条）** 与商品详情闭环。失败时可选 **`hint`** + **关键词回退**（`ProductStyleKeywordSearchService`）。仍支持 **编号模糊查询**（`searchByCode`）。
 - 导入行仍可 **入队阿里云** AddImage（与豆包独立；历史库若仍启用阿里云，队列表与同步逻辑保留，**后台设置页已移除阿里云表单项**，改配置需直接改库或 `system_settings`）。
 
 ### 数据库
@@ -407,7 +407,7 @@
 
 ### 配置
 - **导入时是否生成描述**：后台 **设置 → 豆包视觉** 勾选「导入时生成描述」并**保存**；存储键名仍为 **`openai_describe_on_import`**（历史兼容），由 `VisionOpenAIConfig::get()['describe_on_import']` 读取。表单对「导入描述」「启用豆包」使用 **hidden=0 + checkbox=1**，避免只改其它配置保存时，因 HTML 不提交未勾选框而误写入 **关闭**。**方舟 API Key**：优先读 **Access Key** 框；若为空则使用 **Secret Key** 框（与 Access 二选一即可）。
-- **`config/services.php`**：`volc_ark`（`access_key`/`VOLC_ACCESS_KEY`、`model_id`/`VOLC_ARK_MODEL`、`endpoint_id`/`VOLC_ENDPOINT_ID`、`base_url`/`VOLC_ARK_BASE_URL`、`max_catalog_items` 等）。**单次寻款带入条数** 见后台 `volc_ark_max_catalog`。
+- **`config/services.php`**：`volc_ark`（`access_key`/`VOLC_ACCESS_KEY`、`model_id`/`VOLC_ARK_MODEL`、`endpoint_id`/`VOLC_ENDPOINT_ID`、`base_url`/`VOLC_ARK_BASE_URL`、`max_catalog_items`、`auto_match_catalog_limit`/`VOLC_ARK_AUTO_CATALOG`（默认 **50**）、`auto_match_max_tokens`/`VOLC_ARK_AUTO_MATCH_MAX_TOKENS`（单行编号输出，默认 **64**）等）。后台 **`volc_ark_max_catalog`** 为索引侧上限；**全自动寻款**实际注入豆包的条数为 **`min(auto_match_catalog_limit, max_catalog_items)`**（代码见 `VolcArkVisionConfig`）。
 - **Base URL**：须为 **`https://ark.cn-beijing.volces.com/api/v3`** 这类**根路径**（**不要**填到 `/chat/completions`）；代码会自动拼接 **`/chat/completions`**。若误填完整接口 URL，会变成双重路径，易出现 **HTTP 500 / InternalServiceError**。`VolcArkVisionConfig` 会自动去掉末尾的 **`/chat/completions`** 以容错。
 - **`VOLC_ARK_VERIFY_SSL`**（可选）：Guzzle 访问方舟 HTTPS 是否校验证书，默认开启。Windows 本地若 **`runtime/log`** 出现 **`[volc_ark] 豆包网络异常`** 且含 **`curl_errno` 60**（SSL certificate problem），可在 `.env` 临时设 **`VOLC_ARK_VERIFY_SSL=false`** 验证是否证书链问题；**生产环境 Linux** 建议保持 `true`，并在 `php.ini` 配置 **`openssl.cafile`** 指向有效 CA 包（如 `cacert.pem`）。日志中已输出 **`curl_errno` / `curl_error` / `exception`** 便于对照。
 - **连通性自测（推荐）**：项目根命令行执行 **`php scripts/volc_ark_ping.php`**（Windows：`php scripts\volc_ark_ping.php`）。脚本与后台共用配置，发**一条极简文本** `chat/completions`，输出 **`http`、`ark_error`、`body_snip`、`hint`**。若 **ping 成功** 而导入仍提示「未生成 AI 描述」，多为**识图请求**（大图、data URL）问题；若 **ping 也 HTTP 失败**，请根据 **`ark_error`** 检查 Key、**`ep-` 接入点是否为对话类**、`VOLC_ARK_BASE_URL` 地域是否与控制台一致。
@@ -426,12 +426,12 @@
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
 
 ### 开放 API（无需登录，供仓库手机端 H5）
-- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；**仅豆包**：须在后台启用火山方舟并配置完整，否则返回错误提示。`multipart/form-data`，字段名 **`file`**；可选 **`hint`**。成功时 `data.engine`=`volc_ark` 或关键词回退 `volc_ark_keyword`（`data.fallback`=true）。`items` 含 `product_code`、`similarity`、`match_reason`、`product` 等。
+- `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；**仅豆包**：须在后台启用火山方舟并配置完整，否则返回错误提示。`multipart/form-data`，字段名 **`file`**；可选 **`hint`**。成功时 `data.engine`=`volc_ark` 时 **`data.auto_match`=true**、**`data.matched_code`** 与 **单条** `items`（含索引图、商品信息）；关键词回退时 `volc_ark_keyword`（`data.fallback`=true）。`items` 含 `product_code`、`similarity`、`match_reason`、`product` 等。
 - `POST /index.php/api/search/searchByImage`：同上（别名路径）。
 - `GET /index.php/api/product_search/searchByCode?q=`：编号 **LIKE** 模糊匹配（仍由 `ProductSearch` 提供）。
 
 ### H5 页面
-- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询 / **可选补充说明**；以图寻款上传前 **前端压缩**（长边约 **1600**、体积目标约 **1MB** 以内）；加载态 **「AI 正在比对款式…」**；若 **`data.fallback`** 为真会显示关键词回退说明。H5 请求 API 使用 **`Request::baseFile()`** 动态拼接路径，**子目录部署**（如 `…/public/index.php/searchByImage`）时不再误用站点根 `/index.php/api/...`。**寻款清单**：除有 **AI 描述** 或 **爆款类型** 外，**仅有参考图**（`image_ref`）的上架款也会入清单（匹配弱于有描述，优于完全搜不到）。页面由 **`SearchByImage@index`** 注入 **`window.__H5_API_ENTRY__`**（`json_encode(baseFile())`）；Vue `setup()` 内定义 **`const API_ENTRY`** 读取该值，缺省为 **`/index.php`**，避免出现 **`API_ENTRY is not defined`**；若模板未走该控制器，头脚本也会回退 **`/index.php`**。
+- `GET /index.php/searchByImage`：拍照 / 选图 / 编号查询 / **可选补充说明**；以图寻款上传前 **中心正方形裁剪**（弱化背景）再 **压缩**（长边约 **1600**、体积目标约 **1MB** 以内）；加载态 **「AI 正在比对款式…」**；若 **`data.fallback`** 为真会显示关键词回退说明。H5 请求 API 使用 **`Request::baseFile()`** 动态拼接路径，**子目录部署**（如 `…/public/index.php/searchByImage`）时不再误用站点根 `/index.php/api/...`。**寻款清单**：除有 **AI 描述** 或 **爆款类型** 外，**仅有参考图**（`image_ref`）的上架款也会入清单（匹配弱于有描述，优于完全搜不到）。页面由 **`SearchByImage@index`** 注入 **`window.__H5_API_ENTRY__`**（`json_encode(baseFile())`）；Vue `setup()` 内定义 **`const API_ENTRY`** 读取该值，缺省为 **`/index.php`**，避免出现 **`API_ENTRY is not defined`**；若模板未走该控制器，头脚本也会回退 **`/index.php`**。
 
 ### CSV / Excel 列说明
 - 首行表头需能识别 **产品编号**（含 **编号** 等同义）、**图片** 列（见 `ProductStyleImportService::mapHeader`）；可选 **爆款类型**。
@@ -445,8 +445,8 @@
 - 前台 H5：`view/index/search_by_image.html`
 
 ### 注意
-- **拍照寻款**使用豆包 **按次计费**；库内无 `ai_description` 时须先 **导入并开启描述生成**（或手工补写爆款/特征相关字段，见寻款控制器对清单行的要求）。
-- 单次豆包寻款仅加载 **最近 N 条（默认 250）且已有描述或爆款** 的索引；款式极多时请在后台调大 **豆包单次带入条数上限**（`volc_ark_max_catalog`）或拆业务库。
+- **拍照寻款**使用豆包 **按次计费**；库内无 `ai_description` 时须先 **导入并开启描述生成**（或手工补写爆款/特征相关字段，或至少有 **参考图** 入索引）。
+- 全自动寻款向豆包注入 **最近 N 条**索引（**默认 50**，受 **`VOLC_ARK_AUTO_CATALOG`** 与 **`volc_ark_max_catalog`** 共同约束）；若全库很大，候选仅为 **按 id 倒序的前 N 条**，可能漏匹配更早入库的款式，可 **提高两上限** 或 **用编号/关键词** 缩小范围。
 - 向量（本地）仍为 **全表线性扫描**（适合万级以内）；**拍照流程不走本地余弦**，仅豆包视觉 + 可选关键词回退。
 - 导入仍依赖 Python 抽特征时，请保证 `embed_image.py` 可用。
 - **后台寻款批量导入**、手机拍照寻款：若 **HTTP 413**，先调 Nginx `client_max_body_size`，再调 PHP `upload_max_filesize` 与 `post_max_size`（三者均要覆盖最大单文件体积）。
