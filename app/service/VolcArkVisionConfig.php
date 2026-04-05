@@ -22,7 +22,8 @@ class VolcArkVisionConfig
      *   timeout_seconds:int,
      *   match_max_tokens:int,
      *   describe_max_tokens:int,
-     *   retry_times:int
+     *   retry_times:int,
+     *   verify_ssl:bool
      * }
      */
     public static function get(): array
@@ -94,6 +95,15 @@ class VolcArkVisionConfig
             $retry = 5;
         }
 
+        $verifySsl = (bool) ($base['verify_ssl'] ?? true);
+        $ve = getenv('VOLC_ARK_VERIFY_SSL');
+        if ($ve !== false && \trim((string) $ve) !== '') {
+            $parsed = \filter_var(\trim((string) $ve), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+            if ($parsed !== null) {
+                $verifySsl = $parsed;
+            }
+        }
+
         $enabled = $enabledFlag === '1' && $bearer !== '' && $ep !== '';
 
         return [
@@ -107,6 +117,7 @@ class VolcArkVisionConfig
             'match_max_tokens' => $matchTok,
             'describe_max_tokens' => $descTok,
             'retry_times' => $retry,
+            'verify_ssl' => $verifySsl,
         ];
     }
 }

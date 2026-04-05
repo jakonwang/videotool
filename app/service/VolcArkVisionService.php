@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace app\service;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\RequestException;
 use think\facade\Log;
 
 /**
@@ -237,12 +237,13 @@ TXT;
             'base_url' => (string) ($cfg['base_url'] ?? ''),
             'url' => $url,
         ]);
+        $verifySsl = (bool) ($cfg['verify_ssl'] ?? true);
         try {
             $client = new Client([
                 'timeout' => $cfg['timeout_seconds'],
-                'connect_timeout' => 20,
+                'connect_timeout' => 25,
                 'http_errors' => false,
-                'verify' => true,
+                'verify' => $verifySsl,
             ]);
             $res = $client->post($url, [
                 'headers' => [
@@ -280,12 +281,32 @@ TXT;
             ]);
 
             return $raw;
-        } catch (GuzzleException $e) {
-            Log::warning('[volc_ark] 豆包网络异常', [
+        } catch (\Throwable $e) {
+            $log = [
                 'purpose' => $purpose,
                 'endpoint_id' => $endpointId,
+                'url' => $url,
+                'verify_ssl' => $verifySsl,
+                'exception' => \get_class($e),
                 'error' => $e->getMessage(),
-            ]);
+            ];
+            if ($e instanceof RequestException) {
+                if ($e->hasResponse()) {
+                    $log['response_http'] = $e->getResponse()->getStatusCode();
+                    $log['response_snip'] = \mb_substr((string) $e->getResponse()->getBody(), 0, 400);
+                }
+                $hc = $e->getHandlerContext();
+                if (isset($hc['errno'])) {
+                    $log['curl_errno'] = $hc['errno'];
+                }
+                if (isset($hc['error']) && \is_string($hc['error'])) {
+                    $log['curl_error'] = $hc['error'];
+                }
+            }
+            if (!$verifySsl) {
+                $log['note'] = 'verify_ssl=false，仅用于排查；生产请开启并配置 CA';
+            }
+            Log::warning('[volc_ark] 豆包网络异常', $log);
 
             return null;
         }

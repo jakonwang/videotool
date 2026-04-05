@@ -408,7 +408,8 @@
 ### 配置
 - **导入时是否生成描述**：后台 **设置 → 豆包视觉** 勾选「导入时生成描述」并**保存**；存储键名仍为 **`openai_describe_on_import`**（历史兼容），由 `VisionOpenAIConfig::get()['describe_on_import']` 读取。表单对「导入描述」「启用豆包」使用 **hidden=0 + checkbox=1**，避免只改其它配置保存时，因 HTML 不提交未勾选框而误写入 **关闭**。**方舟 API Key**：优先读 **Access Key** 框；若为空则使用 **Secret Key** 框（与 Access 二选一即可）。
 - **`config/services.php`**：`volc_ark`（`access_key`/`VOLC_ACCESS_KEY`、`secret_key`/`VOLC_SECRET_KEY`、`endpoint_id`/`VOLC_ENDPOINT_ID`、`base_url`/`VOLC_ARK_BASE_URL`、`max_catalog_items`、超时与 token 等）。**单次寻款带入条数** 可在后台「豆包视觉」填写（`volc_ark_max_catalog`）。
-- 环境变量示例：`VOLC_ACCESS_KEY`、`VOLC_ENDPOINT_ID`、`VOLC_ARK_BASE_URL`；若仍需阿里云/Google 旧数据，可继续在库中保留 `aliyun_is_*`、`google_ps_*` 等键（**设置页已不提供编辑**）。
+- **`VOLC_ARK_VERIFY_SSL`**（可选）：Guzzle 访问方舟 HTTPS 是否校验证书，默认开启。Windows 本地若 **`runtime/log`** 出现 **`[volc_ark] 豆包网络异常`** 且含 **`curl_errno` 60**（SSL certificate problem），可在 `.env` 临时设 **`VOLC_ARK_VERIFY_SSL=false`** 验证是否证书链问题；**生产环境 Linux** 建议保持 `true`，并在 `php.ini` 配置 **`openssl.cafile`** 指向有效 CA 包（如 `cacert.pem`）。日志中已输出 **`curl_errno` / `curl_error` / `exception`** 便于对照。
+- 环境变量示例：`VOLC_ACCESS_KEY`、`VOLC_ENDPOINT_ID`、`VOLC_ARK_BASE_URL`、`VOLC_ARK_VERIFY_SSL`；若仍需阿里云/Google 旧数据，可继续在库中保留 `aliyun_is_*`、`google_ps_*` 等键（**设置页已不提供编辑**）。
 
 ### 后台路由（`admin.php`，需登录）
 - `GET /admin.php/product_search`：索引管理页（导入 CSV、列表、打开 H5）

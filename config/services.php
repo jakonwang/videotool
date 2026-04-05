@@ -61,5 +61,7 @@ return [
         'match_max_tokens' => (int) env('VOLC_ARK_MATCH_MAX_TOKENS', 1024),
         'describe_max_tokens' => (int) env('VOLC_ARK_DESCRIBE_MAX_TOKENS', 220),
         'retry_times' => (int) env('VOLC_ARK_RETRY', 2),
+        /** HTTPS 证书校验；可被环境变量 VOLC_ARK_VERIFY_SSL 覆盖（见 VolcArkVisionConfig） */
+        'verify_ssl' => true,
     ],
 ];
