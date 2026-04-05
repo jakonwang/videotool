@@ -196,7 +196,7 @@ videotool/
 ### 5分钟快速部署
 
 1. **解压项目文件**
-2. **安装依赖**: `composer install`（要求 **PHP ≥ 8.1**；后台「寻款」**Excel 嵌入图导入**依赖 `phpoffice/phpspreadsheet` 5.x；**拍照寻款与导入 AI 描述**使用 **火山方舟豆包**（`guzzlehttp/guzzle`）；可选依赖含阿里云图搜等，见 `composer.json`；需 `ext-zip`、`ext-xml`、`ext-gd` 等。豆包可在环境变量 `VOLC_ACCESS_KEY`、`VOLC_ARK_MODEL`（model）或 `VOLC_ENDPOINT_ID`（ep- 兜底）或后台 **设置 → 豆包视觉** 配置）
+2. **安装依赖**: `composer install`（要求 **PHP ≥ 8.1**；后台「寻款」**Excel 嵌入图导入**依赖 `phpoffice/phpspreadsheet` 5.x；**拍照寻款与导入 AI 描述**使用 **火山方舟豆包**（`guzzlehttp/guzzle`）；可选依赖含阿里云图搜等，见 `composer.json`；需 `ext-zip`、`ext-xml`、`ext-gd` 等。豆包可在环境变量 `VOLC_ACCESS_KEY`、`VOLC_ARK_MODEL`（默认推荐 `doubao-1-5-vision-pro-32k` / Doubao-1.5-vision-pro-32k）或 `VOLC_ENDPOINT_ID`（ep-）或后台 **设置 → 豆包视觉** 配置）
 3. **配置数据库**: 编辑 `config/database.php`
 4. **导入数据库**: `mysql -u root -p videotool < database/schema.sql`  
    - 已有库升级商品/达人链：**推荐**在项目根目录执行  

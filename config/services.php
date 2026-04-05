@@ -54,8 +54,8 @@ return [
     'volc_ark' => [
         'access_key' => env('VOLC_ACCESS_KEY', ''),
         'secret_key' => env('VOLC_SECRET_KEY', ''),
-        /** 请求体 model 字段：优先用 VOLC_ARK_MODEL（与官方文档一致）；空则回退 VOLC_ENDPOINT_ID（ep- 接入点） */
-        'model_id' => env('VOLC_ARK_MODEL', ''),
+        /** 请求体 model：默认 Doubao-1.5-vision-pro-32k（方舟 Model ID 多为 doubao-1-5-vision-pro-32k，以控制台「模型列表」为准，可能带日期后缀） */
+        'model_id' => env('VOLC_ARK_MODEL', 'doubao-1-5-vision-pro-32k'),
         'endpoint_id' => env('VOLC_ENDPOINT_ID', ''),
         'base_url' => rtrim((string) env('VOLC_ARK_BASE_URL', 'https://ark.cn-beijing.volces.com/api/v3'), '/'),
         'max_catalog_items' => (int) env('VOLC_ARK_MAX_CATALOG', 250),

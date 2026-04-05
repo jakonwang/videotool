@@ -46,11 +46,11 @@ class VolcArkVisionConfig
         if ($ep === '') {
             $ep = trim((string) (getenv('VOLC_ENDPOINT_ID') ?: ''));
         }
-        /** 与官方「快速入门」一致：chat/completions 的 model 填模型列表中的 Model ID；亦支持推理接入点 ep-。优先级：环境变量 VOLC_ARK_MODEL → 后台模型 ID → endpoint_id */
+        /** model：VOLC_ARK_MODEL → 后台模型 ID → 接入点 ep-（仅 ep 时优先于配置默认，避免被默认 model 覆盖）→ config 默认（Doubao-1.5-vision-pro-32k） */
         $modelFromDb = trim((string) SystemConfigService::get('volc_ark_model_id', '') ?: '');
         $modelFromBase = trim((string) ($base['model_id'] ?? ''));
         $modelFromEnv = trim((string) (getenv('VOLC_ARK_MODEL') ?: ''));
-        $model = $modelFromEnv !== '' ? $modelFromEnv : ($modelFromDb !== '' ? $modelFromDb : ($modelFromBase !== '' ? $modelFromBase : $ep));
+        $model = $modelFromEnv !== '' ? $modelFromEnv : ($modelFromDb !== '' ? $modelFromDb : ($ep !== '' ? $ep : $modelFromBase));
         $url = trim((string) SystemConfigService::get('volc_ark_base_url', '') ?: ($base['base_url'] ?? ''));
         if ($url === '') {
             $url = trim((string) (getenv('VOLC_ARK_BASE_URL') ?: ''));

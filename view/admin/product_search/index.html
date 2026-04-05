@@ -481,7 +481,7 @@
             <span v-if="visionDescribeOnImport">已在设置中开启「导入时生成描述」。</span>
             <span v-else>若需导入自动写描述，请在 <strong>设置</strong> 勾选「导入时生成描述」。</span>
           </div>
-          <div v-if="!volcArkEnabled" style="margin-top:8px;color:#64748b;">拍照寻款需在 <strong>系统 → 设置</strong> 启用 <strong>豆包视觉</strong> 并填写 Endpoint 与 API Key；新环境需执行 <code>database/run_migration_openai_vision_columns.php</code>（Linux 用正斜杠路径）。</div>
+          <div v-if="!volcArkEnabled" style="margin-top:8px;color:#64748b;">拍照寻款需在 <strong>系统 → 设置</strong> 启用 <strong>豆包视觉</strong> 并填写 API Key 与 model（推荐 Doubao-1.5-vision-pro-32k）或 ep-；新环境需执行 <code>database/run_migration_openai_vision_columns.php</code>（Linux 用正斜杠路径）。</div>
         </div>
 
         <div class="admin-filter-section">

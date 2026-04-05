@@ -116,7 +116,7 @@
                     <div class="card shadow-sm mb-3">
                         <div class="card-body">
                     <h5 class="mb-3 text-muted">豆包视觉（寻款）</h5>
-                    <p class="small text-muted">与官方 <a href="https://www.volcengine.com/docs/82379/1399008?lang=zh" target="_blank" rel="noopener">火山方舟 · 快速入门</a> 一致：<code>Authorization: Bearer &lt;API Key&gt;</code>，请求体 <code>model</code> 填 <a href="https://www.volcengine.com/docs/82379/1330310?lang=zh" target="_blank" rel="noopener">模型列表</a> 中的 <strong>Model ID</strong>，或控制台<strong>推理接入点</strong>（<code>ep-</code>）。调用成功可在 <code>runtime/log</code> 搜 <code>[volc_ark]</code>。</p>
+                    <p class="small text-muted">与官方 <a href="https://www.volcengine.com/docs/82379/1399008?lang=zh" target="_blank" rel="noopener">火山方舟 · 快速入门</a> 一致：<code>Authorization: Bearer &lt;API Key&gt;</code>，请求体 <code>model</code> 填 <a href="https://www.volcengine.com/docs/82379/1330310?lang=zh" target="_blank" rel="noopener">模型列表</a> 中的 <strong>Model ID</strong>。寻款推荐 <strong>Doubao-1.5-vision-pro-32k</strong>（常见 ID：<code>doubao-1-5-vision-pro-32k</code>，以控制台为准，可能含日期后缀）；亦可只用 <code>ep-</code> 接入点。调用成功可在 <code>runtime/log</code> 搜 <code>[volc_ark]</code>。</p>
                     <div class="form-group">
                         <input type="hidden" name="volc_ark_enabled" value="0">
                         <div class="custom-control custom-checkbox">
@@ -143,7 +143,7 @@
                     </div>
                     <div class="form-group">
                         <label for="volc_ark_model_id">模型 ID（model，优先）</label>
-                        <input type="text" name="volc_ark_model_id" id="volc_ark_model_id" class="form-control" value="{$volc_ark_model_id|default=''}" placeholder="模型列表中的 Model ID（如 doubao-…）；与下方 ep- 二选一，填了则优先用此项">
+                        <input type="text" name="volc_ark_model_id" id="volc_ark_model_id" class="form-control" value="{$volc_ark_model_id|default=''}" placeholder="推荐 doubao-1-5-vision-pro-32k（Doubao-1.5-vision-pro-32k）；留空则用配置默认或下方 ep-">
                     </div>
                     <div class="form-group">
                         <label for="volc_ark_endpoint_id">接入点 ID（ep-，可选）</label>
