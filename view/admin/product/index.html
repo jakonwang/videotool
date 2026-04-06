@@ -1,6 +1,6 @@
-﻿{extend name="admin/common/layout" /}
+{extend name="admin/common/layout" /}
 
-{block name="title"}鍟嗗搧{/block}
+{block name="title"}商品{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -9,7 +9,7 @@
 <style>
     .content-header { display: none; }
 
-    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锛?*/
+    /* High-Density Modern（仅该页生效） */
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -47,11 +47,11 @@
         align-items: center;
         gap: 12px;
         flex-wrap: nowrap;
-        overflow-x: hidden; /* 榛樿涓嶅嚭鐜版í鍚戞粴鍔ㄦ潯 */
+        overflow-x: hidden; /* 默认不出现横向滚动条 */
         padding-bottom: 0;
         margin-bottom: 12px;
     }
-    /* 浠呭湪绐勫睆鏃跺厑璁告í鍚戞粴鍔紝閬垮厤甯冨眬鏂 */
+    /* 仅在窄屏时允许横向滚动，避免布局断行 */
     @media (max-width: 1200px) {
         .admin-product-filters { overflow-x: auto; padding-bottom: 4px; }
     }
@@ -90,14 +90,14 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus锛圕DN锛?-->
+<!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
+<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
-  const { createApp, reactive, ref, computed, onMounted, nextTick } = Vue;
+  const { createApp, reactive, ref, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
@@ -134,23 +134,6 @@
       const query = reactive({
         keyword: '',
         status: '',
-        category: '',
-      });
-      const categoryOptions = ref([]);
-
-      const editVisible = ref(false);
-      const editSaving = ref(false);
-      const editUploading = ref(false);
-      const thumbFileRef = ref(null);
-      const editForm = reactive({
-        id: 0,
-        name: '',
-        category_name: '',
-        goods_url: '',
-        tiktok_shop_url: '',
-        thumb_url: '',
-        sort_order: 0,
-        status: '1',
       });
 
       async function fetchList() {
@@ -161,7 +144,6 @@
           params.set('page_size', String(pageSize.value));
           if (query.keyword) params.set('keyword', query.keyword);
           if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
-          if (query.category) params.set('category', String(query.category));
           if (sortProp.value) params.set('sort_prop', sortProp.value);
           if (sortOrder.value) params.set('sort_order', sortOrder.value);
 
@@ -169,7 +151,6 @@
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
-          categoryOptions.value = (json.data && Array.isArray(json.data.categories)) ? json.data.categories : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
           ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
@@ -186,7 +167,6 @@
       function onReset() {
         query.keyword = '';
         query.status = '';
-        query.category = '';
         page.value = 1;
         fetchList();
       }
@@ -203,119 +183,16 @@
         window.location.href = '/admin.php/product/add';
       }
 
-      function openEdit(row) {
-        editForm.id = row.id;
-        editForm.name = row.name || '';
-        editForm.category_name = row.category_name || '';
-        editForm.goods_url = row.goods_url || '';
-        editForm.tiktok_shop_url = row.tiktok_shop_url || '';
-        editForm.thumb_url = row.thumb_url || '';
-        editForm.sort_order = Number(row.sort_order) || 0;
-        editForm.status = String(row.status) === '0' ? '0' : '1';
-        editVisible.value = true;
-      }
-
-      function triggerThumbPick() {
-        nextTick(() => {
-          if (thumbFileRef.value) thumbFileRef.value.click();
-        });
-      }
-
-      async function onThumbFileChange(e) {
-        const input = e.target;
-        const f = input.files && input.files[0];
-        if (!f) return;
-        editUploading.value = true;
-        try {
-          const fd = new FormData();
-          fd.append('file', f);
-          const res = await fetch('/admin.php/product/uploadThumb', {
-            method: 'POST',
-            body: fd,
-            credentials: 'same-origin',
-          });
-          const json = await res.json();
-          if (json && json.code === 0 && json.data && json.data.url) {
-            editForm.thumb_url = json.data.url;
-            ElMessage.success(json.msg || tt('common.done'));
-          } else {
-            ElMessage.error((json && json.msg) || tt('page.product.uploadFail'));
-          }
-        } catch (err) {
-          ElMessage.error(tt('common.loadingFailed'));
-        } finally {
-          editUploading.value = false;
-          input.value = '';
-        }
-      }
-
-      async function submitEdit() {
-        const name = String(editForm.name || '').trim();
-        if (!name) {
-          ElMessage.warning(tt('page.product.nameRequired'));
-          return;
-        }
-        editSaving.value = true;
-        try {
-          const body = new URLSearchParams();
-          body.set('name', name);
-          body.set('category_name', String(editForm.category_name || '').trim());
-          body.set('goods_url', String(editForm.goods_url || '').trim());
-          body.set('tiktok_shop_url', String(editForm.tiktok_shop_url || '').trim());
-          body.set('thumb_url', String(editForm.thumb_url || '').trim());
-          body.set('sort_order', String(editForm.sort_order));
-          body.set('status', String(editForm.status));
-          const resp = await fetch('/admin.php/product/edit/' + editForm.id, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-            body: body.toString(),
-            credentials: 'same-origin',
-          });
-          const json = await resp.json();
-          if (json && json.code === 0) {
-            ElMessage.success(json.msg || tt('common.saved'));
-            editVisible.value = false;
-            fetchList();
-          } else {
-            ElMessage.error((json && json.msg) || tt('page.product.saveFailed'));
-          }
-        } catch (err) {
-          ElMessage.error(tt('common.loadingFailed'));
-        } finally {
-          editSaving.value = false;
-        }
-      }
-
-      async function copyStr(text) {
-        const t = String(text || '');
-        if (!t) {
-          ElMessage.warning(tt('page.product.clipboardEmpty'));
-          return;
-        }
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(t);
-          else {
-            const tmp = document.createElement('input');
-            tmp.value = t;
-            document.body.appendChild(tmp);
-            tmp.select();
-            document.execCommand('copy');
-            document.body.removeChild(tmp);
-          }
-          ElMessage.success(tt('common.copyDone'));
-        } catch (e) {
-          ElMessage.error(tt('common.copyFail'));
-        }
-      }
-
-      function copyProductLink(row) {
-        copyStr(row.tiktok_shop_url);
+      function goEdit(row) {
+        window.location.href = '/admin.php/product/edit/' + row.id;
       }
 
       async function doDelete(row) {
         await ElMessageBox.confirm(
-          tt('page.product.deleteConfirmMsg'),
-          tt('page.product.deleteTitle'),
+          lang === 'en'
+            ? 'Delete this product? The "product" field of related videos will be cleared.'
+            : '确定删除该商品？关联视频的「所属商品」将清空。',
+          lang === 'en' ? 'Confirm' : '删除确认',
           { type: 'warning' }
         );
         const resp = await fetch('/admin.php/product/delete/' + row.id, {
@@ -326,12 +203,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || tt('common.deleted'));
+          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '已删除'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || tt('page.product.deleteFailed'));
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '删除失败'));
         }
       }
 
@@ -344,7 +221,6 @@
       return {
         loading,
         query,
-        categoryOptions,
         rows,
         total,
         page,
@@ -356,16 +232,7 @@
         onReset,
         onSortChange,
         goAdd,
-        openEdit,
-        editVisible,
-        editSaving,
-        editUploading,
-        editForm,
-        thumbFileRef,
-        triggerThumbPick,
-        onThumbFileChange,
-        submitEdit,
-        copyProductLink,
+        goEdit,
         doDelete,
         fetchList,
       };
@@ -395,9 +262,6 @@
             <el-option :label="tt('common.statusEnabled')" value="1" />
             <el-option :label="tt('common.statusDisabled')" value="0" />
           </el-select>
-          <el-select v-model="query.category" size="default" clearable filterable :placeholder="tt('page.product.filterCategory')" style="width:180px; flex:0 0 auto;">
-            <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
-          </el-select>
 
           <div class="admin-product-filter-actions">
             <el-button size="default" type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
@@ -415,46 +279,34 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column :label="tt('page.product.thumb')" width="72" align="center">
+          <el-table-column :label="lang==='en'?'Name':'名称'" min-width="220">
             <template #default="{ row }">
-              <el-image v-if="row.thumb_url" :src="row.thumb_url" style="width:48px;height:48px;border-radius:6px;" fit="cover" :preview-src-list="[row.thumb_url]" preview-teleported />
-              <span v-else class="text-muted">鈥?/span>
+              <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('page.product.colName')" min-width="200">
+          <el-table-column :label="lang==='en'?'Product URL':'商品链接'" min-width="320">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.name">{{ row.name || '鈥? }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column :label="tt('page.product.colCategory')" min-width="140">
-            <template #default="{ row }">
-              <span>{{ row.category_name || '鈥? }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column :label="tt('page.product.colGoodsUrl')" min-width="240">
-            <template #default="{ row }">
-              <div v-if="row.tiktok_shop_url" class="url-cell" :title="row.tiktok_shop_url">
-                <a :href="row.tiktok_shop_url" target="_blank" rel="noopener">{{ row.tiktok_shop_url }}</a>
+              <div v-if="row.goods_url" class="url-cell" :title="row.goods_url">
+                <a :href="row.goods_url" target="_blank" rel="noopener">{{ row.goods_url }}</a>
               </div>
-              <span v-else class="text-muted">鈥?/span>
+              <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
           <el-table-column prop="total_videos" :label="tt('page.product.totalVideos')" width="110" />
           <el-table-column prop="downloaded_videos" :label="tt('page.product.downloadedVideos')" width="110" />
           <el-table-column prop="undownloaded_videos" :label="tt('page.product.undownloadedVideos')" width="110" />
-          <el-table-column prop="sort_order" :label="tt('page.product.colSort')" width="110" sortable="custom" />
-          <el-table-column :label="tt('page.product.colStatus')" width="120">
+          <el-table-column prop="sort_order" :label="lang==='en'?'Sort':'排序'" width="110" sortable="custom" />
+          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" :label="tt('page.product.colUpdated')" min-width="180" />
-          <el-table-column :label="tt('page.product.colActions')" width="220" fixed="right">
+          <el-table-column prop="updated_at" :label="lang==='en'?'Updated':'更新时间'" min-width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" link type="primary" @click="copyProductLink(row)">{{ tt('page.product.copyLink') }}</el-button>
-              <el-button size="default" link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
           </el-table-column>
@@ -476,48 +328,9 @@
             @update:page-size="(s)=>{ pageSize=s; page=1; fetchList(); }"
           />
         </div>
-
-        <el-dialog v-model="editVisible" :title="tt('page.product.editTitle')" width="560px" destroy-on-close>
-          <el-form label-position="top" @submit.prevent="submitEdit">
-            <el-form-item :label="tt('page.product.colName')" required>
-              <el-input v-model="editForm.name" maxlength="255" show-word-limit />
-            </el-form-item>
-            <el-form-item :label="tt('page.product.colCategory')">
-              <el-input v-model="editForm.category_name" maxlength="64" :placeholder="tt('page.product.categoryPlaceholder')" />
-            </el-form-item>
-            <el-form-item :label="tt('page.product.colGoodsUrl')">
-              <el-input v-model="editForm.tiktok_shop_url" type="textarea" :rows="2" :placeholder="tt('page.product.tiktokUrlPlaceholder')" />
-            </el-form-item>
-            <el-form-item :label="tt('page.product.formThumb')">
-              <input ref="thumbFileRef" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" @change="onThumbFileChange" />
-              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                <el-button size="default" :loading="editUploading" @click="triggerThumbPick">{{ tt('page.product.pickThumb') }}</el-button>
-                <span style="font-size:12px;color:#909399;">{{ tt('page.product.formThumbHint') }}</span>
-              </div>
-              <el-input v-model="editForm.thumb_url" style="margin-top:8px;" :placeholder="tt('page.product.thumbUrlPh')" />
-              <div v-if="editForm.thumb_url" style="margin-top:8px;">
-                <el-image :src="editForm.thumb_url" style="width:72px;height:72px;border-radius:6px;" fit="cover" />
-              </div>
-            </el-form-item>
-            <el-form-item :label="tt('page.product.colSort')">
-              <el-input-number v-model="editForm.sort_order" :min="0" :step="1" controls-position="right" style="width:160px;" />
-            </el-form-item>
-            <el-form-item :label="tt('page.product.colStatus')">
-              <el-select v-model="editForm.status" style="width:160px;">
-                <el-option :label="tt('common.statusEnabled')" value="1" />
-                <el-option :label="tt('common.statusDisabled')" value="0" />
-              </el-select>
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="editVisible = false">{{ tt('common.cancel') }}</el-button>
-            <el-button type="primary" :loading="editSaving" @click="submitEdit">{{ tt('common.save') }}</el-button>
-          </template>
-        </el-dialog>
       </div>
     `
   }).use(ElementPlus).mount('#productApp');
   {/literal}
 </script>
 {/block}
-

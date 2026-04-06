@@ -1,6 +1,6 @@
-﻿{extend name="admin/common/layout" /}
+{extend name="admin/common/layout" /}
 
-{block name="title"}璁惧{/block}
+{block name="title"}设备{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锛岄鏍间笌鍟嗗搧/杈句汉閾剧粺涓€锟?*/
+    /* High-Density Modern（仅该页生效，风格与商品/达人链统一） */
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -89,7 +89,7 @@
 
 {block name="content"}
 <script>
-  // 涓嬫媺閫夐」锛氱敱鏈嶅姟绔敞鍏ワ紙骞冲彴鍒楄〃锛夛紝閬垮厤棰濆鎺ュ彛
+  // 下拉选项：由服务端注入（平台列表），避免额外接口
   const PLATFORM_OPTIONS = [];
   {volist name="platforms" id="p"}
   PLATFORM_OPTIONS.push({ id: {$p.id}, label: "{:addslashes((string)$p.name)}" });
@@ -99,9 +99,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus锛圕DN锟?-->
+<!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
+<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -184,7 +184,7 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(`纭畾瑕佸垹闄よ澶囷拷?{row.device_name || '璁惧'}銆嶅悧锛熻璁惧涓嬬殑鎵€鏈夎棰戜篃浼氳鍒犻櫎銆俙, '鍒犻櫎纭', { type: 'warning' });
+        await ElMessageBox.confirm(`确定要删除设备「${row.device_name || '设备'}」吗？该设备下的所有视频也会被删除。`, '删除确认', { type: 'warning' });
         const resp = await fetch('/admin.php/device/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -193,12 +193,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '鍒犻櫎鎴愬姛');
+          ElMessage.success(json.msg || '删除成功');
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '鍒犻櫎澶辫触');
+          ElMessage.error((json && json.msg) || '删除失败');
         }
       }
 
@@ -270,30 +270,30 @@
           :cell-style="cellStyle"
         >
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column :label="lang==='en'?'Device name':'璁惧鍚嶇О'" min-width="180">
+          <el-table-column :label="lang==='en'?'Device name':'设备名称'" min-width="180">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.device_name">{{ row.device_name || '锟? }}</div>
+              <div class="name-cell" :title="row.device_name">{{ row.device_name || '—' }}</div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Platform':'鎵€灞炲钩锟?" min-width="160">
+          <el-table-column :label="lang==='en'?'Platform':'所属平台'" min-width="160">
             <template #default="{ row }">
-              <span style="color:#4b5563;">{{ (row.platform && row.platform.name) ? row.platform.name : '锟? }}</span>
+              <span style="color:#4b5563;">{{ (row.platform && row.platform.name) ? row.platform.name : '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'IP':'IP 鍦板潃'" width="200">
+          <el-table-column :label="lang==='en'?'IP':'IP 地址'" width="200">
             <template #default="{ row }">
-              <span class="ip-cell">{{ row.ip_address || '锟? }}</span>
+              <span class="ip-cell">{{ row.ip_address || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Status':'鐘讹拷?" width="120">
+          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" :label="lang==='en'?'Created':'鍒涘缓鏃堕棿'" min-width="180" />
-          <el-table-column :label="lang==='en'?'Actions':'鎿嶄綔'" width="160" fixed="right">
+          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
             <template #default="{ row }">
               <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
@@ -323,4 +323,3 @@
   {/literal}
 </script>
 {/block}
-

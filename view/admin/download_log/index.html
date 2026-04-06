@@ -1,6 +1,6 @@
-﻿{extend name="admin/common/layout" /}
+{extend name="admin/common/layout" /}
 
-{block name="title"}????{/block}
+{block name="title"}下载异常{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern?????????????锟?*/
+    /* High-Density Modern（与缓存页统一，仅该页生效） */
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -111,9 +111,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + Element Plus (CDN) -->
+<!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
+<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -216,47 +216,26 @@
       }
 
       async function onClear() {
-        try {
-          await ElMessageBox.confirm(tt('page.errors.clearConfirm'), tt('page.errors.clearTitle'), {
-            type: 'warning',
-            confirmButtonText: tt('common.ok'),
-            cancelButtonText: tt('common.cancel'),
-          });
-        } catch {
-          return;
-        }
-        try {
-          const params = new URLSearchParams();
-          params.set('date', currentDateYmd.value);
-          const resp = await fetch('/admin.php/downloadLog/clear', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              Accept: 'application/json',
-            },
-            body: params.toString(),
-            credentials: 'same-origin',
-          });
-          const json = await resp.json();
-          if (json && json.code === 401) {
-            ElMessage.error(tt('common.sessionExpired'));
-            return;
-          }
-          if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || tt('page.errors.clearFail'));
-            return;
-          }
-          const d = json.data || {};
-          if (d.no_file) {
-            ElMessage.success(tt('page.errors.clearNoFile'));
-          } else if ((d.removed || 0) === 0) {
-            ElMessage.success(tt('page.errors.clearNone'));
-          } else {
-            ElMessage.success(tt('page.errors.clearSuccess', { n: String(d.removed) }));
-          }
+        await ElMessageBox.confirm(
+          lang === 'en' ? 'Clear (mark handled) download error records?' : '确认清空（标记处理）下载异常记录？',
+          lang === 'en' ? 'Confirm' : '清空异常',
+          {
+          type: 'warning',
+          confirmButtonText: tt('common.ok'),
+          cancelButtonText: tt('common.cancel'),
+        });
+        const resp = await fetch('/admin.php/downloadLog/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          body: '',
+          credentials: 'same-origin',
+        });
+        const json = await resp.json();
+        if (json && json.code === 0) {
+          ElMessage.success(json.msg || (lang === 'en' ? 'Cleared' : '已清空'));
           fetchList();
-        } catch (e) {
-          ElMessage.error((e && e.message) || tt('page.errors.clearFail'));
+        } else {
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Clear failed' : '清空失败'));
         }
       }
 
@@ -308,12 +287,12 @@
       <div class="admin-log-card">
         <div class="admin-log-header">
           <div>
-            <div class="admin-log-breadcrumb">{{ tt('page.errors.breadcrumb') }}</div>
-            <div class="admin-log-title">{{ tt('page.errors.title') }}</div>
+            <div class="admin-log-breadcrumb">${tt('page.errors.breadcrumb')}</div>
+            <div class="admin-log-title">${tt('page.errors.title')}</div>
           </div>
           <div class="admin-log-actions">
             <el-button size="default" :icon="Refresh" @click="onRefresh">{{ tt('common.refresh') }}</el-button>
-            <el-button size="default" type="danger" :icon="Delete" @click="onClear">{{ tt('page.errors.clear') }}</el-button>
+            <el-button size="default" type="danger" :icon="Delete" @click="onClear">${tt('page.errors.clear')}</el-button>
           </div>
         </div>
 
@@ -327,28 +306,28 @@
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.total_errors }}</div>
-              <div class="stat-label">{{ tt('page.errors.statTotal') }}</div>
+              <div class="stat-label">{{ lang==='en'?'Total errors':'总错误数' }}</div>
             </div>
             <div class="stat-icon stat-icon--red"><el-icon><WarningFilled/></el-icon></div>
           </div>
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.download_errors }}</div>
-              <div class="stat-label">{{ tt('page.errors.statDownload') }}</div>
+              <div class="stat-label">{{ lang==='en'?'Download errors':'下载错误' }}</div>
             </div>
             <div class="stat-icon stat-icon--amber"><el-icon><Download/></el-icon></div>
           </div>
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.cache_errors }}</div>
-              <div class="stat-label">{{ tt('page.errors.statCache') }}</div>
+              <div class="stat-label">{{ lang==='en'?'Cache errors':'缓存错误' }}</div>
             </div>
             <div class="stat-icon stat-icon--blue"><el-icon><Coin/></el-icon></div>
           </div>
           <div class="stat-card">
             <div>
               <div class="stat-value">{{ stats.other_errors }}</div>
-              <div class="stat-label">{{ tt('page.errors.statOther') }}</div>
+              <div class="stat-label">{{ lang==='en'?'Other errors':'其他错误' }}</div>
             </div>
             <div class="stat-icon stat-icon--slate"><el-icon><Bug/></el-icon></div>
           </div>
@@ -385,33 +364,33 @@
           :header-cell-style="headerCellStyle"
           :cell-style="cellStyle"
         >
-          <el-table-column prop="time_display" :label="lang==='en'?'Time':'??'" width="140" />
-          <el-table-column :label="lang==='en'?'Video ID':'??ID'" width="110">
+          <el-table-column prop="time_display" :label="lang==='en'?'Time':'时间'" width="140" />
+          <el-table-column :label="lang==='en'?'Video ID':'视频ID'" width="110">
             <template #default="{ row }">
               <span v-if="row.video_id">
                 <el-button size="default" link type="primary" @click="openVideo(row)">#{{ row.video_id }}</el-button>
               </span>
-              <span v-else class="text-muted">锟?/span>
+              <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Video title':'????'" min-width="180">
+          <el-table-column :label="lang==='en'?'Video title':'视频标题'" min-width="180">
             <template #default="{ row }">
-              <span style="font-weight:500; color:#303133;">{{ row.video_title || '锟? }}</span>
+              <span style="font-weight:500; color:#303133;">{{ row.video_title || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Error':'????'" min-width="360" show-overflow-tooltip>
+          <el-table-column :label="lang==='en'?'Error':'错误信息'" min-width="360" show-overflow-tooltip>
             <template #default="{ row }">
-              <div style="color:#b91c1c; font-size:12px; line-height:18px;" :title="row.error">{{ row.error || '锟? }}</div>
+              <div style="color:#b91c1c; font-size:12px; line-height:18px;" :title="row.error">{{ row.error || '—' }}</div>
               <div v-if="row.url" style="color:#6b7280; font-size:12px; line-height:18px; margin-top:4px;" :title="row.url">
                 {{ row.url }}
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Actions':'??'" width="140" fixed="right">
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="140" fixed="right">
             <template #default="{ row }">
-              <el-button v-if="row.video_id" size="default" link type="primary" @click="openVideo(row)">{{ lang==='en'?'View':'??' }}</el-button>
-              <el-button v-if="row.video_id" size="default" link type="warning" @click="openDebug(row)">{{ lang==='en'?'Debug':'??' }}</el-button>
-              <span v-if="!row.video_id" class="text-muted">锟?/span>
+              <el-button v-if="row.video_id" size="default" link type="primary" @click="openVideo(row)">{{ lang==='en'?'View':'查看' }}</el-button>
+              <el-button v-if="row.video_id" size="default" link type="warning" @click="openDebug(row)">{{ lang==='en'?'Debug':'调试' }}</el-button>
+              <span v-if="!row.video_id" class="text-muted">—</span>
             </template>
           </el-table-column>
         </el-table>
@@ -434,5 +413,4 @@
   {/literal}
 </script>
 {/block}
-
 

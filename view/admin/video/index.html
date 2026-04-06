@@ -1,10 +1,10 @@
-﻿{extend name="admin/common/layout" /}
+{extend name="admin/common/layout" /}
 
-{block name="title"}??{/block}
-{block name="page_title"}????{/block}
+{block name="title"}视频{/block}
+{block name="page_title"}视频管理{/block}
 {block name="style"}
 <style>
-  /* ??????????????????????? */
+  /* 采用你提供的模板风格（全局样式，仅作用于该页） */
   .page-container {
     padding: 24px;
     background-color: #f3f4f6;
@@ -17,7 +17,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
   }
 
-  /* ??????????16~20px ????*/
+  /* 顶部操作区（更紧凑：16~20px 间距） */
   .header-actions { margin-bottom: 16px; }
   .breadcrumb {
     font-size: 14px;
@@ -31,7 +31,7 @@
   .btn-primary { border-radius: 8px; padding: 0 24px; font-weight: 500; }
   .btn-danger { border-radius: 8px; border-color: #fca5a5; color: #ef4444; }
 
-  /* ??? */
+  /* 筛选区 */
   .filter-section {
     margin-bottom: 16px;
     padding-bottom: 16px;
@@ -39,7 +39,7 @@
   }
   .custom-form {
     display: flex;
-    flex-wrap: nowrap; /* ??????*/
+    flex-wrap: nowrap; /* 强制同一行 */
     gap: 12px;
     align-items: center;
   }
@@ -48,11 +48,11 @@
   .filter-buttons { margin-left: auto; display: flex; gap: 12px; align-items: center; }
 
   @media (max-width: 1200px) {
-    /* ??????????????????*/
+    /* 屏幕窄时允许横向滚动，避免按钮掉行 */
     .custom-form { overflow-x: auto; padding-bottom: 4px; }
   }
 
-  /* ?????????? */
+  /* 表格：图片与文字层级 */
   .cover-image {
     width: 48px;
     height: 48px;
@@ -88,7 +88,7 @@
   .custom-tag { border-radius: 6px; border: none; font-weight: 500; }
   .action-link { font-weight: 600; }
 
-  /* ???? */
+  /* 底部分页 */
   .footer-pagination {
     margin-top: 16px;
     display: flex;
@@ -96,7 +96,7 @@
     align-items: center;
   }
 
-  /* ???????? /video/batchUpload */
+  /* 上传弹窗：嵌入原 /video/batchUpload */
   .upload-iframe {
     width: 100%;
     height: 72vh;
@@ -106,7 +106,7 @@
   }
   .upload-dialog .el-dialog__body { padding: 0 !important; }
 
-  /* ????????/??/??????*/
+  /* 移动端：操作按钮/表格/弹窗更易用 */
   .admin-table-scroll { width: 100%; overflow-x: auto; }
   .admin-table-scroll .el-table { min-width: 980px; }
   @media (max-width: 768px) {
@@ -129,14 +129,14 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + Element Plus (CDN) -->
+<!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
+<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
-  // Options injected server-side (volist below); avoids extra JSON APIs.
-  // Use push() so ThinkPHP template does not need @last on options.
+  // 下拉选项：由服务端注入，避免额外接口
+  // 下拉选项：由服务端注入，避免额外接口（用 push 方式避免 @last 语法残留）
   const PLATFORM_OPTIONS = [];
   {volist name="platforms" id="p"}
   PLATFORM_OPTIONS.push({ id: {$p.id}, label: "{:addslashes((string)$p.name)}" });
@@ -208,7 +208,7 @@
 
           const res = await fetch('/admin.php/video/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || '加载失败');
           tableData.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
@@ -259,7 +259,7 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(tt('page.video.deleteConfirm'), tt('page.video.deleteTitle'), { type: 'warning' });
+        await ElMessageBox.confirm('确定删除该视频？', '提示', { type: 'warning' });
         const resp = await fetch('/admin.php/video/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -268,20 +268,16 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || tt('common.deleted'));
+          ElMessage.success(json.msg || '删除成功');
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+          ElMessage.error((json && json.msg) || '删除失败');
         }
       }
 
       async function doBatchDelete() {
         if (!batchDeleteEnabled.value) return;
-        await ElMessageBox.confirm(
-          tt('page.video.batchDeleteConfirm', { n: selectedCount.value }),
-          tt('page.video.batchDeleteTitle'),
-          { type: 'warning' },
-        );
+        await ElMessageBox.confirm(`确定删除选中的 ${selectedCount.value} 条视频？`, '提示', { type: 'warning' });
         const ids = selection.value.map(r => r.id);
         const body = new URLSearchParams();
         ids.forEach(id => body.append('ids[]', String(id)));
@@ -293,11 +289,11 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || tt('common.deleted'));
+          ElMessage.success(json.msg || '批量删除成功');
           selection.value = [];
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+          ElMessage.error((json && json.msg) || '批量删除失败');
         }
       }
 
@@ -315,13 +311,14 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success(tt('common.copyDone'));
+          ElMessage.success('已复制');
         } catch (e) {
-          ElMessage.error(tt('common.copyFail'));
+          ElMessage.error('复制失败');
         }
       }
 
       function openUpload() {
+        // cache-bust，避免弹窗内页面缓存旧状态
         uploadIframeSrc.value = '/admin.php/video/batchUpload?_t=' + Date.now();
         uploadVisible.value = true;
       }
@@ -332,6 +329,7 @@
           if (!frameEl || !frameEl.contentDocument) return;
           const doc = frameEl.contentDocument;
 
+          // 隐藏后台壳：侧栏/顶栏/页脚/面包屑，只保留上传表单主体
           const hideSelectors = [
             '.main-sidebar',
             '.main-header',
@@ -346,6 +344,7 @@
             });
           });
 
+          // 归零布局偏移（AdminLTE 默认 content-wrapper 有 margin-left）
           const cw = doc.querySelector('.content-wrapper');
           if (cw) {
             cw.style.marginLeft = '0';
@@ -358,20 +357,23 @@
             container.style.paddingRight = '0';
           }
 
+          // 页面背景与滚动优化
           doc.documentElement.style.background = 'transparent';
           doc.body.style.background = 'transparent';
           doc.body.style.overflowX = 'hidden';
 
+          // 让卡片更贴合弹窗宽度
           doc.querySelectorAll('.card').forEach((el) => {
             el.style.borderRadius = '12px';
             el.style.boxShadow = 'none';
           });
         } catch (e) {
-          /* cross-origin iframe: ignore */
+          // 同源失败或结构变化时静默
         }
       }
 
       function onUploadDialogClose() {
+        // 上传完成后用户通常会关闭弹窗，这里直接刷新列表即可
         page.value = 1;
         fetchList();
       }
@@ -393,39 +395,39 @@
       <div class="page-container">
         <div class="modern-card">
           <div class="header-actions">
-            <div class="breadcrumb">${tt('page.video.breadcrumb')}</div>
+            <div class="breadcrumb">${lang==='en'?'Home / Library / Videos':'首页 / 素材 / 视频管理'}</div>
             <div class="action-buttons">
-              <el-button type="primary" class="btn-primary" @click="openUpload">${tt('page.video.upload')}</el-button>
-              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">${tt('page.video.batchDelete')}</el-button>
-              <span v-if="selectedCount" style="font-size:12px; color:#6b7280; margin-left:6px;">{{ tt('page.video.selectedCount', { n: selectedCount }) }}</span>
+              <el-button type="primary" class="btn-primary" @click="openUpload">${lang==='en'?'Upload':'上传'}</el-button>
+              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">${lang==='en'?'Batch delete':'批量删除'}</el-button>
+              <span v-if="selectedCount" style="font-size:12px; color:#6b7280; margin-left:6px;">已选择 {{selectedCount}} 条</span>
             </div>
           </div>
 
           <div class="filter-section">
             <el-form :inline="true" class="custom-form" @submit.prevent>
               <el-form-item>
-                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="tt('page.video.phPlatform')" style="width: 140px;">
+                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Platform':'平台'" style="width: 140px;">
                   <el-option v-for="o in PLATFORM_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="tt('page.video.phDevice')" style="width: 140px;">
+                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Device':'设备'" style="width: 140px;">
                   <el-option v-for="o in DEVICE_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="tt('page.video.phProduct')" style="width: 140px;">
+                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Product':'商品'" style="width: 140px;">
                   <el-option v-for="o in PRODUCT_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags :placeholder="tt('page.video.phDownloadStatus')" style="width: 140px;">
-                  <el-option :label="tt('page.video.optNotDownloaded')" :value="0" />
-                  <el-option :label="tt('page.video.optDownloaded')" :value="1" />
+                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags :placeholder="lang==='en'?'Download status':'下载状态'" style="width: 140px;">
+                  <el-option :label="lang==='en'?'Not downloaded':'未下载'" :value="0" />
+                  <el-option :label="lang==='en'?'Downloaded':'已下载'" :value="1" />
                 </el-select>
               </el-form-item>
               <el-form-item class="search-input-item">
-                <el-input v-model="filters.keyword" :placeholder="tt('page.video.searchKeyword')" style="width: 240px;" @keyup.enter="onSearch" />
+                <el-input v-model="filters.keyword" :placeholder="lang==='en'?'Search title or URL':'搜索标题或视频链接'" style="width: 240px;" @keyup.enter="onSearch" />
               </el-form-item>
               <el-form-item class="filter-buttons">
                 <el-button type="primary" plain @click="onSearch">{{ tt('common.filter') }}</el-button>
@@ -450,49 +452,49 @@
             >
               <el-table-column type="selection" width="55" />
 
-            <el-table-column :label="tt('page.video.colCover')" width="100">
+            <el-table-column :label="lang==='en'?'Cover':'封面'" width="100">
               <template #default="scope">
                 <el-image class="cover-image" :src="scope.row.cover_url || scope.row.video_url || '/static/default-cover.svg'" fit="cover">
                   <template #error>
-                    <div class="image-placeholder">{{ tt('page.video.coverPlaceholder') }}</div>
+                    <div class="image-placeholder">暂无</div>
                   </template>
                 </el-image>
               </template>
             </el-table-column>
 
-            <el-table-column :label="tt('page.video.colTitleId')" min-width="200">
+            <el-table-column :label="lang==='en'?'Title / ID':'标题 / ID'" min-width="200">
               <template #default="scope">
                 <div class="title-column">
-                  <span class="main-title">{{ scope.row.title || tt('page.video.titleEmpty') }}</span>
+                  <span class="main-title">{{ scope.row.title || '—' }}</span>
                   <span class="sub-id">ID {{ scope.row.id }}</span>
                 </div>
               </template>
             </el-table-column>
 
-            <el-table-column prop="created_at" :label="tt('page.video.colTime')" sortable="custom" min-width="180" />
+            <el-table-column prop="created_at" :label="lang==='en'?'Time':'时间'" sortable="custom" min-width="180" />
 
-            <el-table-column :label="tt('page.video.colPlatform')" width="120">
+            <el-table-column :label="lang==='en'?'Platform':'平台'" width="120">
               <template #default="scope">
                 <el-tag type="info" effect="light" class="custom-tag">
-                  {{ (scope.row.platform && scope.row.platform.name) || tt('page.video.platformEmpty') }}
+                  {{ (scope.row.platform && scope.row.platform.name) || '—' }}
                 </el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column :label="tt('page.video.colStatus')" width="120">
+            <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
               <template #default="scope">
-                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">{{ tt('page.video.optDownloaded') }}</el-tag>
-                <el-tag v-else type="warning" effect="light" class="custom-tag">{{ tt('page.video.optNotDownloaded') }}</el-tag>
+                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">{{ lang==='en'?'Downloaded':'已下载' }}</el-tag>
+                <el-tag v-else type="warning" effect="light" class="custom-tag">{{ lang==='en'?'Not downloaded':'未下载' }}</el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column :label="tt('page.video.colActions')" width="100" fixed="right">
+            <el-table-column :label="lang==='en'?'Actions':'操作'" width="100" fixed="right">
               <template #default="scope">
                 <el-dropdown trigger="click">
-                  <el-button type="primary" link class="action-link">{{ tt('page.video.colActions') }}</el-button>
+                  <el-button type="primary" link class="action-link">{{ lang==='en'?'Actions':'操作' }}</el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item @click="copyText(scope.row.video_url)">{{ tt('page.video.copyUrl') }}</el-dropdown-item>
+                      <el-dropdown-item @click="copyText(scope.row.video_url)">{{ lang==='en'?'Copy URL':'复制链接' }}</el-dropdown-item>
                       <el-dropdown-item @click="goEdit(scope.row)">{{ tt('common.edit') }}</el-dropdown-item>
                       <el-dropdown-item divided @click="doDelete(scope.row)">{{ tt('common.delete') }}</el-dropdown-item>
                     </el-dropdown-menu>
@@ -502,13 +504,13 @@
             </el-table-column>
 
             <template #empty>
-              <div style="padding: 28px 0; text-align:center; color:#6b7280;">{{ tt('page.video.emptyList') }}</div>
+              <div style="padding: 28px 0; text-align:center; color:#6b7280;">{{ lang==='en'?'No videos':'暂无视频数据' }}</div>
             </template>
             </el-table>
           </div>
 
           <div class="footer-pagination">
-            <el-button @click="invertSelection" :disabled="!tableData.length">{{ tt('page.video.invertSelection') }}</el-button>
+            <el-button @click="invertSelection" :disabled="!tableData.length">反选</el-button>
             <el-pagination
               background
               layout="total, prev, pager, next, sizes"
@@ -524,7 +526,7 @@
           <el-dialog
             class="upload-dialog"
             v-model="uploadVisible"
-            :title="tt('page.video.uploadDialogTitle')"
+            :title="lang==='en'?'Upload':'上传视频'"
             width="920px"
             :destroy-on-close="true"
             @closed="onUploadDialogClose"
@@ -538,4 +540,3 @@
   {/literal}
 </script>
 {/block}
-
