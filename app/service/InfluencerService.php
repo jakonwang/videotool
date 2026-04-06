@@ -36,7 +36,7 @@ class InfluencerService
 
     /**
      * @param list<string> $row
-     * @return array{tiktok:int, nickname:?int, avatar:?int, followers:?int, contact:?int, region:?int, status:?int}|null
+     * @return array{tiktok:int, category:?int, nickname:?int, avatar:?int, followers:?int, contact:?int, region:?int, status:?int}|null
      */
     public static function mapHeader(array $row): ?array
     {
@@ -96,6 +96,7 @@ class InfluencerService
 
         return [
             'tiktok' => $tikTokIdx,
+            'category' => $find($norm, ['category', '分类', '类目', '分组', 'tag', '标签']),
             'nickname' => $find($norm, ['nickname', '昵称', 'name', '名称']),
             'avatar' => $find($norm, ['avatar', '头像', 'head']),
             'followers' => $find($norm, ['follower', '粉丝', 'fans']),
@@ -441,7 +442,7 @@ class InfluencerService
     }
 
     /**
-     * @param array{tiktok:int, nickname:?int, avatar:?int, followers:?int, contact:?int, region:?int, status:?int} $map
+     * @param array{tiktok:int, category:?int, nickname:?int, avatar:?int, followers:?int, contact:?int, region:?int, status:?int} $map
      * @param list<string|null> $row
      * @return array{ok:bool, inserted?:bool, updated?:bool, skip?:bool, reason?:string}
      */
@@ -457,6 +458,11 @@ class InfluencerService
         }
 
         $nick = '';
+        $category = null;
+        if (isset($map['category']) && $map['category'] !== null && isset($row[$map['category']])) {
+            $c = trim((string) $row[$map['category']]);
+            $category = $c !== '' ? mb_substr($c, 0, 64) : null;
+        }
         if (isset($map['nickname']) && $map['nickname'] !== null && isset($row[$map['nickname']])) {
             $nick = trim((string) $row[$map['nickname']]);
         }
@@ -488,6 +494,10 @@ class InfluencerService
             $changed = false;
             if ($nick !== '') {
                 $exists->nickname = $nick;
+                $changed = true;
+            }
+            if ($category !== null) {
+                $exists->category_name = $category;
                 $changed = true;
             }
             if ($avatar !== null) {
@@ -522,6 +532,7 @@ class InfluencerService
 
         Influencer::create([
             'tiktok_id' => $handle,
+            'category_name' => $category,
             'nickname' => $nick,
             'avatar_url' => $avatar,
             'follower_count' => $followers,

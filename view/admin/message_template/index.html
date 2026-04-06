@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}话术{/block}
+{block name="title"}璇濇湳{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -24,7 +24,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -104,7 +104,7 @@
 
       async function delRow(row) {
         try {
-          await ElMessageBox.confirm(lang === 'en' ? 'Delete this template?' : '确定删除该模板？', tt('page.influencer.deleteDialogTitle'), { type: 'warning' });
+          await ElMessageBox.confirm(lang === 'en' ? 'Delete this template?' : '纭畾鍒犻櫎璇ユā鏉匡紵', tt('page.influencer.deleteDialogTitle'), { type: 'warning' });
         } catch { return; }
         try {
           const res = await fetch('/admin.php/message_template/delete', {
@@ -140,7 +140,7 @@
         <el-table :data="rows" v-loading="loading" stripe>
           <el-table-column prop="name" :label="tt('page.messageTemplate.colName')" min-width="140" />
           <el-table-column :label="tt('page.messageTemplate.colBody')" min-width="220">
-            <template #default="{ row }"><div class="body-preview" :title="row.body">{{ row.body || '—' }}</div></template>
+            <template #default="{ row }"><div class="body-preview" :title="row.body">{{ row.body || '鈥? }}</div></template>
           </el-table-column>
           <el-table-column prop="sort_order" :label="tt('page.messageTemplate.colSort')" width="90" />
           <el-table-column :label="tt('page.messageTemplate.colStatus')" width="100">
@@ -186,3 +186,4 @@
   {/literal}
 </script>
 {/block}
+

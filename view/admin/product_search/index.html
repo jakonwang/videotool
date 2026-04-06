@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}寻款{/block}
+{block name="title"}瀵绘{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -24,7 +24,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -144,7 +144,7 @@
               inserted: d.inserted != null ? d.inserted : 0,
               updated: d.updated != null ? d.updated : 0,
               failed: d.failed != null ? d.failed : 0,
-              err: d.error_message ? '�? + d.error_message : '',
+              err: d.error_message ? '锟? + d.error_message : '',
             });
             if (d.status === 'failed') {
               ElMessage.error(msg);
@@ -365,7 +365,7 @@
         window.open('/index.php/searchByImage', '_blank', 'noopener');
       }
 
-      /** 可直链预览的图片地址（http(s)、站�?/、data:image�?*/
+      /** 鍙洿閾鹃瑙堢殑鍥剧墖鍦板潃锛坔ttp(s)銆佺珯锟?/銆乨ata:image锟?*/
       function imageDisplayUrl(ref) {
         const s = String(ref || '').trim();
         if (!s) return '';
@@ -543,7 +543,7 @@
         </el-table>
 
         <el-dialog v-model="importDialogVisible" :title="tt('page.styleSearch.importDlgTitle')" width="560px" destroy-on-close align-center @closed="closeImportDialog">
-          <div style="margin-bottom:12px;font-size:13px;color:#475569;">{{ tt('page.styleSearch.importTaskLabel') }} {{ importTaskId }} · {{ importStatusText }}</div>
+          <div style="margin-bottom:12px;font-size:13px;color:#475569;">{{ tt('page.styleSearch.importTaskLabel') }} {{ importTaskId }} 路 {{ importStatusText }}</div>
           <div v-if="importPollError" style="margin-bottom:10px;font-size:12px;color:#b91c1c;line-height:1.5;">{{ importPollError }}</div>
           <el-progress :percentage="importPercent" :status="importDone ? 'success' : undefined" />
           <div style="margin-top:14px;font-size:12px;color:#64748b;margin-bottom:6px;">{{ tt('page.styleSearch.importLog') }}</div>
@@ -590,3 +590,4 @@
   {/literal}
 </script>
 {/block}
+

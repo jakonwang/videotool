@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}商品{/block}
+{block name="title"}鍟嗗搧{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -9,7 +9,7 @@
 <style>
     .content-header { display: none; }
 
-    /* High-Density Modern（仅该页生效） */
+    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锛?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -47,11 +47,11 @@
         align-items: center;
         gap: 12px;
         flex-wrap: nowrap;
-        overflow-x: hidden; /* 默认不出现横向滚动条 */
+        overflow-x: hidden; /* 榛樿涓嶅嚭鐜版í鍚戞粴鍔ㄦ潯 */
         padding-bottom: 0;
         margin-bottom: 12px;
     }
-    /* 仅在窄屏时允许横向滚动，避免布局断行 */
+    /* 浠呭湪绐勫睆鏃跺厑璁告í鍚戞粴鍔紝閬垮厤甯冨眬鏂 */
     @media (max-width: 1200px) {
         .admin-product-filters { overflow-x: auto; padding-bottom: 4px; }
     }
@@ -90,9 +90,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus（CDN） -->
+<!-- Vue3 + ElementPlus锛圕DN锛?-->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -134,7 +134,9 @@
       const query = reactive({
         keyword: '',
         status: '',
+        category: '',
       });
+      const categoryOptions = ref([]);
 
       const editVisible = ref(false);
       const editSaving = ref(false);
@@ -143,6 +145,7 @@
       const editForm = reactive({
         id: 0,
         name: '',
+        category_name: '',
         goods_url: '',
         tiktok_shop_url: '',
         thumb_url: '',
@@ -158,6 +161,7 @@
           params.set('page_size', String(pageSize.value));
           if (query.keyword) params.set('keyword', query.keyword);
           if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
+          if (query.category) params.set('category', String(query.category));
           if (sortProp.value) params.set('sort_prop', sortProp.value);
           if (sortOrder.value) params.set('sort_order', sortOrder.value);
 
@@ -165,6 +169,7 @@
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
+          categoryOptions.value = (json.data && Array.isArray(json.data.categories)) ? json.data.categories : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
           ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
@@ -181,6 +186,7 @@
       function onReset() {
         query.keyword = '';
         query.status = '';
+        query.category = '';
         page.value = 1;
         fetchList();
       }
@@ -200,6 +206,7 @@
       function openEdit(row) {
         editForm.id = row.id;
         editForm.name = row.name || '';
+        editForm.category_name = row.category_name || '';
         editForm.goods_url = row.goods_url || '';
         editForm.tiktok_shop_url = row.tiktok_shop_url || '';
         editForm.thumb_url = row.thumb_url || '';
@@ -252,6 +259,7 @@
         try {
           const body = new URLSearchParams();
           body.set('name', name);
+          body.set('category_name', String(editForm.category_name || '').trim());
           body.set('goods_url', String(editForm.goods_url || '').trim());
           body.set('tiktok_shop_url', String(editForm.tiktok_shop_url || '').trim());
           body.set('thumb_url', String(editForm.thumb_url || '').trim());
@@ -336,6 +344,7 @@
       return {
         loading,
         query,
+        categoryOptions,
         rows,
         total,
         page,
@@ -386,6 +395,9 @@
             <el-option :label="tt('common.statusEnabled')" value="1" />
             <el-option :label="tt('common.statusDisabled')" value="0" />
           </el-select>
+          <el-select v-model="query.category" size="default" clearable filterable :placeholder="tt('page.product.filterCategory')" style="width:180px; flex:0 0 auto;">
+            <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
+          </el-select>
 
           <div class="admin-product-filter-actions">
             <el-button size="default" type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
@@ -406,12 +418,17 @@
           <el-table-column :label="tt('page.product.thumb')" width="72" align="center">
             <template #default="{ row }">
               <el-image v-if="row.thumb_url" :src="row.thumb_url" style="width:48px;height:48px;border-radius:6px;" fit="cover" :preview-src-list="[row.thumb_url]" preview-teleported />
-              <span v-else class="text-muted">—</span>
+              <span v-else class="text-muted">鈥?/span>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.product.colName')" min-width="200">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
+              <div class="name-cell" :title="row.name">{{ row.name || '鈥? }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.product.colCategory')" min-width="140">
+            <template #default="{ row }">
+              <span>{{ row.category_name || '鈥? }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.product.colGoodsUrl')" min-width="240">
@@ -419,7 +436,7 @@
               <div v-if="row.tiktok_shop_url" class="url-cell" :title="row.tiktok_shop_url">
                 <a :href="row.tiktok_shop_url" target="_blank" rel="noopener">{{ row.tiktok_shop_url }}</a>
               </div>
-              <span v-else class="text-muted">—</span>
+              <span v-else class="text-muted">鈥?/span>
             </template>
           </el-table-column>
           <el-table-column prop="total_videos" :label="tt('page.product.totalVideos')" width="110" />
@@ -465,6 +482,9 @@
             <el-form-item :label="tt('page.product.colName')" required>
               <el-input v-model="editForm.name" maxlength="255" show-word-limit />
             </el-form-item>
+            <el-form-item :label="tt('page.product.colCategory')">
+              <el-input v-model="editForm.category_name" maxlength="64" :placeholder="tt('page.product.categoryPlaceholder')" />
+            </el-form-item>
             <el-form-item :label="tt('page.product.colGoodsUrl')">
               <el-input v-model="editForm.tiktok_shop_url" type="textarea" :rows="2" :placeholder="tt('page.product.tiktokUrlPlaceholder')" />
             </el-form-item>
@@ -500,3 +520,4 @@
   {/literal}
 </script>
 {/block}
+

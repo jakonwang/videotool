@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}平台{/block}
+{block name="title"}骞冲彴{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern（仅该页生效，风格与商品/达人链统一�?*/
+    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锛岄鏍间笌鍟嗗搧/杈句汉閾剧粺涓€锟?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -108,9 +108,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus（CDN�?-->
+<!-- Vue3 + ElementPlus锛圕DN锟?-->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -219,9 +219,9 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success('已复制链�?);
+          ElMessage.success('宸插鍒堕摼锟?);
         } catch (e) {
-          ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
+          ElMessage.error(lang === 'en' ? 'Copy failed' : '澶嶅埗澶辫触');
         }
       }
 
@@ -232,7 +232,7 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(`确定要删除平台�?{row.name || ''}」吗？删除后关联的设备与视频将一并移除。`, '删除确认', { type: 'warning' });
+        await ElMessageBox.confirm(`纭畾瑕佸垹闄ゅ钩鍙帮拷?{row.name || ''}銆嶅悧锛熷垹闄ゅ悗鍏宠仈鐨勮澶囦笌瑙嗛灏嗕竴骞剁Щ闄ゃ€俙, '鍒犻櫎纭', { type: 'warning' });
         const resp = await fetch('/admin.php/platform/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -241,12 +241,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '删除成功');
+          ElMessage.success(json.msg || '鍒犻櫎鎴愬姛');
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '删除失败');
+          ElMessage.error((json && json.msg) || '鍒犻櫎澶辫触');
         }
       }
 
@@ -317,40 +317,40 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Platform name':'平台名称'" min-width="160" sortable="custom" prop="name">
+          <el-table-column :label="lang==='en'?'Platform name':'骞冲彴鍚嶇О'" min-width="160" sortable="custom" prop="name">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.name">{{ row.name || '�? }}</div>
+              <div class="name-cell" :title="row.name">{{ row.name || '锟? }}</div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Code':'平台代码'" width="160" sortable="custom" prop="code">
+          <el-table-column :label="lang==='en'?'Code':'骞冲彴浠ｇ爜'" width="160" sortable="custom" prop="code">
             <template #default="{ row }">
-              <span class="code-cell">{{ row.code || '�? }}</span>
+              <span class="code-cell">{{ row.code || '锟? }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Icon':'图标'" width="120">
+          <el-table-column :label="lang==='en'?'Icon':'鍥炬爣'" width="120">
             <template #default="{ row }">
               <span v-if="row.icon" v-html="row.icon"></span>
-              <span v-else class="text-muted">�?/span>
+              <span v-else class="text-muted">锟?/span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Link':'访问链接'" min-width="360">
+          <el-table-column :label="lang==='en'?'Link':'璁块棶閾炬帴'" min-width="360">
             <template #default="{ row }">
               <div class="link-cell">
-                <div class="link-text" :title="row.link">{{ row.link || '�? }}</div>
+                <div class="link-text" :title="row.link">{{ row.link || '锟? }}</div>
                 <el-button size="default" link type="primary" @click="copyText(row.link)">{{ tt('common.copy') }}</el-button>
                 <el-button size="default" link type="primary" @click="openLink(row)">{{ tt('common.open') }}</el-button>
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Status':'状�?" width="120" sortable="custom" prop="status">
+          <el-table-column :label="lang==='en'?'Status':'鐘讹拷?" width="120" sortable="custom" prop="status">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
+          <el-table-column prop="created_at" :label="lang==='en'?'Created':'鍒涘缓鏃堕棿'" min-width="180" sortable="custom" />
+          <el-table-column :label="lang==='en'?'Actions':'鎿嶄綔'" width="160" fixed="right">
             <template #default="{ row }">
               <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
@@ -380,3 +380,4 @@
   {/literal}
 </script>
 {/block}
+

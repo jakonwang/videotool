@@ -46,6 +46,7 @@ class Influencer extends BaseController
     {
         $keyword = trim((string) $this->request->param('keyword', ''));
         $status = $this->request->param('status', null);
+        $category = trim((string) $this->request->param('category', ''));
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
         if ($pageSize <= 0) {
@@ -65,6 +66,9 @@ class Influencer extends BaseController
         if ($status !== null && $status !== '') {
             $query->where('status', (int) $status);
         }
+        if ($category !== '') {
+            $query->where('category_name', $category);
+        }
 
         $list = $query->paginate([
             'list_rows' => $pageSize,
@@ -83,6 +87,7 @@ class Influencer extends BaseController
             $items[] = [
                 'id' => (int) $row->id,
                 'tiktok_id' => (string) ($row->tiktok_id ?? ''),
+                'category_name' => (string) ($row->category_name ?? ''),
                 'nickname' => (string) ($row->nickname ?? ''),
                 'avatar_url' => (string) ($row->avatar_url ?? ''),
                 'follower_count' => (int) ($row->follower_count ?? 0),
@@ -98,6 +103,11 @@ class Influencer extends BaseController
 
         return $this->jsonOk([
             'items' => $items,
+            'categories' => InfluencerModel::whereNotNull('category_name')
+                ->where('category_name', '<>', '')
+                ->distinct(true)
+                ->order('category_name', 'asc')
+                ->column('category_name'),
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
@@ -214,7 +224,7 @@ class Influencer extends BaseController
      */
     public function sampleCsv()
     {
-        $csv = "\xEF\xBB\xBFtiktok_id,nickname,follower_count,region,whatsapp,zalo,contact,status\n@demo_creator,Demo昵称,12000,VN,84912345678,84912345678,,1\n";
+        $csv = "\xEF\xBB\xBFtiktok_id,category_name,nickname,follower_count,region,whatsapp,zalo,contact,status\n@demo_creator,美妆达人,Demo昵称,12000,VN,84912345678,84912345678,,1\n";
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -239,7 +249,7 @@ class Influencer extends BaseController
                 return $this->jsonErr('无法写入响应');
             }
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['id', 'tiktok_id', 'nickname', 'avatar_url', 'follower_count', 'contact', 'region', 'status', 'created_at', 'updated_at']);
+            fputcsv($out, ['id', 'tiktok_id', 'category_name', 'nickname', 'avatar_url', 'follower_count', 'contact', 'region', 'status', 'created_at', 'updated_at']);
 
             $batch = 2000;
             $lastId = 0;
@@ -259,6 +269,7 @@ class Influencer extends BaseController
                     fputcsv($out, [
                         $r['id'] ?? '',
                         $r['tiktok_id'] ?? '',
+                        $r['category_name'] ?? '',
                         $r['nickname'] ?? '',
                         $r['avatar_url'] ?? '',
                         (int) ($r['follower_count'] ?? 0),
@@ -303,6 +314,10 @@ class Influencer extends BaseController
 
             if (isset($payload['nickname'])) {
                 $row->nickname = trim((string) $payload['nickname']);
+            }
+            if (array_key_exists('category_name', $payload)) {
+                $c = trim((string) $payload['category_name']);
+                $row->category_name = $c !== '' ? mb_substr($c, 0, 64) : null;
             }
             if (array_key_exists('avatar_url', $payload)) {
                 $a = trim((string) $payload['avatar_url']);

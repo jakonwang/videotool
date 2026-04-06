@@ -59,6 +59,7 @@ class Product extends BaseController
     {
         $keyword = trim((string) $this->request->param('keyword', ''));
         $status = $this->request->param('status', '');
+        $category = trim((string) $this->request->param('category', ''));
 
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
@@ -80,6 +81,9 @@ class Product extends BaseController
         }
         if ($status !== '' && $status !== null) {
             $query->where('status', (int) $status);
+        }
+        if ($category !== '') {
+            $query->where('category_name', $category);
         }
 
         $list = $query->paginate([
@@ -124,6 +128,7 @@ class Product extends BaseController
             $items[] = [
                 'id' => $pid,
                 'name' => (string) ($p->name ?? ''),
+                'category_name' => (string) ($p->category_name ?? ''),
                 'goods_url' => (string) ($p->goods_url ?? ''),
                 'thumb_url' => (string) ($p->thumb_url ?? ''),
                 'tiktok_shop_url' => (string) ($p->tiktok_shop_url ?? ''),
@@ -142,6 +147,11 @@ class Product extends BaseController
             'msg' => 'ok',
             'data' => [
                 'items' => $items,
+                'categories' => ProductModel::whereNotNull('category_name')
+                    ->where('category_name', '<>', '')
+                    ->distinct(true)
+                    ->order('category_name', 'asc')
+                    ->column('category_name'),
                 'total' => (int) $list->total(),
                 'page' => (int) $list->currentPage(),
                 'page_size' => (int) $list->listRows(),
@@ -159,6 +169,7 @@ class Product extends BaseController
             }
             ProductModel::create([
                 'name' => $name,
+                'category_name' => trim((string) ($data['category_name'] ?? '')) ?: null,
                 'goods_url' => trim((string) ($data['goods_url'] ?? '')) ?: null,
                 'thumb_url' => trim((string) ($data['thumb_url'] ?? '')) ?: null,
                 'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,
@@ -181,6 +192,7 @@ class Product extends BaseController
             }
             ProductModel::where('id', $id)->update([
                 'name' => $name,
+                'category_name' => trim((string) ($data['category_name'] ?? '')) ?: null,
                 'goods_url' => trim((string) ($data['goods_url'] ?? '')) ?: null,
                 'thumb_url' => trim((string) ($data['thumb_url'] ?? '')) ?: null,
                 'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,

@@ -197,6 +197,7 @@ class InfluencerImportTaskRunner
             }
             $detected = [
                 'tiktok' => 0,
+                'category' => null,
                 'nickname' => isset($firstRow[1]) ? 1 : null,
                 'avatar' => null,
                 'followers' => null,
@@ -405,6 +406,7 @@ class InfluencerImportTaskRunner
             }
             $task->header_json = json_encode([
                 'tiktok' => 0,
+                'category' => null,
                 'nickname' => isset($first[1]) ? 1 : null,
                 'avatar' => null,
                 'followers' => null,

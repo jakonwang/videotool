@@ -15,6 +15,7 @@ class Influencer extends Model
     protected $schema = [
         'id'             => 'int',
         'tiktok_id'      => 'string',
+        'category_name'  => 'string',
         'nickname'       => 'string',
         'avatar_url'     => 'string',
         'follower_count' => 'int',

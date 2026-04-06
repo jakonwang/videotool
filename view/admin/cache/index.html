@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}缓存 · TikStar OPS{/block}
+{block name="title"}缂撳瓨 路 TikStar OPS{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern（仅该页生效�?*/
+    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锟?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -147,9 +147,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus（CDN�?-->
+<!-- Vue3 + ElementPlus锛圕DN锟?-->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -190,7 +190,7 @@
       const isEnabled = ref(true);
 
       const expireText = computed(() => {
-        if (!stats.expire_seconds) return '无限�?;
+        if (!stats.expire_seconds) return '鏃犻檺锟?;
         const h = Math.round((Number(stats.expire_seconds) / 3600) * 10) / 10;
         return `${h} h`;
       });
@@ -236,8 +236,8 @@
 
       async function onClear() {
         await ElMessageBox.confirm(
-          lang === 'en' ? 'Clear all cache? This action cannot be undone.' : '确认清空所有缓存？该操作无法恢复！',
-          lang === 'en' ? 'Confirm' : '清空缓存',
+          lang === 'en' ? 'Clear all cache? This action cannot be undone.' : '纭娓呯┖鎵€鏈夌紦瀛橈紵璇ユ搷浣滄棤娉曟仮澶嶏紒',
+          lang === 'en' ? 'Confirm' : '娓呯┖缂撳瓨',
           {
           type: 'warning',
           confirmButtonText: tt('common.ok'),
@@ -251,11 +251,11 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || (lang === 'en' ? 'Cache cleared' : '已清空缓�?));
+          ElMessage.success(json.msg || (lang === 'en' ? 'Cache cleared' : '宸叉竻绌虹紦锟?));
           page.value = 1;
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Clear failed' : '清空失败'));
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Clear failed' : '娓呯┖澶辫触'));
         }
       }
 
@@ -263,8 +263,8 @@
         const hash = row && row.hash ? String(row.hash) : '';
         if (!hash) return;
         await ElMessageBox.confirm(
-          lang === 'en' ? 'Delete this cache file?' : '确认删除该缓存文件？',
-          lang === 'en' ? 'Confirm' : '删除确认',
+          lang === 'en' ? 'Delete this cache file?' : '纭鍒犻櫎璇ョ紦瀛樻枃浠讹紵',
+          lang === 'en' ? 'Confirm' : '鍒犻櫎纭',
           {
           type: 'warning',
           confirmButtonText: tt('common.delete'),
@@ -278,12 +278,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '删除成功'));
+          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '鍒犻櫎鎴愬姛'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '删除失败'));
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '鍒犻櫎澶辫触'));
         }
       }
 
@@ -303,7 +303,7 @@
           }
           ElMessage.success(tt('influencer.copied'));
         } catch (e) {
-          ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
+          ElMessage.error(lang === 'en' ? 'Copy failed' : '澶嶅埗澶辫触');
         }
       }
 
@@ -356,32 +356,32 @@
 
         <el-alert v-if="!isEnabled" class="admin-cache-alert" type="warning" show-icon :closable="false">
           <template #title>
-            下载缓存尚未启用，请�?<span class="code-chip">config/download_cache.php</span> 或环境变量中开�?<span class="code-chip">download_cache.enabled</span>�?          </template>
+            涓嬭浇缂撳瓨灏氭湭鍚敤锛岃锟?<span class="code-chip">config/download_cache.php</span> 鎴栫幆澧冨彉閲忎腑寮€锟?<span class="code-chip">download_cache.enabled</span>锟?          </template>
         </el-alert>
         <el-alert v-else class="admin-cache-alert" type="warning" show-icon :closable="false">
           <template #title>
-            缓存用于加速下载与断点续传；可�?<span class="code-chip">config/download_cache.php</span> 调整策略�?          </template>
+            缂撳瓨鐢ㄤ簬鍔犻€熶笅杞戒笌鏂偣缁紶锛涘彲锟?<span class="code-chip">config/download_cache.php</span> 璋冩暣绛栫暐锟?          </template>
         </el-alert>
 
         <div class="admin-cache-stats">
           <div class="stat-card">
             <div class="stat-left">
               <div class="stat-value">{{ stats.total_files }}</div>
-              <div class="stat-label">缓存文件�?/div>
+              <div class="stat-label">缂撳瓨鏂囦欢锟?/div>
             </div>
             <div class="stat-icon stat-icon--blue"><el-icon><Document/></el-icon></div>
           </div>
           <div class="stat-card">
             <div class="stat-left">
               <div class="stat-value">{{ stats.total_size_human }}</div>
-              <div class="stat-label">占用空间</div>
+              <div class="stat-label">鍗犵敤绌洪棿</div>
             </div>
             <div class="stat-icon stat-icon--green"><el-icon><Coin/></el-icon></div>
           </div>
           <div class="stat-card">
             <div class="stat-left">
               <div class="stat-value">{{ expireText }}</div>
-              <div class="stat-label">缓存有效�?/div>
+              <div class="stat-label">缂撳瓨鏈夋晥锟?/div>
             </div>
             <div class="stat-icon stat-icon--amber"><el-icon><TrendCharts/></el-icon></div>
           </div>
@@ -391,9 +391,9 @@
                 <el-tooltip :content="cacheDirText" placement="top" :show-after="200">
                   <span class="path-ellipsis">{{ cacheDirText }}</span>
                 </el-tooltip>
-                <el-button size="default" link type="primary" :icon="CopyDocument" @click="copyText(cacheDirText)" aria-label="复制缓存目录" />
+                <el-button size="default" link type="primary" :icon="CopyDocument" @click="copyText(cacheDirText)" aria-label="澶嶅埗缂撳瓨鐩綍" />
               </div>
-              <div class="stat-label">缓存目录</div>
+              <div class="stat-label">缂撳瓨鐩綍</div>
             </div>
             <div class="stat-icon stat-icon--slate"><el-icon><Folder/></el-icon></div>
           </div>
@@ -418,11 +418,11 @@
           :header-cell-style="headerCellStyle"
           :cell-style="cellStyle"
         >
-          <el-table-column prop="file_name" :label="lang==='en'?'File':'文件�?" min-width="220" />
-          <el-table-column prop="source_url" :label="lang==='en'?'Source URL':'来源 URL'" min-width="320" show-overflow-tooltip />
-          <el-table-column prop="size_human" :label="lang==='en'?'Size':'文件大小'" width="120" />
-          <el-table-column prop="cached_at_text" :label="lang==='en'?'Cached at':'缓存时间'" width="180" />
-          <el-table-column :label="lang==='en'?'Actions':'操作'" width="120" fixed="right">
+          <el-table-column prop="file_name" :label="lang==='en'?'File':'鏂囦欢锟?" min-width="220" />
+          <el-table-column prop="source_url" :label="lang==='en'?'Source URL':'鏉ユ簮 URL'" min-width="320" show-overflow-tooltip />
+          <el-table-column prop="size_human" :label="lang==='en'?'Size':'鏂囦欢澶у皬'" width="120" />
+          <el-table-column prop="cached_at_text" :label="lang==='en'?'Cached at':'缂撳瓨鏃堕棿'" width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'鎿嶄綔'" width="120" fixed="right">
             <template #default="{ row }">
               <el-button size="default" link type="danger" @click="onDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
@@ -451,4 +451,5 @@
 
 </script>
 {/block}
+
 

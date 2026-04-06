@@ -15,6 +15,7 @@ class Product extends Model
     protected $schema = [
         'id'          => 'int',
         'name'        => 'string',
+        'category_name' => 'string',
         'goods_url'   => 'string',
         'thumb_url'   => 'string',
         'tiktok_shop_url' => 'string',

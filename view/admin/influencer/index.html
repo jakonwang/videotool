@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}达人{/block}
+{block name="title"}杈句汉{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -25,7 +25,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -62,7 +62,8 @@
       const total = ref(0);
       const page = ref(1);
       const pageSize = ref(10);
-      const query = reactive({ keyword: '', status: '' });
+      const query = reactive({ keyword: '', status: '', category: '' });
+      const categoryOptions = ref([]);
       const importing = ref(false);
       const importDialogVisible = ref(false);
       const importTaskId = ref(0);
@@ -76,6 +77,7 @@
       const editForm = reactive({
         id: 0,
         tiktok_id: '',
+        category_name: '',
         nickname: '',
         avatar_url: '',
         follower_count: 0,
@@ -177,10 +179,12 @@
           p.set('page_size', String(pageSize.value));
           if (query.keyword) p.set('keyword', query.keyword);
           if (query.status !== '' && query.status != null) p.set('status', String(query.status));
+          if (query.category) p.set('category', String(query.category));
           const res = await fetch('/admin.php/influencer/list?' + p.toString(), { credentials: 'same-origin', headers: { ...apiFetchHeaders } });
           const json = parseJsonBody(res, await res.text());
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
+          categoryOptions.value = (json.data && Array.isArray(json.data.categories)) ? json.data.categories : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -197,6 +201,7 @@
       function onReset() {
         query.keyword = '';
         query.status = '';
+        query.category = '';
         page.value = 1;
         fetchList();
       }
@@ -274,6 +279,7 @@
         const ch = row.contact_channels || {};
         editForm.id = row.id;
         editForm.tiktok_id = row.tiktok_id || '';
+        editForm.category_name = row.category_name || '';
         editForm.nickname = row.nickname || '';
         editForm.avatar_url = row.avatar_url || '';
         editForm.follower_count = row.follower_count != null ? Number(row.follower_count) : 0;
@@ -294,6 +300,7 @@
             headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
             body: JSON.stringify({
               id: editForm.id,
+              category_name: editForm.category_name,
               nickname: editForm.nickname,
               avatar_url: editForm.avatar_url,
               follower_count: editForm.follower_count,
@@ -462,6 +469,7 @@
         page,
         pageSize,
         query,
+        categoryOptions,
         importing,
         importDialogVisible,
         importPercent,
@@ -524,12 +532,16 @@
             <el-option :label="tt('page.influencer.status1')" value="1" />
             <el-option :label="tt('page.influencer.status2')" value="2" />
           </el-select>
+          <el-select v-model="query.category" clearable filterable :placeholder="tt('page.influencer.filterCategory')" style="width:180px;">
+            <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
+          </el-select>
           <el-button type="primary" @click="onSearch">{{ tt('common.search') }}</el-button>
           <el-button @click="onReset">{{ tt('common.reset') }}</el-button>
         </div>
 
         <el-table :data="rows" stripe v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle" row-key="id">
           <el-table-column prop="tiktok_id" :label="tt('page.influencer.colHandle')" min-width="140" />
+          <el-table-column prop="category_name" :label="tt('page.influencer.colCategory')" min-width="120" />
           <el-table-column prop="nickname" :label="tt('page.influencer.colNick')" min-width="120" />
           <el-table-column prop="follower_count" :label="tt('page.influencer.colFans')" width="100" />
           <el-table-column prop="region" :label="tt('page.influencer.colRegion')" width="100" />
@@ -582,7 +594,7 @@
         </el-dialog>
 
         <el-dialog v-model="outreachVisible" :title="tt('page.influencer.outreachTitle')" width="560px" destroy-on-close>
-          <div v-if="outreachRow" style="margin-bottom:8px;font-size:13px;color:#606266;">{{ outreachRow.tiktok_id }} · {{ outreachRow.nickname }}</div>
+          <div v-if="outreachRow" style="margin-bottom:8px;font-size:13px;color:#606266;">{{ outreachRow.tiktok_id }} 路 {{ outreachRow.nickname }}</div>
           <el-form label-width="100px" size="default">
             <el-form-item :label="tt('page.influencer.pickTemplate')">
               <el-select v-model="outreachTplId" style="width:100%;" filterable @change="renderOutreachPreview">
@@ -614,6 +626,9 @@
             <el-form-item :label="tt('page.influencer.colHandle')">
               <el-input v-model="editForm.tiktok_id" disabled />
             </el-form-item>
+            <el-form-item :label="tt('page.influencer.colCategory')">
+              <el-input v-model="editForm.category_name" maxlength="64" :placeholder="tt('page.influencer.categoryPlaceholder')" />
+            </el-form-item>
             <el-form-item :label="tt('page.influencer.colNick')">
               <el-input v-model="editForm.nickname" />
             </el-form-item>
@@ -630,7 +645,7 @@
               <el-input v-model="editForm.contact_whatsapp" placeholder="84912345678" />
             </el-form-item>
             <el-form-item :label="tt('page.influencer.editZalo')">
-              <el-input v-model="editForm.contact_zalo" placeholder="84912345678 或 zalo.me 后缀" />
+              <el-input v-model="editForm.contact_zalo" placeholder="84912345678 鎴?zalo.me 鍚庣紑" />
             </el-form-item>
             <el-form-item :label="tt('page.influencer.editNote')">
               <el-input v-model="editForm.contact_note" type="textarea" :rows="2" />
@@ -654,3 +669,4 @@
   {/literal}
 </script>
 {/block}
+

@@ -21,6 +21,10 @@
                         <input type="text" id="name" name="name" class="form-control" value="{$info.name|default=''}" required placeholder="商品名称">
                     </div>
                     <div class="form-group">
+                        <label for="category_name">分类</label>
+                        <input type="text" id="category_name" name="category_name" class="form-control" value="{$info.category_name|default=''}" placeholder="如：美妆、鞋包、电子">
+                    </div>
+                    <div class="form-group">
                         <label for="tiktok_shop_url">商品链接（TikTok）</label>
                         <input type="url" id="tiktok_shop_url" name="tiktok_shop_url" class="form-control" value="{$info.tiktok_shop_url|default=''}" placeholder="TikTok Shop / 橱窗商品链接（列表展示与一键复制）">
                     </div>

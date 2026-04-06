@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+    <script src="/static/i18n/i18n.js?v=20260406_category1"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -24,7 +24,7 @@
             --dash-border: rgba(29,36,78,0.12);
             --dash-danger: #ff6b8e;
             --dash-success: #28c7a5;
-            /* 侧栏：现代极简暗黑（Notion / Linear / Vercel 风格�?*/
+            /* 渚ф爮锛氱幇浠ｆ瀬绠€鏆楅粦锛圢otion / Linear / Vercel 椋庢牸锟?*/
             --dash-sidebar-bg: #111827;
             --dash-sidebar-border: rgba(255,255,255,0.06);
             --dash-sidebar-text: #9CA3AF;
@@ -66,7 +66,7 @@
             font-size: 1.5rem;
             font-weight: 600;
         }
-        /* 顶部栏：本项目不使用（保留结构兼容，但隐藏） */
+        /* 椤堕儴鏍忥細鏈」鐩笉浣跨敤锛堜繚鐣欑粨鏋勫吋瀹癸紝浣嗛殣钘忥級 */
         .dark-dashboard .main-header { display: none; }
         .dark-dashboard .main-sidebar {
             background: var(--dash-sidebar-bg);
@@ -85,7 +85,7 @@
             font-weight: 600;
         }
 
-        /* 固定布局：避免页面底部多余滚动条；侧栏内部滚�?*/
+        /* 鍥哄畾甯冨眬锛氶伩鍏嶉〉闈㈠簳閮ㄥ浣欐粴鍔ㄦ潯锛涗晶鏍忓唴閮ㄦ粴锟?*/
         .layout-fixed .main-sidebar .sidebar {
             height: calc(100vh - var(--dash-brand-h));
             overflow-y: auto;
@@ -98,7 +98,7 @@
         .layout-fixed .main-footer {
             padding-bottom: 0.75rem;
         }
-        /* 侧栏菜单：Bootstrap collapse 控制展开（与 SSR 一致）+ 极简暗黑 */
+        /* 渚ф爮鑿滃崟锛欱ootstrap collapse 鎺у埗灞曞紑锛堜笌 SSR 涓€鑷达級+ 鏋佺畝鏆楅粦 */
         .dark-dashboard .sidebar .admin-sidenav {
             padding: 10px 10px 10px;
         }
@@ -211,7 +211,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 8px 14px 8px 28px; /* 更紧�?+ 统一与图标对�?*/
+            padding: 8px 14px 8px 28px; /* 鏇寸揣锟?+ 缁熶竴涓庡浘鏍囧锟?*/
             margin: 2px 0;
             border-radius: 10px;
             color: #9CA3AF;
@@ -462,7 +462,7 @@
             border-color: rgba(23,32,66,.12);
         }
 
-        /* ===== 统一后台页面规范（与 /video 风格一致）===== */
+        /* ===== 缁熶竴鍚庡彴椤甸潰瑙勮寖锛堜笌 /video 椋庢牸涓€鑷达級===== */
         .admin-page-container {
             padding: 20px;
             background: #f3f4f6;
@@ -528,7 +528,7 @@
             align-items: center;
         }
 
-        /* ===== 移动端适配：显示顶部栏 + 抽屉侧栏 ===== */
+        /* ===== 绉诲姩绔€傞厤锛氭樉绀洪《閮ㄦ爮 + 鎶藉眽渚ф爮 ===== */
         @media (max-width: 992px) {
             :root { --dash-topbar-h: 56px; }
             .dark-dashboard .main-header {
@@ -536,15 +536,15 @@
                 position: sticky;
                 top: 0;
                 z-index: 1030;
-                /* 移动端避免透底：看得到下方内容文字 */
+                /* 绉诲姩绔伩鍏嶉€忓簳锛氱湅寰楀埌涓嬫柟鍐呭鏂囧瓧 */
                 background: rgba(255,255,255,0.98);
                 border-bottom: 1px solid rgba(29,36,78,.08);
                 backdrop-filter: blur(10px);
             }
-            /* 侧栏推拉/遮罩时，保证背景不透明 */
+            /* 渚ф爮鎺ㄦ媺/閬僵鏃讹紝淇濊瘉鑳屾櫙涓嶉€忔槑 */
             .dark-dashboard .main-sidebar {
                 background: var(--dash-sidebar-bg);
-                /* 确保移动端侧栏层级最高，避免被内容区覆盖 */
+                /* 纭繚绉诲姩绔晶鏍忓眰绾ф渶楂橈紝閬垮厤琚唴瀹瑰尯瑕嗙洊 */
                 z-index: 1085 !important;
             }
             .dark-dashboard .main-sidebar .sidebar {
@@ -590,12 +590,12 @@
         <nav class="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button" aria-label="菜单">
+                    <a class="nav-link" data-widget="pushmenu" href="#" role="button" aria-label="鑿滃崟">
                         <i class="fas fa-bars"></i>
                     </a>
                 </li>
             </ul>
-            <div class="admin-topbar-title" data-i18n="admin.topTitle">后台管理</div>
+            <div class="admin-topbar-title" data-i18n="admin.topTitle">鍚庡彴绠＄悊</div>
             <ul class="navbar-nav ml-auto align-items-center">
                 <li class="nav-item d-none d-sm-flex">
                     <span class="admin-topbar-user mr-2" title="{:session('admin_username') ?: ''}">
@@ -604,14 +604,14 @@
                 </li>
                 <li class="nav-item">
                     <button type="button" class="btn btn-outline-secondary btn-sm admin-logout-btn" id="btnAdminLogout">
-                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
+                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">閫€鍑?/span>
                     </button>
                 </li>
                 <li class="nav-item ml-2 d-none d-sm-flex">
                     <div class="btn-group btn-group-sm" role="group" aria-label="Language">
-                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZhTop">中文</button>
+                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZhTop">涓枃</button>
                         <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangEnTop">English</button>
-                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangViTop">Tiếng Việt</button>
+                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangViTop">Ti岷縩g Vi峄噒</button>
                     </div>
                 </li>
             </ul>
@@ -622,24 +622,24 @@
                 <span class="brand-text font-weight-light"><i class="fas fa-star mr-1"></i>TikStar OPS</span>
             </a>
             <div class="sidebar">
-                <nav class="mt-2" aria-label="主导航">
+                <nav class="mt-2" aria-label="涓诲鑸?>
                     <div class="admin-sidenav">
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.overview">概览</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.overview">姒傝</div>
                         <a href="/admin.php" class="admin-sidenav-link {if $Request.controller == 'Index'}active{/if}">
                             <span class="admin-sidenav-ico"><i data-lucide="layout-dashboard"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.dashboard">仪表盘</span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.dashboard">浠〃鐩?/span>
                         </a>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.groupSearch">寻款</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.groupSearch">瀵绘</div>
                         <a href="/admin.php/product_search" class="admin-sidenav-link {if $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}active{/if}">
                             <span class="admin-sidenav-ico"><i data-lucide="camera"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.styleSearch">寻款</span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.styleSearch">瀵绘</span>
                         </a>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.groupCreator">达人</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.groupCreator">杈句汉</div>
                         <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Influencer' && $Request.controller != 'influencer' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'MessageTemplate' && $Request.controller != 'messagetemplate'}collapsed{/if} {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-creator" aria-expanded="{if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}true{else /}false{/if}" aria-controls="admin-nav-creator" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="users"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.groupCreatorMenu">达人运营</span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.groupCreatorMenu">杈句汉杩愯惀</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
                         <div id="admin-nav-creator" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}show{/if}">
@@ -647,28 +647,28 @@
                                 <li>
                                     <a href="/admin.php/influencer" class="admin-sidenav-sublink {if $Request.controller == 'Influencer' || $Request.controller == 'influencer'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.influencerList">名录</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.influencerList">鍚嶅綍</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">达人链</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">杈句汉閾?/span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/message_template" class="admin-sidenav-sublink {if $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="message-square"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.messageTemplates">话术</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.messageTemplates">璇濇湳</span>
                                     </a>
                                 </li>
                             </ul>
                         </div>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.material">素材</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.material">绱犳潗</div>
                         <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="folder"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.materialMenu">素材库</span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.materialMenu">绱犳潗搴?/span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
                         <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product'}show{/if}">
@@ -676,28 +676,28 @@
                                 <li>
                                     <a href="/admin.php/video" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action != 'batchUpload' && $Request.action != 'batch_upload' && $Request.action != 'batchupload' && $Request.action != 'batch-upload'}active{/if}{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="video"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.video">视频</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.video">瑙嗛</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/video/batchUpload" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action == 'batchUpload' || $Request.action == 'batch_upload' || $Request.action == 'batchupload' || $Request.action == 'batch-upload'}active{/if}{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="cloud-upload"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.upload">上传</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.upload">涓婁紶</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/product" class="admin-sidenav-sublink {if $Request.controller == 'Product' || $Request.controller == 'product'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="shopping-bag"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.product">商品</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.product">鍟嗗搧</span>
                                     </a>
                                 </li>
                             </ul>
                         </div>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.terminalSection">终端</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.terminalSection">缁堢</div>
                         <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Platform' && $Request.controller != 'platform' && $Request.controller != 'Device' && $Request.controller != 'device'}collapsed{/if} {if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-terminal" aria-expanded="{if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}true{else /}false{/if}" aria-controls="admin-nav-terminal" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="monitor-smartphone"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.terminal">终端</span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.terminal">缁堢</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
                         <div id="admin-nav-terminal" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}show{/if}">
@@ -705,22 +705,22 @@
                                 <li>
                                     <a href="/admin.php/platform" class="admin-sidenav-sublink {if $Request.controller == 'Platform' || $Request.controller == 'platform'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="layers"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.platform">平台</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.platform">骞冲彴</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/device" class="admin-sidenav-sublink {if $Request.controller == 'Device' || $Request.controller == 'device'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="smartphone"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.device">设备</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.device">璁惧</span>
                                     </a>
                                 </li>
                             </ul>
                         </div>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.system">系统</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.system">绯荤粺</div>
                         <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Settings' && $Request.controller != 'settings' && $Request.controller != 'Cache' && $Request.controller != 'cache' && $Request.controller != 'DownloadLog' && $Request.controller != 'downloadlog' && $Request.controller != 'User' && $Request.controller != 'user' && $Request.controller != 'ClientLicense' && $Request.controller != 'clientlicense' && $Request.controller != 'ClientVersion' && $Request.controller != 'clientversion'}collapsed{/if} {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user' || $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense' || $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-system" aria-expanded="{if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user' || $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense' || $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}true{else /}false{/if}" aria-controls="admin-nav-system" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="settings"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.system">系统</span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.system">绯荤粺</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
                         <div id="admin-nav-system" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Settings' || $Request.controller == 'settings' || $Request.controller == 'Cache' || $Request.controller == 'cache' || $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog' || $Request.controller == 'User' || $Request.controller == 'user' || $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense' || $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}show{/if}">
@@ -728,43 +728,43 @@
                                 <li>
                                     <a href="/admin.php/settings" class="admin-sidenav-sublink {if $Request.controller == 'Settings' || $Request.controller == 'settings'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="sliders-horizontal"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.settings">系统设置</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.settings">绯荤粺璁剧疆</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/user" class="admin-sidenav-sublink {if $Request.controller == 'User' || $Request.controller == 'user'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.user">用户</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.user">鐢ㄦ埛</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/client_license" class="admin-sidenav-sublink {if $Request.controller == 'ClientLicense' || $Request.controller == 'clientlicense'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="key"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.clientLicense">发卡</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.clientLicense">鍙戝崱</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/client_version" class="admin-sidenav-sublink {if $Request.controller == 'ClientVersion' || $Request.controller == 'clientversion'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="package"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.clientVersion">版本</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.clientVersion">鐗堟湰</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/cache" class="admin-sidenav-sublink {if $Request.controller == 'Cache' || $Request.controller == 'cache'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="database"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.cache">缓存</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.cache">缂撳瓨</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/downloadLog" class="admin-sidenav-sublink {if $Request.controller == 'DownloadLog' || $Request.controller == 'downloadlog'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="triangle-alert"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.errors">异常</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.errors">寮傚父</span>
                                     </a>
                                 </li>
                                 <li>
                                     <a href="/admin.php/auth/logout" class="admin-sidenav-sublink">
                                         <span class="admin-sidenav-subico"><i data-lucide="log-out"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.logout">退出</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.logout">閫€鍑?/span>
                                     </a>
                                 </li>
                             </ul>
@@ -772,33 +772,33 @@
 
                         <div class="admin-sidenav-footer">
                             <div class="rowline">
-                                <span class="k">设备</span>
+                                <span class="k">璁惧</span>
                                 <span class="v" id="sbDeviceCount">-</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">上传</span>
+                                <span class="k">涓婁紶</span>
                                 <span class="v" id="sbUploadsSize">-</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">版本</span>
+                                <span class="k">鐗堟湰</span>
                                 <span class="muted">{$app_version}</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">账号</span>
+                                <span class="k">璐﹀彿</span>
                                 <span class="muted text-truncate" style="max-width: 120px;" title="{:session('admin_username') ?: ''}">
-                                    {:session('admin_username') ?: '—'}
+                                    {:session('admin_username') ?: '鈥?}
                                 </span>
                             </div>
                             <div class="rowline">
                                 <button type="button" class="btn btn-outline-secondary btn-sm w-100 admin-logout-btn" id="btnAdminLogout2">
-                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
+                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">閫€鍑?/span>
                                 </button>
                             </div>
                             <div class="rowline">
                                 <div class="btn-group btn-group-sm w-100" role="group" aria-label="Language">
-                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZh">中文</button>
+                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZh">涓枃</button>
                                     <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangEn">English</button>
-                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangVi">Tiếng Việt</button>
+                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangVi">Ti岷縩g Vi峄噒</button>
                                 </div>
                             </div>
                         </div>
@@ -811,7 +811,7 @@
             <section class="content-header">
                 <div class="container-fluid d-flex align-items-center justify-content-between flex-wrap">
                     <div>
-                        <h1 class="page-title mb-0">{block name="page_title"}后台管理{/block}</h1>
+                        <h1 class="page-title mb-0">{block name="page_title"}鍚庡彴绠＄悊{/block}</h1>
                         <small class="text-muted">{block name="breadcrumb"}{/block}</small>
                     </div>
                     <div class="mt-2 mt-sm-0">
@@ -831,20 +831,20 @@
             <div class="float-right d-none d-sm-inline">
                 <strong>Version</strong> {$app_version}
             </div>
-            <strong>TikStar OPS</strong> · Copyright &copy; {:date('Y')}
+            <strong>TikStar OPS</strong> 路 Copyright &copy; {:date('Y')}
         </footer>
     </div>
 
     <div class="toast-container position-fixed p-3" style="right:0;">
         <div id="globalToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="2500">
             <div class="toast-header">
-                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">提示</span></strong>
-                <small class="text-muted">现在</small>
+                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">鎻愮ず</span></strong>
+                <small class="text-muted">鐜板湪</small>
                 <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="toast-body" id="toastBody">操作成功</div>
+            <div class="toast-body" id="toastBody">鎿嶄綔鎴愬姛</div>
         </div>
     </div>
 
@@ -852,15 +852,15 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="confirmTitle">请确�?/h5>
+                    <h5 class="modal-title" id="confirmTitle">璇风‘璁?/h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body" id="confirmMessage">确认执行该操作吗�?/div>
+                <div class="modal-body" id="confirmMessage">纭鎵ц璇ユ搷浣滃悧锛?/div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-danger" id="confirmOkBtn">确认</button>
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">鍙栨秷</button>
+                    <button type="button" class="btn btn-danger" id="confirmOkBtn">纭</button>
                 </div>
             </div>
         </div>
@@ -890,10 +890,10 @@
             return {
                 showToast(type, message, title) {
                     const typeMap = {
-                        success: {icon: 'fa-check-circle', title: title || '成功'},
-                        error: {icon: 'fa-times-circle', title: title || '错误'},
-                        warning: {icon: 'fa-exclamation-triangle', title: title || '提醒'},
-                        info: {icon: 'fa-info-circle', title: title || '提示'}
+                        success: {icon: 'fa-check-circle', title: title || '鎴愬姛'},
+                        error: {icon: 'fa-times-circle', title: title || '閿欒'},
+                        warning: {icon: 'fa-exclamation-triangle', title: title || '鎻愰啋'},
+                        info: {icon: 'fa-info-circle', title: title || '鎻愮ず'}
                     };
                     const meta = typeMap[type] || typeMap.info;
                     toastTitle.html(`<i class="fas ${meta.icon} mr-1"></i>${meta.title}`);
@@ -901,7 +901,7 @@
                     toastEl.toast('show');
                 },
                 confirm(message, onOk) {
-                    confirmMessage.text(message || '确认执行该操作吗�?);
+                    confirmMessage.text(message || '纭鎵ц璇ユ搷浣滃悧锛?);
                     confirmCallback = onOk;
                     confirmModal.modal('show');
                 }
@@ -918,7 +918,7 @@
         });
     </script>
     <script>
-        // 侧栏底部信息：设备数�?/ uploads 占用
+        // 渚ф爮搴曢儴淇℃伅锛氳澶囨暟閲?/ uploads 鍗犵敤
         $(function () {
             function formatBytes(bytes) {
                 const b = parseInt(bytes || 0, 10);
@@ -930,7 +930,7 @@
             }
             $.get('/admin.php/stats/overview').done(function (res) {
                 if (res && res.code === 0 && res.data) {
-                    $('#sbDeviceCount').text(res.data.devices ?? '�?);
+                    $('#sbDeviceCount').text(res.data.devices ?? '鈥?);
                 }
             });
             $.get('/admin.php/stats/storageUsage').done(function (res) {
@@ -941,8 +941,7 @@
         });
     </script>
     <script>
-        // 侧栏分组自动展开：按当前 URL 匹配子菜单链接，避免服务�?$Request.controller 命名差异导致全部收起
-        $(function () {
+        // 渚ф爮鍒嗙粍鑷姩灞曞紑锛氭寜褰撳墠 URL 鍖归厤瀛愯彍鍗曢摼鎺ワ紝閬垮厤鏈嶅姟绔懡鍚嶅樊寮傚鑷村叏閮ㄦ敹璧?        $(function () {
             const path = (window.location.pathname || '').replace(/\/+$/, '');
             const full = window.location.href || '';
 
@@ -955,7 +954,7 @@
                 }
             }
 
-            // 只处理我们自己的分组容器
+            // 鍙鐞嗘垜浠嚜宸辩殑鍒嗙粍瀹瑰櫒
             const $collapses = $('.admin-sidenav-subwrap.collapse');
             if (!$collapses.length) return;
 
@@ -964,7 +963,7 @@
                 const href = ($(this).attr('href') || '').replace(/\/+$/, '');
                 if (!href) return;
 
-                // href 通常形如 /admin.php/video/batchUpload
+                // href 閫氬父褰㈠ /admin.php/video/batchUpload
                 const hit = (path === href) || (path && href && path.indexOf(href) !== -1) || (full && full.indexOf(href) !== -1);
                 if (hit) {
                     const $collapse = $(this).closest('.collapse');
@@ -977,7 +976,7 @@
                 }
             });
 
-            // 如果没匹配到子项，则保留服务端渲染状态（一般不会发生）
+            // 濡傛灉娌″尮閰嶅埌瀛愰」锛屽垯淇濈暀鏈嶅姟绔覆鏌撶姸鎬侊紙涓€鑸笉浼氬彂鐢燂級
             if (!matched) {
                 $collapses.each(function () {
                     const $c = $(this);
@@ -990,12 +989,12 @@
         });
     </script>
     <script>
-        // 退出登录（全局�?        $(function () {
+        // 閫€鍑虹櫥褰曪紙鍏ㄥ眬锛?        $(function () {
             function doLogout() {
                 $.post('/admin.php/auth/logout', {}, function () {
                     window.location.href = '/admin.php/auth/login';
                 }).fail(function () {
-                    // 降级：后�?GET 退出（�?JS / POST 被拦截也能退出）
+                    // 闄嶇骇锛氬悗鍙?GET 閫€鍑猴紙褰?JS / POST 琚嫤鎴篃鑳介€€鍑猴級
                     window.location.href = '/admin.php/auth/logout';
                 });
             }
@@ -1004,7 +1003,7 @@
         });
     </script>
     <script>
-        // i18n（全局：layout 菜单 + 顶栏/侧栏切换�?        (function () {
+        // i18n锛堝叏灞€锛歭ayout 鑿滃崟 + 椤舵爮/渚ф爮鍒囨崲锛?        (function () {
             if (!window.AppI18n) return;
             const lang = window.AppI18n.getLang('zh');
             window.AppI18n.applyDom(document);
@@ -1035,4 +1034,5 @@
     {block name="script"}{/block}
 </body>
 </html>
+
 

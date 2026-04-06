@@ -1,6 +1,6 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
-{block name="title"}达人链{/block}
+{block name="title"}杈句汉閾緖/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -9,7 +9,7 @@
 <style>
     .content-header { display: none; }
 
-    /* High-Density Modern（仅该页生效，风格与商品页统一�?*/
+    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锛岄鏍间笌鍟嗗搧椤电粺涓€锟?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -94,7 +94,7 @@
 
 {block name="content"}
 <script>
-  // 下拉选项：由服务端注入（启用的商品），避免额外接�?  const PRODUCT_OPTIONS = [];
+  // 涓嬫媺閫夐」锛氱敱鏈嶅姟绔敞鍏ワ紙鍚敤鐨勫晢鍝侊級锛岄伩鍏嶉澶栨帴锟?  const PRODUCT_OPTIONS = [];
   {volist name="products" id="p"}
   PRODUCT_OPTIONS.push({ id: {$p.id}, label: "{:addslashes((string)$p.name)}" });
   {/volist}
@@ -103,9 +103,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus（CDN�?-->
+<!-- Vue3 + ElementPlus锛圕DN锟?-->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_product1"></script>
+<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -327,7 +327,7 @@
             <template #default="{ row }">
               <span v-if="row.influencer && row.influencer.tiktok_id" style="color:#303133; font-weight:500;">
                 {{ row.influencer.tiktok_id }}
-                <span v-if="row.influencer.nickname" style="color:#6b7280; font-weight:400;"> · {{ row.influencer.nickname }}</span>
+                <span v-if="row.influencer.nickname" style="color:#6b7280; font-weight:400;"> 路 {{ row.influencer.nickname }}</span>
               </span>
               <span v-else style="color:#9ca3af;">{{ tt('page.styleSearch.emDash') }}</span>
             </template>
@@ -384,3 +384,4 @@
   {/literal}
 </script>
 {/block}
+
