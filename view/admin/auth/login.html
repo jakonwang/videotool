@@ -287,8 +287,8 @@
           <div class="brand-logo-mark">V</div>
         </div>
 
-        <div class="brand-title" id="brandTitle">视频素材库</div>
-        <div class="brand-subtitle" id="brandSubtitle">更快的上传、更稳的下载、更清晰的分发，让素材流转更高效。</div>
+        <div class="brand-title" id="brandTitle">TikStar OPS</div>
+        <div class="brand-subtitle" id="brandSubtitle">寻款 · 达人运营 · 素材与分发</div>
 
         <div class="brand-art" aria-hidden="true">
           <div class="orb orb-a"></div>
@@ -314,7 +314,7 @@
     </section>
   </div>
 
-  <script src="/static/i18n/i18n.js"></script>
+  <script src="/static/i18n/i18n.js?v=20260408_modules"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -327,6 +327,10 @@
       const lang = window.AppI18n.getLang('zh');
       window.AppI18n.applyHtmlLang(lang);
       document.title = window.AppI18n.t('auth.pageTitle', null, lang);
+      const bt = document.getElementById('brandTitle');
+      const bs = document.getElementById('brandSubtitle');
+      if (bt) bt.textContent = window.AppI18n.t('auth.brandTitle', null, lang);
+      if (bs) bs.textContent = window.AppI18n.t('auth.brandSubtitle', null, lang);
       const zh = document.getElementById('btnLangZh');
       const en = document.getElementById('btnLangEn');
       if (zh) zh.addEventListener('click', () => window.AppI18n.setLang('zh'));

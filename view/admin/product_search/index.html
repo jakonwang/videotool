@@ -24,7 +24,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js"></script>
+<script src="/static/i18n/i18n.js?v=20260408_modules"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -33,6 +33,7 @@
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
 
   const apiFetchHeaders = {
     'Accept': 'application/json, text/javascript, */*;q=0.01',
@@ -447,14 +448,14 @@
         tableRef, selectedRows, batchDeleting,
         visionDescribeOnImport, visionDescCount, volcArkEnabled, visionAnyProviderReady,
         editVisible, editSaving, editImageInputKey, editForm,
-        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang,
+        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang, tt,
         imageDisplayUrl, isImagePreviewable,
       };
     },
     template: `
       <div class="admin-modern-card">
         <div class="admin-header-actions">
-          <div class="admin-breadcrumb">素材 / 寻款</div>
+          <div class="admin-breadcrumb">{{ tt('page.styleSearch.breadcrumb') }}</div>
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div style="font-size:18px;font-weight:600;color:#111827;">图片搜款式 · 索引管理</div>
             <div class="admin-action-buttons">

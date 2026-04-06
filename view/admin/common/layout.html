@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260407_influencer_complete"></script>
+    <script src="/static/i18n/i18n.js?v=20260408_modules"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -624,19 +624,48 @@
             <div class="sidebar">
                 <nav class="mt-2" aria-label="主导航">
                     <div class="admin-sidenav">
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.data">数据</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.overview">概览</div>
                         <a href="/admin.php" class="admin-sidenav-link {if $Request.controller == 'Index'}active{/if}">
                             <span class="admin-sidenav-ico"><i data-lucide="layout-dashboard"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.dashboard">仪表盘</span>
                         </a>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.material">素材</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'ProductSearch' && $Request.controller != 'productsearch' && $Request.controller != 'Influencer' && $Request.controller != 'influencer'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch' || $Request.controller == 'Influencer' || $Request.controller == 'influencer'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch' || $Request.controller == 'Influencer' || $Request.controller == 'influencer'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
-                            <span class="admin-sidenav-ico"><i data-lucide="folder"></i></span>
-                            <span class="admin-sidenav-txt" data-i18n="admin.menu.material">素材</span>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.groupSearch">寻款</div>
+                        <a href="/admin.php/product_search" class="admin-sidenav-link {if $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}active{/if}">
+                            <span class="admin-sidenav-ico"><i data-lucide="camera"></i></span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.styleSearch">寻款</span>
+                        </a>
+
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.groupCreator">达人</div>
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Influencer' && $Request.controller != 'influencer' && $Request.controller != 'Distribute' && $Request.controller != 'distribute'}collapsed{/if} {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-creator" aria-expanded="{if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}true{else /}false{/if}" aria-controls="admin-nav-creator" role="button">
+                            <span class="admin-sidenav-ico"><i data-lucide="users"></i></span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.groupCreatorMenu">达人运营</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch' || $Request.controller == 'Influencer' || $Request.controller == 'influencer'}show{/if}">
+                        <div id="admin-nav-creator" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}show{/if}">
+                            <ul class="admin-sidenav-sub">
+                                <li>
+                                    <a href="/admin.php/influencer" class="admin-sidenav-sublink {if $Request.controller == 'Influencer' || $Request.controller == 'influencer'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.influencerList">名录</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">达人链</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.material">素材</div>
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
+                            <span class="admin-sidenav-ico"><i data-lucide="folder"></i></span>
+                            <span class="admin-sidenav-txt" data-i18n="admin.menu.materialMenu">素材库</span>
+                            <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
+                        </a>
+                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/video" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action != 'batchUpload' && $Request.action != 'batch_upload' && $Request.action != 'batchupload' && $Request.action != 'batch-upload'}active{/if}{/if}">
@@ -656,28 +685,10 @@
                                         <span class="admin-sidenav-subtxt" data-i18n="admin.menu.product">商品</span>
                                     </a>
                                 </li>
-                                <li>
-                                    <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
-                                        <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">达人链</span>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="/admin.php/product_search" class="admin-sidenav-sublink {if $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}active{/if}">
-                                        <span class="admin-sidenav-subico"><i data-lucide="camera"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.styleSearch">寻款</span>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="/admin.php/influencer" class="admin-sidenav-sublink {if $Request.controller == 'Influencer' || $Request.controller == 'influencer'}active{/if}">
-                                        <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.influencer">达人</span>
-                                    </a>
-                                </li>
                             </ul>
                         </div>
 
-                        <div class="admin-sidenav-section" data-i18n="admin.menu.terminal">设备</div>
+                        <div class="admin-sidenav-section" data-i18n="admin.menu.terminalSection">终端</div>
                         <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Platform' && $Request.controller != 'platform' && $Request.controller != 'Device' && $Request.controller != 'device'}collapsed{/if} {if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-terminal" aria-expanded="{if $Request.controller == 'Platform' || $Request.controller == 'platform' || $Request.controller == 'Device' || $Request.controller == 'device'}true{else /}false{/if}" aria-controls="admin-nav-terminal" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="monitor-smartphone"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.terminal">终端</span>
@@ -814,7 +825,7 @@
             <div class="float-right d-none d-sm-inline">
                 <strong>Version</strong> {$Think.config.app.version|default='1.0.2'}
             </div>
-            <strong>Copyright &copy; 2024 视频管理系统.</strong> All rights reserved.
+            <strong>TikStar OPS</strong> · Copyright &copy; {:date('Y')}
         </footer>
     </div>
 

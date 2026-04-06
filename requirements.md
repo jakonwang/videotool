@@ -1,5 +1,26 @@
 # 功能需求与实现说明
 
+## TikStar OPS 系统模块（2026-04）
+
+### 定位
+- **TikStar OPS** 作为运营中台，整合：**寻款**（商品/款式图搜索索引）、**达人运营**（TikTok `@handle` 名录、联系信息导入与更新、达人分发链）、**素材库**（视频与商品归类、批量上传）、**终端**（平台/设备）与**系统**（设置、用户、桌面端发卡/版本、缓存与异常）。
+
+### 侧栏信息架构（与 `view/admin/common/layout.html` 一致）
+| 模块 | 分组文案（i18n 键） | 子菜单 / 入口 | 说明 |
+|------|---------------------|---------------|------|
+| 概览 | `admin.menu.overview` | 仪表盘 | 统计与快捷入口 |
+| 寻款 | `admin.menu.groupSearch` | `admin.menu.styleSearch` → `/product_search` | 图片搜款式、CSV/Excel 异步导入索引 |
+| 达人 | `admin.menu.groupCreator` + `admin.menu.groupCreatorMenu`（折叠） | `admin.menu.influencerList` → `/influencer`；`admin.menu.distribute` → `/distribute` | TikTok 名录（唯一 `tiktok_id`、联系信息 Upsert）、达人链生成与关联达人 |
+| 素材 | `admin.menu.material` + `admin.menu.materialMenu`（折叠） | 视频、上传、商品 | 内容与商品维度的素材管理 |
+| 终端 | `admin.menu.terminal` | 平台、设备 | 取片设备与平台 |
+| 系统 | `admin.menu.system` | 设置、用户、发卡、版本、缓存、异常 | |
+
+### 面包屑约定
+- 寻款页：`page.styleSearch.breadcrumb`（如「寻款 / 索引」）。
+- 达人名录 / 达人链：`page.influencer.breadcrumb`、`page.distribute.breadcrumb`（统一在「达人」域下）。
+
+---
+
 ## 品牌与达人 CRM（2026-04）
 
 ### 系统名称
@@ -7,7 +28,7 @@
 
 ### 达人名录（tiktok_id = TikTok 用户名 @handle）
 - 数据库表 `influencers`：`tiktok_id` 存**规范化**用户名——小写、前导 `@`，与 TikTok **@handle** 对应，全局唯一；另有昵称、头像 URL、粉丝数、`contact_info`（TEXT 存 JSON 文本）、地区、`status`（0 待联系 / 1 合作中 / 2 黑名单）。
-- 后台路径：**素材 → 达人**（`/admin.php/influencer`）：分页列表、关键词与状态筛选、**导入更新**（异步）、**示例 CSV 下载**、行内**编辑/删除**（删除前自动将相关达人链的 `influencer_id` 置空）。
+- 后台路径：**达人 → 名录**（`/admin.php/influencer`）：分页列表、关键词与状态筛选、**导入更新**（异步）、**示例 CSV 下载**、行内**编辑/删除**（删除前自动将相关达人链的 `influencer_id` 置空）。
 - 支持 **.csv / .txt / .xlsx / .xls / .xlsm**：首行可识别表头（含 `tiktok_id`、`handle`、`用户名` 等）；无法识别时默认**第一列为 TikTok 用户名**。
 - 导入任务表 `influencer_import_tasks`；前端创建任务后轮询 `POST /admin.php/influencer/importTaskTick`。
 - **升级数据库**（Windows / Linux 均可）：项目根目录执行  
@@ -30,7 +51,7 @@
 | POST | `/influencer/delete` | JSON `{"id":n}` 删除达人 |
 
 ### 多语言
-- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）；侧栏「达人」等键名见 `admin.menu.influencer`、`page.influencer.*`。修改脚本后需提高 `view/admin/common/layout.html` 中 `i18n.js` 的 `?v=`。
+- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）；模块分组键名见 `admin.menu.overview`、`admin.menu.groupSearch`、`admin.menu.groupCreator`、`admin.menu.material` 等。修改脚本后需提高 `view/admin/common/layout.html` 中 `i18n.js` 的 `?v=`（如 `20260408_modules`）。
 
 ## 商品与达人分发（2026-03）
 
@@ -45,11 +66,13 @@
 - `videos.product_id`：可空；有值且与分发商品一致时才参与 `influencerRandom`。
 - `videos.device_id`：可空；绑定商品用于达人链时，可不选设备（IP 取片仍按设备分配未下载视频）。
 
-### 后台侧栏（分组 + 精简名称）
+### 后台侧栏（分组 + 精简名称）— 已由「TikStar OPS 系统模块」一节替代，此处保留历史参考
 | 分组 | 子菜单 | 含义 |
 |------|--------|------|
 | （顶栏） | 仪表盘 | 首页 |
-| 素材 | 视频 / 上传 / 商品 / 达人链 / 寻款 / 达人 | 列表、批量上传、商品、达人分发、图片搜款式索引、TikTok 达人名录与导入 |
+| 寻款 | 寻款 | 图片搜款式索引（独立模块入口） |
+| 达人 | 名录 / 达人链 | TikTok 达人名录与导入、达人分发链接 |
+| 素材 | 视频 / 上传 / 商品 | 视频与商品维度的素材管理 |
 | 终端 | 平台 / 设备 | 平台与终端设备 |
 | 系统 | 系统设置 / 用户 / 发卡 / 版本 / 缓存 / 异常 | 参数、管理员、桌面授权码、桌面安装包发布、缓存、下载错误监控 |
 
