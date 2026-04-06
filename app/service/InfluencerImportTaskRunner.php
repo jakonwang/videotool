@@ -145,7 +145,8 @@ class InfluencerImportTaskRunner
             $task->status = 'failed';
             $task->error_message = $e->getMessage();
             $task->save();
-            self::appendLog($task, '异常：' . mb_substr($e->getMessage(), 0, 200));
+            $loc = $e->getFile() . ':' . $e->getLine();
+            self::appendLog($task, '异常：' . mb_substr($e->getMessage(), 0, 200) . ' @ ' . $loc);
 
             return self::formatSnapshot($task);
         }
