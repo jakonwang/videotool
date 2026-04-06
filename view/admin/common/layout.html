@@ -871,6 +871,7 @@
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <script>
+        {literal}
         window.AdminUI = (function () {
             const toastEl = $('#globalToast');
             const toastTitle = $('#toastTitle');
@@ -907,8 +908,10 @@
                 }
             };
         })();
+        {/literal}
     </script>
     <script>
+        {literal}
         $(function () {
             try {
                 if (window.lucide) {
@@ -916,8 +919,10 @@
                 }
             } catch (e) {}
         });
+        {/literal}
     </script>
     <script>
+        {literal}
         // 侧栏底部信息：设备数量 / uploads 占用
         $(function () {
             function formatBytes(bytes) {
@@ -939,8 +944,10 @@
                 }
             });
         });
+        {/literal}
     </script>
     <script>
+        {literal}
         // 侧栏分组自动展开：按当前 URL 匹配子菜单链接，避免服务端命名差异导致全部收起
         $(function () {
             const path = (window.location.pathname || '').replace(/\/+$/, '');
@@ -988,8 +995,10 @@
                 });
             }
         });
+        {/literal}
     </script>
     <script>
+        {literal}
         // 退出登录（全局）
         $(function () {
             function doLogout() {
@@ -1003,8 +1012,10 @@
             $('#btnAdminLogout').on('click', doLogout);
             $('#btnAdminLogout2').on('click', doLogout);
         });
+        {/literal}
     </script>
     <script>
+        {literal}
         // i18n（全局：layout 菜单 + 顶栏/侧栏切换）
         (function () {
             if (!window.AppI18n) return;
@@ -1033,6 +1044,7 @@
             bind('btnLangViTop', 'vi');
             setActive();
         })();
+        {/literal}
     </script>
     {block name="script"}{/block}
 </body>
