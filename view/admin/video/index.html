@@ -131,7 +131,7 @@
 {block name="script"}
 <!-- Vue3 + Element Plus (CDN) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_ops2"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops3"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -208,7 +208,7 @@
 
           const res = await fetch('/admin.php/video/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || '????');
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           tableData.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
@@ -259,7 +259,7 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm('????????', '??', { type: 'warning' });
+        await ElMessageBox.confirm(tt('page.video.deleteConfirm'), tt('page.video.deleteTitle'), { type: 'warning' });
         const resp = await fetch('/admin.php/video/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -268,16 +268,20 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '????');
+          ElMessage.success(json.msg || tt('common.deleted'));
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '????');
+          ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
         }
       }
 
       async function doBatchDelete() {
         if (!batchDeleteEnabled.value) return;
-        await ElMessageBox.confirm(`????????${selectedCount.value} ????`, '??', { type: 'warning' });
+        await ElMessageBox.confirm(
+          tt('page.video.batchDeleteConfirm', { n: selectedCount.value }),
+          tt('page.video.batchDeleteTitle'),
+          { type: 'warning' },
+        );
         const ids = selection.value.map(r => r.id);
         const body = new URLSearchParams();
         ids.forEach(id => body.append('ids[]', String(id)));
@@ -289,11 +293,11 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '??????');
+          ElMessage.success(json.msg || tt('common.deleted'));
           selection.value = [];
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '??????');
+          ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
         }
       }
 
@@ -311,14 +315,14 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success('????);
+          ElMessage.success(tt('common.copyDone'));
         } catch (e) {
-          ElMessage.error('????');
+          ElMessage.error(tt('common.copyFail'));
         }
       }
 
       function openUpload() {
-        // cache-bust??????????????        uploadIframeSrc.value = '/admin.php/video/batchUpload?_t=' + Date.now();
+        uploadIframeSrc.value = '/admin.php/video/batchUpload?_t=' + Date.now();
         uploadVisible.value = true;
       }
 
@@ -328,7 +332,7 @@
           if (!frameEl || !frameEl.contentDocument) return;
           const doc = frameEl.contentDocument;
 
-          // ????????/??/??/??????????????          const hideSelectors = [
+          const hideSelectors = [
             '.main-sidebar',
             '.main-header',
             '.main-footer',
@@ -342,7 +346,7 @@
             });
           });
 
-          // ???????AdminLTE ?? content-wrapper ??margin-left??          const cw = doc.querySelector('.content-wrapper');
+          const cw = doc.querySelector('.content-wrapper');
           if (cw) {
             cw.style.marginLeft = '0';
             cw.style.padding = '0';
@@ -354,22 +358,20 @@
             container.style.paddingRight = '0';
           }
 
-          // ??????????          doc.documentElement.style.background = 'transparent';
+          doc.documentElement.style.background = 'transparent';
           doc.body.style.background = 'transparent';
           doc.body.style.overflowX = 'hidden';
 
-          // ??????????
           doc.querySelectorAll('.card').forEach((el) => {
             el.style.borderRadius = '12px';
             el.style.boxShadow = 'none';
           });
         } catch (e) {
-          // ????????????
+          /* cross-origin iframe: ignore */
         }
       }
 
       function onUploadDialogClose() {
-        // ?????????????????????????
         page.value = 1;
         fetchList();
       }
@@ -391,39 +393,39 @@
       <div class="page-container">
         <div class="modern-card">
           <div class="header-actions">
-            <div class="breadcrumb">${lang==='en'?'Home / Library / Videos':'?? / ?? / ????'}</div>
+            <div class="breadcrumb">${tt('page.video.breadcrumb')}</div>
             <div class="action-buttons">
-              <el-button type="primary" class="btn-primary" @click="openUpload">${lang==='en'?'Upload':'??'}</el-button>
-              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">${lang==='en'?'Batch delete':'????'}</el-button>
-              <span v-if="selectedCount" style="font-size:12px; color:#6b7280; margin-left:6px;">??? {{selectedCount}} ??/span>
+              <el-button type="primary" class="btn-primary" @click="openUpload">${tt('page.video.upload')}</el-button>
+              <el-button type="danger" plain class="btn-danger" :disabled="!batchDeleteEnabled" @click="doBatchDelete">${tt('page.video.batchDelete')}</el-button>
+              <span v-if="selectedCount" style="font-size:12px; color:#6b7280; margin-left:6px;">{{ tt('page.video.selectedCount', { n: selectedCount }) }}</span>
             </div>
           </div>
 
           <div class="filter-section">
             <el-form :inline="true" class="custom-form" @submit.prevent>
               <el-form-item>
-                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Platform':'??'" style="width: 140px;">
+                <el-select v-model="filters.platform_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="tt('page.video.phPlatform')" style="width: 140px;">
                   <el-option v-for="o in PLATFORM_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Device':'??'" style="width: 140px;">
+                <el-select v-model="filters.device_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="tt('page.video.phDevice')" style="width: 140px;">
                   <el-option v-for="o in DEVICE_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="lang==='en'?'Product':'??'" style="width: 140px;">
+                <el-select v-model="filters.product_ids" multiple clearable collapse-tags collapse-tags-tooltip :placeholder="tt('page.video.phProduct')" style="width: 140px;">
                   <el-option v-for="o in PRODUCT_OPTIONS" :key="o.id" :label="o.label" :value="o.id" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags :placeholder="lang==='en'?'Download status':'?????" style="width: 140px;">
-                  <el-option :label="lang==='en'?'Not downloaded':'????" :value="0" />
-                  <el-option :label="lang==='en'?'Downloaded':'????" :value="1" />
+                <el-select v-model="filters.is_downloaded" multiple clearable collapse-tags :placeholder="tt('page.video.phDownloadStatus')" style="width: 140px;">
+                  <el-option :label="tt('page.video.optNotDownloaded')" :value="0" />
+                  <el-option :label="tt('page.video.optDownloaded')" :value="1" />
                 </el-select>
               </el-form-item>
               <el-form-item class="search-input-item">
-                <el-input v-model="filters.keyword" :placeholder="lang==='en'?'Search title or URL':'??????????" style="width: 240px;" @keyup.enter="onSearch" />
+                <el-input v-model="filters.keyword" :placeholder="tt('page.video.searchKeyword')" style="width: 240px;" @keyup.enter="onSearch" />
               </el-form-item>
               <el-form-item class="filter-buttons">
                 <el-button type="primary" plain @click="onSearch">{{ tt('common.filter') }}</el-button>
@@ -448,49 +450,49 @@
             >
               <el-table-column type="selection" width="55" />
 
-            <el-table-column :label="lang==='en'?'Cover':'??'" width="100">
+            <el-table-column :label="tt('page.video.colCover')" width="100">
               <template #default="scope">
                 <el-image class="cover-image" :src="scope.row.cover_url || scope.row.video_url || '/static/default-cover.svg'" fit="cover">
                   <template #error>
-                    <div class="image-placeholder">??</div>
+                    <div class="image-placeholder">{{ tt('page.video.coverPlaceholder') }}</div>
                   </template>
                 </el-image>
               </template>
             </el-table-column>
 
-            <el-table-column :label="lang==='en'?'Title / ID':'?? / ID'" min-width="200">
+            <el-table-column :label="tt('page.video.colTitleId')" min-width="200">
               <template #default="scope">
                 <div class="title-column">
-                  <span class="main-title">{{ scope.row.title || '?? }}</span>
+                  <span class="main-title">{{ scope.row.title || tt('page.video.titleEmpty') }}</span>
                   <span class="sub-id">ID {{ scope.row.id }}</span>
                 </div>
               </template>
             </el-table-column>
 
-            <el-table-column prop="created_at" :label="lang==='en'?'Time':'??'" sortable="custom" min-width="180" />
+            <el-table-column prop="created_at" :label="tt('page.video.colTime')" sortable="custom" min-width="180" />
 
-            <el-table-column :label="lang==='en'?'Platform':'??'" width="120">
+            <el-table-column :label="tt('page.video.colPlatform')" width="120">
               <template #default="scope">
                 <el-tag type="info" effect="light" class="custom-tag">
-                  {{ (scope.row.platform && scope.row.platform.name) || '?? }}
+                  {{ (scope.row.platform && scope.row.platform.name) || tt('page.video.platformEmpty') }}
                 </el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column :label="lang==='en'?'Status':'???" width="120">
+            <el-table-column :label="tt('page.video.colStatus')" width="120">
               <template #default="scope">
-                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">{{ lang==='en'?'Downloaded':'???? }}</el-tag>
-                <el-tag v-else type="warning" effect="light" class="custom-tag">{{ lang==='en'?'Not downloaded':'???? }}</el-tag>
+                <el-tag v-if="scope.row.is_downloaded === 1" type="success" effect="light" class="custom-tag">{{ tt('page.video.optDownloaded') }}</el-tag>
+                <el-tag v-else type="warning" effect="light" class="custom-tag">{{ tt('page.video.optNotDownloaded') }}</el-tag>
               </template>
             </el-table-column>
 
-            <el-table-column :label="lang==='en'?'Actions':'??'" width="100" fixed="right">
+            <el-table-column :label="tt('page.video.colActions')" width="100" fixed="right">
               <template #default="scope">
                 <el-dropdown trigger="click">
-                  <el-button type="primary" link class="action-link">{{ lang==='en'?'Actions':'??' }}</el-button>
+                  <el-button type="primary" link class="action-link">{{ tt('page.video.colActions') }}</el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item @click="copyText(scope.row.video_url)">{{ lang==='en'?'Copy URL':'????' }}</el-dropdown-item>
+                      <el-dropdown-item @click="copyText(scope.row.video_url)">{{ tt('page.video.copyUrl') }}</el-dropdown-item>
                       <el-dropdown-item @click="goEdit(scope.row)">{{ tt('common.edit') }}</el-dropdown-item>
                       <el-dropdown-item divided @click="doDelete(scope.row)">{{ tt('common.delete') }}</el-dropdown-item>
                     </el-dropdown-menu>
@@ -522,7 +524,7 @@
           <el-dialog
             class="upload-dialog"
             v-model="uploadVisible"
-            :title="lang==='en'?'Upload':'????'"
+            :title="tt('page.video.uploadDialogTitle')"
             width="920px"
             :destroy-on-close="true"
             @closed="onUploadDialogClose"
