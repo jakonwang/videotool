@@ -263,6 +263,9 @@
       'page.product.downloadedVideos': '已下载',
       'page.product.undownloadedVideos': '未下载',
 
+      'page.video.invertSelection': '反选',
+      'page.video.emptyList': '暂无视频数据',
+
       'page.distribute.breadcrumb': '达人 / 达人链',
       'page.distribute.title': '达人链',
       'page.distribute.add': '+ 生成达人链',
@@ -627,6 +630,9 @@
       'page.product.totalVideos': 'Total videos',
       'page.product.downloadedVideos': 'Downloaded',
       'page.product.undownloadedVideos': 'Undownloaded',
+
+      'page.video.invertSelection': 'Invert selection',
+      'page.video.emptyList': 'No videos',
 
       'page.distribute.breadcrumb': 'Creators / Links',
       'page.distribute.title': 'Creator Links',
@@ -1033,6 +1039,9 @@
       'page.product.formThumb': 'Ảnh thu nhỏ',
       'page.product.formThumbHint': 'Chọn ảnh để tải lên; hoặc dán URL',
       'page.product.uploading': 'Đang tải…',
+
+      'page.video.invertSelection': 'Đảo chọn',
+      'page.video.emptyList': 'Chưa có video',
 
       'dashboard.ops.bizHead': 'Tổng quan vận hành'
     }

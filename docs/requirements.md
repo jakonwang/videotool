@@ -83,7 +83,7 @@
 ### 多语言
 
 - 运维速查：**`README.md`** 中有「多语言（i18n）与脚本缓存版本」总述。
-- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）。修改脚本后需**全站**提高所有引用 `i18n.js` 的 **`?v=`**（当前示例：**`20260408_ops`**），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页；达人前台另 bump `influencer_i18n.js` 的 `?v=`。
+- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）。修改脚本后需**全站**提高所有引用 `i18n.js` 的 **`?v=`**（当前示例：**`20260408_ops2`**），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页；达人前台另 bump `influencer_i18n.js` 的 `?v=`。
 
 ### 寻款索引 i18n（2026-04）
 
@@ -143,7 +143,7 @@
 
 ## 后台：视频 / 商品 / 达人链 / 平台 / 设备 / 缓存 / 下载异常（Vue3 + Element Plus）
 
-- **视频** `GET /admin.php/video/list`；`view/admin/video/index.html`。
+- **视频** `GET /admin.php/video/list`；`view/admin/video/index.html`。注意：脚本区「下拉选项」注释**不可**与 `const PLATFORM_OPTIONS = []` 写在同一行（`//` 会吞掉整行，导致未定义）；分页区「反选」按钮须正确闭合 `</el-button>`（损坏为 `?/el-button>` 时会导致前端模板解析异常）。空列表与反选文案使用 `page.video.emptyList`、`page.video.invertSelection`。
 - **商品** `GET /admin.php/product/list`（含 `thumb_url`、`tiktok_shop_url`）；`view/admin/product/index.html`；`POST /admin.php/product/uploadThumb`。列表表头、复制空内容/双空链、删除确认等均走 i18n（`page.product.colName` 等及 `page.product.deleteConfirmMsg`）。
 - **达人链** `GET /admin.php/distribute/list`；`view/admin/distribute/index.html`。
 - **平台** `GET /admin.php/platform/list`；`view/admin/platform/index.html`。

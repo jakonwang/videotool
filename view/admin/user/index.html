@@ -9,7 +9,7 @@
 <style>
   .content-header { display: none; }
 
-  /* High-Density Modern（与缓存页统一，仅该页生效�?*/
+  /* High-Density Modern（与缓存页统一，仅该页生效�?*/
   .tp-ep-wrap {
     padding: 24px;
     background: #f4f6f8;
@@ -74,7 +74,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops2"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -178,7 +178,7 @@
         if (dialog.mode === 'create') {
           const password = String(dialog.form.password || '');
           if (password.length < 6) {
-            ElMessage.warning(lang === 'en' ? 'Password must be at least 6 characters' : '密码至少 6 �?);
+            ElMessage.warning(lang === 'en' ? 'Password must be at least 6 characters' : '密码至少 6 �?);
             return;
           }
           await postForm('/admin.php/user/create', {
@@ -191,7 +191,7 @@
             id: String(dialog.form.id),
             username,
             status: String(dialog.form.status || 1),
-          }, '已保�?);
+          }, '已保�?);
         }
 
         dialog.visible = false;
@@ -208,13 +208,13 @@
       async function submitResetPwd() {
         const p = String(pwdDialog.password || '');
         if (p.length < 6) {
-          ElMessage.warning(lang === 'en' ? 'Password must be at least 6 characters' : '密码至少 6 �?);
+          ElMessage.warning(lang === 'en' ? 'Password must be at least 6 characters' : '密码至少 6 �?);
           return;
         }
         await postForm('/admin.php/user/resetPassword', {
           id: String(pwdDialog.id),
           password: p,
-        }, '密码已重�?);
+        }, '密码已重�?);
         pwdDialog.visible = false;
       }
 
@@ -223,7 +223,7 @@
           ElMessage.warning(lang === 'en' ? 'Cannot disable current account' : '不能禁用当前登录账号');
           return;
         }
-        await postForm('/admin.php/user/toggle', { id: String(row.id) }, '已更�?);
+        await postForm('/admin.php/user/toggle', { id: String(row.id) }, '已更�?);
         fetchList();
       }
 
@@ -233,14 +233,14 @@
           return;
         }
         await ElMessageBox.confirm(
-          lang === 'en' ? `Delete user "${row.username}"?` : `确认删除用户�?{row.username}」？`,
+          lang === 'en' ? `Delete user "${row.username}"?` : `确认删除用户�?{row.username}」？`,
           lang === 'en' ? 'Confirm' : '删除确认',
           {
           type: 'warning',
           confirmButtonText: tt('common.delete'),
           cancelButtonText: tt('common.cancel'),
         });
-        await postForm('/admin.php/user/delete', { id: String(row.id) }, '已删�?);
+        await postForm('/admin.php/user/delete', { id: String(row.id) }, '已删�?);
         const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
         page.value = Math.min(page.value, maxPage);
         fetchList();
@@ -337,19 +337,19 @@
           :cell-style="cellStyle"
         >
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column :label="lang==='en'?'Username':'用户�?" min-width="180">
+          <el-table-column :label="lang==='en'?'Username':'用户�?" min-width="180">
             <template #default="{ row }">
               <span class="name-cell">{{ row.username }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Status':'状�?" width="120">
+          <el-table-column :label="lang==='en'?'Status':'状�?" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="last_login_at" :label="lang==='en'?'Last login':'最后登�?" min-width="180" />
+          <el-table-column prop="last_login_at" :label="lang==='en'?'Last login':'最后登�?" min-width="180" />
           <el-table-column prop="last_login_ip" label="IP" width="160" show-overflow-tooltip />
           <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" />
           <el-table-column :label="lang==='en'?'Actions':'操作'" width="240" fixed="right">
@@ -377,13 +377,13 @@
 
         <el-dialog v-model="dialog.visible" :title="dialog.mode === 'create' ? (lang==='en'?'Add user':'添加用户') : (lang==='en'?'Edit user':'编辑用户')" width="520px">
           <el-form label-width="92px">
-            <el-form-item :label="lang==='en'?'Username':'用户�?">
+            <el-form-item :label="lang==='en'?'Username':'用户�?">
               <el-input v-model="dialog.form.username" size="default" :placeholder="lang==='en'?'Enter username':'请输入用户名'" />
             </el-form-item>
             <el-form-item v-if="dialog.mode === 'create'" :label="lang==='en'?'Password':'密码'">
-              <el-input v-model="dialog.form.password" size="default" :placeholder="lang==='en'?'At least 6 characters':'至少 6 �?" show-password />
+              <el-input v-model="dialog.form.password" size="default" :placeholder="lang==='en'?'At least 6 characters':'至少 6 �?" show-password />
             </el-form-item>
-            <el-form-item :label="lang==='en'?'Status':'状�?">
+            <el-form-item :label="lang==='en'?'Status':'状�?">
               <el-select v-model="dialog.form.status" size="default" style="width:140px">
                 <el-option :label="tt('common.statusEnabled')" :value="1" />
                 <el-option :label="tt('common.statusDisabled')" :value="0" />
@@ -401,8 +401,8 @@
             <el-form-item :label="lang==='en'?'User':'用户'">
               <el-input :model-value="pwdDialog.username" size="default" disabled />
             </el-form-item>
-            <el-form-item :label="lang==='en'?'New password':'新密�?">
-              <el-input v-model="pwdDialog.password" size="default" :placeholder="lang==='en'?'At least 6 characters':'至少 6 �?" show-password @keyup.enter="submitResetPwd" />
+            <el-form-item :label="lang==='en'?'New password':'新密�?">
+              <el-input v-model="pwdDialog.password" size="default" :placeholder="lang==='en'?'At least 6 characters':'至少 6 �?" show-password @keyup.enter="submitResetPwd" />
             </el-form-item>
           </el-form>
           <template #footer>

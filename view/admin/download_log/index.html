@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern?????????????ù?*/
+    /* High-Density Modern?????????????ÔøΩ?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -113,7 +113,7 @@
 {block name="script"}
 <!-- Vue3 + Element Plus (CDN) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops2"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -391,17 +391,17 @@
               <span v-if="row.video_id">
                 <el-button size="default" link type="primary" @click="openVideo(row)">#{{ row.video_id }}</el-button>
               </span>
-              <span v-else class="text-muted">ù?/span>
+              <span v-else class="text-muted">ÔøΩ?/span>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Video title':'????'" min-width="180">
             <template #default="{ row }">
-              <span style="font-weight:500; color:#303133;">{{ row.video_title || 'ù? }}</span>
+              <span style="font-weight:500; color:#303133;">{{ row.video_title || 'ÔøΩ? }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Error':'????'" min-width="360" show-overflow-tooltip>
             <template #default="{ row }">
-              <div style="color:#b91c1c; font-size:12px; line-height:18px;" :title="row.error">{{ row.error || 'ù? }}</div>
+              <div style="color:#b91c1c; font-size:12px; line-height:18px;" :title="row.error">{{ row.error || 'ÔøΩ? }}</div>
               <div v-if="row.url" style="color:#6b7280; font-size:12px; line-height:18px; margin-top:4px;" :title="row.url">
                 {{ row.url }}
               </div>
@@ -411,7 +411,7 @@
             <template #default="{ row }">
               <el-button v-if="row.video_id" size="default" link type="primary" @click="openVideo(row)">{{ lang==='en'?'View':'??' }}</el-button>
               <el-button v-if="row.video_id" size="default" link type="warning" @click="openDebug(row)">{{ lang==='en'?'Debug':'??' }}</el-button>
-              <span v-if="!row.video_id" class="text-muted">ù?/span>
+              <span v-if="!row.video_id" class="text-muted">ÔøΩ?/span>
             </template>
           </el-table-column>
         </el-table>

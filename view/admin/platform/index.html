@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern（仅该页生效，风格与商品/达人链统一�?*/
+    /* High-Density Modern（仅该页生效，风格与商品/达人链统一�?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -108,9 +108,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus（CDN�?-->
+<!-- Vue3 + ElementPlus（CDN�?-->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops2"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -219,7 +219,7 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success('已复制链�?);
+          ElMessage.success('已复制链�?);
         } catch (e) {
           ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
         }
@@ -232,7 +232,7 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(`确定要删除平台�?{row.name || ''}」吗？删除后关联的设备与视频将一并移除。`, '删除确认', { type: 'warning' });
+        await ElMessageBox.confirm(`确定要删除平台�?{row.name || ''}」吗？删除后关联的设备与视频将一并移除。`, '删除确认', { type: 'warning' });
         const resp = await fetch('/admin.php/platform/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -319,30 +319,30 @@
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
           <el-table-column :label="lang==='en'?'Platform name':'平台名称'" min-width="160" sortable="custom" prop="name">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.name">{{ row.name || '�? }}</div>
+              <div class="name-cell" :title="row.name">{{ row.name || '�? }}</div>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Code':'平台代码'" width="160" sortable="custom" prop="code">
             <template #default="{ row }">
-              <span class="code-cell">{{ row.code || '�? }}</span>
+              <span class="code-cell">{{ row.code || '�? }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Icon':'图标'" width="120">
             <template #default="{ row }">
               <span v-if="row.icon" v-html="row.icon"></span>
-              <span v-else class="text-muted">�?/span>
+              <span v-else class="text-muted">�?/span>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Link':'访问链接'" min-width="360">
             <template #default="{ row }">
               <div class="link-cell">
-                <div class="link-text" :title="row.link">{{ row.link || '�? }}</div>
+                <div class="link-text" :title="row.link">{{ row.link || '�? }}</div>
                 <el-button size="default" link type="primary" @click="copyText(row.link)">{{ tt('common.copy') }}</el-button>
                 <el-button size="default" link type="primary" @click="openLink(row)">{{ tt('common.open') }}</el-button>
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Status':'状�?" width="120" sortable="custom" prop="status">
+          <el-table-column :label="lang==='en'?'Status':'状�?" width="120" sortable="custom" prop="status">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}

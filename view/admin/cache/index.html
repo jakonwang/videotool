@@ -8,7 +8,7 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    /* High-Density Modern（仅该页生效�?*/
+    /* High-Density Modern（仅该页生效�?*/
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -147,9 +147,9 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus（CDN�?-->
+<!-- Vue3 + ElementPlus（CDN�?-->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops2"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -190,7 +190,7 @@
       const isEnabled = ref(true);
 
       const expireText = computed(() => {
-        if (!stats.expire_seconds) return '无限�?;
+        if (!stats.expire_seconds) return '无限�?;
         const h = Math.round((Number(stats.expire_seconds) / 3600) * 10) / 10;
         return `${h} h`;
       });
@@ -251,7 +251,7 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || (lang === 'en' ? 'Cache cleared' : '已清空缓�?));
+          ElMessage.success(json.msg || (lang === 'en' ? 'Cache cleared' : '已清空缓�?));
           page.value = 1;
           fetchList();
         } else {
@@ -356,18 +356,18 @@
 
         <el-alert v-if="!isEnabled" class="admin-cache-alert" type="warning" show-icon :closable="false">
           <template #title>
-            下载缓存尚未启用，请�?<span class="code-chip">config/download_cache.php</span> 或环境变量中开�?<span class="code-chip">download_cache.enabled</span>�?          </template>
+            下载缓存尚未启用，请�?<span class="code-chip">config/download_cache.php</span> 或环境变量中开�?<span class="code-chip">download_cache.enabled</span>�?          </template>
         </el-alert>
         <el-alert v-else class="admin-cache-alert" type="warning" show-icon :closable="false">
           <template #title>
-            缓存用于加速下载与断点续传；可�?<span class="code-chip">config/download_cache.php</span> 调整策略�?          </template>
+            缓存用于加速下载与断点续传；可�?<span class="code-chip">config/download_cache.php</span> 调整策略�?          </template>
         </el-alert>
 
         <div class="admin-cache-stats">
           <div class="stat-card">
             <div class="stat-left">
               <div class="stat-value">{{ stats.total_files }}</div>
-              <div class="stat-label">缓存文件�?/div>
+              <div class="stat-label">缓存文件�?/div>
             </div>
             <div class="stat-icon stat-icon--blue"><el-icon><Document/></el-icon></div>
           </div>
@@ -381,7 +381,7 @@
           <div class="stat-card">
             <div class="stat-left">
               <div class="stat-value">{{ expireText }}</div>
-              <div class="stat-label">缓存有效�?/div>
+              <div class="stat-label">缓存有效�?/div>
             </div>
             <div class="stat-icon stat-icon--amber"><el-icon><TrendCharts/></el-icon></div>
           </div>
@@ -418,7 +418,7 @@
           :header-cell-style="headerCellStyle"
           :cell-style="cellStyle"
         >
-          <el-table-column prop="file_name" :label="lang==='en'?'File':'文件�?" min-width="220" />
+          <el-table-column prop="file_name" :label="lang==='en'?'File':'文件�?" min-width="220" />
           <el-table-column prop="source_url" :label="lang==='en'?'Source URL':'来源 URL'" min-width="320" show-overflow-tooltip />
           <el-table-column prop="size_human" :label="lang==='en'?'Size':'文件大小'" width="120" />
           <el-table-column prop="cached_at_text" :label="lang==='en'?'Cached at':'缓存时间'" width="180" />
