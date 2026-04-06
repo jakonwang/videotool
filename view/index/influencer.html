@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -265,7 +265,7 @@
             createApp({
                 setup() {
                     const loading = ref(true);
-                    const productName = ref('锟?);
+                    const productName = ref('');
                     const goodsUrl = ref('');
                     const video = reactive({
                         id: 0,
@@ -297,7 +297,7 @@
                             const res = await fetch(apiUrl);
                             const json = await safeJson(res);
                             if (!json || json.code !== 0 || !json.data) {
-                                productName.value = '锟?;
+                                productName.value = '';
                                 goodsUrl.value = '';
                                 video.id = 0;
                                 video.title = '';
@@ -485,7 +485,7 @@
                           <div class="info">
                             <div class="label">{{ t('influencer.videoTitle') }}</div>
                             <div class="infoBox">
-                              <div class="infoText">{{ video.title || '锟? }}</div>
+                              <div class="infoText">{{ video.title || '—' }}</div>
                             </div>
                           </div>
 

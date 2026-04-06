@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>鍚庡彴鐧诲綍</title>
+  <title>后台登录</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
   <style>
     :root{
@@ -26,7 +26,7 @@
       background:#0b1020;
     }
 
-    /* 鍏ㄥ睆鑳屾櫙锛氬讥鏁ｆ笎锟?+ 缃戞牸 */
+    /* 全屏背景：弥散渐变 + 网格 */
     .bg{ position:fixed; inset:0; pointer-events:none; user-select:none; }
     .bg-gradient{
       position:absolute; inset:-20%;
@@ -58,7 +58,7 @@
     .bg-blur-2{ right:-140px; top:12%; background:rgba(99,102,241,.32); }
     .bg-blur-3{ left:35%; bottom:-180px; background:rgba(236,72,153,.24); }
 
-    /* 宸﹀彸鍒嗘爮 */
+    /* 左右分栏 */
     .shell{
       position:relative; z-index:1;
       min-height:100vh;
@@ -67,7 +67,7 @@
       align-items:stretch;
     }
 
-    /* 宸︿晶鍝佺墝锟?*/
+    /* 左侧品牌区 */
     .brand{
       padding:64px 56px;
       display:flex;
@@ -152,7 +152,7 @@
       background:rgba(99,102,241,.6);
     }
 
-    /* 鍙充晶鐧诲綍鍗＄墖锟?*/
+    /* 右侧登录卡片 */
     .panel{
       padding:64px 56px;
       display:flex;
@@ -211,7 +211,7 @@
       margin-bottom:8px;
     }
 
-    /* 杈撳叆妗嗭細large 楂樺害 48 + 娴呰摑鐏拌儗锟?+ 寰 hover/focus */
+    /* 输入框：large 高度 48 + 浅蓝灰背景 + hover/focus */
     .input :deep(.el-input__wrapper){
       height:48px;
       border-radius: var(--field-radius);
@@ -233,7 +233,7 @@
     .input :deep(.el-input__prefix-inner){ color: rgba(17,24,39,.55); }
     .input :deep(.el-icon){ font-size:18px; }
 
-    /* 鎸夐挳锛歭arge 48 楂樺害锟?00% 瀹斤紝绾壊 Primary锛屾棤寤変环闃村奖 */
+    /* 按钮：large 48 高度 + 100% 宽度，纯色 Primary，无阴影 */
     .submit{
       margin-top:18px;
       width:100%;
@@ -255,7 +255,7 @@
       gap:6px;
     }
 
-    /* 鍝嶅簲寮忥細绐勫睆涓婁笅甯冨眬 */
+    /* 响应式：窄屏上下布局 */
     @media (max-width: 1024px){
       body{ overflow:auto; }
       .shell{ grid-template-columns:1fr; }
@@ -281,14 +281,14 @@
   </div>
 
   <div class="shell">
-    <section class="brand" aria-label="鍝佺墝灞曠ず">
+    <section class="brand" aria-label="品牌展示">
       <div class="brand-inner">
         <div class="brand-logo" aria-hidden="true">
           <div class="brand-logo-mark">V</div>
         </div>
 
         <div class="brand-title" id="brandTitle">TikStar OPS</div>
-        <div class="brand-subtitle" id="brandSubtitle">瀵绘 路 杈句汉杩愯惀 路 绱犳潗涓庡垎锟?/div>
+        <div class="brand-subtitle" id="brandSubtitle">寻款 · 达人运营 · 素材与分发</div>
 
         <div class="brand-art" aria-hidden="true">
           <div class="orb orb-a"></div>
@@ -302,21 +302,21 @@
           <span class="dot"></span>
           <span id="brandFootnoteText"></span>
           <span style="margin-left:10px;"></span>
-          <a href="javascript:void(0)" id="btnLangZh" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">涓枃</a>
+          <a href="javascript:void(0)" id="btnLangZh" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">中文</a>
           <span style="color:rgba(15,23,42,.35);">/</span>
           <a href="javascript:void(0)" id="btnLangEn" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">English</a>
           <span style="color:rgba(15,23,42,.35);">/</span>
-          <a href="javascript:void(0)" id="btnLangVi" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">Ti岷縩g Vi峄噒</a>
+          <a href="javascript:void(0)" id="btnLangVi" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">Tiếng Việt</a>
         </div>
       </div>
     </section>
 
-    <section class="panel" aria-label="鐧诲綍闈㈡澘">
+    <section class="panel" aria-label="登录面板">
       <div class="glass" id="loginApp"></div>
     </section>
   </div>
 
-  <script src="/static/i18n/i18n.js?v=20260408_modules"></script>
+  <script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
