@@ -181,8 +181,8 @@
                     <p class="kpi-title" data-i18n="dashboard.kpi.videosTotal">视频总数</p>
                     <p class="kpi-value">{$video_total}</p>
                     <div class="kpi-trend">
-                        <span data-i18n="dashboard.kpi.downloaded">已下载</span> {$stats.downloaded|default=0}
-                        · <span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$stats.undownloaded|default=0}
+                        <span data-i18n="dashboard.kpi.downloaded">已下载</span> {$d_downloaded}
+                        · <span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$d_undownloaded}
                     </div>
                 </div>
             </div>
@@ -195,8 +195,8 @@
                 <div class="kpi-ico" style="background: rgba(34,197,94,0.10);"><i data-lucide="badge-check"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.downloaded">已下载</p>
-                    <p class="kpi-value">{$stats.downloaded|default=0}</p>
-                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.downloadRate">下载率（重点）</span> {$stats.download_rate|default=0}%</div>
+                    <p class="kpi-value">{$d_downloaded}</p>
+                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.downloadRate">下载率（重点）</span> {$d_download_rate}%</div>
                 </div>
             </div>
             <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/video?is_downloaded=1" data-i18n="dashboard.action.filter">筛选</a>
@@ -208,7 +208,7 @@
                 <div class="kpi-ico"><i data-lucide="trending-up"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.downloadRate">下载率（重点）</p>
-                    <p class="kpi-value">{$stats.download_rate|default=0}%</p>
+                    <p class="kpi-value">{$d_download_rate}%</p>
                     <div class="kpi-trend">
                         <span data-i18n="dashboard.kpi.asof" data-i18n-title="dashboard.kpi.asof">截至 {$asof_display}</span>
                         · <span data-i18n="dashboard.kpi.target">目标 100%</span>
@@ -224,8 +224,8 @@
                 <div class="kpi-ico" style="background: rgba(239,68,68,0.10);"><i data-lucide="hourglass"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.pending">待下载</p>
-                    <p class="kpi-value">{$stats.undownloaded|default=0}</p>
-                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$stats.undownload_rate|default=0}%</div>
+                    <p class="kpi-value">{$d_undownloaded}</p>
+                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$d_undownload_rate}%</div>
                 </div>
             </div>
             <a class="kpi-link" style="--kpi-c: var(--ds-danger);" href="/admin.php/video?is_downloaded=0" data-i18n="dashboard.action.handle">处理</a>
@@ -240,7 +240,7 @@
                 <div class="kpi-ico"><i data-lucide="layers"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.platforms">平台数量</p>
-                    <p class="kpi-value">{$stats.platforms|default=0}</p>
+                    <p class="kpi-value">{$d_platforms}</p>
                     <div class="kpi-trend" data-i18n="dashboard.kpi.overview">总览</div>
                 </div>
             </div>
@@ -253,7 +253,7 @@
                 <div class="kpi-ico" style="background: rgba(34,197,94,0.10);"><i data-lucide="smartphone"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.devices">设备数量</p>
-                    <p class="kpi-value">{$stats.devices|default=0}</p>
+                    <p class="kpi-value">{$d_devices}</p>
                     <div class="kpi-trend" data-i18n="dashboard.kpi.overview">总览</div>
                 </div>
             </div>
@@ -266,16 +266,16 @@
                 <div class="kpi-ico"><i data-lucide="cloud-upload"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.todayUpload">今日上传</p>
-                    <p class="kpi-value">{$stats.today_uploaded|default=0}</p>
-                    {if $stats.today_uploaded_delta_pct !== null}
-                        <div class="kpi-trend {if $stats.today_uploaded_delta_pct >= 0}up{else /}down{/if}">
-                            {if $stats.today_uploaded_delta_pct >= 0}↑ +{else /}↓ {/if}{$stats.today_uploaded_delta_pct}%
-                            <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$stats.avg7_uploaded|default=0}</span>
+                    <p class="kpi-value">{$d_today_uploaded}</p>
+                    {if $d_has_upload_delta}
+                        <div class="kpi-trend {if $d_today_uploaded_delta_pct >= 0}up{else /}down{/if}">
+                            {if $d_today_uploaded_delta_pct >= 0}↑ +{else /}↓ {/if}{$d_today_uploaded_delta_pct}%
+                            <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$d_avg7_uploaded}</span>
                         </div>
                     {else /}
                         <div class="kpi-trend">
-                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$stats.yesterday_uploaded|default=0}
-                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$stats.avg7_uploaded|default=0}
+                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$d_yesterday_uploaded}
+                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_uploaded}
                         </div>
                     {/if}
                 </div>
@@ -289,16 +289,16 @@
                 <div class="kpi-ico"><i data-lucide="download"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.todayDownload">今日下载</p>
-                    <p class="kpi-value">{$stats.today_downloaded|default=0}</p>
-                    {if $stats.today_downloaded_delta_pct !== null}
-                        <div class="kpi-trend {if $stats.today_downloaded_delta_pct >= 0}up{else /}down{/if}">
-                            {if $stats.today_downloaded_delta_pct >= 0}↑ +{else /}↓ {/if}{$stats.today_downloaded_delta_pct}%
-                            <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$stats.avg7_downloaded|default=0}</span>
+                    <p class="kpi-value">{$d_today_downloaded}</p>
+                    {if $d_has_download_delta}
+                        <div class="kpi-trend {if $d_today_downloaded_delta_pct >= 0}up{else /}down{/if}">
+                            {if $d_today_downloaded_delta_pct >= 0}↑ +{else /}↓ {/if}{$d_today_downloaded_delta_pct}%
+                            <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$d_avg7_downloaded}</span>
                         </div>
                     {else /}
                         <div class="kpi-trend">
-                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$stats.yesterday_downloaded|default=0}
-                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$stats.avg7_downloaded|default=0}
+                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$d_yesterday_downloaded}
+                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_downloaded}
                         </div>
                     {/if}
                 </div>
@@ -315,7 +315,7 @@
                 <div class="kpi-ico" style="background: rgba(139,92,246,0.10);"><i data-lucide="camera"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.styleIndex">寻款索引</p>
-                    <p class="kpi-value">{$stats.style_index_total|default=0}</p>
+                    <p class="kpi-value">{$d_style_index_total}</p>
                     <div class="kpi-trend" data-i18n="dashboard.kpi.styleIndexSub">有效款式条目</div>
                 </div>
             </div>
@@ -328,7 +328,7 @@
                 <div class="kpi-ico" style="background: rgba(14,165,233,0.10);"><i data-lucide="users"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.influencers">达人名录</p>
-                    <p class="kpi-value">{$stats.influencers_total|default=0}</p>
+                    <p class="kpi-value">{$d_influencers_total}</p>
                     <div class="kpi-trend" data-i18n="dashboard.kpi.influencersSub">TikTok @handle</div>
                 </div>
             </div>
@@ -341,7 +341,7 @@
                 <div class="kpi-ico" style="background: rgba(16,185,129,0.10);"><i data-lucide="link-2"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.creatorLinks">达人链</p>
-                    <p class="kpi-value">{$stats.creator_links_total|default=0}</p>
+                    <p class="kpi-value">{$d_creator_links_total}</p>
                     <div class="kpi-trend" data-i18n="dashboard.kpi.creatorLinksSub">分发链接数</div>
                 </div>
             </div>
@@ -353,17 +353,17 @@
 <div class="ops-card">
     <div class="ops-title" data-i18n="dashboard.ops.title">今日数据总结</div>
     <p class="ops-text">
-        <span data-i18n="dashboard.ops.todayUpload">今日上传</span> <strong>{$stats.today_uploaded|default=0}</strong> 条，
-        <span data-i18n="dashboard.ops.pending">待处理</span> <strong>{$stats.undownloaded|default=0}</strong> 条，
-        <span data-i18n="dashboard.ops.downloadRate">下载率</span> <strong>{$stats.download_rate|default=0}%</strong>。
+        <span data-i18n="dashboard.ops.todayUpload">今日上传</span> <strong>{$d_today_uploaded}</strong> 条，
+        <span data-i18n="dashboard.ops.pending">待处理</span> <strong>{$d_undownloaded}</strong> 条，
+        <span data-i18n="dashboard.ops.downloadRate">下载率</span> <strong>{$d_download_rate}%</strong>。
     </p>
     <p class="ops-text ops-text--biz" style="margin-top:10px;font-size:13px;color:#475569;">
         <span data-i18n="dashboard.ops.bizHead">业务概览</span>：
-        <span data-i18n="dashboard.kpi.styleIndex">寻款索引</span> <strong>{$stats.style_index_total|default=0}</strong>
+        <span data-i18n="dashboard.kpi.styleIndex">寻款索引</span> <strong>{$d_style_index_total}</strong>
         ·
-        <span data-i18n="dashboard.kpi.influencers">达人名录</span> <strong>{$stats.influencers_total|default=0}</strong>
+        <span data-i18n="dashboard.kpi.influencers">达人名录</span> <strong>{$d_influencers_total}</strong>
         ·
-        <span data-i18n="dashboard.kpi.creatorLinks">达人链</span> <strong>{$stats.creator_links_total|default=0}</strong>
+        <span data-i18n="dashboard.kpi.creatorLinks">达人链</span> <strong>{$d_creator_links_total}</strong>
     </p>
     <div class="ops-hint" data-i18n="dashboard.ops.hint">建议：优先处理未下载素材，提高下载率。</div>
 </div>

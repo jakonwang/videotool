@@ -137,7 +137,7 @@
 ## 仪表盘统计（2026-03）
 
 - `GET /admin.php/stats/overview`、`trends`、`platformDistribution`、`downloadErrorTrends`、`downloadErrorTop`、`productDistribution`、`storageUsage`。
-- 实现：`app/service/StatsService.php`、`app/controller/admin/Stats.php`、首页 `view/admin/index/index.html`。仪表盘 KPI 中 **视频总数、截至日期** 等在 **`Index::index()`** 中先算好标量（如 `video_total`、`asof_display`）再传入视图，模板里用 `{$video_total}`，避免在 `.html` 里写 `$stats['videos']` / `{:...??...}` 时个别环境模板编译或 PHP 版本差异导致 **unexpected identifier "videos"**。
+- 实现：`app/service/StatsService.php`、`app/controller/admin/Stats.php`、首页 `view/admin/index/index.html`。仪表盘 **所有 KPI 数字**（含已下载/未下载、下载率、平台/设备、今日上传/下载与环比、寻款/达人/达人链等）均在 **`Index::dashboardScalars()`** 中从 `StatsService::overview()` 转为扁平标量（`d_*`、`video_total`、`asof_display`）再传入视图；模板**禁止**再使用 `{$stats.xxx|default=...}`，以免 ThinkPHP 编译出含 `$stats['downloaded']` 等片段时在个别环境报 **unexpected identifier "videos" / "downloaded"** 等。
 - 升级：`php database/run_migration_product_distribution.php` 或 `database/migrations/20260330_product_distribution.sql`。
 
 ---
