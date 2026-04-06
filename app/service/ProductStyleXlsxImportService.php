@@ -263,7 +263,13 @@ class ProductStyleXlsxImportService
         $imagePathWeb = null;
         $imageTemp = null;
         if ($prebuiltRowWebPaths !== null && $publicRootForMap !== null && $publicRootForMap !== '') {
-            $pw = $prebuiltRowWebPaths[$r] ?? $prebuiltRowWebPaths[(string) $r] ?? null;
+            $pw = $prebuiltRowWebPaths[$r]
+                ?? $prebuiltRowWebPaths[(string) $r]
+                ?? $prebuiltRowWebPaths[$r - 1]
+                ?? $prebuiltRowWebPaths[(string) ($r - 1)]
+                ?? $prebuiltRowWebPaths[$r + 1]
+                ?? $prebuiltRowWebPaths[(string) ($r + 1)]
+                ?? null;
             if (\is_string($pw) && $pw !== '') {
                 $root = \rtrim(\str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $publicRootForMap), DIRECTORY_SEPARATOR);
                 $rel = \str_replace('/', DIRECTORY_SEPARATOR, $pw);
@@ -347,9 +353,14 @@ class ProductStyleXlsxImportService
             $openPath = $real !== false ? $real : $sourceFilePath;
             $title = $sheet->getTitle();
             foreach ($tryCols as $col) {
-                $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageAtCell($openPath, $title, $col, $r);
-                if ($tmp !== null) {
-                    return $tmp;
+                foreach ([$r, $r - 1, $r + 1] as $rr) {
+                    if ($rr < 2) {
+                        continue;
+                    }
+                    $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageAtCell($openPath, $title, $col, $rr);
+                    if ($tmp !== null) {
+                        return $tmp;
+                    }
                 }
             }
         }
@@ -471,6 +482,22 @@ class ProductStyleXlsxImportService
             return null;
         }
         if (\preg_match('#^data:image/#', $path) === 1) {
+            $commaPos = \strpos($path, ',');
+            if ($commaPos !== false) {
+                $meta = \substr($path, 0, $commaPos);
+                $payload = \substr($path, $commaPos + 1);
+                if (\stripos($meta, ';base64') !== false) {
+                    $decoded = \base64_decode($payload, true);
+                    if ($decoded !== false && $decoded !== '') {
+                        return $decoded;
+                    }
+                } else {
+                    $decoded = \rawurldecode($payload);
+                    if ($decoded !== '') {
+                        return $decoded;
+                    }
+                }
+            }
             $raw = @\file_get_contents($path);
 
             return ($raw !== false && $raw !== '') ? $raw : null;

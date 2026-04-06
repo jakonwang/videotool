@@ -42,6 +42,7 @@ class ProductStyleXlsxDrawingRowMapBuilder
         }
 
         $map = [];
+        $mapAnyRow = [];
         try {
             $sheet = $spreadsheet->getActiveSheet();
             $hr = \max(1, (int) $sheet->getHighestRow());
@@ -79,6 +80,11 @@ class ProductStyleXlsxDrawingRowMapBuilder
                         $map[$r] = $web;
                     }
                 }
+                foreach (self::rowsFromDrawingAnyColumn($drawing) as $r) {
+                    if ($r >= 2 && $r <= $hr && !isset($mapAnyRow[$r])) {
+                        $mapAnyRow[$r] = $web;
+                    }
+                }
             }
 
             for ($r = 2; $r <= $hr; $r++) {
@@ -110,13 +116,27 @@ class ProductStyleXlsxDrawingRowMapBuilder
                 if (isset($map[$r])) {
                     continue;
                 }
-                $web = ProductStyleXlsxZipEmbeddedImageService::extractRowImageToProductsDir($openPath, $title, $imgCol, $r, $publicRoot);
-                if ($web !== null) {
-                    $map[$r] = $web;
+                if (isset($mapAnyRow[$r])) {
+                    $map[$r] = $mapAnyRow[$r];
+                    continue;
+                }
+                foreach ([$r, $r - 1, $r + 1] as $rr) {
+                    if ($rr < 2) {
+                        continue;
+                    }
+                    $web = ProductStyleXlsxZipEmbeddedImageService::extractRowImageToProductsDir($openPath, $title, $imgCol, $rr, $publicRoot);
+                    if ($web !== null) {
+                        $map[$r] = $web;
+                        break;
+                    }
                 }
             }
             for ($r = 2; $r <= $hr; $r++) {
                 if (isset($map[$r])) {
+                    continue;
+                }
+                if (isset($mapAnyRow[$r])) {
+                    $map[$r] = $mapAnyRow[$r];
                     continue;
                 }
                 for ($d = -2; $d <= 2; $d++) {
@@ -127,10 +147,15 @@ class ProductStyleXlsxDrawingRowMapBuilder
                     if ($c < 1) {
                         continue;
                     }
-                    $web = ProductStyleXlsxZipEmbeddedImageService::extractRowImageToProductsDir($openPath, $title, $c, $r, $publicRoot);
-                    if ($web !== null) {
-                        $map[$r] = $web;
-                        break;
+                    foreach ([$r, $r - 1, $r + 1] as $rr) {
+                        if ($rr < 2) {
+                            continue;
+                        }
+                        $web = ProductStyleXlsxZipEmbeddedImageService::extractRowImageToProductsDir($openPath, $title, $c, $rr, $publicRoot);
+                        if ($web !== null) {
+                            $map[$r] = $web;
+                            break 2;
+                        }
                     }
                 }
             }
@@ -205,7 +230,8 @@ class ProductStyleXlsxDrawingRowMapBuilder
         if ($maxC < $imgCol1Based || $minC > $imgCol1Based) {
             $cc = (int) \round(($minC + $maxC) / 2);
             $cr = (int) \round(($minR + $maxR) / 2);
-            if ($cc === $imgCol1Based) {
+            // Disjoint 兜底：考虑偏移导致锚点列与视觉中心列轻微错位（容忍 1 列）
+            if (\abs($cc - $imgCol1Based) <= 1) {
                 return [$cr];
             }
 
@@ -214,6 +240,49 @@ class ProductStyleXlsxDrawingRowMapBuilder
         $rows = [];
         for ($r = $minR; $r <= $maxR; $r++) {
             $rows[] = $r;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * 忽略列，仅根据锚点覆盖行区间（Disjoint 用中心行）做兜底映射。
+     *
+     * @return list<int>
+     */
+    private static function rowsFromDrawingAnyColumn(BaseDrawing $drawing): array
+    {
+        $coordStr = \trim($drawing->getCoordinates());
+        if ($coordStr === '') {
+            return [];
+        }
+        try {
+            $from = Coordinate::indexesFromString($coordStr);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $fr = (int) $from[1];
+        $to2 = \trim((string) $drawing->getCoordinates2());
+        if ($to2 === '') {
+            return [$fr];
+        }
+        try {
+            $to = Coordinate::indexesFromString($to2);
+            $tr = (int) $to[1];
+        } catch (\Throwable $e) {
+            return [$fr];
+        }
+        $minR = \min($fr, $tr);
+        $maxR = \max($fr, $tr);
+        if ($maxR < $minR) {
+            return [$fr];
+        }
+        $rows = [];
+        for ($r = $minR; $r <= $maxR; $r++) {
+            $rows[] = $r;
+        }
+        if ($rows === []) {
+            return [(int) \round(($minR + $maxR) / 2)];
         }
 
         return $rows;
