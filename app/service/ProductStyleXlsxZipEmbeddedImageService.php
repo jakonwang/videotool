@@ -528,11 +528,18 @@ class ProductStyleXlsxZipEmbeddedImageService
         if ($formula === '') {
             return null;
         }
-        if (\preg_match('/^\s*=?\s*DISPIMG\s*\(\s*"([^"]+)"/i', $formula, $m) !== 1) {
-            return null;
-        }
-        $id = \trim((string) ($m[1] ?? ''));
+        // 兼容：DISPIMG / _xlfn.DISPIMG，单双引号，或其它包装函数里携带 "ID_xxx"
+        if (\preg_match('/^\s*=?\s*(?:_xlfn\.)?DISPIMG\s*\(\s*(["\'])([^"\']+)\1/i', $formula, $m) === 1) {
+            $id = \trim((string) ($m[2] ?? ''));
 
-        return $id !== '' ? $id : null;
+            return $id !== '' ? $id : null;
+        }
+        if (\preg_match('/(["\'])(ID_[A-Za-z0-9]+)\1/i', $formula, $m2) === 1) {
+            $id = \trim((string) ($m2[2] ?? ''));
+
+            return $id !== '' ? $id : null;
+        }
+
+        return null;
     }
 }

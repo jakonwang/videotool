@@ -122,7 +122,10 @@ class ProductStyleXlsxDrawingRowMapBuilder
                     continue;
                 }
                 $raw = $cell->getValue();
-                if (!\is_string($raw) || \stripos($raw, 'DISPIMG(') === false) {
+                if (!\is_string($raw)) {
+                    continue;
+                }
+                if (\stripos($raw, 'DISPIMG(') === false && \stripos($raw, '"ID_') === false && \stripos($raw, '\'ID_') === false) {
                     continue;
                 }
                 $web = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgFormulaToProductsDir($openPath, $raw, $publicRoot);
