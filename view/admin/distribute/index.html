@@ -106,7 +106,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_modules"></script>
+<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -115,7 +115,7 @@
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
-  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
 
   const headerCellStyle = {
     backgroundColor: '#F9FAFB',
@@ -194,9 +194,9 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success('已复制链接');
+          ElMessage.success(tt('common.copyDone'));
         } catch (e) {
-          ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
+          ElMessage.error(tt('common.copyFail'));
         }
       }
 
@@ -217,17 +217,25 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '已更新');
+          ElMessage.success(json.msg || tt('common.updated'));
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '操作失败');
+          ElMessage.error((json && json.msg) || tt('page.distribute.opFail'));
         }
       }
 
       async function doDelete(row) {
         const id = row && row.id ? row.id : 0;
         if (!id) return;
-        await ElMessageBox.confirm('确定删除该链接？', '删除确认', { type: 'warning' });
+        try {
+          await ElMessageBox.confirm(tt('page.distribute.deleteConfirm'), tt('page.distribute.deleteTitle'), {
+            type: 'warning',
+            confirmButtonText: tt('common.delete'),
+            cancelButtonText: tt('common.cancel'),
+          });
+        } catch {
+          return;
+        }
         const resp = await fetch('/admin.php/distribute/delete/' + id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -236,12 +244,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '已删除');
+          ElMessage.success(json.msg || tt('common.deleted'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '删除失败');
+          ElMessage.error((json && json.msg) || tt('page.distribute.deleteFail'));
         }
       }
 
@@ -276,11 +284,11 @@
       <div class="admin-dist-card">
         <div class="admin-dist-header">
           <div>
-            <div class="admin-dist-breadcrumb">${tt('page.distribute.breadcrumb')}</div>
-            <div class="admin-dist-title">${tt('page.distribute.title')}</div>
+            <div class="admin-dist-breadcrumb">{{ tt('page.distribute.breadcrumb') }}</div>
+            <div class="admin-dist-title">{{ tt('page.distribute.title') }}</div>
           </div>
           <div class="admin-dist-actions">
-            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">${tt('page.distribute.add')}</el-button>
+            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">{{ tt('page.distribute.add') }}</el-button>
           </div>
         </div>
 
@@ -309,47 +317,47 @@
           :cell-style="cellStyle"
         >
           <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column :label="lang==='en'?'Product':'商品'" min-width="160">
+          <el-table-column :label="tt('page.distribute.colProduct')" min-width="160">
             <template #default="{ row }">
               <div style="font-weight:500; color:#303133;">
-                {{ (row.product && row.product.name) ? row.product.name : '—' }}
+                {{ (row.product && row.product.name) ? row.product.name : tt('page.styleSearch.emDash') }}
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Creator':'达人'" min-width="140">
+          <el-table-column :label="tt('page.distribute.colCreator')" min-width="140">
             <template #default="{ row }">
               <span v-if="row.influencer && row.influencer.tiktok_id" style="color:#303133; font-weight:500;">
                 {{ row.influencer.tiktok_id }}
                 <span v-if="row.influencer.nickname" style="color:#6b7280; font-weight:400;"> · {{ row.influencer.nickname }}</span>
               </span>
-              <span v-else style="color:#9ca3af;">—</span>
+              <span v-else style="color:#9ca3af;">{{ tt('page.styleSearch.emDash') }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Note':'备注'" min-width="160">
+          <el-table-column :label="tt('page.distribute.colNote')" min-width="160">
             <template #default="{ row }">
-              <span style="color:#4b5563;">{{ row.label || '—' }}</span>
+              <span style="color:#4b5563;">{{ row.label || tt('page.styleSearch.emDash') }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Link':'达人页链接'" min-width="360">
+          <el-table-column :label="tt('page.distribute.colLink')" min-width="360">
             <template #default="{ row }">
               <div class="link-cell">
-                <div class="link-text" :title="row.link">{{ row.link || '—' }}</div>
+                <div class="link-text" :title="row.link">{{ row.link || tt('page.styleSearch.emDash') }}</div>
                 <el-button size="default" link type="primary" @click="copyText(row.link)">{{ tt('common.copy') }}</el-button>
                 <el-button size="default" link type="primary" @click="openLink(row)">{{ tt('common.open') }}</el-button>
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
+          <el-table-column :label="tt('page.distribute.colStatus')" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" />
-          <el-table-column :label="lang==='en'?'Actions':'操作'" width="180" fixed="right">
+          <el-table-column prop="created_at" :label="tt('page.distribute.colCreated')" min-width="180" />
+          <el-table-column :label="tt('page.distribute.colActions')" width="180" fixed="right">
             <template #default="{ row }">
-              <el-button size="default" link type="primary" @click="doToggle(row)">{{ lang==='en'?'Toggle':'启停' }}</el-button>
+              <el-button size="default" link type="primary" @click="doToggle(row)">{{ tt('page.distribute.toggle') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>
           </el-table-column>

@@ -224,6 +224,66 @@ class Influencer extends BaseController
     }
 
     /**
+     * 导出全量达人 CSV（UTF-8 BOM，与导入列兼容：含 contact 原始文本）
+     */
+    public function exportCsv()
+    {
+        try {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $filename = 'influencers_' . date('Ymd_His') . '.csv';
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return $this->jsonErr('无法写入响应');
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['id', 'tiktok_id', 'nickname', 'avatar_url', 'follower_count', 'contact', 'region', 'status', 'created_at', 'updated_at']);
+
+            $batch = 2000;
+            $lastId = 0;
+            while (true) {
+                $rows = Db::name('influencers')
+                    ->where('id', '>', $lastId)
+                    ->order('id', 'asc')
+                    ->limit($batch)
+                    ->select();
+                if ($rows === null || count($rows) === 0) {
+                    break;
+                }
+                foreach ($rows as $row) {
+                    $r = is_array($row) ? $row : $row->toArray();
+                    $lastId = (int) ($r['id'] ?? 0);
+                    $contact = (string) ($r['contact_info'] ?? '');
+                    fputcsv($out, [
+                        $r['id'] ?? '',
+                        $r['tiktok_id'] ?? '',
+                        $r['nickname'] ?? '',
+                        $r['avatar_url'] ?? '',
+                        (int) ($r['follower_count'] ?? 0),
+                        $contact,
+                        $r['region'] ?? '',
+                        (int) ($r['status'] ?? 0),
+                        (string) ($r['created_at'] ?? ''),
+                        (string) ($r['updated_at'] ?? ''),
+                    ]);
+                }
+            }
+            fclose($out);
+        } catch (\Throwable $e) {
+            Log::error('influencer exportCsv: ' . $e->getMessage());
+
+            if (!headers_sent()) {
+                return $this->jsonErr('导出失败：' . $e->getMessage());
+            }
+        }
+
+        exit;
+    }
+
+    /**
      * POST：编辑达人（不可改 tiktok_id）
      */
     public function update()

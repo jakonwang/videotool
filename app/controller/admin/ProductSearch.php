@@ -433,4 +433,80 @@ class ProductSearch extends BaseController
             'Content-Disposition' => 'attachment; filename="sample_product_style.csv"',
         ], 'html');
     }
+
+    /**
+     * 全量导出索引 CSV（UTF-8 BOM；不含 embedding 向量，便于备份与核对）
+     */
+    public function exportCsv()
+    {
+        try {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $filename = 'product_style_items_' . date('Ymd_His') . '.csv';
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return $this->jsonErr('无法写入响应');
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+
+            $keys = array_keys(Db::name('product_style_items')->getFields());
+            $hasImagePath = in_array('image_path', $keys, true);
+
+            $headers = ['id', 'product_code', 'image_ref'];
+            if ($hasImagePath) {
+                $headers[] = 'image_path';
+            }
+            $headers = array_merge($headers, ['hot_type', 'ai_description', 'status', 'created_at', 'updated_at']);
+            fputcsv($out, $headers);
+
+            $field = 'id,product_code,image_ref,hot_type,ai_description,status,created_at,updated_at';
+            if ($hasImagePath) {
+                $field = 'id,product_code,image_ref,image_path,hot_type,ai_description,status,created_at,updated_at';
+            }
+
+            $batch = 2000;
+            $lastId = 0;
+            while (true) {
+                $rows = Db::name('product_style_items')
+                    ->field($field)
+                    ->where('id', '>', $lastId)
+                    ->order('id', 'asc')
+                    ->limit($batch)
+                    ->select();
+                if ($rows === null || count($rows) === 0) {
+                    break;
+                }
+                foreach ($rows as $row) {
+                    $r = is_array($row) ? $row : $row->toArray();
+                    $lastId = (int) ($r['id'] ?? 0);
+                    $line = [
+                        $r['id'] ?? '',
+                        $r['product_code'] ?? '',
+                        $r['image_ref'] ?? '',
+                    ];
+                    if ($hasImagePath) {
+                        $line[] = (string) ($r['image_path'] ?? '');
+                    }
+                    $line[] = (string) ($r['hot_type'] ?? '');
+                    $line[] = (string) ($r['ai_description'] ?? '');
+                    $line[] = (int) ($r['status'] ?? 0);
+                    $line[] = (string) ($r['created_at'] ?? '');
+                    $line[] = (string) ($r['updated_at'] ?? '');
+                    fputcsv($out, $line);
+                }
+            }
+            fclose($out);
+        } catch (\Throwable $e) {
+            Log::error('product_search exportCsv: ' . $e->getMessage());
+
+            if (!headers_sent()) {
+                return $this->jsonErr('导出失败：' . $e->getMessage());
+            }
+        }
+
+        exit;
+    }
 }

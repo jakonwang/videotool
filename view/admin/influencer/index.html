@@ -25,7 +25,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260408_modules"></script>
+<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -34,7 +34,7 @@
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
-  const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
 
   const apiFetchHeaders = {
     'Accept': 'application/json, text/javascript, */*;q=0.01',
@@ -43,7 +43,7 @@
 
   function parseJsonBody(res, text) {
     try { return JSON.parse(text); } catch (e) {
-      throw new Error('非 JSON 响应 HTTP ' + res.status);
+      throw new Error(tt('page.styleSearch.errNonJson', { status: res.status }));
     }
   }
 
@@ -104,24 +104,33 @@
           });
           const json = parseJsonBody(res, await res.text());
           if (json && json.code === 401) {
-            ElMessage.error('未登录或会话过期');
+            ElMessage.error(tt('common.sessionExpired'));
             stopImportPolling();
             return;
           }
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || '推进任务失败');
+            ElMessage.error((json && json.msg) || tt('page.styleSearch.taskPushFail'));
             stopImportPolling();
             return;
           }
           const d = json.data || {};
           importPercent.value = d.percent != null ? Number(d.percent) : 0;
-          importStatusText.value = (d.status || '') + ' · ' + (d.processed_rows != null ? d.processed_rows : 0) + '/' + (d.total_rows != null ? d.total_rows : '?');
+          importStatusText.value = tt('page.styleSearch.tickLine', {
+            status: d.status || '',
+            processed: d.processed_rows != null ? d.processed_rows : 0,
+            total: d.total_rows != null ? d.total_rows : '?',
+          });
           importLogs.value = Array.isArray(d.logs) ? d.logs.slice(-80) : [];
           if (d.done) {
             importDone.value = true;
             stopImportPolling();
-            const msg = '导入结束：新增 ' + (d.inserted != null ? d.inserted : 0) + '，更新 ' + (d.updated != null ? d.updated : 0) + '，失败 ' + (d.failed != null ? d.failed : 0);
-            if (d.status === 'failed') ElMessage.error(msg + (d.error_message ? ' ' + d.error_message : ''));
+            const msg = tt('page.styleSearch.importSummary', {
+              inserted: d.inserted != null ? d.inserted : 0,
+              updated: d.updated != null ? d.updated : 0,
+              failed: d.failed != null ? d.failed : 0,
+              err: d.error_message ? ' ' + d.error_message : '',
+            });
+            if (d.status === 'failed') ElMessage.error(msg);
             else ElMessage.success(msg);
             const input = document.getElementById('infFileInput');
             if (input) input.value = '';
@@ -129,7 +138,7 @@
             return;
           }
         } catch (e) {
-          ElMessage.error(e.message || '轮询失败');
+          ElMessage.error(e.message || tt('page.styleSearch.pollFail'));
           stopImportPolling();
         }
       }
@@ -182,7 +191,7 @@
       async function doImport() {
         const input = document.getElementById('infFileInput');
         if (!input || !input.files || !input.files[0]) {
-          ElMessage.warning('请选择文件');
+          ElMessage.warning(tt('page.influencer.pickFile'));
           return;
         }
         importing.value = true;
@@ -197,21 +206,21 @@
           });
           const json = parseJsonBody(res, await res.text());
           if (json && json.code === 401) {
-            ElMessage.error('未登录或会话过期');
+            ElMessage.error(tt('common.sessionExpired'));
             return;
           }
           if (json && json.code === 0 && json.data && json.data.mode === 'async' && json.data.task_id) {
             importTaskId.value = Number(json.data.task_id);
             importPercent.value = 0;
             importLogs.value = [];
-            importStatusText.value = '…';
+            importStatusText.value = tt('page.influencer.ellipsis');
             importDialogVisible.value = true;
             startImportPolling();
             return;
           }
-          ElMessage.error((json && json.msg) || '导入失败');
+          ElMessage.error((json && json.msg) || tt('page.styleSearch.importFail'));
         } catch (e) {
-          ElMessage.error(e.message || '导入失败');
+          ElMessage.error(e.message || tt('page.styleSearch.importFail'));
         } finally {
           importing.value = false;
         }
@@ -235,9 +244,9 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success(tt('common.copy') + ' OK');
+          ElMessage.success(tt('common.copyDone'));
         } catch (e) {
-          ElMessage.error('复制失败');
+          ElMessage.error(tt('common.copyFail'));
         }
       }
 
@@ -279,14 +288,14 @@
           });
           const json = parseJsonBody(res, await res.text());
           if (json && json.code === 401) {
-            ElMessage.error('未登录或会话过期');
+            ElMessage.error(tt('common.sessionExpired'));
             return;
           }
           if (!json || json.code !== 0) {
             ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
             return;
           }
-          ElMessage.success(json.msg || tt('common.save'));
+          ElMessage.success(json.msg || tt('common.saved'));
           editVisible.value = false;
           fetchList();
         } catch (e) {
@@ -298,7 +307,11 @@
 
       async function deleteRow(row) {
         try {
-          await ElMessageBox.confirm(tt('page.influencer.deleteConfirm'), tt('common.delete'), { type: 'warning' });
+          await ElMessageBox.confirm(tt('page.influencer.deleteConfirm'), tt('page.influencer.deleteDialogTitle'), {
+            type: 'warning',
+            confirmButtonText: tt('common.delete'),
+            cancelButtonText: tt('common.cancel'),
+          });
         } catch {
           return;
         }
@@ -311,14 +324,14 @@
           });
           const json = parseJsonBody(res, await res.text());
           if (json && json.code === 401) {
-            ElMessage.error('未登录或会话过期');
+            ElMessage.error(tt('common.sessionExpired'));
             return;
           }
           if (!json || json.code !== 0) {
             ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
             return;
           }
-          ElMessage.success(json.msg || tt('common.delete'));
+          ElMessage.success(json.msg || tt('common.deleted'));
           fetchList();
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -370,6 +383,7 @@
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <a class="el-button el-button--default" style="text-decoration:none;" href="/admin.php/influencer/sampleCsv" target="_blank" rel="noopener">{{ tt('page.influencer.sampleCsv') }}</a>
+            <a class="el-button el-button--default" style="text-decoration:none;" href="/admin.php/influencer/exportCsv" rel="noopener">{{ tt('page.influencer.exportCsv') }}</a>
             <input type="file" id="infFileInput" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:220px;" />
             <el-button type="primary" size="default" :loading="importing" @click="doImport">{{ tt('page.influencer.importBtn') }}</el-button>
           </div>
@@ -400,7 +414,7 @@
           </el-table-column>
           <el-table-column :label="tt('page.influencer.colContact')" min-width="160">
             <template #default="{ row }">
-              <span style="word-break:break-all; font-size:13px;">{{ row.contact_display || '—' }}</span>
+              <span style="word-break:break-all; font-size:13px;">{{ row.contact_display || tt('page.styleSearch.emDash') }}</span>
               <el-button v-if="row.contact_display" size="small" link type="primary" @click="copyText(row.contact_display)">{{ tt('common.copy') }}</el-button>
             </template>
           </el-table-column>

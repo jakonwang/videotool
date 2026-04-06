@@ -28,7 +28,7 @@
 
 ### 达人名录（tiktok_id = TikTok 用户名 @handle）
 - 数据库表 `influencers`：`tiktok_id` 存**规范化**用户名——小写、前导 `@`，与 TikTok **@handle** 对应，全局唯一；另有昵称、头像 URL、粉丝数、`contact_info`（TEXT 存 JSON 文本）、地区、`status`（0 待联系 / 1 合作中 / 2 黑名单）。
-- 后台路径：**达人 → 名录**（`/admin.php/influencer`）：分页列表、关键词与状态筛选、**导入更新**（异步）、**示例 CSV 下载**、行内**编辑/删除**（删除前自动将相关达人链的 `influencer_id` 置空）。
+- 后台路径：**达人 → 名录**（`/admin.php/influencer`）：分页列表、关键词与状态筛选、**导入更新**（异步）、**示例 CSV 下载**、**全量导出 CSV**（`GET /admin.php/influencer/exportCsv`，UTF-8 BOM，列含 `contact` 与导入兼容）、行内**编辑/删除**（删除前自动将相关达人链的 `influencer_id` 置空）。
 - 支持 **.csv / .txt / .xlsx / .xls / .xlsm**：首行可识别表头（含 `tiktok_id`、`handle`、`用户名` 等）；无法识别时默认**第一列为 TikTok 用户名**。
 - 导入任务表 `influencer_import_tasks`；前端创建任务后轮询 `POST /admin.php/influencer/importTaskTick`。
 - **升级数据库**（Windows / Linux 均可）：项目根目录执行  
@@ -47,11 +47,29 @@
 | GET | `/influencer/importTaskStatus` | 任务快照 |
 | POST | `/influencer/importTaskTick` | 推进一行 |
 | GET | `/influencer/sampleCsv` | 下载导入示例 CSV |
+| GET | `/influencer/exportCsv` | 全量导出达人 CSV（UTF-8 BOM） |
 | POST | `/influencer/update` | JSON 编辑达人（不可改 `tiktok_id`） |
 | POST | `/influencer/delete` | JSON `{"id":n}` 删除达人 |
 
 ### 多语言
-- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）；模块分组键名见 `admin.menu.overview`、`admin.menu.groupSearch`、`admin.menu.groupCreator`、`admin.menu.material` 等。修改脚本后需提高 `view/admin/common/layout.html` 中 `i18n.js` 的 `?v=`（如 `20260408_modules`）。
+- 运维速查：**`README.md`** 中有「多语言（i18n）与脚本缓存版本」总述；本文件下列为业务键与页面细节。
+- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）；模块分组键名见 `admin.menu.overview`、`admin.menu.groupSearch`、`admin.menu.groupCreator`、`admin.menu.material` 等。修改脚本后需**全站**提高所有引用 `i18n.js` 的 `?v=`（当前示例：`20260414_full_sync`），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页（缓存/用户/商品/视频等）；达人前台另见 `influencer_i18n.js` 的 `?v=`。
+
+### 寻款索引页 i18n（2026-04）
+- `view/admin/product_search/index.html`：提示框、筛选、表格列、导入进度弹窗、编辑弹窗及脚本内 `ElMessage` / `ElMessageBox` 文案已走 `AppI18n.t`（`page.styleSearch.*` 与 `common.*`）；`tt` 支持占位符 `{var}`。越南语 `vi` 已补常用键，其余仍回退中文。
+
+### 达人名录页 i18n（2026-04）
+- `view/admin/influencer/index.html`：导入轮询、会话过期、复制成功/失败、保存/删除成功提示与删除确认框（标题与确认/取消按钮）均走 i18n；导入进度与结束摘要复用 `page.styleSearch.tickLine`、`importSummary`、`taskPushFail` 等与寻款一致的键；`tt` 支持第二参数占位符。
+
+### 达人链页 i18n（2026-04）
+- `view/admin/distribute/index.html`：页眉与表格列、启停/删除/复制等提示与确认框均走 `page.distribute.*` / `common.*`；修复原模板中误用 JS 模板字符串 `${tt(...)}` 导致文案不随 Vue 渲染的问题，改为 `{{ tt('…') }}`；删除成功提示使用 `common.deleted`。
+
+### 登录页 i18n（2026-04）
+- `view/admin/auth/login.html`：`i18n.js` 版本与全站对齐；品牌脚注由 `auth.brandFootnote` 注入；语言切换增加 **Tiếng Việt**（`setLang('vi')`）；登录失败兜底文案使用 `auth.loginFailed`（不再误用 `auth.loginBtn`）。
+
+### 仪表盘业务 KPI（2026-04）
+- 首页 SSR 与 `GET /admin.php/stats/overview` 同源（`StatsService::overview()`），除平台/设备/视频等指标外，另含：**寻款索引**（`product_style_items` 且 `status=1`）、**达人名录**（`influencers`）、**达人链**（`product_links`）；表不存在或未迁移时对应项为 `0`。
+- **今日数据总结**卡片在「今日上传 / 待处理 / 下载率」下增加一行 **业务概览**（`dashboard.ops.bizHead`），与三张业务 KPI 卡数字一致。
 
 ## 商品与达人分发（2026-03）
 
@@ -77,7 +95,7 @@
 | 系统 | 系统设置 / 用户 / 发卡 / 版本 / 缓存 / 异常 | 参数、管理员、桌面授权码、桌面安装包发布、缓存、下载错误监控 |
 
 - 侧栏分组使用 **Bootstrap collapse**（与页面 SSR 同步 `show`，避免 AdminLTE Treeview 初始化把当前分组收拢）；样式为自定义「玻璃拟态 + 霓虹描边」分组头与子项指示点，与 AdminLTE 默认 `nav-treeview` 视觉脱钩。
-- **后台多语言**：文案在 `public/static/i18n/i18n.js` 中维护；侧栏等使用 `data-i18n="键名"`，由 `AppI18n.applyDom` 替换。**新增或修改翻译键后**，须同步提高 `view/admin/common/layout.html` 里 `i18n.js` 的 `?v=` 缓存版本，否则浏览器可能仍加载旧脚本，界面会显示键名（如 `admin.menu.styleSearch`）而非译文。
+- **后台多语言**：文案在 `public/static/i18n/i18n.js` 中维护；侧栏等使用 `data-i18n="键名"`，由 `AppI18n.applyDom` 替换。**新增或修改翻译键后**，须同步提高**全站**所有 `i18n.js` 引用的 `?v=`（与 `layout.html` 保持一致，当前示例 `20260414_full_sync`），否则浏览器可能仍加载旧脚本，界面会显示键名（如 `admin.menu.styleSearch`）而非译文。
 
 ### 侧边栏 UI（2026-03）
 - 暗黑侧栏参考 **Vercel / Tailwind UI**：分组标题更小更克制（uppercase + tracking-wider），可点击项与标题层级区分明显。
@@ -109,7 +127,7 @@
 - 让后台首页不止“总数”，增加**趋势**与**结构分布**，便于运营与排查问题。
 
 ### 接口（后台入口 `admin.php`）
-- `GET /admin.php/stats/overview`：KPI 总览（含今日上传/今日下载）
+- `GET /admin.php/stats/overview`：KPI 总览（含今日上传/今日下载，以及寻款索引/达人/达人链条数等业务字段，见 `StatsService::overview()`）
 - `GET /admin.php/stats/trends?days=30`：近 N 天上传/下载趋势
 - `GET /admin.php/stats/platformDistribution`：平台分布（已下载/未下载）
 - `GET /admin.php/stats/downloadErrorTrends?days=7`：近 N 天下载异常趋势（解析 runtime 日志）
@@ -394,7 +412,7 @@
 - URL 参数：`?lang=zh` 或 `?lang=en`
 - 本地记忆：`localStorage(app_lang)`
 - 语言优先级：`?lang=` > `localStorage(app_lang)` > `navigator.language` > 默认中文
-- 代码位置：`public/static/i18n/i18n.js`
+- 代码位置：`public/static/i18n/i18n.js`；模板中通过 `?v=` 防缓存，修改字典后需与全站统一提高版本号。
 
 #### 达人取片页（Influencer）
 - 支持语言：越南语（`vi`，默认）/英文（`en`）
@@ -402,7 +420,7 @@
 - URL 参数：`?ilang=vi` 或 `?ilang=en`
 - 本地记忆：`localStorage(influencer_lang)`
 - 语言优先级：`?ilang=` > `localStorage(influencer_lang)` > `navigator.language` > 默认越南语
-- 代码位置：`public/static/i18n/influencer_i18n.js`，页面：`view/index/influencer.html`
+- 代码位置：`public/static/i18n/influencer_i18n.js`，页面：`view/index/influencer.html`；修改字典后需提高该脚本 URL 的 `?v=`（与后台 `i18n.js` 同批次 bump，当前示例 `20260414_full_sync`）。
 
 ## 后台统一页面规范（与 /video 一致）（2026-03）
 
@@ -480,6 +498,7 @@
 - `POST /admin.php/product_search/batchDelete`：批量删除；JSON body `{"ids":[1,2,3]}`（单次最多 500 条）
 - `POST /admin.php/product_search/update/<id>`：编辑；`multipart`：`product_code`（必填）、`hot_type`、`image_ref`（修改链接/路径会**重算向量**）；可选文件字段 `image` 上传新图覆盖。若已启用豆包且**更换了参考图**，会尝试 **重新生成 `ai_description`** 并同步 `products`。
 - `GET /admin.php/product_search/sampleCsv`：下载示例 CSV
+- `GET /admin.php/product_search/exportCsv`：全量导出索引 CSV（UTF-8 BOM；列含 `id`、`product_code`、`image_ref`、（若库表有该列）`image_path`、`hot_type`、`ai_description`、`status`、时间戳；**不含** `embedding` 向量，避免文件过大）
 
 ### 开放 API（无需登录，供仓库手机端 H5）
 - `POST /index.php/api/product_search/searchByImage`：由 **`app\controller\api\Search@searchByImage`** 处理；**仅豆包**：须在后台启用火山方舟并配置完整，否则返回错误提示。`multipart/form-data`，字段名 **`file`**；可选 **`hint`**。成功时 `data.engine`=`volc_ark` 时 **`data.auto_match`=true**、**`data.matched_code`** 与 **单条** `items`（含索引图、商品信息）；关键词回退时 `volc_ark_keyword`（`data.fallback`=true）。`items` 含 `product_code`、`similarity`、`match_reason`、`product` 等。

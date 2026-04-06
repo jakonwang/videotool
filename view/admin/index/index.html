@@ -1,6 +1,6 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}仪表盘{/block}
+{block name="title"}TikStar OPS · 仪表盘{/block}
 {block name="page_title"}<span data-i18n="page.dashboard.title">仪表盘</span>{/block}
 {block name="style"}
 <style>
@@ -35,11 +35,17 @@
         gap: 12px;
         margin-bottom: 18px;
     }
+    .kpi-grid-modules {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-bottom: 18px;
+    }
     @media (max-width: 992px) {
         .kpi-grid-hero, .kpi-grid-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .kpi-grid-modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 576px) {
         .kpi-grid-hero, .kpi-grid-mini { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .kpi-grid-modules { grid-template-columns: repeat(1, minmax(0, 1fr)); }
     }
 
     .kpi-card {
@@ -302,12 +308,62 @@
     </div>
 </div>
 
+<div class="kpi-grid-mini kpi-grid-modules">
+    <div class="kpi-card kpi-card--mini" style="--kpi-c: #8b5cf6;">
+        <div class="kpi-row">
+            <div class="kpi-left">
+                <div class="kpi-ico" style="background: rgba(139,92,246,0.10);"><i data-lucide="camera"></i></div>
+                <div>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.styleIndex">寻款索引</p>
+                    <p class="kpi-value">{$stats.style_index_total|default=0}</p>
+                    <div class="kpi-trend" data-i18n="dashboard.kpi.styleIndexSub">有效款式条目</div>
+                </div>
+            </div>
+            <a class="kpi-link" style="--kpi-c: #8b5cf6;" href="/admin.php/product_search" data-i18n="dashboard.action.manage">管理</a>
+        </div>
+    </div>
+    <div class="kpi-card kpi-card--mini" style="--kpi-c: #0ea5e9;">
+        <div class="kpi-row">
+            <div class="kpi-left">
+                <div class="kpi-ico" style="background: rgba(14,165,233,0.10);"><i data-lucide="users"></i></div>
+                <div>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.influencers">达人名录</p>
+                    <p class="kpi-value">{$stats.influencers_total|default=0}</p>
+                    <div class="kpi-trend" data-i18n="dashboard.kpi.influencersSub">TikTok @handle</div>
+                </div>
+            </div>
+            <a class="kpi-link" style="--kpi-c: #0ea5e9;" href="/admin.php/influencer" data-i18n="dashboard.action.manage">管理</a>
+        </div>
+    </div>
+    <div class="kpi-card kpi-card--mini" style="--kpi-c: #10b981;">
+        <div class="kpi-row">
+            <div class="kpi-left">
+                <div class="kpi-ico" style="background: rgba(16,185,129,0.10);"><i data-lucide="link-2"></i></div>
+                <div>
+                    <p class="kpi-title" data-i18n="dashboard.kpi.creatorLinks">达人链</p>
+                    <p class="kpi-value">{$stats.creator_links_total|default=0}</p>
+                    <div class="kpi-trend" data-i18n="dashboard.kpi.creatorLinksSub">分发链接数</div>
+                </div>
+            </div>
+            <a class="kpi-link" style="--kpi-c: #10b981;" href="/admin.php/distribute" data-i18n="dashboard.action.manage">管理</a>
+        </div>
+    </div>
+</div>
+
 <div class="ops-card">
     <div class="ops-title" data-i18n="dashboard.ops.title">今日数据总结</div>
     <p class="ops-text">
         <span data-i18n="dashboard.ops.todayUpload">今日上传</span> <strong>{$stats.today_uploaded|default=0}</strong> 条，
         <span data-i18n="dashboard.ops.pending">待处理</span> <strong>{$stats.undownloaded|default=0}</strong> 条，
         <span data-i18n="dashboard.ops.downloadRate">下载率</span> <strong>{$stats.download_rate|default=0}%</strong>。
+    </p>
+    <p class="ops-text ops-text--biz" style="margin-top:10px;font-size:13px;color:#475569;">
+        <span data-i18n="dashboard.ops.bizHead">业务概览</span>：
+        <span data-i18n="dashboard.kpi.styleIndex">寻款索引</span> <strong>{$stats.style_index_total|default=0}</strong>
+        ·
+        <span data-i18n="dashboard.kpi.influencers">达人名录</span> <strong>{$stats.influencers_total|default=0}</strong>
+        ·
+        <span data-i18n="dashboard.kpi.creatorLinks">达人链</span> <strong>{$stats.creator_links_total|default=0}</strong>
     </p>
     <div class="ops-hint" data-i18n="dashboard.ops.hint">建议：优先处理未下载素材，提高下载率。</div>
 </div>
@@ -360,7 +416,7 @@
                 <span class="font-weight-semibold" data-i18n="dashboard.chart.topErrors">Top异常</span>
             </div>
             <div class="card-body">
-                <div id="errorTopList" class="small text-muted" data-i18n="influencer.loading">加载中…</div>
+                <div id="errorTopList" class="small text-muted" data-i18n="common.loading">加载中…</div>
             </div>
         </div>
     </div>

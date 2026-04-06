@@ -300,11 +300,13 @@
 
         <div class="brand-footnote">
           <span class="dot"></span>
-          <span id="brandFootnoteText">企业级后台 · 高密度信息 · 稳定可控</span>
+          <span id="brandFootnoteText"></span>
           <span style="margin-left:10px;"></span>
           <a href="javascript:void(0)" id="btnLangZh" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">中文</a>
           <span style="color:rgba(15,23,42,.35);">/</span>
           <a href="javascript:void(0)" id="btnLangEn" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">English</a>
+          <span style="color:rgba(15,23,42,.35);">/</span>
+          <a href="javascript:void(0)" id="btnLangVi" style="color:rgba(15,23,42,.68); text-decoration:none; font-weight:600;">Tiếng Việt</a>
         </div>
       </div>
     </section>
@@ -314,7 +316,7 @@
     </section>
   </div>
 
-  <script src="/static/i18n/i18n.js?v=20260408_modules"></script>
+  <script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -329,12 +331,16 @@
       document.title = window.AppI18n.t('auth.pageTitle', null, lang);
       const bt = document.getElementById('brandTitle');
       const bs = document.getElementById('brandSubtitle');
+      const bf = document.getElementById('brandFootnoteText');
       if (bt) bt.textContent = window.AppI18n.t('auth.brandTitle', null, lang);
       if (bs) bs.textContent = window.AppI18n.t('auth.brandSubtitle', null, lang);
+      if (bf) bf.textContent = window.AppI18n.t('auth.brandFootnote', null, lang);
       const zh = document.getElementById('btnLangZh');
       const en = document.getElementById('btnLangEn');
+      const vi = document.getElementById('btnLangVi');
       if (zh) zh.addEventListener('click', () => window.AppI18n.setLang('zh'));
       if (en) en.addEventListener('click', () => window.AppI18n.setLang('en'));
+      if (vi) vi.addEventListener('click', () => window.AppI18n.setLang('vi'));
     })();
   </script>
   <script>
@@ -346,7 +352,7 @@
       setup() {
         const i18n = window.AppI18n;
         const lang = i18n ? i18n.getLang('zh') : 'zh';
-        const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
+        const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
 
         const loading = ref(false);
         const form = reactive({
@@ -374,11 +380,11 @@
               credentials: 'same-origin',
             });
             const json = await resp.json();
-            if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('auth.loginBtn'));
+            if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('auth.loginFailed'));
             const to = (json.data && json.data.redirect) ? json.data.redirect : '/admin.php';
             window.location.href = to;
           } catch (e) {
-            ElMessage.error(e && e.message ? e.message : tt('auth.loginBtn'));
+            ElMessage.error(e && e.message ? e.message : tt('auth.loginFailed'));
           } finally {
             loading.value = false;
           }

@@ -78,10 +78,32 @@ class StatsService
             $avg7Downloaded = 0.0;
         }
 
+        $influencersTotal = 0;
+        $styleIndexTotal = 0;
+        $creatorLinksTotal = 0;
+        try {
+            $influencersTotal = (int) Db::name('influencers')->count();
+        } catch (\Throwable $e) {
+            $influencersTotal = 0;
+        }
+        try {
+            $styleIndexTotal = (int) Db::name('product_style_items')->where('status', 1)->count();
+        } catch (\Throwable $e) {
+            $styleIndexTotal = 0;
+        }
+        try {
+            $creatorLinksTotal = (int) Db::name('product_links')->count();
+        } catch (\Throwable $e) {
+            $creatorLinksTotal = 0;
+        }
+
         return [
             'platforms' => $platforms,
             'devices' => $devices,
             'videos' => $videos,
+            'influencers_total' => $influencersTotal,
+            'style_index_total' => $styleIndexTotal,
+            'creator_links_total' => $creatorLinksTotal,
             'downloaded' => $downloaded,
             'undownloaded' => $undownloaded,
             'today_uploaded' => $todayUploaded,

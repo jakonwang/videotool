@@ -35,4 +35,6 @@ google-key.json
 
 # 本地大体积 Excel 样例（勿提交 GitHub，单文件限 100MB）
 docs/*.xlsx
+# 项目根目录临时/大表 Excel（Windows 测试用，勿入库）
+/*.xlsx
 
