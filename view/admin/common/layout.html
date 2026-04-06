@@ -604,7 +604,7 @@
                 </li>
                 <li class="nav-item">
                     <button type="button" class="btn btn-outline-secondary btn-sm admin-logout-btn" id="btnAdminLogout">
-                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退�?/span>
+                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
                     </button>
                 </li>
                 <li class="nav-item ml-2 d-none d-sm-flex">
@@ -622,7 +622,7 @@
                 <span class="brand-text font-weight-light"><i class="fas fa-star mr-1"></i>TikStar OPS</span>
             </a>
             <div class="sidebar">
-                <nav class="mt-2" aria-label="主导�?>
+                <nav class="mt-2" aria-label="主导航">
                     <div class="admin-sidenav">
                         <div class="admin-sidenav-section" data-i18n="admin.menu.overview">概览</div>
                         <a href="/admin.php" class="admin-sidenav-link {if $Request.controller == 'Index'}active{/if}">
@@ -764,7 +764,7 @@
                                 <li>
                                     <a href="/admin.php/auth/logout" class="admin-sidenav-sublink">
                                         <span class="admin-sidenav-subico"><i data-lucide="log-out"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.logout">退�?/span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.logout">退出</span>
                                     </a>
                                 </li>
                             </ul>
@@ -773,11 +773,11 @@
                         <div class="admin-sidenav-footer">
                             <div class="rowline">
                                 <span class="k">设备</span>
-                                <span class="v" id="sbDeviceCount">�?/span>
+                                <span class="v" id="sbDeviceCount">-</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">上传�?/span>
-                                <span class="v" id="sbUploadsSize">�?/span>
+                                <span class="k">上传</span>
+                                <span class="v" id="sbUploadsSize">-</span>
                             </div>
                             <div class="rowline">
                                 <span class="k">版本</span>
@@ -786,12 +786,12 @@
                             <div class="rowline">
                                 <span class="k">账号</span>
                                 <span class="muted text-truncate" style="max-width: 120px;" title="{:session('admin_username') ?: ''}">
-                                    {:session('admin_username') ?: '�?}
+                                    {:session('admin_username') ?: '—'}
                                 </span>
                             </div>
                             <div class="rowline">
                                 <button type="button" class="btn btn-outline-secondary btn-sm w-100 admin-logout-btn" id="btnAdminLogout2">
-                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退�?/span>
+                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
                                 </button>
                             </div>
                             <div class="rowline">
