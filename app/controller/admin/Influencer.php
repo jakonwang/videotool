@@ -1,0 +1,211 @@
+<?php
+declare(strict_types=1);
+
+namespace app\controller\admin;
+
+use app\BaseController;
+use app\model\Influencer as InfluencerModel;
+use app\service\InfluencerImportTaskRunner;
+use app\service\InfluencerService;
+use think\facade\Log;
+use think\facade\View;
+
+/**
+ * 达人名录（tiktok_id = TikTok @handle）
+ */
+class Influencer extends BaseController
+{
+    private function jsonOk(array $data = [], string $msg = 'ok')
+    {
+        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+    }
+
+    private function jsonErr(string $msg, int $code = 1, $data = null)
+    {
+        return json(['code' => $code, 'msg' => $msg, 'data' => $data]);
+    }
+
+    public function index()
+    {
+        return View::fetch('admin/influencer/index', []);
+    }
+
+    /**
+     * 达人下拉（达人链关联）
+     */
+    public function searchJson()
+    {
+        $q = trim((string) $this->request->param('q', ''));
+        $items = InfluencerService::searchOptions($q, 30);
+
+        return $this->jsonOk(['items' => $items]);
+    }
+
+    public function listJson()
+    {
+        $keyword = trim((string) $this->request->param('keyword', ''));
+        $status = $this->request->param('status', null);
+        $page = (int) $this->request->param('page', 1);
+        $pageSize = (int) $this->request->param('page_size', 10);
+        if ($pageSize <= 0) {
+            $pageSize = 10;
+        }
+        if ($pageSize > 100) {
+            $pageSize = 100;
+        }
+
+        $query = InfluencerModel::order('id', 'desc');
+        if ($keyword !== '') {
+            $query->where(function ($sub) use ($keyword) {
+                $sub->whereLike('tiktok_id', '%' . $keyword . '%')
+                    ->whereOr('nickname', 'like', '%' . $keyword . '%');
+            });
+        }
+        if ($status !== null && $status !== '') {
+            $query->where('status', (int) $status);
+        }
+
+        $list = $query->paginate([
+            'list_rows' => $pageSize,
+            'page' => $page,
+            'query' => $this->request->param(),
+        ]);
+
+        $items = [];
+        foreach ($list as $row) {
+            $contactRaw = (string) ($row->contact_info ?? '');
+            $contactDisplay = $contactRaw;
+            if ($contactRaw !== '' && ($contactRaw[0] === '{' || $contactRaw[0] === '[')) {
+                $j = json_decode($contactRaw, true);
+                if (is_array($j)) {
+                    $contactDisplay = isset($j['text']) ? (string) $j['text'] : $contactRaw;
+                }
+            }
+            $items[] = [
+                'id' => (int) $row->id,
+                'tiktok_id' => (string) ($row->tiktok_id ?? ''),
+                'nickname' => (string) ($row->nickname ?? ''),
+                'avatar_url' => (string) ($row->avatar_url ?? ''),
+                'follower_count' => (int) ($row->follower_count ?? 0),
+                'contact_info' => $contactRaw,
+                'contact_display' => $contactDisplay,
+                'region' => (string) ($row->region ?? ''),
+                'status' => (int) ($row->status ?? 1),
+                'created_at' => (string) ($row->created_at ?? ''),
+                'updated_at' => (string) ($row->updated_at ?? ''),
+            ];
+        }
+
+        return $this->jsonOk([
+            'items' => $items,
+            'total' => (int) $list->total(),
+            'page' => (int) $list->currentPage(),
+            'page_size' => (int) $list->listRows(),
+        ]);
+    }
+
+    public function importCsv()
+    {
+        try {
+            return $this->importCsvInner();
+        } catch (\Throwable $e) {
+            Log::error('influencer importCsv: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+
+            return $this->jsonErr('导入失败：' . $e->getMessage());
+        }
+    }
+
+    public function importTaskStatus()
+    {
+        try {
+            $id = (int) $this->request->param('task_id', 0);
+            if ($id <= 0) {
+                return $this->jsonErr('无效 task_id');
+            }
+            InfluencerImportTaskRunner::bumpMemoryAndTime();
+            $snap = InfluencerImportTaskRunner::snapshot($id);
+            if ($snap === null) {
+                return $this->jsonErr('任务不存在');
+            }
+
+            return $this->jsonOk($snap);
+        } catch (\Throwable $e) {
+            Log::error('influencer importTaskStatus: ' . $e->getMessage());
+
+            return $this->jsonErr('查询失败：' . $e->getMessage());
+        }
+    }
+
+    public function importTaskTick()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('仅支持 POST');
+            }
+            $id = 0;
+            $raw = (string) $this->request->getContent();
+            if ($raw !== '') {
+                $j = json_decode($raw, true);
+                if (is_array($j) && isset($j['task_id'])) {
+                    $id = (int) $j['task_id'];
+                }
+            }
+            if ($id <= 0) {
+                $id = (int) $this->request->post('task_id', 0);
+            }
+            if ($id <= 0) {
+                $id = (int) $this->request->param('task_id', 0);
+            }
+            if ($id <= 0) {
+                return $this->jsonErr('无效 task_id');
+            }
+            $r = InfluencerImportTaskRunner::tick($id);
+            if (isset($r['_error'])) {
+                return $this->jsonErr((string) $r['_error']);
+            }
+
+            return $this->jsonOk($r);
+        } catch (\Throwable $e) {
+            Log::error('influencer importTaskTick: ' . $e->getMessage());
+
+            return $this->jsonErr('处理失败：' . $e->getMessage());
+        }
+    }
+
+    private function importCsvInner()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('仅支持 POST');
+        }
+        $file = $this->request->file('file');
+        if (!$file) {
+            return $this->jsonErr('请上传文件');
+        }
+        $ext = strtolower((string) $file->extension());
+        if ($ext === '') {
+            $ext = strtolower(pathinfo((string) $file->getOriginalName(), PATHINFO_EXTENSION));
+        }
+        $tmp = $file->getPathname();
+        if (!is_readable($tmp)) {
+            return $this->jsonErr('无法读取上传文件');
+        }
+
+        if (!in_array($ext, ['csv', 'txt', 'xlsx', 'xls', 'xlsm'], true)) {
+            return $this->jsonErr('仅支持 .csv / .txt / .xlsx / .xls / .xlsm');
+        }
+
+        InfluencerImportTaskRunner::bumpMemoryAndTime();
+        try {
+            $taskId = InfluencerImportTaskRunner::createFromUploadedFile($tmp, $ext);
+        } catch (\Throwable $e) {
+            Log::warning('influencer create import task: ' . $e->getMessage());
+
+            return $this->jsonErr('创建导入任务失败：' . $e->getMessage() . '（请先执行 database/run_migration_influencers_crm.php）');
+        }
+
+        return $this->jsonOk([
+            'mode' => 'async',
+            'task_id' => $taskId,
+        ], '任务已创建');
+    }
+}

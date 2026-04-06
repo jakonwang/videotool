@@ -13,18 +13,24 @@ class ProductLink extends Model
     protected $name = 'product_links';
 
     protected $schema = [
-        'id'         => 'int',
-        'product_id' => 'int',
-        'token'      => 'string',
-        'label'      => 'string',
-        'status'     => 'int',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'id'            => 'int',
+        'product_id'    => 'int',
+        'token'         => 'string',
+        'label'         => 'string',
+        'influencer_id' => 'int',
+        'status'        => 'int',
+        'created_at'    => 'datetime',
+        'updated_at'    => 'datetime',
     ];
 
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function influencer()
+    {
+        return $this->belongsTo(Influencer::class, 'influencer_id');
     }
 
     /**

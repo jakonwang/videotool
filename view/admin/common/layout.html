@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{block name="title"}社媒素材库{/block}</title>
+    <title>{block name="title"}TikStar OPS{/block}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -611,6 +611,7 @@
                     <div class="btn-group btn-group-sm" role="group" aria-label="Language">
                         <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZhTop">中文</button>
                         <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangEnTop">English</button>
+                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangViTop">Tiếng Việt</button>
                     </div>
                 </li>
             </ul>
@@ -618,7 +619,7 @@
 
         <aside class="main-sidebar sidebar-dark-primary elevation-4">
             <a href="/admin.php" class="brand-link text-center">
-                <span class="brand-text font-weight-light"><i class="fas fa-database mr-1"></i>社媒素材库</span>
+                <span class="brand-text font-weight-light"><i class="fas fa-star mr-1"></i>TikStar OPS</span>
             </a>
             <div class="sidebar">
                 <nav class="mt-2" aria-label="主导航">
@@ -630,12 +631,12 @@
                         </a>
 
                         <div class="admin-sidenav-section" data-i18n="admin.menu.material">素材</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'ProductSearch' && $Request.controller != 'productsearch'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Video' && $Request.controller != 'video' && $Request.controller != 'Product' && $Request.controller != 'product' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'ProductSearch' && $Request.controller != 'productsearch' && $Request.controller != 'Influencer' && $Request.controller != 'influencer'}collapsed{/if} {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch' || $Request.controller == 'Influencer' || $Request.controller == 'influencer'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-material" aria-expanded="{if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch' || $Request.controller == 'Influencer' || $Request.controller == 'influencer'}true{else /}false{/if}" aria-controls="admin-nav-material" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="folder"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.material">素材</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}show{/if}">
+                        <div id="admin-nav-material" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Video' || $Request.controller == 'video' || $Request.controller == 'Product' || $Request.controller == 'product' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch' || $Request.controller == 'Influencer' || $Request.controller == 'influencer'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/video" class="admin-sidenav-sublink {if $Request.controller == 'Video' || $Request.controller == 'video'}{if $Request.action != 'batchUpload' && $Request.action != 'batch_upload' && $Request.action != 'batchupload' && $Request.action != 'batch-upload'}active{/if}{/if}">
@@ -665,6 +666,12 @@
                                     <a href="/admin.php/product_search" class="admin-sidenav-sublink {if $Request.controller == 'ProductSearch' || $Request.controller == 'productsearch'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="camera"></i></span>
                                         <span class="admin-sidenav-subtxt" data-i18n="admin.menu.styleSearch">寻款</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/influencer" class="admin-sidenav-sublink {if $Request.controller == 'Influencer' || $Request.controller == 'influencer'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="users"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.influencer">达人</span>
                                     </a>
                                 </li>
                             </ul>
@@ -774,6 +781,7 @@
                                 <div class="btn-group btn-group-sm w-100" role="group" aria-label="Language">
                                     <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZh">中文</button>
                                     <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangEn">English</button>
+                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangVi">Tiếng Việt</button>
                                 </div>
                             </div>
                         </div>
@@ -986,12 +994,13 @@
             const lang = window.AppI18n.getLang('zh');
             window.AppI18n.applyDom(document);
             function setActive() {
-                const ids = ['btnLangZh','btnLangEn','btnLangZhTop','btnLangEnTop'];
-                ids.forEach((id) => {
+                const pairs = [
+                    ['btnLangZh', 'zh'], ['btnLangEn', 'en'], ['btnLangVi', 'vi'],
+                    ['btnLangZhTop', 'zh'], ['btnLangEnTop', 'en'], ['btnLangViTop', 'vi']
+                ];
+                pairs.forEach(([id, l]) => {
                     const el = document.getElementById(id);
-                    if (!el) return;
-                    const isEn = id.toLowerCase().indexOf('en') !== -1;
-                    el.classList.toggle('active', (lang === 'en') === isEn);
+                    if (el) el.classList.toggle('active', lang === l);
                 });
             }
             function bind(id, targetLang) {
@@ -1001,8 +1010,10 @@
             }
             bind('btnLangZh', 'zh');
             bind('btnLangEn', 'en');
+            bind('btnLangVi', 'vi');
             bind('btnLangZhTop', 'zh');
             bind('btnLangEnTop', 'en');
+            bind('btnLangViTop', 'vi');
             setActive();
         })();
     </script>

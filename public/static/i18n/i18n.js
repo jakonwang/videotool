@@ -10,6 +10,7 @@
   function normalizeLang(lang) {
     var s = String(lang || '').toLowerCase();
     if (s === 'en' || s.indexOf('en-') === 0) return 'en';
+    if (s === 'vi' || s.indexOf('vi-') === 0) return 'vi';
     if (s === 'zh' || s.indexOf('zh-') === 0) return 'zh';
     return '';
   }
@@ -60,7 +61,10 @@
     try {
       var l = normalizeLang(lang) || getLang('zh');
       var html = document && document.documentElement;
-      if (html) html.setAttribute('lang', l === 'en' ? 'en' : 'zh-CN');
+      if (!html) return;
+      if (l === 'en') html.setAttribute('lang', 'en');
+      else if (l === 'vi') html.setAttribute('lang', 'vi');
+      else html.setAttribute('lang', 'zh-CN');
     } catch (e) {}
   }
 
@@ -136,6 +140,7 @@
       'admin.menu.product': '商品',
       'admin.menu.distribute': '达人链',
       'admin.menu.styleSearch': '寻款',
+      'admin.menu.influencer': '达人',
       'admin.menu.terminal': '终端',
       'admin.menu.platform': '平台',
       'admin.menu.device': '设备',
@@ -163,6 +168,24 @@
       'page.distribute.allProducts': '全部商品',
       'page.distribute.hint': '达人打开链接后，随机展示该商品下一条未下载视频；下载后全局标记为已下载，不再出现。',
       'page.distribute.empty': '暂无链接',
+
+      'page.influencer.breadcrumb': '素材 / 达人',
+      'page.influencer.title': '达人名录',
+      'page.influencer.hint': 'tiktok_id 为 TikTok 用户名（@handle），导入列可含：tiktok_id / handle、昵称、粉丝、地区、联系方式等。支持 CSV、TXT、Excel。',
+      'page.influencer.importBtn': '导入更新',
+      'page.influencer.searchPh': '搜索 @handle 或昵称',
+      'page.influencer.statusFilter': '状态',
+      'page.influencer.status0': '待联系',
+      'page.influencer.status1': '合作中',
+      'page.influencer.status2': '黑名单',
+      'page.influencer.colHandle': 'TikTok',
+      'page.influencer.colNick': '昵称',
+      'page.influencer.colFans': '粉丝',
+      'page.influencer.colRegion': '地区',
+      'page.influencer.colStatus': '状态',
+      'page.influencer.colContact': '联系方式',
+      'page.influencer.colUpdated': '更新时间',
+      'page.influencer.importProgress': '导入进度',
 
       'page.platform.breadcrumb': '素材 / 平台',
       'page.platform.title': '平台',
@@ -305,6 +328,7 @@
       'admin.menu.product': 'Products',
       'admin.menu.distribute': 'Creator Links',
       'admin.menu.styleSearch': 'Style search',
+      'admin.menu.influencer': 'Creators',
       'admin.menu.terminal': 'Devices',
       'admin.menu.platform': 'Platforms',
       'admin.menu.device': 'Terminals',
@@ -331,6 +355,24 @@
       'page.distribute.allProducts': 'All products',
       'page.distribute.hint': 'Creators open the link to get a random undownloaded video for the product. Once downloaded, it is globally marked and will not appear again.',
       'page.distribute.empty': 'No links',
+
+      'page.influencer.breadcrumb': 'Library / Creators',
+      'page.influencer.title': 'Creator directory',
+      'page.influencer.hint': 'tiktok_id is the TikTok username (@handle). Columns may include handle, nickname, followers, region, contact. CSV, TXT, Excel supported.',
+      'page.influencer.importBtn': 'Import / update',
+      'page.influencer.searchPh': 'Search @handle or nickname',
+      'page.influencer.statusFilter': 'Status',
+      'page.influencer.status0': 'Pending',
+      'page.influencer.status1': 'Active',
+      'page.influencer.status2': 'Blocked',
+      'page.influencer.colHandle': 'TikTok',
+      'page.influencer.colNick': 'Nickname',
+      'page.influencer.colFans': 'Followers',
+      'page.influencer.colRegion': 'Region',
+      'page.influencer.colStatus': 'Status',
+      'page.influencer.colContact': 'Contact',
+      'page.influencer.colUpdated': 'Updated',
+      'page.influencer.importProgress': 'Import progress',
 
       'page.platform.breadcrumb': 'Library / Platforms',
       'page.platform.title': 'Platforms',
@@ -413,6 +455,46 @@
       'dashboard.loadFail.errorsTrend': 'Failed to load error trends',
       'dashboard.loadFail.product': 'Failed to load product distribution',
       'dashboard.unit.count': 'items'
+    },
+    vi: {
+      'lang.zh': '中文',
+      'lang.en': 'English',
+      'common.ok': 'OK',
+      'common.cancel': 'Hủy',
+      'common.search': 'Tìm',
+      'common.filter': 'Lọc',
+      'common.reset': 'Đặt lại',
+      'common.copy': 'Sao chép',
+      'common.refresh': 'Làm mới',
+      'common.statusAll': 'Tất cả',
+      'common.loadingFailed': 'Tải thất bại',
+      'common.loading': 'Đang tải…',
+      'common.noData': 'Không có dữ liệu',
+      'admin.menu.material': 'Thư viện',
+      'admin.menu.influencer': 'Creator',
+      'admin.menu.distribute': 'Link creator',
+      'admin.menu.styleSearch': 'Tìm kiểu',
+      'admin.menu.dashboard': 'Bảng điều khiển',
+      'admin.menu.video': 'Video',
+      'admin.menu.upload': 'Tải lên',
+      'admin.menu.product': 'Sản phẩm',
+      'page.influencer.breadcrumb': 'Thư viện / Creator',
+      'page.influencer.title': 'Danh bạ creator',
+      'page.influencer.hint': 'tiktok_id là tên TikTok (@handle). Cột: handle, biệt danh, follower, khu vực, liên hệ. Hỗ trợ CSV, TXT, Excel.',
+      'page.influencer.importBtn': 'Nhập / cập nhật',
+      'page.influencer.searchPh': 'Tìm @handle hoặc biệt danh',
+      'page.influencer.statusFilter': 'Trạng thái',
+      'page.influencer.status0': 'Chờ liên hệ',
+      'page.influencer.status1': 'Đang hợp tác',
+      'page.influencer.status2': 'Chặn',
+      'page.influencer.colHandle': 'TikTok',
+      'page.influencer.colNick': 'Biệt danh',
+      'page.influencer.colFans': 'Follower',
+      'page.influencer.colRegion': 'Khu vực',
+      'page.influencer.colStatus': 'Trạng thái',
+      'page.influencer.colContact': 'Liên hệ',
+      'page.influencer.colUpdated': 'Cập nhật',
+      'page.influencer.importProgress': 'Tiến trình nhập'
     }
   };
 

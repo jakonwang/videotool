@@ -316,6 +316,15 @@
               </div>
             </template>
           </el-table-column>
+          <el-table-column :label="lang==='en'?'Creator':'达人'" min-width="140">
+            <template #default="{ row }">
+              <span v-if="row.influencer && row.influencer.tiktok_id" style="color:#303133; font-weight:500;">
+                {{ row.influencer.tiktok_id }}
+                <span v-if="row.influencer.nickname" style="color:#6b7280; font-weight:400;"> · {{ row.influencer.nickname }}</span>
+              </span>
+              <span v-else style="color:#9ca3af;">—</span>
+            </template>
+          </el-table-column>
           <el-table-column :label="lang==='en'?'Note':'备注'" min-width="160">
             <template #default="{ row }">
               <span style="color:#4b5563;">{{ row.label || '—' }}</span>

@@ -73,6 +73,9 @@ class AdminAuthMiddleware
         if (preg_match('#^/product_search/(list|importCsv|importTaskStatus|importTaskTick|syncAliyunQueue|batchDelete|update|delete|sampleCsv)#i', $path)) {
             return true;
         }
+        if (preg_match('#^/influencer/(list|search|importCsv|importTaskStatus|importTaskTick)#i', $path)) {
+            return true;
+        }
         return false;
     }
 }

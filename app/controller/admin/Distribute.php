@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace app\controller\admin;
 
 use app\BaseController;
+use app\model\Influencer as InfluencerModel;
 use app\model\Product as ProductModel;
 use app\model\ProductLink as ProductLinkModel;
+use app\service\InfluencerService;
 use think\facade\View;
 
 /**
@@ -39,7 +41,7 @@ class Distribute extends BaseController
     public function index()
     {
         $productId = (int) $this->request->param('product_id', 0);
-        $query = ProductLinkModel::with(['product'])->order('id', 'desc');
+        $query = ProductLinkModel::with(['product', 'influencer'])->order('id', 'desc');
         if ($productId > 0) {
             $query->where('product_id', $productId);
         }
@@ -70,7 +72,7 @@ class Distribute extends BaseController
         if ($pageSize <= 0) $pageSize = 10;
         if ($pageSize > 100) $pageSize = 100;
 
-        $query = ProductLinkModel::with(['product'])->order('id', 'desc');
+        $query = ProductLinkModel::with(['product', 'influencer'])->order('id', 'desc');
         if ($productId > 0) {
             $query->where('product_id', $productId);
         }
@@ -85,11 +87,17 @@ class Distribute extends BaseController
         $items = [];
         foreach ($list as $row) {
             $token = (string) ($row->token ?? '');
+            $inf = $row->influencer ?? null;
             $items[] = [
                 'id' => (int) $row->id,
                 'product' => $row->product ? [
                     'id' => (int) ($row->product_id ?? 0),
                     'name' => (string) ($row->product->name ?? ''),
+                ] : null,
+                'influencer' => $inf ? [
+                    'id' => (int) ($inf->id ?? 0),
+                    'tiktok_id' => (string) ($inf->tiktok_id ?? ''),
+                    'nickname' => (string) ($inf->nickname ?? ''),
                 ] : null,
                 'label' => (string) ($row->label ?? ''),
                 'token' => $token,
@@ -116,6 +124,19 @@ class Distribute extends BaseController
         if ($this->request->isPost()) {
             $productId = (int) $this->request->post('product_id', 0);
             $label = trim((string) $this->request->post('label', ''));
+            $influencerTiktok = trim((string) $this->request->post('influencer_tiktok', ''));
+            $influencerId = null;
+            if ($influencerTiktok !== '') {
+                $h = InfluencerService::normalizeTiktokId($influencerTiktok);
+                if ($h === null) {
+                    return json(['code' => 1, 'msg' => '达人 TikTok 用户名格式无效（需为 @handle，字母数字点下划线）']);
+                }
+                $inf = InfluencerModel::where('tiktok_id', $h)->find();
+                if (!$inf) {
+                    return json(['code' => 1, 'msg' => '未找到该达人，请先在「达人」中导入']);
+                }
+                $influencerId = (int) $inf->id;
+            }
             if ($productId <= 0) {
                 return json(['code' => 1, 'msg' => '请选择商品']);
             }
@@ -127,6 +148,7 @@ class Distribute extends BaseController
                 'product_id' => $productId,
                 'token' => $this->generateToken(),
                 'label' => $label !== '' ? $label : null,
+                'influencer_id' => $influencerId,
                 'status' => 1,
             ]);
             return json(['code' => 0, 'msg' => '生成成功']);

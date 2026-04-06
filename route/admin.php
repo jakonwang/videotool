@@ -123,5 +123,13 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('product_search/delete/<id>', 'app\controller\admin\ProductSearch@delete');
     Route::get('product_search/sampleCsv', 'app\controller\admin\ProductSearch@sampleCsv');
     Route::get('product_search', 'app\controller\admin\ProductSearch@index');
+
+    // 达人名录（TikTok @handle）
+    Route::get('influencer/list', 'app\controller\admin\Influencer@listJson');
+    Route::get('influencer/search', 'app\controller\admin\Influencer@searchJson');
+    Route::post('influencer/importCsv', 'app\controller\admin\Influencer@importCsv');
+    Route::get('influencer/importTaskStatus', 'app\controller\admin\Influencer@importTaskStatus');
+    Route::post('influencer/importTaskTick', 'app\controller\admin\Influencer@importTaskTick');
+    Route::get('influencer', 'app\controller\admin\Influencer@index');
 }
 

@@ -1,5 +1,34 @@
 # 功能需求与实现说明
 
+## 品牌与达人 CRM（2026-04）
+
+### 系统名称
+- 后台侧栏与默认页面标题展示为 **TikStar OPS**（原「社媒素材库」文案已替换）。
+
+### 达人名录（tiktok_id = TikTok 用户名 @handle）
+- 数据库表 `influencers`：`tiktok_id` 存**规范化**用户名——小写、前导 `@`，与 TikTok **@handle** 对应，全局唯一；另有昵称、头像 URL、粉丝数、`contact_info`（TEXT 存 JSON 文本）、地区、`status`（0 待联系 / 1 合作中 / 2 黑名单）。
+- 后台路径：**素材 → 达人**（`/admin.php/influencer`）：分页列表、关键词与状态筛选、**导入更新**（异步，避免大文件超时）。
+- 支持 **.csv / .txt / .xlsx / .xls / .xlsm**：首行可识别表头（含 `tiktok_id`、`handle`、`用户名` 等）；无法识别时默认**第一列为 TikTok 用户名**。
+- 导入任务表 `influencer_import_tasks`；前端创建任务后轮询 `POST /admin.php/influencer/importTaskTick`。
+- **升级数据库**（Windows / Linux 均可）：项目根目录执行  
+  `php database/run_migration_influencers_crm.php`  
+  （依赖 `config/database.php`；已存在结构会跳过）。
+
+### 达人链可选关联达人
+- `product_links.influencer_id` 可空；生成达人链时可填 **关联达人（TikTok 用户名）**，须与名录中已有 `tiktok_id` 一致；列表接口返回 `influencer` 对象便于展示。
+
+### 后台 JSON 接口（入口 `admin.php`）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/influencer/list` | 达人分页列表 |
+| GET | `/influencer/search` | 下拉搜索，`q` |
+| POST | `/influencer/importCsv` | 上传文件，返回 `task_id` |
+| GET | `/influencer/importTaskStatus` | 任务快照 |
+| POST | `/influencer/importTaskTick` | 推进一行 |
+
+### 多语言
+- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）；侧栏「达人」等键名见 `admin.menu.influencer`、`page.influencer.*`。修改脚本后需提高 `view/admin/common/layout.html` 中 `i18n.js` 的 `?v=`。
+
 ## 商品与达人分发（2026-03）
 
 ### 需求摘要
@@ -17,7 +46,7 @@
 | 分组 | 子菜单 | 含义 |
 |------|--------|------|
 | （顶栏） | 仪表盘 | 首页 |
-| 素材 | 视频 / 上传 / 商品 / 达人链 / 寻款 | 列表、批量上传、商品、达人分发、图片搜款式索引 |
+| 素材 | 视频 / 上传 / 商品 / 达人链 / 寻款 / 达人 | 列表、批量上传、商品、达人分发、图片搜款式索引、TikTok 达人名录与导入 |
 | 终端 | 平台 / 设备 | 平台与终端设备 |
 | 系统 | 系统设置 / 用户 / 发卡 / 版本 / 缓存 / 异常 | 参数、管理员、桌面授权码、桌面安装包发布、缓存、下载错误监控 |
 
