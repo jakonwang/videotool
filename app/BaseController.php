@@ -53,8 +53,10 @@ abstract class BaseController
             try {
                 $ver = config('app.version');
                 View::assign('app_version', $ver ? (string) $ver : '1.0.2');
+                View::assign('app_year', date('Y'));
             } catch (\Throwable $e) {
                 View::assign('app_version', '1.0.2');
+                View::assign('app_year', date('Y'));
             }
         }
 
