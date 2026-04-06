@@ -422,4 +422,117 @@ class ProductStyleXlsxZipEmbeddedImageService
 
         return $web;
     }
+
+    /**
+     * 解析类似 =DISPIMG("ID_xxx",1) 的公式，直接从 xl/cellimages.xml 取图并写入临时文件。
+     */
+    public static function extractImageFromDispImgFormula(string $xlsxPath, string $formula): ?string
+    {
+        $id = self::parseDispImgIdFromFormula($formula);
+        if ($id === null) {
+            return null;
+        }
+        $zip = new ZipArchive();
+        if ($zip->open($xlsxPath) !== true) {
+            return null;
+        }
+        try {
+            $rels = self::parseRelationships($zip, 'xl/_rels/cellimages.xml.rels');
+            if ($rels === []) {
+                return null;
+            }
+            $cellImagesXml = self::zipGetString($zip, 'xl/cellimages.xml');
+            if ($cellImagesXml === null) {
+                return null;
+            }
+            $dom = self::loadDom($cellImagesXml);
+            $xp = new \DOMXPath($dom);
+            $nodes = $xp->query('//*[local-name()="cellImage"]');
+            $rid = null;
+            foreach ($nodes as $node) {
+                $nameNode = $xp->query('.//*[local-name()="cNvPr"]', $node)->item(0);
+                if (!($nameNode instanceof \DOMElement)) {
+                    continue;
+                }
+                $name = (string) $nameNode->getAttribute('name');
+                if ($name === '') {
+                    continue;
+                }
+                if (\strcasecmp($name, $id) !== 0) {
+                    continue;
+                }
+                $blipNode = $xp->query('.//*[local-name()="blip"]', $node)->item(0);
+                if (!($blipNode instanceof \DOMElement)) {
+                    continue;
+                }
+                $rid = $blipNode->getAttributeNS(self::NS_ODR, 'embed');
+                if ($rid === '') {
+                    foreach ($blipNode->attributes ?? [] as $attr) {
+                        if ($attr->localName === 'embed' && $attr->value !== '') {
+                            $rid = (string) $attr->value;
+                            break;
+                        }
+                    }
+                }
+                if ($rid !== '') {
+                    break;
+                }
+            }
+            if ($rid === null || $rid === '' || !isset($rels[$rid])) {
+                return null;
+            }
+            $target = (string) $rels[$rid];
+            $mediaPath = self::joinXlPath('xl', $target);
+            $bin = self::zipGetString($zip, $mediaPath);
+            if ($bin === null || $bin === '') {
+                return null;
+            }
+            $ext = \strtolower(\pathinfo($mediaPath, PATHINFO_EXTENSION) ?: 'png');
+            if (!\in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true)) {
+                $ext = 'png';
+            }
+            if ($ext === 'jpeg') {
+                $ext = 'jpg';
+            }
+            $tmp = ProductStyleImportService::createTempImagePath($ext);
+            if (@\file_put_contents($tmp, $bin) === false) {
+                return null;
+            }
+
+            return $tmp;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    /**
+     * 解析 DISPIMG 公式并直接落盘至 public/uploads/products（md5），返回站内路径。
+     */
+    public static function extractImageFromDispImgFormulaToProductsDir(string $xlsxPath, string $formula, string $publicRoot): ?string
+    {
+        $tmp = self::extractImageFromDispImgFormula($xlsxPath, $formula);
+        if ($tmp === null || !\is_file($tmp)) {
+            return null;
+        }
+        $web = ProductStyleImportService::saveImportImageToProductsDir($tmp, $publicRoot);
+        if (\is_file($tmp)) {
+            @\unlink($tmp);
+        }
+
+        return $web;
+    }
+
+    private static function parseDispImgIdFromFormula(string $formula): ?string
+    {
+        $formula = \trim($formula);
+        if ($formula === '') {
+            return null;
+        }
+        if (\preg_match('/^\s*=?\s*DISPIMG\s*\(\s*"([^"]+)"/i', $formula, $m) !== 1) {
+            return null;
+        }
+        $id = \trim((string) ($m[1] ?? ''));
+
+        return $id !== '' ? $id : null;
+    }
 }

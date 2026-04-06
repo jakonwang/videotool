@@ -254,7 +254,12 @@ class ProductStyleXlsxImportService
         ?array $prebuiltRowWebPaths = null
     ): ?array {
         $code = \trim((string) $sheet->getCell(self::cellAddr($codeCol, $r))->getFormattedValue());
-        $imgRaw = \trim((string) $sheet->getCell(self::cellAddr($imgCol, $r))->getFormattedValue());
+        $imgCell = $sheet->getCell(self::cellAddr($imgCol, $r));
+        $imgRaw = \trim((string) $imgCell->getFormattedValue());
+        $imgRawValue = $imgCell->getValue();
+        if (($imgRaw === '' || \strtoupper($imgRaw) === '#NAME?') && \is_string($imgRawValue) && \trim($imgRawValue) !== '') {
+            $imgRaw = \trim($imgRawValue);
+        }
         $hot = '';
         if ($hotCol !== null) {
             $hot = \trim((string) $sheet->getCell(self::cellAddr($hotCol, $r))->getFormattedValue());
@@ -358,6 +363,26 @@ class ProductStyleXlsxImportService
                         continue;
                     }
                     $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageAtCell($openPath, $title, $col, $rr);
+                    if ($tmp !== null) {
+                        return $tmp;
+                    }
+                }
+            }
+            foreach ([$r, $r - 1, $r + 1] as $rr) {
+                if ($rr < 2) {
+                    continue;
+                }
+                foreach ($tryCols as $col) {
+                    try {
+                        $cell = $sheet->getCell(self::cellAddr($col, $rr));
+                    } catch (\Throwable $e) {
+                        continue;
+                    }
+                    $raw = $cell->getValue();
+                    if (!\is_string($raw) || \stripos($raw, 'DISPIMG(') === false) {
+                        continue;
+                    }
+                    $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgFormula($openPath, $raw);
                     if ($tmp !== null) {
                         return $tmp;
                     }

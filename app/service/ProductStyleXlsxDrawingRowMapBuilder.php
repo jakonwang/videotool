@@ -111,6 +111,26 @@ class ProductStyleXlsxDrawingRowMapBuilder
 
             $real = \realpath($xlsxPath);
             $openPath = $real !== false ? $real : $xlsxPath;
+            // WPS/ET 的 DISPIMG 公式图片：例如 =DISPIMG("ID_xxx",1)
+            for ($r = 2; $r <= $hr; $r++) {
+                if (isset($map[$r])) {
+                    continue;
+                }
+                try {
+                    $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($imgCol) . $r);
+                } catch (\Throwable $e) {
+                    continue;
+                }
+                $raw = $cell->getValue();
+                if (!\is_string($raw) || \stripos($raw, 'DISPIMG(') === false) {
+                    continue;
+                }
+                $web = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgFormulaToProductsDir($openPath, $raw, $publicRoot);
+                if ($web !== null) {
+                    $map[$r] = $web;
+                }
+            }
+
             $title = $sheet->getTitle();
             for ($r = 2; $r <= $hr; $r++) {
                 if (isset($map[$r])) {
