@@ -191,7 +191,8 @@ class InfluencerService
         if ($t === '') {
             return '';
         }
-        if (preg_match('#^https?://(?:www\.)?zalo\.me/([^/?#\s]+)#i', $t, $m)) {
+        // Use ~ as delimiter to avoid clash with '#' inside character class.
+        if (preg_match('~^https?://(?:www\.)?zalo\.me/([^/?#\s]+)~i', $t, $m)) {
             return $m[1];
         }
         $digits = preg_replace('/\D+/', '', $t) ?? '';
