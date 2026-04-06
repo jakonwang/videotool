@@ -185,7 +185,7 @@
           p.set('page', String(page.value));
           p.set('page_size', String(pageSize.value));
           if (query.keyword) p.set('keyword', query.keyword);
-          const res = await fetch('/admin.php/product_search/list?' + p.toString(), {
+          const res = await fetch('/admin.php/product_search/listJson?' + p.toString(), {
             credentials: 'same-origin',
             headers: { ...apiFetchHeaders },
           });

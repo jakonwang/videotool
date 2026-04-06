@@ -367,7 +367,7 @@
         try {
           const [r1, r2] = await Promise.all([
             fetch('/admin.php/message_template/list?page=1&page_size=200&enabled=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
-            fetch('/admin.php/product/list?page=1&page_size=500&status=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
+            fetch('/admin.php/product/listJson?page=1&page_size=500&status=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
           ]);
           const j1 = parseJsonBody(r1, await r1.text());
           const j2 = parseJsonBody(r2, await r2.text());

@@ -174,7 +174,7 @@
           params.set('date', currentDateYmd.value);
           if (keyword.value.trim()) params.set('keyword', keyword.value.trim());
 
-          const res = await fetch('/admin.php/downloadLog/list?' + params.toString(), { credentials: 'same-origin' });
+          const res = await fetch('/admin.php/downloadLog/listJson?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
 

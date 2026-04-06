@@ -109,7 +109,7 @@
           params.set('page_size', String(pageSize.value));
           if (query.keyword) params.set('keyword', query.keyword);
           if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
-          const res = await fetch('/admin.php/client_version/list?' + params.toString(), {
+          const res = await fetch('/admin.php/client_version/listJson?' + params.toString(), {
             credentials: 'same-origin',
             headers: { ...apiFetchHeaders },
           });
