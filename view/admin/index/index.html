@@ -179,7 +179,7 @@
                 <div class="kpi-ico" style="background: rgba(245,158,11,0.10);"><i data-lucide="video"></i></div>
                 <div>
                     <p class="kpi-title" data-i18n="dashboard.kpi.videosTotal">视频总数</p>
-                    <p class="kpi-value">{$stats.videos|default=0}</p>
+                    <p class="kpi-value">{:htmlentities((string)(int)($stats['videos'] ?? 0))}</p>
                     <div class="kpi-trend">
                         <span data-i18n="dashboard.kpi.downloaded">已下载</span> {$stats.downloaded|default=0}
                         · <span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$stats.undownloaded|default=0}
@@ -210,7 +210,7 @@
                     <p class="kpi-title" data-i18n="dashboard.kpi.downloadRate">下载率（重点）</p>
                     <p class="kpi-value">{$stats.download_rate|default=0}%</p>
                     <div class="kpi-trend">
-                        <span data-i18n="dashboard.kpi.asof" data-i18n-title="dashboard.kpi.asof">截至 {$stats.asof|default=''}</span>
+                        <span data-i18n="dashboard.kpi.asof" data-i18n-title="dashboard.kpi.asof">截至 {:htmlentities((string)($stats['asof'] ?? ''))}</span>
                         · <span data-i18n="dashboard.kpi.target">目标 100%</span>
                     </div>
                 </div>

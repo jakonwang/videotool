@@ -137,7 +137,7 @@
 ## 仪表盘统计（2026-03）
 
 - `GET /admin.php/stats/overview`、`trends`、`platformDistribution`、`downloadErrorTrends`、`downloadErrorTop`、`productDistribution`、`storageUsage`。
-- 实现：`app/service/StatsService.php`、`app/controller/admin/Stats.php`、首页 `view/admin/index/index.html`。
+- 实现：`app/service/StatsService.php`、`app/controller/admin/Stats.php`、首页 `view/admin/index/index.html`。KPI 中 **`$stats['videos']`、`$stats['asof']`** 等建议使用 **`{: ... }` 原生 PHP 输出**（如 `htmlentities` + `??`），避免 `{$stats.videos|...}` 与 `|default=''` 在部分环境下编译出异常 PHP（报 **unexpected identifier "videos"** 等）。
 - 升级：`php database/run_migration_product_distribution.php` 或 `database/migrations/20260330_product_distribution.sql`。
 
 ---
