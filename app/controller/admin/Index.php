@@ -14,7 +14,14 @@ class Index extends BaseController
 {
     public function index()
     {
-        return View::fetch('admin/index/index', ['stats' => StatsService::overview()]);
+        $stats = StatsService::overview();
+
+        return View::fetch('admin/index/index', [
+            'stats'         => $stats,
+            // 标量单独传入，避免模板编译对 $stats['videos'] / ?? 等解析异常（部分环境报 unexpected identifier "videos"）
+            'video_total'   => (int) ($stats['videos'] ?? 0),
+            'asof_display'  => (string) ($stats['asof'] ?? ''),
+        ]);
     }
 }
 
