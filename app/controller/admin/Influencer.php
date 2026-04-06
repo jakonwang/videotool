@@ -7,6 +7,7 @@ use app\BaseController;
 use app\model\Influencer as InfluencerModel;
 use app\service\InfluencerImportTaskRunner;
 use app\service\InfluencerService;
+use think\facade\Db;
 use think\facade\Log;
 use think\facade\View;
 
@@ -207,5 +208,119 @@ class Influencer extends BaseController
             'mode' => 'async',
             'task_id' => $taskId,
         ], '任务已创建');
+    }
+
+    /**
+     * 下载导入示例 CSV（表头 + 一行样例）
+     */
+    public function sampleCsv()
+    {
+        $csv = "\xEF\xBB\xBFtiktok_id,nickname,follower_count,region,contact,status\n@demo_creator,Demo昵称,12000,VN,line:demo,1\n";
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="sample_influencers.csv"',
+        ], 'html');
+    }
+
+    /**
+     * POST：编辑达人（不可改 tiktok_id）
+     */
+    public function update()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('仅支持 POST');
+            }
+            $payload = $this->parseJsonOrPost();
+            $id = (int) ($payload['id'] ?? 0);
+            if ($id <= 0) {
+                return $this->jsonErr('无效 id');
+            }
+            $row = InfluencerModel::find($id);
+            if (!$row) {
+                return $this->jsonErr('记录不存在');
+            }
+
+            if (isset($payload['nickname'])) {
+                $row->nickname = trim((string) $payload['nickname']);
+            }
+            if (array_key_exists('avatar_url', $payload)) {
+                $a = trim((string) $payload['avatar_url']);
+                $row->avatar_url = $a !== '' ? mb_substr($a, 0, 1024) : null;
+            }
+            if (isset($payload['follower_count'])) {
+                $row->follower_count = max(0, (int) $payload['follower_count']);
+            }
+            if (array_key_exists('contact_text', $payload)) {
+                $t = trim((string) $payload['contact_text']);
+                $row->contact_info = $t !== '' ? InfluencerService::normalizeContactInfo($t) : null;
+            }
+            if (array_key_exists('region', $payload)) {
+                $r = trim((string) $payload['region']);
+                $row->region = $r !== '' ? mb_substr($r, 0, 64) : null;
+            }
+            if (isset($payload['status'])) {
+                $st = (int) $payload['status'];
+                if ($st >= 0 && $st <= 2) {
+                    $row->status = $st;
+                }
+            }
+            $row->save();
+
+            return $this->jsonOk([], '已保存');
+        } catch (\Throwable $e) {
+            Log::error('influencer update: ' . $e->getMessage());
+
+            return $this->jsonErr('保存失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * POST：删除达人（先解除达人链上的关联）
+     */
+    public function delete()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('仅支持 POST');
+            }
+            $payload = $this->parseJsonOrPost();
+            $id = (int) ($payload['id'] ?? 0);
+            if ($id <= 0) {
+                $id = (int) $this->request->param('id', 0);
+            }
+            if ($id <= 0) {
+                return $this->jsonErr('无效 id');
+            }
+            $row = InfluencerModel::find($id);
+            if (!$row) {
+                return $this->jsonErr('记录不存在');
+            }
+            Db::name('product_links')->where('influencer_id', $id)->update(['influencer_id' => null]);
+            $row->delete();
+
+            return $this->jsonOk([], '已删除');
+        } catch (\Throwable $e) {
+            Log::error('influencer delete: ' . $e->getMessage());
+
+            return $this->jsonErr('删除失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function parseJsonOrPost(): array
+    {
+        $raw = (string) $this->request->getContent();
+        if ($raw !== '' && ($raw[0] === '{' || $raw[0] === '[')) {
+            $j = json_decode($raw, true);
+            if (is_array($j)) {
+                return $j;
+            }
+        }
+
+        return $this->request->post();
     }
 }

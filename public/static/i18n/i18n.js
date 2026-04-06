@@ -186,6 +186,11 @@
       'page.influencer.colContact': '联系方式',
       'page.influencer.colUpdated': '更新时间',
       'page.influencer.importProgress': '导入进度',
+      'page.influencer.sampleCsv': '示例 CSV',
+      'page.influencer.editTitle': '编辑达人',
+      'page.influencer.deleteConfirm': '确定删除该达人？已关联的达人链将自动取消关联。',
+      'page.influencer.colActions': '操作',
+      'page.influencer.colAvatar': '头像 URL',
 
       'page.platform.breadcrumb': '素材 / 平台',
       'page.platform.title': '平台',
@@ -373,6 +378,11 @@
       'page.influencer.colContact': 'Contact',
       'page.influencer.colUpdated': 'Updated',
       'page.influencer.importProgress': 'Import progress',
+      'page.influencer.sampleCsv': 'Sample CSV',
+      'page.influencer.editTitle': 'Edit creator',
+      'page.influencer.deleteConfirm': 'Delete this creator? Linked creator links will be unlinked.',
+      'page.influencer.colActions': 'Actions',
+      'page.influencer.colAvatar': 'Avatar URL',
 
       'page.platform.breadcrumb': 'Library / Platforms',
       'page.platform.title': 'Platforms',
@@ -494,7 +504,12 @@
       'page.influencer.colStatus': 'Trạng thái',
       'page.influencer.colContact': 'Liên hệ',
       'page.influencer.colUpdated': 'Cập nhật',
-      'page.influencer.importProgress': 'Tiến trình nhập'
+      'page.influencer.importProgress': 'Tiến trình nhập',
+      'page.influencer.sampleCsv': 'CSV mẫu',
+      'page.influencer.editTitle': 'Sửa creator',
+      'page.influencer.deleteConfirm': 'Xóa creator này? Liên kết creator sẽ được gỡ.',
+      'page.influencer.colActions': 'Thao tác',
+      'page.influencer.colAvatar': 'URL ảnh đại diện'
     }
   };
 

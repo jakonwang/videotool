@@ -130,6 +130,9 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('influencer/importCsv', 'app\controller\admin\Influencer@importCsv');
     Route::get('influencer/importTaskStatus', 'app\controller\admin\Influencer@importTaskStatus');
     Route::post('influencer/importTaskTick', 'app\controller\admin\Influencer@importTaskTick');
+    Route::get('influencer/sampleCsv', 'app\controller\admin\Influencer@sampleCsv');
+    Route::post('influencer/update', 'app\controller\admin\Influencer@update');
+    Route::post('influencer/delete', 'app\controller\admin\Influencer@delete');
     Route::get('influencer', 'app\controller\admin\Influencer@index');
 }
 

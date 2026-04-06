@@ -25,13 +25,13 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_tikstar_ops"></script>
+<script src="/static/i18n/i18n.js?v=20260407_influencer_complete"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
   const { createApp, reactive, ref, computed, onMounted, onUnmounted } = Vue;
-  const { ElMessage } = ElementPlus;
+  const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
   const tt = (k) => (i18n ? i18n.t(k, null, lang) : k);
@@ -71,6 +71,18 @@
       const importLogs = ref([]);
       const importDone = ref(false);
       let importPollTimer = null;
+      const editVisible = ref(false);
+      const editSaving = ref(false);
+      const editForm = reactive({
+        id: 0,
+        tiktok_id: '',
+        nickname: '',
+        avatar_url: '',
+        follower_count: 0,
+        contact_text: '',
+        region: '',
+        status: 1,
+      });
 
       function stopImportPolling() {
         if (importPollTimer) {
@@ -236,6 +248,83 @@
         return tt('page.influencer.status1');
       }
 
+      function openEdit(row) {
+        editForm.id = row.id;
+        editForm.tiktok_id = row.tiktok_id || '';
+        editForm.nickname = row.nickname || '';
+        editForm.avatar_url = row.avatar_url || '';
+        editForm.follower_count = row.follower_count != null ? Number(row.follower_count) : 0;
+        editForm.contact_text = row.contact_display || '';
+        editForm.region = row.region || '';
+        editForm.status = row.status != null ? Number(row.status) : 1;
+        editVisible.value = true;
+      }
+
+      async function saveEdit() {
+        editSaving.value = true;
+        try {
+          const res = await fetch('/admin.php/influencer/update', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              id: editForm.id,
+              nickname: editForm.nickname,
+              avatar_url: editForm.avatar_url,
+              follower_count: editForm.follower_count,
+              contact_text: editForm.contact_text,
+              region: editForm.region,
+              status: editForm.status,
+            }),
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 401) {
+            ElMessage.error('未登录或会话过期');
+            return;
+          }
+          if (!json || json.code !== 0) {
+            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            return;
+          }
+          ElMessage.success(json.msg || tt('common.save'));
+          editVisible.value = false;
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          editSaving.value = false;
+        }
+      }
+
+      async function deleteRow(row) {
+        try {
+          await ElMessageBox.confirm(tt('page.influencer.deleteConfirm'), tt('common.delete'), { type: 'warning' });
+        } catch {
+          return;
+        }
+        try {
+          const res = await fetch('/admin.php/influencer/delete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ id: row.id }),
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 401) {
+            ElMessage.error('未登录或会话过期');
+            return;
+          }
+          if (!json || json.code !== 0) {
+            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            return;
+          }
+          ElMessage.success(json.msg || tt('common.delete'));
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      }
+
       const rows = computed(() => items.value || []);
 
       onMounted(() => { fetchList(); });
@@ -264,6 +353,12 @@
         closeImportDialog,
         copyText,
         statusLabel,
+        editVisible,
+        editSaving,
+        editForm,
+        openEdit,
+        saveEdit,
+        deleteRow,
       };
     },
     template: `
@@ -274,6 +369,7 @@
             <div class="admin-inf-title">{{ tt('page.influencer.title') }}</div>
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <a class="el-button el-button--default" style="text-decoration:none;" href="/admin.php/influencer/sampleCsv" target="_blank" rel="noopener">{{ tt('page.influencer.sampleCsv') }}</a>
             <input type="file" id="infFileInput" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:220px;" />
             <el-button type="primary" size="default" :loading="importing" @click="doImport">{{ tt('page.influencer.importBtn') }}</el-button>
           </div>
@@ -309,6 +405,12 @@
             </template>
           </el-table-column>
           <el-table-column prop="updated_at" :label="tt('page.influencer.colUpdated')" min-width="160" />
+          <el-table-column :label="tt('page.influencer.colActions')" width="140" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button size="small" link type="danger" @click="deleteRow(row)">{{ tt('common.delete') }}</el-button>
+            </template>
+          </el-table-column>
           <template #empty>
             <div style="padding:24px; text-align:center; color:#909399;">{{ tt('common.noData') }}</div>
           </template>
@@ -331,6 +433,40 @@
           <div class="import-log-viewer" style="margin-top:12px;">
             <div v-for="(log, idx) in importLogs" :key="idx">{{ log.t }} {{ log.m }}</div>
           </div>
+        </el-dialog>
+
+        <el-dialog v-model="editVisible" :title="tt('page.influencer.editTitle')" width="520px" destroy-on-close>
+          <el-form label-width="100px" size="default">
+            <el-form-item :label="tt('page.influencer.colHandle')">
+              <el-input v-model="editForm.tiktok_id" disabled />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.colNick')">
+              <el-input v-model="editForm.nickname" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.colAvatar')">
+              <el-input v-model="editForm.avatar_url" type="textarea" :rows="2" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.colFans')">
+              <el-input-number v-model="editForm.follower_count" :min="0" :step="1" style="width:100%;" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.colRegion')">
+              <el-input v-model="editForm.region" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.colContact')">
+              <el-input v-model="editForm.contact_text" type="textarea" :rows="2" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.colStatus')">
+              <el-select v-model="editForm.status" style="width:100%;">
+                <el-option :label="tt('page.influencer.status0')" :value="0" />
+                <el-option :label="tt('page.influencer.status1')" :value="1" />
+                <el-option :label="tt('page.influencer.status2')" :value="2" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="editVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" :loading="editSaving" @click="saveEdit">{{ tt('common.save') }}</el-button>
+          </template>
         </el-dialog>
       </div>
     `

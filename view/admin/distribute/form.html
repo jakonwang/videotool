@@ -1,5 +1,15 @@
 {extend name="admin/common/layout" /}
 
+{block name="style"}
+<style>
+    #influencer_suggest { display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 1050; max-height: 220px; overflow: auto; margin-top: 2px; border-radius: 6px; border: 1px solid rgba(0,0,0,.1); background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+    #influencer_suggest a { display: block; padding: 8px 12px; font-size: 14px; color: #333; border-bottom: 1px solid #f0f0f0; text-decoration: none; }
+    #influencer_suggest a:last-child { border-bottom: none; }
+    #influencer_suggest a:hover { background: #f5f7fa; }
+    .inf-wrap { position: relative; }
+</style>
+{/block}
+
 {block name="title"}生成达人链{/block}
 {block name="page_title"}生成达人链{/block}
 {block name="breadcrumb"}<a href="/admin.php/distribute" class="text-muted">达人链</a> / 生成{/block}
@@ -22,9 +32,10 @@
                             {/volist}
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group inf-wrap">
                         <label for="influencer_tiktok">关联达人（可选）</label>
-                        <input type="text" name="influencer_tiktok" id="influencer_tiktok" class="form-control" placeholder="TikTok 用户名，如 @handle 或 handle（须已在「达人」中导入）">
+                        <input type="text" name="influencer_tiktok" id="influencer_tiktok" class="form-control" autocomplete="off" placeholder="输入 @handle 或昵称搜索后点选">
+                        <div id="influencer_suggest"></div>
                         <small class="form-text text-muted">与名录中的 TikTok 用户名一致；留空表示不关联。</small>
                     </div>
                     <div class="form-group">
@@ -44,6 +55,52 @@
 {block name="script"}
 <script>
     $(function () {
+        var infTimer = null;
+        var $inp = $('#influencer_tiktok');
+        var $box = $('#influencer_suggest');
+        function renderInfSuggest(items) {
+            $box.empty();
+            if (!items || !items.length) {
+                $box.hide();
+                return;
+            }
+            items.forEach(function (x) {
+                var label = (x.tiktok_id || '') + (x.nickname ? ' · ' + x.nickname : '');
+                var $a = $('<a href="#"></a>').text(label);
+                $a.on('click', function (ev) {
+                    ev.preventDefault();
+                    $inp.val(x.tiktok_id || '');
+                    $box.hide();
+                });
+                $box.append($a);
+            });
+            $box.show();
+        }
+        $inp.on('input', function () {
+            clearTimeout(infTimer);
+            var q = $(this).val().trim();
+            if (q.length < 1) {
+                $box.hide();
+                return;
+            }
+            infTimer = setTimeout(function () {
+                $.getJSON('/admin.php/influencer/search', { q: q })
+                    .done(function (res) {
+                        if (res && res.code === 0 && res.data && res.data.items) {
+                            renderInfSuggest(res.data.items);
+                        } else {
+                            renderInfSuggest([]);
+                        }
+                    })
+                    .fail(function () { $box.hide(); });
+            }, 300);
+        });
+        $(document).on('click', function (e) {
+            if (!$(e.target).closest('.inf-wrap').length) {
+                $box.hide();
+            }
+        });
+
         $('#dist-form').on('submit', function (e) {
             e.preventDefault();
             const $btn = $(this).find('button[type="submit"]');
