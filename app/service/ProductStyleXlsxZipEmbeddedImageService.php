@@ -400,4 +400,26 @@ class ProductStyleXlsxZipEmbeddedImageService
 
         return $walk($anchor);
     }
+
+    /**
+     * 从 Zip 解析出图片后写入 public/uploads/products（md5），并删除临时文件。
+     */
+    public static function extractRowImageToProductsDir(
+        string $xlsxPath,
+        string $sheetTitle,
+        int $imgCol1Based,
+        int $row1Based,
+        string $publicRoot
+    ): ?string {
+        $tmp = self::extractImageAtCell($xlsxPath, $sheetTitle, $imgCol1Based, $row1Based);
+        if ($tmp === null || !\is_file($tmp)) {
+            return null;
+        }
+        $web = ProductStyleImportService::saveImportImageToProductsDir($tmp, $publicRoot);
+        if ($web !== null && \is_file($tmp)) {
+            @\unlink($tmp);
+        }
+
+        return $web;
+    }
 }

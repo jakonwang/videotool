@@ -79,7 +79,7 @@ class ProductStyleXlsxImportService
 
                 $n = 0;
                 for ($r = 2; $r <= $highestRow; $r++) {
-                    $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path);
+                    $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path, null, null);
                     if ($rec !== null) {
                         $n++;
                     }
@@ -132,7 +132,7 @@ class ProductStyleXlsxImportService
             $imgCol = $headerMap['image'] + 1;
             $hotCol = isset($headerMap['hot']) ? $headerMap['hot'] + 1 : null;
 
-            return self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $excelRow, $path);
+            return self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $excelRow, $path, null, null);
         } finally {
             $spreadsheet->disconnectWorksheets();
         }
@@ -142,10 +142,17 @@ class ProductStyleXlsxImportService
      * 异步 tick 专用：**只加载一次**工作簿，从 startRow 顺序扫到 highestRow，返回第一条有效行。
      * 避免旧实现每扫一行空行就 {@see readDataRowAt} 全表 load 导致的极慢（数百次磁盘解压）。
      *
-     * @return array{rec: ?array{row: int, code: string, hot: string, imageTemp: ?string, imageRaw: string}, next_line_idx: int}
+     * @param array<int|string, string>|null $prebuiltRowWebPaths 行号 => /uploads/products/md5.ext（先批量提取嵌入图）
+     *
+     * @return array{rec: ?array{row: int, code: string, hot: string, imageTemp: ?string, imageRaw: string, imagePathWeb?: string}, next_line_idx: int}
      */
-    public static function readNextSubstantiveRowSingleLoad(string $path, int $startRow, int $highestRow): array
-    {
+    public static function readNextSubstantiveRowSingleLoad(
+        string $path,
+        int $startRow,
+        int $highestRow,
+        ?string $publicRootForRowMap = null,
+        ?array $prebuiltRowWebPaths = null
+    ): array {
         if (!\class_exists(IOFactory::class)) {
             return ['rec' => null, 'next_line_idx' => $startRow];
         }
@@ -177,7 +184,7 @@ class ProductStyleXlsxImportService
             $hotCol = isset($headerMap['hot']) ? $headerMap['hot'] + 1 : null;
 
             for ($r = $startRow; $r <= $highestRow; $r++) {
-                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path);
+                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path, $publicRootForRowMap, $prebuiltRowWebPaths);
                 if ($rec !== null) {
                     return ['rec' => $rec, 'next_line_idx' => $r + 1];
                 }
@@ -220,7 +227,7 @@ class ProductStyleXlsxImportService
 
             $highestRow = (int) $sheet->getHighestRow();
             for ($r = 2; $r <= $highestRow; $r++) {
-                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path);
+                $rec = self::extractDataRow($sheet, $drawingsByCell, $codeCol, $imgCol, $hotCol, $r, $path, null, null);
                 if ($rec !== null) {
                     yield $rec;
                 }
@@ -232,7 +239,8 @@ class ProductStyleXlsxImportService
 
     /**
      * @param array<string, SheetDrawing|MemoryDrawing> $drawingsByCell
-     * @return array{row: int, code: string, hot: string, imageTemp: ?string, imageRaw: string}|null
+     * @param array<int|string, string>|null $prebuiltRowWebPaths
+     * @return array{row: int, code: string, hot: string, imageTemp: ?string, imageRaw: string, imagePathWeb?: string}|null
      */
     private static function extractDataRow(
         Worksheet $sheet,
@@ -241,7 +249,9 @@ class ProductStyleXlsxImportService
         int $imgCol,
         ?int $hotCol,
         int $r,
-        ?string $sourceFilePath = null
+        ?string $sourceFilePath = null,
+        ?string $publicRootForMap = null,
+        ?array $prebuiltRowWebPaths = null
     ): ?array {
         $code = \trim((string) $sheet->getCell(self::cellAddr($codeCol, $r))->getFormattedValue());
         $imgRaw = \trim((string) $sheet->getCell(self::cellAddr($imgCol, $r))->getFormattedValue());
@@ -250,19 +260,40 @@ class ProductStyleXlsxImportService
             $hot = \trim((string) $sheet->getCell(self::cellAddr($hotCol, $r))->getFormattedValue());
         }
 
-        $imageTemp = self::resolveRowEmbeddedImage($sheet, $drawingsByCell, $imgCol, $r, $sourceFilePath);
+        $imagePathWeb = null;
+        $imageTemp = null;
+        if ($prebuiltRowWebPaths !== null && $publicRootForMap !== null && $publicRootForMap !== '') {
+            $pw = $prebuiltRowWebPaths[$r] ?? $prebuiltRowWebPaths[(string) $r] ?? null;
+            if (\is_string($pw) && $pw !== '') {
+                $root = \rtrim(\str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $publicRootForMap), DIRECTORY_SEPARATOR);
+                $rel = \str_replace('/', DIRECTORY_SEPARATOR, $pw);
+                $abs = $root . $rel;
+                if (\is_file($abs) && \is_readable($abs)) {
+                    $imageTemp = $abs;
+                    $imagePathWeb = $pw;
+                }
+            }
+        }
+        if ($imageTemp === null) {
+            $imageTemp = self::resolveRowEmbeddedImage($sheet, $drawingsByCell, $imgCol, $r, $sourceFilePath);
+        }
 
         if ($code === '' && $imageTemp === null && $imgRaw === '') {
             return null;
         }
 
-        return [
+        $out = [
             'row' => $r,
             'code' => $code,
             'hot' => $hot,
             'imageTemp' => $imageTemp,
             'imageRaw' => $imgRaw,
         ];
+        if ($imagePathWeb !== null) {
+            $out['imagePathWeb'] = $imagePathWeb;
+        }
+
+        return $out;
     }
 
     /**
@@ -324,6 +355,16 @@ class ProductStyleXlsxImportService
         }
 
         return null;
+    }
+
+    /**
+     * 导出 PhpSpreadsheet 嵌入 Drawing 为临时文件（供行映射批量落盘）。
+     *
+     * @param \PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing|\PhpOffice\PhpSpreadsheet\Worksheet\Drawing $drawing
+     */
+    public static function exportEmbeddedDrawingToTemp($drawing): ?string
+    {
+        return self::exportDrawingToTemp($drawing);
     }
 
     /** @param positive-int $col 1-based 列号（A=1） */

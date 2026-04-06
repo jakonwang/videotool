@@ -152,6 +152,47 @@ class ProductStyleImportService
         return '/' . \str_replace(DIRECTORY_SEPARATOR, '/', $sub . DIRECTORY_SEPARATOR . $name);
     }
 
+    /**
+     * Excel 导入：按文件内容 md5 命名保存到 public/uploads/products/，供寻款索引与豆包识别。
+     *
+     * @return string|null 站内路径如 /uploads/products/{md5}.jpg
+     */
+    public static function saveImportImageToProductsDir(string $sourceAbsolute, string $publicRoot): ?string
+    {
+        $sourceAbsolute = \str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $sourceAbsolute);
+        if (!\is_file($sourceAbsolute) || !\is_readable($sourceAbsolute)) {
+            return null;
+        }
+        $bin = @\file_get_contents($sourceAbsolute);
+        if ($bin === false || $bin === '') {
+            return null;
+        }
+        $publicRoot = \rtrim(\str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $publicRoot), DIRECTORY_SEPARATOR);
+        $sub = 'uploads' . DIRECTORY_SEPARATOR . 'products';
+        $dir = $publicRoot . DIRECTORY_SEPARATOR . $sub;
+        if (!\is_dir($dir) && !@\mkdir($dir, 0755, true) && !\is_dir($dir)) {
+            return null;
+        }
+        $ext = \strtolower(\pathinfo($sourceAbsolute, PATHINFO_EXTENSION) ?: 'jpg');
+        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+        if (!\in_array($ext, $allowed, true)) {
+            $ext = 'jpg';
+        }
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+        $name = \md5($bin) . '.' . $ext;
+        $dest = $dir . DIRECTORY_SEPARATOR . $name;
+        if (\is_file($dest)) {
+            return '/' . \str_replace(DIRECTORY_SEPARATOR, '/', $sub . DIRECTORY_SEPARATOR . $name);
+        }
+        if (!@\file_put_contents($dest, $bin)) {
+            return null;
+        }
+
+        return '/' . \str_replace(DIRECTORY_SEPARATOR, '/', $sub . DIRECTORY_SEPARATOR . $name);
+    }
+
     /** 供 Excel 嵌入图等写入临时文件 */
     public static function createTempImagePath(string $ext): string
     {

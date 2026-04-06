@@ -13,10 +13,18 @@ use think\facade\Log;
 class ProductStyleIndexRowService
 {
     /**
+     * @param string|null $imagePathStored 导入实拍图站内路径（如 /uploads/products/md5.jpg），供豆包等；表无列时写入会忽略
+     *
      * @return array{inserted:bool, updated:bool}
      */
-    public static function upsertStyleItem(string $code, string $imageRef, string $hotType, array $embeddingVec, ?string $aiDescription = null): array
-    {
+    public static function upsertStyleItem(
+        string $code,
+        string $imageRef,
+        string $hotType,
+        array $embeddingVec,
+        ?string $aiDescription = null,
+        ?string $imagePathStored = null
+    ): array {
         $code = trim($code);
         $embJson = json_encode($embeddingVec, JSON_UNESCAPED_UNICODE);
         $row = ItemModel::where('product_code', $code)->find();
@@ -30,19 +38,26 @@ class ProductStyleIndexRowService
             if ($aiDescription !== null && $aiDescription !== '') {
                 $data['ai_description'] = $aiDescription;
             }
+            if ($imagePathStored !== null && $imagePathStored !== '') {
+                $data['image_path'] = $imagePathStored;
+            }
             $row->save($data);
 
             return ['inserted' => false, 'updated' => true];
         }
 
-        ItemModel::create([
+        $create = [
             'product_code' => $code,
             'image_ref' => $imageRef,
             'hot_type' => $hotType,
             'ai_description' => $aiDescription ?? '',
             'embedding' => $embJson,
             'status' => 1,
-        ]);
+        ];
+        if ($imagePathStored !== null && $imagePathStored !== '') {
+            $create['image_path'] = $imagePathStored;
+        }
+        ItemModel::create($create);
 
         return ['inserted' => true, 'updated' => false];
     }

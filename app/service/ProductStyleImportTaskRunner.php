@@ -31,6 +31,58 @@ class ProductStyleImportTaskRunner
         return $dir . DIRECTORY_SEPARATOR . 'pending_' . $taskId . '.json';
     }
 
+    /** Excel 行号 => 嵌入图站内路径（drawing_map_*.json） */
+    private static function drawingMapPath(int $taskId): string
+    {
+        $dir = root_path() . 'runtime' . DIRECTORY_SEPARATOR . 'style_import_tasks';
+        if (!\is_dir($dir)) {
+            @\mkdir($dir, 0755, true);
+        }
+
+        return $dir . DIRECTORY_SEPARATOR . 'drawing_map_' . $taskId . '.json';
+    }
+
+    private static function unlinkDrawingMap(int $taskId): void
+    {
+        $p = self::drawingMapPath($taskId);
+        if (\is_file($p)) {
+            @\unlink($p);
+        }
+    }
+
+    /**
+     * @return array<int, string>|null 行号 => /uploads/products/...
+     */
+    private static function loadDrawingRowMap(ProductStyleImportTask $task): ?array
+    {
+        $meta = \json_decode((string) $task->header_json, true);
+        if (!\is_array($meta) || empty($meta['drawing_map_rel'])) {
+            return null;
+        }
+        $rel = (string) $meta['drawing_map_rel'];
+        $path = root_path() . 'runtime' . DIRECTORY_SEPARATOR . \str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
+        if (!\is_file($path) || !\is_readable($path)) {
+            return null;
+        }
+        $raw = @\file_get_contents($path);
+        if ($raw === false || $raw === '') {
+            return null;
+        }
+        $data = \json_decode($raw, true);
+        if (!\is_array($data)) {
+            return null;
+        }
+        $out = [];
+        foreach ($data as $k => $v) {
+            if (!\is_string($v) || $v === '') {
+                continue;
+            }
+            $out[(int) $k] = $v;
+        }
+
+        return $out;
+    }
+
     private static function unlinkExcelPending(int $taskId): void
     {
         $p = self::excelPendingPath($taskId);
@@ -40,7 +92,7 @@ class ProductStyleImportTaskRunner
     }
 
     /**
-     * @param array{row:int, code:string, hot:string, resolved_ref:string, resolved_temp:string, excel_embed_source:?string} $payload
+     * @param array{row:int, code:string, hot:string, resolved_ref:string, resolved_temp:string, excel_embed_source:?string, image_path_web?:?string} $payload
      */
     private static function writeExcelPending(int $taskId, array $payload): void
     {
@@ -55,7 +107,7 @@ class ProductStyleImportTaskRunner
     }
 
     /**
-     * @return array{row:int, code:string, hot:string, resolved_ref:string, resolved_temp:string, excel_embed_source:?string}|null
+     * @return array{row:int, code:string, hot:string, resolved_ref:string, resolved_temp:string, excel_embed_source:?string, image_path_web:?string}|null
      */
     private static function readExcelPending(int $taskId): ?array
     {
@@ -81,6 +133,10 @@ class ProductStyleImportTaskRunner
         if ($excelEmbed === '') {
             $excelEmbed = null;
         }
+        $imagePathWeb = isset($pl['image_path_web']) ? (string) $pl['image_path_web'] : null;
+        if ($imagePathWeb === '') {
+            $imagePathWeb = null;
+        }
         if ($row < 1 || $resolvedTemp === '') {
             return null;
         }
@@ -92,6 +148,7 @@ class ProductStyleImportTaskRunner
             'resolved_ref' => $resolvedRef,
             'resolved_temp' => $resolvedTemp,
             'excel_embed_source' => $excelEmbed,
+            'image_path_web' => $imagePathWeb,
         ];
     }
 
@@ -189,6 +246,7 @@ class ProductStyleImportTaskRunner
         $abs = self::absolutePath($task);
         if ($abs === null || !\is_file($abs)) {
             self::unlinkExcelPending((int) $task->id);
+            self::unlinkDrawingMap((int) $task->id);
             $task->status = 'failed';
             $task->error_message = '任务文件丢失';
             $task->save();
@@ -202,6 +260,7 @@ class ProductStyleImportTaskRunner
         } catch (\Throwable $e) {
             Log::error('ProductStyleImportTaskRunner tick: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             self::unlinkExcelPending((int) $task->id);
+            self::unlinkDrawingMap((int) $task->id);
             $task->status = 'failed';
             $task->error_message = $e->getMessage();
             $task->save();
@@ -395,7 +454,8 @@ class ProductStyleImportTaskRunner
                 }
             }
 
-            $u = ProductStyleIndexRowService::upsertStyleItem($code, $resolved['ref'], $hot, $vec, $aiDesc);
+            $pathDbCsv = ProductStyleImportService::saveImportImageToProductsDir($resolved['temp'], $publicRoot);
+            $u = ProductStyleIndexRowService::upsertStyleItem($code, $resolved['ref'], $hot, $vec, $aiDesc, $pathDbCsv);
             ProductStyleIndexRowService::syncProductAiDescription($code, $aiDesc);
             if (\strpos($resolved['temp'], 'style_import') !== false && \is_file($resolved['temp'])) {
                 @\unlink($resolved['temp']);
@@ -454,6 +514,7 @@ class ProductStyleImportTaskRunner
         $hot = $pl['hot'];
         $resolvedTemp = $pl['resolved_temp'];
         $excelEmbedSource = $pl['excel_embed_source'];
+        $imagePathWebPl = $pl['image_path_web'] ?? null;
 
         if (!\is_file($resolvedTemp) || !\is_readable($resolvedTemp)) {
             $task->failed_count = (int) $task->failed_count + 1;
@@ -489,6 +550,11 @@ class ProductStyleImportTaskRunner
             }
         }
 
+        $imagePathDb = ($imagePathWebPl !== null && $imagePathWebPl !== '') ? $imagePathWebPl : null;
+        if ($imagePathDb === null) {
+            $imagePathDb = ProductStyleImportService::saveImportImageToProductsDir($resolvedTemp, $publicRoot);
+        }
+
         $aiDesc = null;
         if ($visionOn) {
             try {
@@ -507,7 +573,7 @@ class ProductStyleImportTaskRunner
             }
         }
 
-        $u = ProductStyleIndexRowService::upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc);
+        $u = ProductStyleIndexRowService::upsertStyleItem($code, $imageRef, $hot, $vec, $aiDesc, $imagePathDb);
         ProductStyleIndexRowService::syncProductAiDescription($code, $aiDesc);
         if (\strpos($resolvedTemp, 'style_import') !== false && \is_file($resolvedTemp)) {
             @\unlink($resolvedTemp);
@@ -565,6 +631,7 @@ class ProductStyleImportTaskRunner
         $meta = \json_decode((string) $task->header_json, true);
         if (!\is_array($meta) || empty($meta['excel'])) {
             self::unlinkExcelPending((int) $task->id);
+            self::unlinkDrawingMap((int) $task->id);
             $task->status = 'failed';
             $task->error_message = 'Excel 任务状态损坏';
             $task->save();
@@ -598,7 +665,14 @@ class ProductStyleImportTaskRunner
             return self::formatSnapshot($task);
         }
 
-        $pack = ProductStyleXlsxImportService::readNextSubstantiveRowSingleLoad($absPath, $lineStart, $highestRow);
+        $rowMap = self::loadDrawingRowMap($task);
+        $pack = ProductStyleXlsxImportService::readNextSubstantiveRowSingleLoad(
+            $absPath,
+            $lineStart,
+            $highestRow,
+            $publicRoot,
+            $rowMap
+        );
         $task->line_idx = $pack['next_line_idx'];
         $task->save();
 
@@ -614,6 +688,10 @@ class ProductStyleImportTaskRunner
         $imgTemp = $rec['imageTemp'];
         $imgRaw = $rec['imageRaw'];
         $hot = $rec['hot'];
+        $imagePathWebRec = isset($rec['imagePathWeb']) ? (string) $rec['imagePathWeb'] : '';
+        if ($imagePathWebRec === '') {
+            $imagePathWebRec = null;
+        }
 
         if ($code === '') {
             self::bumpExcelProcessedRows($task);
@@ -624,7 +702,9 @@ class ProductStyleImportTaskRunner
         if (($imgTemp === null || !\is_file($imgTemp) || !\is_readable($imgTemp)) && \trim($imgRaw) === '') {
             $task->failed_count = (int) $task->failed_count + 1;
             $task->save();
-            self::appendLog($task, '第' . $rowIndex . '行：图片列为空且无嵌入图');
+            $msg = '[第' . $rowIndex . '行] 缺失图片对象（有编号但图片列无文本且无可用嵌入图）';
+            Log::info('style_import: ' . $msg);
+            self::appendLog($task, $msg);
             self::bumpExcelProcessedRows($task);
 
             return self::formatSnapshot($task);
@@ -632,8 +712,12 @@ class ProductStyleImportTaskRunner
 
         $excelEmbedSource = null;
         if ($imgTemp !== null && \is_file($imgTemp) && \is_readable($imgTemp)) {
-            $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
-            $excelEmbedSource = $imgTemp;
+            if ($imagePathWebRec !== null) {
+                $resolved = ['ref' => $imagePathWebRec, 'temp' => $imgTemp, 'ok' => true];
+            } else {
+                $resolved = ['ref' => '(Excel嵌入图)', 'temp' => $imgTemp, 'ok' => true];
+                $excelEmbedSource = $imgTemp;
+            }
         } else {
             $resolved = ProductStyleImportService::resolveImage($imgRaw, $publicRoot);
         }
@@ -646,14 +730,18 @@ class ProductStyleImportTaskRunner
             return self::formatSnapshot($task);
         }
 
-        self::writeExcelPending((int) $task->id, [
+        $pendingPayload = [
             'row' => $rowIndex,
             'code' => $code,
             'hot' => $hot,
             'resolved_ref' => (string) $resolved['ref'],
             'resolved_temp' => (string) $resolved['temp'],
             'excel_embed_source' => $excelEmbedSource,
-        ]);
+        ];
+        if ($imagePathWebRec !== null) {
+            $pendingPayload['image_path_web'] = $imagePathWebRec;
+        }
+        self::writeExcelPending((int) $task->id, $pendingPayload);
         self::appendLog($task, '[' . \date('H:i:s') . '] 第 ' . $rowIndex . ' 行：图片已解析，下一轮将抽取向量' . ($visionOn ? '与豆包特征' : '') . '（若长时间停在 0/N，请查看下一条「开始抽取向量」日志）');
 
         return self::formatSnapshot($task);
@@ -681,7 +769,26 @@ class ProductStyleImportTaskRunner
         $hr = (int) $analysis['highest_row'];
         $substantive = (int) ($analysis['substantive_rows'] ?? 0);
         $task->header_resolved = 1;
-        $task->header_json = \json_encode(['excel' => 1, 'highest_row' => $hr], JSON_UNESCAPED_UNICODE);
+        $extLower = \strtolower((string) $task->file_ext);
+        $headerPayload = ['excel' => 1, 'highest_row' => $hr];
+        if (\in_array($extLower, ['xlsx', 'xlsm'], true)) {
+            $publicRoot = root_path() . 'public';
+            $built = ProductStyleXlsxDrawingRowMapBuilder::build($absPath, $publicRoot);
+            if (!($built['ok'] ?? false)) {
+                Log::warning('Excel 嵌入图行映射失败（将回退按格解析）：' . (string) ($built['error'] ?? ''));
+                self::appendLog($task, '嵌入图批量提取未完全成功，已回退单元格解析：' . \mb_substr((string) ($built['error'] ?? ''), 0, 120));
+            }
+            $map = $built['map'] ?? [];
+            $mapJson = \json_encode($map, JSON_UNESCAPED_UNICODE);
+            if ($mapJson !== false) {
+                $dm = self::drawingMapPath((int) $task->id);
+                if (@\file_put_contents($dm, $mapJson) !== false) {
+                    $headerPayload['drawing_map_rel'] = 'style_import_tasks/drawing_map_' . (int) $task->id . '.json';
+                    self::appendLog($task, '已提取嵌入图行映射 ' . \count($map) . ' 行（见 runtime/style_import_tasks/drawing_map_' . (int) $task->id . '.json）');
+                }
+            }
+        }
+        $task->header_json = \json_encode($headerPayload, JSON_UNESCAPED_UNICODE);
         $task->total_rows = \max(0, $substantive);
         $task->line_idx = 2;
         $task->processed_rows = 0;
@@ -832,6 +939,7 @@ class ProductStyleImportTaskRunner
             return;
         }
         self::unlinkExcelPending((int) $task->id);
+        self::unlinkDrawingMap((int) $task->id);
         $task->status = 'completed';
         $task->save();
     }
