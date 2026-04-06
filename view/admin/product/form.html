@@ -24,6 +24,23 @@
                         <label for="goods_url">商品链接</label>
                         <input type="url" id="goods_url" name="goods_url" class="form-control" value="{$info.goods_url|default=''}" placeholder="https:// 发给达人时可参考">
                     </div>
+                    <div class="form-group">
+                        <label for="tiktok_shop_url">TikTok 商品链</label>
+                        <input type="url" id="tiktok_shop_url" name="tiktok_shop_url" class="form-control" value="{$info.tiktok_shop_url|default=''}" placeholder="TikTok Shop / 橱窗商品链接，列表可一键复制">
+                    </div>
+                    <div class="form-group">
+                        <label>缩略图</label>
+                        <input type="hidden" id="thumb_url" name="thumb_url" value="{$info.thumb_url|default=''}">
+                        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                            <input type="file" id="thumb_file" accept="image/jpeg,image/png,image/gif,image/webp" class="form-control-file">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="thumb_upload_btn">上传图片</button>
+                        </div>
+                        <small class="form-text text-muted d-block mb-1">也可在下方直接填站内路径或 URL</small>
+                        <input type="text" id="thumb_url_text" class="form-control" value="{$info.thumb_url|default=''}" placeholder="/uploads/product_thumbs/... 或 https://">
+                        <div class="mt-2" id="thumb_preview_wrap" style="display:none;">
+                            <img id="thumb_preview" alt="" style="max-height:96px;border-radius:6px;border:1px solid #e5e7eb;">
+                        </div>
+                    </div>
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label for="sort_order">排序</label>
@@ -50,8 +67,60 @@
 {block name="script"}
 <script>
     $(function () {
+        function syncThumbHidden() {
+            $('#thumb_url').val($('#thumb_url_text').val().trim());
+        }
+        function showThumbPreview(src) {
+            if (!src) {
+                $('#thumb_preview_wrap').hide();
+                return;
+            }
+            $('#thumb_preview').attr('src', src.indexOf('http') === 0 ? src : src);
+            $('#thumb_preview_wrap').show();
+        }
+        $('#thumb_url_text').on('input', function () {
+            syncThumbHidden();
+            showThumbPreview($(this).val().trim());
+        });
+        (function () {
+            var t0 = ($('#thumb_url_text').val() || '').trim();
+            if (t0) showThumbPreview(t0);
+        })();
+        $('#thumb_upload_btn').on('click', function () {
+            const f = document.getElementById('thumb_file').files[0];
+            if (!f) {
+                AdminUI.showToast('warning', '请先选择图片');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('file', f);
+            const btn = $(this);
+            btn.prop('disabled', true);
+            $.ajax({
+                url: '/admin.php/product/uploadThumb',
+                type: 'POST',
+                data: fd,
+                processData: false,
+                contentType: false,
+            }).done(function (res) {
+                if (res.code === 0 && res.data && res.data.url) {
+                    $('#thumb_url_text').val(res.data.url);
+                    syncThumbHidden();
+                    showThumbPreview(res.data.url);
+                    AdminUI.showToast('success', res.msg || '上传成功');
+                } else {
+                    AdminUI.showToast('error', res.msg || '上传失败');
+                }
+            }).fail(function () {
+                AdminUI.showToast('error', '网络错误');
+            }).always(function () {
+                btn.prop('disabled', false);
+            });
+        });
+
         $('#product-form').on('submit', function (event) {
             event.preventDefault();
+            syncThumbHidden();
             const $form = $(this);
             const submitBtn = $form.find('button[type="submit"]');
             const originalHtml = submitBtn.html();

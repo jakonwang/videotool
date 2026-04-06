@@ -25,7 +25,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -79,10 +79,23 @@
         nickname: '',
         avatar_url: '',
         follower_count: 0,
-        contact_text: '',
+        contact_whatsapp: '',
+        contact_zalo: '',
+        contact_note: '',
         region: '',
         status: 1,
       });
+
+      const outreachVisible = ref(false);
+      const outreachRow = ref(null);
+      const tplList = ref([]);
+      const productList = ref([]);
+      const outreachTplId = ref(null);
+      const outreachProductId = ref(null);
+      const outreachPreview = ref('');
+      const outreachWaUrl = ref('');
+      const outreachZaloUrl = ref('');
+      const outreachRendering = ref(false);
 
       function stopImportPolling() {
         if (importPollTimer) {
@@ -258,12 +271,15 @@
       }
 
       function openEdit(row) {
+        const ch = row.contact_channels || {};
         editForm.id = row.id;
         editForm.tiktok_id = row.tiktok_id || '';
         editForm.nickname = row.nickname || '';
         editForm.avatar_url = row.avatar_url || '';
         editForm.follower_count = row.follower_count != null ? Number(row.follower_count) : 0;
-        editForm.contact_text = row.contact_display || '';
+        editForm.contact_whatsapp = ch.whatsapp || '';
+        editForm.contact_zalo = ch.zalo || '';
+        editForm.contact_note = ch.text || '';
         editForm.region = row.region || '';
         editForm.status = row.status != null ? Number(row.status) : 1;
         editVisible.value = true;
@@ -281,7 +297,9 @@
               nickname: editForm.nickname,
               avatar_url: editForm.avatar_url,
               follower_count: editForm.follower_count,
-              contact_text: editForm.contact_text,
+              contact_whatsapp: editForm.contact_whatsapp,
+              contact_zalo: editForm.contact_zalo,
+              contact_note: editForm.contact_note,
               region: editForm.region,
               status: editForm.status,
             }),
@@ -338,6 +356,100 @@
         }
       }
 
+      async function loadOutreachLists() {
+        try {
+          const [r1, r2] = await Promise.all([
+            fetch('/admin.php/message_template/list?page=1&page_size=200&enabled=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
+            fetch('/admin.php/product/list?page=1&page_size=500&status=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
+          ]);
+          const j1 = parseJsonBody(r1, await r1.text());
+          const j2 = parseJsonBody(r2, await r2.text());
+          if (j1 && j1.code === 0 && j1.data && j1.data.items) {
+            tplList.value = j1.data.items.filter((x) => Number(x.status) === 1);
+          }
+          if (j2 && j2.code === 0 && j2.data && j2.data.items) {
+            productList.value = j2.data.items;
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      async function openOutreach(row) {
+        outreachRow.value = row;
+        outreachTplId.value = null;
+        outreachProductId.value = null;
+        outreachPreview.value = '';
+        outreachWaUrl.value = '';
+        outreachZaloUrl.value = '';
+        outreachVisible.value = true;
+        await loadOutreachLists();
+        if (tplList.value.length) {
+          outreachTplId.value = tplList.value[0].id;
+        } else {
+          ElMessage.warning(tt('page.influencer.noTemplates'));
+        }
+        await renderOutreachPreview();
+      }
+
+      async function renderOutreachPreview() {
+        const row = outreachRow.value;
+        if (!row || !outreachTplId.value) {
+          outreachPreview.value = '';
+          outreachWaUrl.value = '';
+          outreachZaloUrl.value = '';
+          return;
+        }
+        outreachRendering.value = true;
+        try {
+          const body = {
+            template_id: outreachTplId.value,
+            influencer_id: row.id,
+            product_id: outreachProductId.value || 0,
+          };
+          const res = await fetch('/admin.php/message_template/render', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(body),
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 401) {
+            ElMessage.error(tt('common.sessionExpired'));
+            return;
+          }
+          if (!json || json.code !== 0) {
+            outreachPreview.value = (json && json.msg) || tt('common.loadingFailed');
+            outreachWaUrl.value = '';
+            outreachZaloUrl.value = '';
+            return;
+          }
+          const d = json.data || {};
+          outreachPreview.value = d.text || '';
+          outreachWaUrl.value = d.wa_url || '';
+          outreachZaloUrl.value = d.zalo_url || '';
+        } catch (e) {
+          outreachPreview.value = e.message || tt('common.loadingFailed');
+        } finally {
+          outreachRendering.value = false;
+        }
+      }
+
+      async function copyThenOpenZalo() {
+        const t = outreachPreview.value || '';
+        if (!t) return;
+        await copyText(t);
+        const u = outreachZaloUrl.value || (outreachRow.value && outreachRow.value.contact_channels && outreachRow.value.contact_channels.zalo_open);
+        if (u) window.open(u, '_blank', 'noopener');
+        else ElMessage.warning(tt('page.influencer.zaloHint'));
+      }
+
+      function openWaPrefill() {
+        const u = outreachWaUrl.value;
+        if (u) window.open(u, '_blank', 'noopener');
+        else ElMessage.warning(tt('page.influencer.noWhatsapp'));
+      }
+
       const rows = computed(() => items.value || []);
 
       onMounted(() => { fetchList(); });
@@ -372,6 +484,20 @@
         openEdit,
         saveEdit,
         deleteRow,
+        outreachVisible,
+        outreachRow,
+        tplList,
+        productList,
+        outreachTplId,
+        outreachProductId,
+        outreachPreview,
+        outreachWaUrl,
+        outreachZaloUrl,
+        outreachRendering,
+        openOutreach,
+        renderOutreachPreview,
+        copyThenOpenZalo,
+        openWaPrefill,
       };
     },
     template: `
@@ -412,15 +538,21 @@
               <el-tag size="small" :type="Number(row.status)===2 ? 'danger' : (Number(row.status)===0 ? 'info' : 'success')">{{ statusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('page.influencer.colContact')" min-width="160">
+          <el-table-column :label="tt('page.influencer.colContact')" min-width="200">
             <template #default="{ row }">
-              <span style="word-break:break-all; font-size:13px;">{{ row.contact_display || tt('page.styleSearch.emDash') }}</span>
-              <el-button v-if="row.contact_display" size="small" link type="primary" @click="copyText(row.contact_display)">{{ tt('common.copy') }}</el-button>
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+                <a v-if="row.contact_channels && row.contact_channels.wa_me" :href="row.contact_channels.wa_me" target="_blank" rel="noopener" class="el-button el-button--small is-link" style="text-decoration:none;padding:0 4px;">{{ tt('page.influencer.openWa') }}</a>
+                <a v-if="row.contact_channels && row.contact_channels.zalo_open" :href="row.contact_channels.zalo_open" target="_blank" rel="noopener" class="el-button el-button--small is-link" style="text-decoration:none;padding:0 4px;">{{ tt('page.influencer.openZalo') }}</a>
+                <span v-if="row.contact_display" style="font-size:12px;color:#606266;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" :title="row.contact_display">{{ row.contact_display }}</span>
+                <el-button v-if="row.contact_display" size="small" link type="primary" @click="copyText(row.contact_display)">{{ tt('common.copy') }}</el-button>
+                <span v-if="!row.contact_display && !(row.contact_channels && (row.contact_channels.wa_me || row.contact_channels.zalo_open))" style="color:#909399;">{{ tt('page.styleSearch.emDash') }}</span>
+              </div>
             </template>
           </el-table-column>
           <el-table-column prop="updated_at" :label="tt('page.influencer.colUpdated')" min-width="160" />
-          <el-table-column :label="tt('page.influencer.colActions')" width="140" fixed="right">
+          <el-table-column :label="tt('page.influencer.colActions')" width="200" fixed="right">
             <template #default="{ row }">
+              <el-button size="small" link type="primary" @click="openOutreach(row)">{{ tt('page.influencer.outreach') }}</el-button>
               <el-button size="small" link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="small" link type="danger" @click="deleteRow(row)">{{ tt('common.delete') }}</el-button>
             </template>
@@ -449,6 +581,34 @@
           </div>
         </el-dialog>
 
+        <el-dialog v-model="outreachVisible" :title="tt('page.influencer.outreachTitle')" width="560px" destroy-on-close>
+          <div v-if="outreachRow" style="margin-bottom:8px;font-size:13px;color:#606266;">{{ outreachRow.tiktok_id }} · {{ outreachRow.nickname }}</div>
+          <el-form label-width="100px" size="default">
+            <el-form-item :label="tt('page.influencer.pickTemplate')">
+              <el-select v-model="outreachTplId" style="width:100%;" filterable @change="renderOutreachPreview">
+                <el-option v-for="t in tplList" :key="t.id" :label="t.name" :value="t.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.pickProduct')">
+              <el-select v-model="outreachProductId" clearable style="width:100%;" filterable :placeholder="tt('page.influencer.productOptionalPh')" @change="renderOutreachPreview">
+                <el-option v-for="p in productList" :key="p.id" :label="p.name" :value="p.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.renderPreview')">
+              <div v-loading="outreachRendering">
+                <el-input v-model="outreachPreview" type="textarea" :rows="8" readonly />
+              </div>
+            </el-form-item>
+          </el-form>
+          <div style="font-size:12px;color:#909399;margin-bottom:8px;">{{ tt('page.influencer.zaloHint') }}</div>
+          <template #footer>
+            <el-button @click="outreachVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button @click="copyText(outreachPreview)">{{ tt('common.copy') }}</el-button>
+            <el-button type="primary" plain @click="copyThenOpenZalo">{{ tt('page.influencer.copyThenZalo') }}</el-button>
+            <el-button type="success" @click="openWaPrefill">{{ tt('page.influencer.openWaPrefill') }}</el-button>
+          </template>
+        </el-dialog>
+
         <el-dialog v-model="editVisible" :title="tt('page.influencer.editTitle')" width="520px" destroy-on-close>
           <el-form label-width="100px" size="default">
             <el-form-item :label="tt('page.influencer.colHandle')">
@@ -466,8 +626,14 @@
             <el-form-item :label="tt('page.influencer.colRegion')">
               <el-input v-model="editForm.region" />
             </el-form-item>
-            <el-form-item :label="tt('page.influencer.colContact')">
-              <el-input v-model="editForm.contact_text" type="textarea" :rows="2" />
+            <el-form-item :label="tt('page.influencer.editWhatsapp')">
+              <el-input v-model="editForm.contact_whatsapp" placeholder="84912345678" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.editZalo')">
+              <el-input v-model="editForm.contact_zalo" placeholder="84912345678 或 zalo.me 后缀" />
+            </el-form-item>
+            <el-form-item :label="tt('page.influencer.editNote')">
+              <el-input v-model="editForm.contact_note" type="textarea" :rows="2" />
             </el-form-item>
             <el-form-item :label="tt('page.influencer.colStatus')">
               <el-select v-model="editForm.status" style="width:100%;">

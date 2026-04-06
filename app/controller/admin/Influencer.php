@@ -75,12 +75,10 @@ class Influencer extends BaseController
         $items = [];
         foreach ($list as $row) {
             $contactRaw = (string) ($row->contact_info ?? '');
-            $contactDisplay = $contactRaw;
-            if ($contactRaw !== '' && ($contactRaw[0] === '{' || $contactRaw[0] === '[')) {
-                $j = json_decode($contactRaw, true);
-                if (is_array($j)) {
-                    $contactDisplay = isset($j['text']) ? (string) $j['text'] : $contactRaw;
-                }
+            $channels = InfluencerService::contactChannelsFromStored($contactRaw !== '' ? $contactRaw : null);
+            $contactDisplay = InfluencerService::contactDisplayLine($channels);
+            if ($contactDisplay === '' && $contactRaw !== '') {
+                $contactDisplay = $contactRaw;
             }
             $items[] = [
                 'id' => (int) $row->id,
@@ -90,6 +88,7 @@ class Influencer extends BaseController
                 'follower_count' => (int) ($row->follower_count ?? 0),
                 'contact_info' => $contactRaw,
                 'contact_display' => $contactDisplay,
+                'contact_channels' => $channels,
                 'region' => (string) ($row->region ?? ''),
                 'status' => (int) ($row->status ?? 1),
                 'created_at' => (string) ($row->created_at ?? ''),
@@ -215,7 +214,7 @@ class Influencer extends BaseController
      */
     public function sampleCsv()
     {
-        $csv = "\xEF\xBB\xBFtiktok_id,nickname,follower_count,region,contact,status\n@demo_creator,Demo昵称,12000,VN,line:demo,1\n";
+        $csv = "\xEF\xBB\xBFtiktok_id,nickname,follower_count,region,whatsapp,zalo,contact,status\n@demo_creator,Demo昵称,12000,VN,84912345678,84912345678,,1\n";
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -312,9 +311,14 @@ class Influencer extends BaseController
             if (isset($payload['follower_count'])) {
                 $row->follower_count = max(0, (int) $payload['follower_count']);
             }
-            if (array_key_exists('contact_text', $payload)) {
-                $t = trim((string) $payload['contact_text']);
-                $row->contact_info = $t !== '' ? InfluencerService::normalizeContactInfo($t) : null;
+            if (array_key_exists('contact_whatsapp', $payload)
+                || array_key_exists('contact_zalo', $payload)
+                || array_key_exists('contact_note', $payload)
+                || array_key_exists('contact_text', $payload)) {
+                $row->contact_info = InfluencerService::mergeContactFromUpdatePayload(
+                    (string) ($row->contact_info ?? ''),
+                    $payload
+                );
             }
             if (array_key_exists('region', $payload)) {
                 $r = trim((string) $payload['region']);

@@ -91,12 +91,17 @@ class InfluencerService
             return null;
         }
 
+        $whatsappIdx = $find($norm, ['whatsapp', 'wa', 'whatapp']);
+        $zaloIdx = $find($norm, ['zalo']);
+
         return [
             'tiktok' => $tikTokIdx,
             'nickname' => $find($norm, ['nickname', '昵称', 'name', '名称']),
             'avatar' => $find($norm, ['avatar', '头像', 'head']),
             'followers' => $find($norm, ['follower', '粉丝', 'fans']),
-            'contact' => $find($norm, ['contact', '联系', 'wechat', '微信', 'line', 'phone', '手机', '邮箱', 'email', 'whatsapp']),
+            'contact' => $find($norm, ['contact', '联系', 'wechat', '微信', 'line', 'phone', '手机', '电话', '邮箱', 'email']),
+            'whatsapp' => $whatsappIdx,
+            'zalo' => $zaloIdx,
             'region' => $find($norm, ['region', '地区', '国家', 'country']),
             'status' => $find($norm, ['status', '状态']),
         ];
@@ -156,6 +161,260 @@ class InfluencerService
     }
 
     /**
+     * WhatsApp / wa.me 用：仅数字，越南常见 0 开头或缺 84 时补全为 84…
+     */
+    public static function normalizeWhatsappNumber(string $raw): string
+    {
+        $s = preg_replace('/\D+/', '', $raw) ?? '';
+        if ($s === '') {
+            return '';
+        }
+        if (str_starts_with($s, '84')) {
+            return $s;
+        }
+        if (str_starts_with($s, '0')) {
+            return '84' . substr($s, 1);
+        }
+        if (strlen($s) >= 9 && strlen($s) <= 11 && ($s[0] ?? '') === '9') {
+            return '84' . $s;
+        }
+
+        return $s;
+    }
+
+    /**
+     * Zalo：支持 zalo.me/xxx 链接、纯数字（按手机号规范）、或 Zalo UID 字符串
+     */
+    public static function normalizeZaloToken(string $raw): string
+    {
+        $t = trim($raw);
+        if ($t === '') {
+            return '';
+        }
+        if (preg_match('#^https?://(?:www\.)?zalo\.me/([^/?#\s]+)#i', $t, $m)) {
+            return $m[1];
+        }
+        $digits = preg_replace('/\D+/', '', $t) ?? '';
+        if ($digits !== '' && strlen($digits) >= 8 && $digits === preg_replace('/\D+/', '', $t)) {
+            return self::normalizeWhatsappNumber($t);
+        }
+
+        return preg_replace('/\s+/u', '', $t) ?? $t;
+    }
+
+    /**
+     * 从导入行提取联系方式片段（非空键才写入）
+     *
+     * @param array<string, int|null> $map
+     * @param list<string|null> $row
+     *
+     * @return array<string, string>
+     */
+    public static function contactPartsFromImportRow(array $map, array $row): array
+    {
+        $parts = [];
+        if (isset($map['whatsapp'], $row[$map['whatsapp']])) {
+            $w = self::normalizeWhatsappNumber((string) $row[$map['whatsapp']]);
+            if ($w !== '') {
+                $parts['whatsapp'] = $w;
+            }
+        }
+        if (isset($map['zalo'], $row[$map['zalo']])) {
+            $z = self::normalizeZaloToken((string) $row[$map['zalo']]);
+            if ($z !== '') {
+                $parts['zalo'] = $z;
+            }
+        }
+        if (isset($map['contact'], $row[$map['contact']])) {
+            $raw = trim((string) $row[$map['contact']]);
+            if ($raw !== '') {
+                if ($raw[0] === '{' || $raw[0] === '[') {
+                    $j = json_decode($raw, true);
+                    if (is_array($j)) {
+                        foreach (['whatsapp', 'zalo', 'text', 'telegram', 'email'] as $k) {
+                            if (!isset($j[$k]) || $j[$k] === '' || $j[$k] === null) {
+                                continue;
+                            }
+                            $v = trim((string) $j[$k]);
+                            if ($v === '') {
+                                continue;
+                            }
+                            if ($k === 'whatsapp') {
+                                $v = self::normalizeWhatsappNumber($v);
+                            } elseif ($k === 'zalo') {
+                                $v = self::normalizeZaloToken($v);
+                            }
+                            if ($v !== '') {
+                                $parts[$k] = $v;
+                            }
+                        }
+                    }
+                } else {
+                    $parts['text'] = $raw;
+                }
+            }
+        }
+
+        return $parts;
+    }
+
+    /**
+     * 合并导入/编辑产生的联系方式到已有 JSON
+     *
+     * @param array<string, string> $parts
+     */
+    public static function mergeContactPartsInto(?string $existingJson, array $parts): ?string
+    {
+        if ($parts === []) {
+            return null;
+        }
+        $base = [];
+        if ($existingJson !== null && trim($existingJson) !== '') {
+            $j = json_decode($existingJson, true);
+            if (is_array($j)) {
+                $base = $j;
+            }
+        }
+        foreach ($parts as $k => $v) {
+            if ($v === '' || $v === null) {
+                continue;
+            }
+            $base[$k] = $v;
+        }
+        if ($base === []) {
+            return null;
+        }
+        $enc = json_encode($base, JSON_UNESCAPED_UNICODE);
+
+        return $enc !== false ? $enc : null;
+    }
+
+    /**
+     * 列表/API：解析 contact_info，生成打开 App 用链接
+     *
+     * @return array{whatsapp:string,zalo:string,telegram:string,email:string,text:string,wa_me:string,zalo_open:string}
+     */
+    public static function contactChannelsFromStored(?string $contactRaw): array
+    {
+        $out = [
+            'whatsapp' => '',
+            'zalo' => '',
+            'telegram' => '',
+            'email' => '',
+            'text' => '',
+            'wa_me' => '',
+            'zalo_open' => '',
+        ];
+        if ($contactRaw === null || trim($contactRaw) === '') {
+            return $out;
+        }
+        $j = json_decode($contactRaw, true);
+        if (!is_array($j)) {
+            $out['text'] = $contactRaw;
+
+            return $out;
+        }
+        $out['whatsapp'] = isset($j['whatsapp']) ? trim((string) $j['whatsapp']) : '';
+        $out['zalo'] = isset($j['zalo']) ? trim((string) $j['zalo']) : '';
+        $out['telegram'] = isset($j['telegram']) ? trim((string) $j['telegram']) : '';
+        $out['email'] = isset($j['email']) ? trim((string) $j['email']) : '';
+        if (isset($j['text'])) {
+            $out['text'] = trim((string) $j['text']);
+        }
+        if ($out['whatsapp'] !== '') {
+            $out['wa_me'] = 'https://wa.me/' . $out['whatsapp'];
+        }
+        if ($out['zalo'] !== '') {
+            $out['zalo_open'] = 'https://zalo.me/' . $out['zalo'];
+        }
+
+        return $out;
+    }
+
+    public static function contactDisplayLine(array $channels): string
+    {
+        if (($channels['text'] ?? '') !== '') {
+            return (string) $channels['text'];
+        }
+        $bits = [];
+        if (($channels['whatsapp'] ?? '') !== '') {
+            $bits[] = 'WhatsApp';
+        }
+        if (($channels['zalo'] ?? '') !== '') {
+            $bits[] = 'Zalo';
+        }
+        if (($channels['telegram'] ?? '') !== '') {
+            $bits[] = 'Telegram';
+        }
+        if (($channels['email'] ?? '') !== '') {
+            $bits[] = 'Email';
+        }
+
+        return $bits !== [] ? implode(' · ', $bits) : '';
+    }
+
+    /**
+     * 后台编辑：按字段合并或清空 contact_info
+     *
+     * @param array<string, mixed> $payload
+     */
+    public static function mergeContactFromUpdatePayload(?string $existingJson, array $payload): ?string
+    {
+        $structured = array_key_exists('contact_whatsapp', $payload)
+            || array_key_exists('contact_zalo', $payload)
+            || array_key_exists('contact_note', $payload);
+        if (!$structured && array_key_exists('contact_text', $payload)) {
+            $t = trim((string) $payload['contact_text']);
+            if ($t === '') {
+                return null;
+            }
+
+            return self::normalizeContactInfo($t);
+        }
+        if (!$structured) {
+            return $existingJson !== null && trim((string) $existingJson) !== '' ? $existingJson : null;
+        }
+
+        $base = [];
+        if ($existingJson !== null && trim((string) $existingJson) !== '') {
+            $j = json_decode((string) $existingJson, true);
+            if (is_array($j)) {
+                $base = $j;
+            }
+        }
+        if (array_key_exists('contact_whatsapp', $payload)) {
+            $v = trim((string) $payload['contact_whatsapp']);
+            if ($v === '') {
+                unset($base['whatsapp']);
+            } else {
+                $base['whatsapp'] = self::normalizeWhatsappNumber($v);
+            }
+        }
+        if (array_key_exists('contact_zalo', $payload)) {
+            $v = trim((string) $payload['contact_zalo']);
+            if ($v === '') {
+                unset($base['zalo']);
+            } else {
+                $base['zalo'] = self::normalizeZaloToken($v);
+            }
+        }
+        if (array_key_exists('contact_note', $payload)) {
+            $v = trim((string) $payload['contact_note']);
+            if ($v === '') {
+                unset($base['text']);
+            } else {
+                $base['text'] = $v;
+            }
+        }
+        if ($base === []) {
+            return null;
+        }
+        $enc = json_encode($base, JSON_UNESCAPED_UNICODE);
+
+        return $enc !== false ? $enc : null;
+    }
+
+    /**
      * 写入 contact_info 列：合法 JSON 则原样；否则存 {"text":"..."}
      */
     public static function normalizeContactInfo(?string $raw): ?string
@@ -209,10 +468,7 @@ class InfluencerService
         if (isset($map['followers']) && $map['followers'] !== null && isset($row[$map['followers']])) {
             $followers = self::parseFollowerCount((string) $row[$map['followers']]);
         }
-        $contactJson = null;
-        if (isset($map['contact']) && $map['contact'] !== null && isset($row[$map['contact']])) {
-            $contactJson = self::normalizeContactInfo((string) $row[$map['contact']]);
-        }
+        $contactParts = self::contactPartsFromImportRow($map, $row);
         $region = null;
         if (isset($map['region']) && $map['region'] !== null && isset($row[$map['region']])) {
             $r = trim((string) $row[$map['region']]);
@@ -241,9 +497,12 @@ class InfluencerService
                 $exists->follower_count = $followers;
                 $changed = true;
             }
-            if ($contactJson !== null) {
-                $exists->contact_info = $contactJson;
-                $changed = true;
+            if ($contactParts !== []) {
+                $merged = self::mergeContactPartsInto((string) ($exists->contact_info ?? ''), $contactParts);
+                if ($merged !== null) {
+                    $exists->contact_info = $merged;
+                    $changed = true;
+                }
             }
             if ($region !== null) {
                 $exists->region = $region;
@@ -258,12 +517,14 @@ class InfluencerService
             return ['ok' => true, 'updated' => true];
         }
 
+        $newContact = $contactParts !== [] ? self::mergeContactPartsInto(null, $contactParts) : null;
+
         Influencer::create([
             'tiktok_id' => $handle,
             'nickname' => $nick,
             'avatar_url' => $avatar,
             'follower_count' => $followers,
-            'contact_info' => $contactJson,
+            'contact_info' => $newContact,
             'region' => $region,
             'status' => $status,
         ]);

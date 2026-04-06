@@ -60,6 +60,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('product/delete/<id>', 'app\controller\admin\Product@delete');
     Route::get('product/add', 'app\controller\admin\Product@add');
     Route::post('product/add', 'app\controller\admin\Product@add');
+    Route::post('product/uploadThumb', 'app\controller\admin\Product@uploadThumb');
     Route::get('product', 'app\controller\admin\Product@index');
 
     // 分发链接
@@ -136,5 +137,12 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('influencer/update', 'app\controller\admin\Influencer@update');
     Route::post('influencer/delete', 'app\controller\admin\Influencer@delete');
     Route::get('influencer', 'app\controller\admin\Influencer@index');
+
+    // 达人联系话术模板
+    Route::get('message_template/list', 'app\controller\admin\MessageTemplate@listJson');
+    Route::post('message_template/save', 'app\controller\admin\MessageTemplate@save');
+    Route::post('message_template/delete', 'app\controller\admin\MessageTemplate@delete');
+    Route::post('message_template/render', 'app\controller\admin\MessageTemplate@render');
+    Route::get('message_template', 'app\controller\admin\MessageTemplate@index');
 }
 

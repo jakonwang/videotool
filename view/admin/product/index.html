@@ -92,7 +92,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -187,12 +187,48 @@
         window.location.href = '/admin.php/product/edit/' + row.id;
       }
 
+      async function copyStr(text) {
+        const t = String(text || '');
+        if (!t) {
+          ElMessage.warning(tt('page.product.clipboardEmpty'));
+          return;
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(t);
+          else {
+            const tmp = document.createElement('input');
+            tmp.value = t;
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+          }
+          ElMessage.success(tt('common.copyDone'));
+        } catch (e) {
+          ElMessage.error(tt('common.copyFail'));
+        }
+      }
+
+      function copyGoods(row) {
+        copyStr(row.goods_url);
+      }
+      function copyTiktok(row) {
+        copyStr(row.tiktok_shop_url);
+      }
+      function copyPair(row) {
+        const a = (row.goods_url || '').trim();
+        const b = (row.tiktok_shop_url || '').trim();
+        if (!a && !b) {
+          ElMessage.warning(tt('page.product.bothUrlsEmpty'));
+          return;
+        }
+        copyStr([a, b].filter(Boolean).join('\n'));
+      }
+
       async function doDelete(row) {
         await ElMessageBox.confirm(
-          lang === 'en'
-            ? 'Delete this product? The "product" field of related videos will be cleared.'
-            : '确定删除该商品？关联视频的「所属商品」将清空。',
-          lang === 'en' ? 'Confirm' : '删除确认',
+          tt('page.product.deleteConfirmMsg'),
+          tt('page.product.deleteTitle'),
           { type: 'warning' }
         );
         const resp = await fetch('/admin.php/product/delete/' + row.id, {
@@ -203,12 +239,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '已删除'));
+          ElMessage.success(json.msg || tt('common.deleted'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '删除失败'));
+          ElMessage.error((json && json.msg) || tt('page.product.deleteFailed'));
         }
       }
 
@@ -279,12 +315,18 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Name':'名称'" min-width="220">
+          <el-table-column :label="tt('page.product.thumb')" width="72" align="center">
+            <template #default="{ row }">
+              <el-image v-if="row.thumb_url" :src="row.thumb_url" style="width:48px;height:48px;border-radius:6px;" fit="cover" :preview-src-list="[row.thumb_url]" preview-teleported />
+              <span v-else class="text-muted">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.product.colName')" min-width="200">
             <template #default="{ row }">
               <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Product URL':'商品链接'" min-width="320">
+          <el-table-column :label="tt('page.product.colGoodsUrl')" min-width="200">
             <template #default="{ row }">
               <div v-if="row.goods_url" class="url-cell" :title="row.goods_url">
                 <a :href="row.goods_url" target="_blank" rel="noopener">{{ row.goods_url }}</a>
@@ -292,20 +334,31 @@
               <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
+          <el-table-column :label="tt('page.product.tiktokShopUrl')" min-width="200">
+            <template #default="{ row }">
+              <div v-if="row.tiktok_shop_url" class="url-cell" :title="row.tiktok_shop_url">
+                <a :href="row.tiktok_shop_url" target="_blank" rel="noopener">TikTok</a>
+              </div>
+              <span v-else class="text-muted">—</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="total_videos" :label="tt('page.product.totalVideos')" width="110" />
           <el-table-column prop="downloaded_videos" :label="tt('page.product.downloadedVideos')" width="110" />
           <el-table-column prop="undownloaded_videos" :label="tt('page.product.undownloadedVideos')" width="110" />
-          <el-table-column prop="sort_order" :label="lang==='en'?'Sort':'排序'" width="110" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
+          <el-table-column prop="sort_order" :label="tt('page.product.colSort')" width="110" sortable="custom" />
+          <el-table-column :label="tt('page.product.colStatus')" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" :label="lang==='en'?'Updated':'更新时间'" min-width="180" />
-          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
+          <el-table-column prop="updated_at" :label="tt('page.product.colUpdated')" min-width="180" />
+          <el-table-column :label="tt('page.product.colActions')" width="260" fixed="right">
             <template #default="{ row }">
+              <el-button size="small" link type="primary" @click="copyGoods(row)">{{ tt('page.product.copyGoods') }}</el-button>
+              <el-button size="small" link type="primary" @click="copyTiktok(row)">{{ tt('page.product.copyTiktok') }}</el-button>
+              <el-button size="small" link @click="copyPair(row)">{{ tt('page.product.copyPair') }}</el-button>
               <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
             </template>

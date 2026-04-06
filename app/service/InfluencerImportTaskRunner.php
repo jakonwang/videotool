@@ -200,6 +200,8 @@ class InfluencerImportTaskRunner
                 'avatar' => null,
                 'followers' => null,
                 'contact' => null,
+                'whatsapp' => null,
+                'zalo' => null,
                 'region' => null,
                 'status' => null,
             ];
@@ -406,6 +408,8 @@ class InfluencerImportTaskRunner
                 'avatar' => null,
                 'followers' => null,
                 'contact' => null,
+                'whatsapp' => null,
+                'zalo' => null,
                 'region' => null,
                 'status' => null,
             ], JSON_UNESCAPED_UNICODE);

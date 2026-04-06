@@ -216,7 +216,7 @@
 <body>
     <div id="app"></div>
 
-    <script src="/static/i18n/influencer_i18n.js?v=20260414_full_sync"></script>
+    <script src="/static/i18n/influencer_i18n.js?v=20260408_ops"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
@@ -265,7 +265,7 @@
             createApp({
                 setup() {
                     const loading = ref(true);
-                    const productName = ref('â€”');
+                    const productName = ref('â€?);
                     const goodsUrl = ref('');
                     const video = reactive({
                         id: 0,
@@ -297,7 +297,7 @@
                             const res = await fetch(apiUrl);
                             const json = await safeJson(res);
                             if (!json || json.code !== 0 || !json.data) {
-                                productName.value = 'â€”';
+                                productName.value = 'â€?;
                                 goodsUrl.value = '';
                                 video.id = 0;
                                 video.title = '';
@@ -485,7 +485,7 @@
                           <div class="info">
                             <div class="label">{{ t('influencer.videoTitle') }}</div>
                             <div class="infoBox">
-                              <div class="infoText">{{ video.title || 'â€”' }}</div>
+                              <div class="infoText">{{ video.title || 'â€? }}</div>
                             </div>
                           </div>
 

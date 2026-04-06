@@ -22,6 +22,14 @@ class DownloadLog extends BaseController
         return runtime_path() . 'log' . DIRECTORY_SEPARATOR . substr($date, 0, 6) . DIRECTORY_SEPARATOR . substr($date, 6, 2) . '.log';
     }
 
+    /**
+     * 与列表解析一致：命中则视为下载/缓存相关异常行（可自日志中剔除）
+     */
+    private function isDownloadRelatedErrorLine(string $line): bool
+    {
+        return (bool) preg_match('/代理下载错误|下载失败|预缓存失败|缓存.*失败/i', $line);
+    }
+
     private function parseErrors(string $dateYmd, string $keyword = ''): array
     {
         $logFile = $this->getLogFileByDate($dateYmd);
@@ -39,7 +47,7 @@ class DownloadLog extends BaseController
 
         $lines = file($logFile);
         foreach ($lines as $line) {
-            if (!preg_match('/代理下载错误|下载失败|预缓存失败|缓存.*失败/i', $line)) {
+            if (!$this->isDownloadRelatedErrorLine($line)) {
                 continue;
             }
 
@@ -238,12 +246,49 @@ class DownloadLog extends BaseController
     }
     
     /**
-     * 清除错误日志（标记为已处理）
+     * 从指定日期的 runtime 日志文件中删除「下载/缓存相关异常」行（与列表筛选规则一致），其它日志行保留。
      */
     public function clear()
     {
-        // 这里可以实现清除逻辑，暂时只返回成功
-        return json(['code' => 0, 'msg' => '功能开发中']);
+        $date = trim((string) $this->request->param('date', ''));
+        if ($date === '' && $this->request->isPost()) {
+            $date = trim((string) $this->request->post('date', ''));
+        }
+        $date = preg_replace('/[^0-9]/', '', $date);
+        if (strlen($date) !== 8) {
+            $date = date('Ymd');
+        }
+
+        $logFile = $this->getLogFileByDate($date);
+        if (!is_file($logFile)) {
+            return json(['code' => 0, 'msg' => 'ok', 'data' => ['removed' => 0, 'no_file' => true]]);
+        }
+
+        $lines = @file($logFile);
+        if ($lines === false) {
+            return json(['code' => 1, 'msg' => '无法读取日志文件']);
+        }
+
+        $removed = 0;
+        $kept = [];
+        foreach ($lines as $line) {
+            if ($this->isDownloadRelatedErrorLine($line)) {
+                $removed++;
+                continue;
+            }
+            $kept[] = $line;
+        }
+
+        $payload = implode('', $kept);
+        if (@file_put_contents($logFile, $payload, LOCK_EX) === false) {
+            return json(['code' => 1, 'msg' => '无法写入日志文件']);
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => 'ok',
+            'data' => ['removed' => $removed],
+        ]);
     }
 }
 

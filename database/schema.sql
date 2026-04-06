@@ -29,6 +29,8 @@ CREATE TABLE products (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品名称',
     goods_url VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商品页外链',
+    thumb_url VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '列表缩略图',
+    tiktok_shop_url VARCHAR(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'TikTok商品链',
     ai_description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'OpenAI Vision 耳环视觉特征（与寻款编号 name 同步时写入）',
     status TINYINT(1) DEFAULT 1 COMMENT '1启用 0禁用',
     sort_order INT DEFAULT 0 COMMENT '排序，越小越前',
@@ -79,6 +81,19 @@ CREATE TABLE influencer_import_tasks (
     KEY idx_status (status),
     KEY idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='达人导入任务';
+
+-- 达人联系话术模板
+CREATE TABLE message_templates (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '模板名称',
+    body MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '正文占位符',
+    sort_order INT NOT NULL DEFAULT 0,
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1启用 0禁用',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_status_sort (status, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='达人联系话术模板';
 
 -- 达人分发链接（token 对应前台取片页）
 CREATE TABLE product_links (

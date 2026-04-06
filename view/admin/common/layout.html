@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
+    <script src="/static/i18n/i18n.js?v=20260408_ops"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -24,7 +24,7 @@
             --dash-border: rgba(29,36,78,0.12);
             --dash-danger: #ff6b8e;
             --dash-success: #28c7a5;
-            /* 侧栏：现代极简暗黑（Notion / Linear / Vercel 风格） */
+            /* 侧栏：现代极简暗黑（Notion / Linear / Vercel 风格�?*/
             --dash-sidebar-bg: #111827;
             --dash-sidebar-border: rgba(255,255,255,0.06);
             --dash-sidebar-text: #9CA3AF;
@@ -85,7 +85,7 @@
             font-weight: 600;
         }
 
-        /* 固定布局：避免页面底部多余滚动条；侧栏内部滚动 */
+        /* 固定布局：避免页面底部多余滚动条；侧栏内部滚�?*/
         .layout-fixed .main-sidebar .sidebar {
             height: calc(100vh - var(--dash-brand-h));
             overflow-y: auto;
@@ -211,7 +211,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 8px 14px 8px 28px; /* 更紧凑 + 统一与图标对齐 */
+            padding: 8px 14px 8px 28px; /* 更紧�?+ 统一与图标对�?*/
             margin: 2px 0;
             border-radius: 10px;
             color: #9CA3AF;
@@ -604,7 +604,7 @@
                 </li>
                 <li class="nav-item">
                     <button type="button" class="btn btn-outline-secondary btn-sm admin-logout-btn" id="btnAdminLogout">
-                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
+                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退�?/span>
                     </button>
                 </li>
                 <li class="nav-item ml-2 d-none d-sm-flex">
@@ -622,7 +622,7 @@
                 <span class="brand-text font-weight-light"><i class="fas fa-star mr-1"></i>TikStar OPS</span>
             </a>
             <div class="sidebar">
-                <nav class="mt-2" aria-label="主导航">
+                <nav class="mt-2" aria-label="主导�?>
                     <div class="admin-sidenav">
                         <div class="admin-sidenav-section" data-i18n="admin.menu.overview">概览</div>
                         <a href="/admin.php" class="admin-sidenav-link {if $Request.controller == 'Index'}active{/if}">
@@ -637,12 +637,12 @@
                         </a>
 
                         <div class="admin-sidenav-section" data-i18n="admin.menu.groupCreator">达人</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Influencer' && $Request.controller != 'influencer' && $Request.controller != 'Distribute' && $Request.controller != 'distribute'}collapsed{/if} {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-creator" aria-expanded="{if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}true{else /}false{/if}" aria-controls="admin-nav-creator" role="button">
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Influencer' && $Request.controller != 'influencer' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'MessageTemplate' && $Request.controller != 'messagetemplate'}collapsed{/if} {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-creator" aria-expanded="{if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}true{else /}false{/if}" aria-controls="admin-nav-creator" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="users"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.groupCreatorMenu">达人运营</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-creator" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}show{/if}">
+                        <div id="admin-nav-creator" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/influencer" class="admin-sidenav-sublink {if $Request.controller == 'Influencer' || $Request.controller == 'influencer'}active{/if}">
@@ -654,6 +654,12 @@
                                     <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
                                         <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">达人链</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/message_template" class="admin-sidenav-sublink {if $Request.controller == 'MessageTemplate' || $Request.controller == 'messagetemplate'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="message-square"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.messageTemplates">话术</span>
                                     </a>
                                 </li>
                             </ul>
@@ -758,7 +764,7 @@
                                 <li>
                                     <a href="/admin.php/auth/logout" class="admin-sidenav-sublink">
                                         <span class="admin-sidenav-subico"><i data-lucide="log-out"></i></span>
-                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.logout">退出</span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.logout">退�?/span>
                                     </a>
                                 </li>
                             </ul>
@@ -767,11 +773,11 @@
                         <div class="admin-sidenav-footer">
                             <div class="rowline">
                                 <span class="k">设备</span>
-                                <span class="v" id="sbDeviceCount">—</span>
+                                <span class="v" id="sbDeviceCount">�?/span>
                             </div>
                             <div class="rowline">
-                                <span class="k">上传量</span>
-                                <span class="v" id="sbUploadsSize">—</span>
+                                <span class="k">上传�?/span>
+                                <span class="v" id="sbUploadsSize">�?/span>
                             </div>
                             <div class="rowline">
                                 <span class="k">版本</span>
@@ -780,12 +786,12 @@
                             <div class="rowline">
                                 <span class="k">账号</span>
                                 <span class="muted text-truncate" style="max-width: 120px;" title="{:session('admin_username') ?: ''}">
-                                    {:session('admin_username') ?: '—'}
+                                    {:session('admin_username') ?: '�?}
                                 </span>
                             </div>
                             <div class="rowline">
                                 <button type="button" class="btn btn-outline-secondary btn-sm w-100 admin-logout-btn" id="btnAdminLogout2">
-                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
+                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退�?/span>
                                 </button>
                             </div>
                             <div class="rowline">
@@ -846,12 +852,12 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="confirmTitle">请确认</h5>
+                    <h5 class="modal-title" id="confirmTitle">请确�?/h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body" id="confirmMessage">确认执行该操作吗？</div>
+                <div class="modal-body" id="confirmMessage">确认执行该操作吗�?/div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-danger" id="confirmOkBtn">确认</button>
@@ -895,7 +901,7 @@
                     toastEl.toast('show');
                 },
                 confirm(message, onOk) {
-                    confirmMessage.text(message || '确认执行该操作吗？');
+                    confirmMessage.text(message || '确认执行该操作吗�?);
                     confirmCallback = onOk;
                     confirmModal.modal('show');
                 }
@@ -912,7 +918,7 @@
         });
     </script>
     <script>
-        // 侧栏底部信息：设备数量 / uploads 占用
+        // 侧栏底部信息：设备数�?/ uploads 占用
         $(function () {
             function formatBytes(bytes) {
                 const b = parseInt(bytes || 0, 10);
@@ -924,7 +930,7 @@
             }
             $.get('/admin.php/stats/overview').done(function (res) {
                 if (res && res.code === 0 && res.data) {
-                    $('#sbDeviceCount').text(res.data.devices ?? '—');
+                    $('#sbDeviceCount').text(res.data.devices ?? '�?);
                 }
             });
             $.get('/admin.php/stats/storageUsage').done(function (res) {
@@ -935,7 +941,7 @@
         });
     </script>
     <script>
-        // 侧栏分组自动展开：按当前 URL 匹配子菜单链接，避免服务端 $Request.controller 命名差异导致全部收起
+        // 侧栏分组自动展开：按当前 URL 匹配子菜单链接，避免服务�?$Request.controller 命名差异导致全部收起
         $(function () {
             const path = (window.location.pathname || '').replace(/\/+$/, '');
             const full = window.location.href || '';
@@ -984,13 +990,12 @@
         });
     </script>
     <script>
-        // 退出登录（全局）
-        $(function () {
+        // 退出登录（全局�?        $(function () {
             function doLogout() {
                 $.post('/admin.php/auth/logout', {}, function () {
                     window.location.href = '/admin.php/auth/login';
                 }).fail(function () {
-                    // 降级：后端 GET 退出（无 JS / POST 被拦截也能退出）
+                    // 降级：后�?GET 退出（�?JS / POST 被拦截也能退出）
                     window.location.href = '/admin.php/auth/logout';
                 });
             }
@@ -999,8 +1004,7 @@
         });
     </script>
     <script>
-        // i18n（全局：layout 菜单 + 顶栏/侧栏切换）
-        (function () {
+        // i18n（全局：layout 菜单 + 顶栏/侧栏切换�?        (function () {
             if (!window.AppI18n) return;
             const lang = window.AppI18n.getLang('zh');
             window.AppI18n.applyDom(document);

@@ -125,6 +125,8 @@ class Product extends BaseController
                 'id' => $pid,
                 'name' => (string) ($p->name ?? ''),
                 'goods_url' => (string) ($p->goods_url ?? ''),
+                'thumb_url' => (string) ($p->thumb_url ?? ''),
+                'tiktok_shop_url' => (string) ($p->tiktok_shop_url ?? ''),
                 'status' => (int) ($p->status ?? 0),
                 'sort_order' => (int) ($p->sort_order ?? 0),
                 'total_videos' => (int) ($st['total_videos'] ?? 0),
@@ -158,6 +160,8 @@ class Product extends BaseController
             ProductModel::create([
                 'name' => $name,
                 'goods_url' => trim((string) ($data['goods_url'] ?? '')) ?: null,
+                'thumb_url' => trim((string) ($data['thumb_url'] ?? '')) ?: null,
+                'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,
                 'status' => (int) ($data['status'] ?? 1),
                 'sort_order' => (int) ($data['sort_order'] ?? 0),
             ]);
@@ -178,6 +182,8 @@ class Product extends BaseController
             ProductModel::where('id', $id)->update([
                 'name' => $name,
                 'goods_url' => trim((string) ($data['goods_url'] ?? '')) ?: null,
+                'thumb_url' => trim((string) ($data['thumb_url'] ?? '')) ?: null,
+                'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,
                 'status' => (int) ($data['status'] ?? 1),
                 'sort_order' => (int) ($data['sort_order'] ?? 0),
             ]);
@@ -195,5 +201,40 @@ class Product extends BaseController
         $id = $this->request->param('id');
         ProductModel::destroy($id);
         return json(['code' => 0, 'msg' => '删除成功']);
+    }
+
+    /**
+     * 上传商品缩略图 → public/uploads/product_thumbs/{Ymd}/
+     */
+    public function uploadThumb()
+    {
+        if (!$this->request->isPost()) {
+            return json(['code' => 1, 'msg' => '仅支持 POST']);
+        }
+        $file = $this->request->file('file');
+        if (!$file) {
+            return json(['code' => 1, 'msg' => '请选择图片']);
+        }
+        $ext = strtolower((string) $file->extension());
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            return json(['code' => 1, 'msg' => '仅支持 jpg/png/gif/webp']);
+        }
+        if ($file->getSize() > 5 * 1024 * 1024) {
+            return json(['code' => 1, 'msg' => '图片不超过 5MB']);
+        }
+        $dateStr = date('Ymd');
+        $baseDir = root_path() . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'product_thumbs' . DIRECTORY_SEPARATOR . $dateStr . DIRECTORY_SEPARATOR;
+        if (!is_dir($baseDir) && !mkdir($baseDir, 0755, true) && !is_dir($baseDir)) {
+            return json(['code' => 1, 'msg' => '无法创建上传目录']);
+        }
+        $saveName = bin2hex(random_bytes(8)) . '.' . $ext;
+        try {
+            $file->move($baseDir, $saveName);
+        } catch (\Throwable $e) {
+            return json(['code' => 1, 'msg' => '上传失败：' . $e->getMessage()]);
+        }
+        $url = '/uploads/product_thumbs/' . $dateStr . '/' . $saveName;
+
+        return json(['code' => 0, 'msg' => 'ok', 'data' => ['url' => $url]]);
     }
 }

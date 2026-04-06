@@ -19,7 +19,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260414_full_sync"></script>
+<script src="/static/i18n/i18n.js?v=20260408_ops"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -47,7 +47,7 @@
   function parseJsonBody(res, text) {
     if (res.status === 413) {
       throw new Error(
-        '文件超过服务器允许的上传大小（HTTP 413）。请压缩安装包、改用下载直链，或在服务器调大：Nginx client_max_body_size、PHP upload_max_filesize/post_max_size（详见 requirements.md）。'
+        '文件超过服务器允许的上传大小（HTTP 413）。请压缩安装包、改用下载直链，或在服务器调大：Nginx client_max_body_size、PHP upload_max_filesize/post_max_size（详�?requirements.md）�?
       );
     }
     try {
@@ -56,8 +56,8 @@
       const html = text && String(text).trim().startsWith('<');
       throw new Error(
         html
-          ? ('服务器返回了网页而非 JSON（常见：未登录、404、PHP 报错）。HTTP ' + res.status)
-          : ('无法解析接口返回（HTTP ' + res.status + '）')
+          ? ('服务器返回了网页而非 JSON（常见：未登录�?04、PHP 报错）。HTTP ' + res.status)
+          : ('无法解析接口返回（HTTP ' + res.status + '�?)
       );
     }
   }
@@ -75,7 +75,7 @@
     const text = await res.text();
     const j = parseJsonBody(res, text);
     if (j && j.code === 401) {
-      throw new Error(j.msg || '未登录或会话已过期，请刷新页面重新登录');
+      throw new Error(j.msg || '未登录或会话已过期，请刷新页面重新登�?);
     }
     return j;
   }
@@ -115,7 +115,7 @@
           });
           const text = await res.text();
           const json = parseJsonBody(res, text);
-          if (json && json.code === 401) throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登录');
+          if (json && json.code === 401) throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登�?);
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
@@ -195,7 +195,7 @@
           const text = await res.text();
           const json = parseJsonBody(res, text);
           if (json && json.code === 401) {
-            throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登录');
+            throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登�?);
           }
           if (json && json.code === 0 && json.data && json.data.url) {
             form.download_url = json.data.url;
@@ -290,8 +290,8 @@
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div style="font-size:18px;font-weight:600;color:#111827;">{{ lang==='en' ? 'Desktop releases' : '版本发布' }}</div>
             <div class="admin-action-buttons">
-              <el-button @click="openPublicDownloadPage">{{ lang==='en' ? 'Public downloads' : '公开下载页' }}</el-button>
-              <el-button type="primary" @click="openAdd">{{ lang==='en' ? 'New release' : '发布新版本' }}</el-button>
+              <el-button @click="openPublicDownloadPage">{{ lang==='en' ? 'Public downloads' : '公开下载�? }}</el-button>
+              <el-button type="primary" @click="openAdd">{{ lang==='en' ? 'New release' : '发布新版�? }}</el-button>
             </div>
           </div>
         </div>
@@ -301,8 +301,8 @@
             <el-input v-model="query.keyword" clearable size="default"
               :placeholder="lang==='en'?'Version / notes':'版本号或更新说明'" style="width:240px;flex:0 0 auto;" @keyup.enter="onSearch" />
             <el-select v-model="query.status" clearable size="default" :placeholder="tt('common.statusAll')" style="width:140px;flex:0 0 auto;">
-              <el-option :label="lang==='en'?'Published':'已发布'" value="1" />
-              <el-option :label="lang==='en'?'Offline':'已下线'" value="0" />
+              <el-option :label="lang==='en'?'Published':'已发�?" value="1" />
+              <el-option :label="lang==='en'?'Offline':'已下�?" value="0" />
             </el-select>
             <div class="admin-filter-buttons">
               <el-button type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
@@ -313,15 +313,15 @@
 
         <el-table :data="rows" stripe row-key="id" v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle">
           <el-table-column prop="id" label="ID" width="72" />
-          <el-table-column prop="version" :label="lang==='en'?'Version':'版本号'" width="120" />
+          <el-table-column prop="version" :label="lang==='en'?'Version':'版本�?" width="120" />
           <el-table-column :label="lang==='en'?'Notes':'更新日志'" min-width="220">
             <template #default="{ row }">
-              <div class="notes-preview" :title="row.release_notes">{{ row.release_notes || '—' }}</div>
+              <div class="notes-preview" :title="row.release_notes">{{ row.release_notes || '�? }}</div>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Force':'强制更新'" width="100">
             <template #default="{ row }">
-              <el-tag size="small" :type="row.is_mandatory ? 'warning' : 'info'">{{ row.is_mandatory ? (lang==='en'?'Yes':'是') : (lang==='en'?'No':'否') }}</el-tag>
+              <el-tag size="small" :type="row.is_mandatory ? 'warning' : 'info'">{{ row.is_mandatory ? (lang==='en'?'Yes':'�?) : (lang==='en'?'No':'�?) }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column :label="tt('common.statusEnabled')" width="100">
@@ -335,7 +335,7 @@
           <el-table-column :label="lang==='en'?'Download':'下载'" width="88" align="center">
             <template #default="{ row }">
               <el-button v-if="packageHref(row)" link type="primary" @click="openPackage(row)">{{ lang==='en' ? 'Download' : '下载' }}</el-button>
-              <span v-else style="color:#9ca3af;font-size:13px;">—</span>
+              <span v-else style="color:#9ca3af;font-size:13px;">�?/span>
             </template>
           </el-table-column>
           <el-table-column :label="lang==='en'?'Actions':'操作'" width="200" fixed="right">
@@ -351,20 +351,20 @@
         </el-table>
 
         <div class="admin-footer-pagination">
-          <span style="color:#6b7280;font-size:13px;">{{ lang==='en' ? ('Total ' + total) : ('共 ' + total + ' 条') }}</span>
+          <span style="color:#6b7280;font-size:13px;">{{ lang==='en' ? ('Total ' + total) : ('�?' + total + ' �?) }}</span>
           <el-pagination v-model:current-page="page" v-model:page-size="pageSize" background layout="prev, pager, next"
             :total="total" @update:current-page="(p)=>{page=p;fetchList();}" @update:page-size="(s)=>{pageSize=s;page=1;fetchList();}" />
         </div>
 
-        <el-dialog v-model="formVisible" :title="formMode==='add' ? (lang==='en'?'New release':'发布新版本') : tt('common.edit')" width="520px" destroy-on-close>
+        <el-dialog v-model="formVisible" :title="formMode==='add' ? (lang==='en'?'New release':'发布新版�?) : tt('common.edit')" width="520px" destroy-on-close>
           <el-form label-width="100px">
-            <el-form-item :label="lang==='en'?'Version':'版本号'" required>
+            <el-form-item :label="lang==='en'?'Version':'版本�?" required>
               <el-input v-model="form.version" placeholder="1.0.0" />
             </el-form-item>
             <el-form-item :label="lang==='en'?'Notes':'更新说明'">
               <el-input v-model="form.release_notes" type="textarea" :rows="4" />
             </el-form-item>
-            <el-form-item :label="lang==='en'?'Package URL':'安装包'">
+            <el-form-item :label="lang==='en'?'Package URL':'安装�?">
               <el-input v-model="form.download_url" type="textarea" :rows="2" :placeholder="lang==='en'?'Direct link':'直链，或下方上传'" />
               <el-upload class="mt-2" :show-file-list="false" :http-request="customUpload" :disabled="uploadLoading">
                 <el-button size="small" :loading="uploadLoading">{{ lang==='en' ? 'Upload file' : '上传附件' }}</el-button>
@@ -372,13 +372,13 @@
               <div class="mt-1 text-muted" style="font-size:12px;color:#6b7280;line-height:1.5;">
                 {{ lang==='en'
                   ? 'Large installers: use a direct URL, or raise Nginx/PHP upload limits (see docs).'
-                  : '安装包较大时建议填外链；本地上传若出现 413，需在服务器调大上传限制（见 requirements.md）。' }}
+                  : '安装包较大时建议填外链；本地上传若出�?413，需在服务器调大上传限制（见 requirements.md）�? }}
               </div>
             </el-form-item>
             <el-form-item :label="lang==='en'?'Force update':'强制更新'">
               <el-switch v-model="form.is_mandatory" :active-value="1" :inactive-value="0" />
             </el-form-item>
-            <el-form-item :label="lang==='en'?'Status':'状态'">
+            <el-form-item :label="lang==='en'?'Status':'状�?">
               <el-radio-group v-model="form.status">
                 <el-radio-button :label="1">{{ lang==='en'?'Published':'发布' }}</el-radio-button>
                 <el-radio-button :label="0">{{ lang==='en'?'Offline':'下线' }}</el-radio-button>
