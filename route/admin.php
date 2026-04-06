@@ -147,8 +147,18 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('influencer/sampleCsv', 'app\controller\admin\Influencer@sampleCsv');
     Route::get('influencer/exportCsv', 'app\controller\admin\Influencer@exportCsv');
     Route::post('influencer/update', 'app\controller\admin\Influencer@update');
+    Route::post('influencer/updateStatus', 'app\controller\admin\Influencer@updateStatus');
+    Route::get('influencer/outreachHistory', 'app\controller\admin\Influencer@outreachHistory');
     Route::post('influencer/delete', 'app\controller\admin\Influencer@delete');
     Route::get('influencer', 'app\controller\admin\Influencer@index');
+
+    // 分类管理（商品/达人）
+    Route::get('category/list', 'app\controller\admin\Category@listJson');
+    Route::get('category/listJson', 'app\controller\admin\Category@listJson');
+    Route::get('category/options', 'app\controller\admin\Category@options');
+    Route::post('category/save', 'app\controller\admin\Category@save');
+    Route::post('category/delete', 'app\controller\admin\Category@delete');
+    Route::get('category', 'app\controller\admin\Category@index');
 
     // 达人联系话术模板
     Route::get('message_template/list', 'app\controller\admin\MessageTemplate@listJson');

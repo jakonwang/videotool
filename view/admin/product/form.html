@@ -21,8 +21,14 @@
                         <input type="text" id="name" name="name" class="form-control" value="{$info.name|default=''}" required placeholder="商品名称">
                     </div>
                     <div class="form-group">
-                        <label for="category_name">分类</label>
-                        <input type="text" id="category_name" name="category_name" class="form-control" value="{$info.category_name|default=''}" placeholder="如：美妆、鞋包、电子">
+                        <label for="category_id">分类</label>
+                        <select id="category_id" name="category_id" class="form-control">
+                            <option value="">请选择分类</option>
+                            {volist name="categories" id="cat"}
+                            <option value="{$cat.id}" {if isset($info) && $info.category_id == $cat.id}selected{/if}>{$cat.name}</option>
+                            {/volist}
+                        </select>
+                        <input type="hidden" id="category_name" name="category_name" value="{$info.category_name|default=''}">
                     </div>
                     <div class="form-group">
                         <label for="tiktok_shop_url">商品链接（TikTok）</label>
@@ -71,6 +77,24 @@
 {block name="script"}
 <script>
     $(function () {
+        function loadCategoryOptions() {
+            const $sel = $('#category_id');
+            const current = $sel.val() || '';
+            $.get('/admin.php/category/options?type=product')
+                .done(function (res) {
+                    if (!res || res.code !== 0 || !res.data || !Array.isArray(res.data.items)) return;
+                    let html = '<option value="">请选择分类</option>';
+                    res.data.items.forEach(function (item) {
+                        const id = String(item.id || '');
+                        const name = String(item.name || '');
+                        html += '<option value="' + id.replace(/"/g, '&quot;') + '">' + name + '</option>';
+                    });
+                    $sel.html(html);
+                    if (current) $sel.val(current);
+                    $sel.trigger('change');
+                });
+        }
+
         function syncThumbHidden() {
             $('#thumb_url').val($('#thumb_url_text').val().trim());
         }
@@ -121,6 +145,13 @@
                 btn.prop('disabled', false);
             });
         });
+
+        $('#category_id').on('change', function () {
+            var name = $(this).find('option:selected').text() || '';
+            if (!$(this).val()) name = '';
+            $('#category_name').val(name);
+        }).trigger('change');
+        loadCategoryOptions();
 
         $('#product-form').on('submit', function (event) {
             event.preventDefault();

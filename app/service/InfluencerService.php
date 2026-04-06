@@ -133,7 +133,7 @@ class InfluencerService
     }
 
     /**
-     * 0 待联系 1 合作中 2 黑名单
+     * 0待联系 1已发私信 2已回复 3待寄样 4已寄样 5合作中 6黑名单
      */
     public static function parseStatus(string $raw): ?int
     {
@@ -143,16 +143,25 @@ class InfluencerService
         }
         if (preg_match('/^\d+$/', $s)) {
             $n = (int) $s;
-            if ($n >= 0 && $n <= 2) {
+            if ($n >= 0 && $n <= 6) {
                 return $n;
             }
         }
         $l = mb_strtolower($s, 'UTF-8');
         if (str_contains($l, '黑') || str_contains($l, 'block')) {
+            return 6;
+        }
+        if (str_contains($l, '合作') || str_contains($l, 'active')) {
+            return 5;
+        }
+        if (str_contains($l, '私信') || str_contains($l, 'dm')) {
+            return 1;
+        }
+        if (str_contains($l, '回复') || str_contains($l, 'reply')) {
             return 2;
         }
-        if (str_contains($l, '合作') || str_contains($l, 'ok') || str_contains($l, 'active')) {
-            return 1;
+        if (str_contains($l, '寄样') || str_contains($l, 'sample')) {
+            return 3;
         }
         if (str_contains($l, '待') || str_contains($l, 'pending') || str_contains($l, '新')) {
             return 0;
@@ -481,7 +490,7 @@ class InfluencerService
             $r = trim((string) $row[$map['region']]);
             $region = $r !== '' ? mb_substr($r, 0, 64) : null;
         }
-        $status = 1;
+        $status = 0;
         if (isset($map['status']) && $map['status'] !== null && isset($row[$map['status']])) {
             $st = self::parseStatus((string) $row[$map['status']]);
             if ($st !== null) {

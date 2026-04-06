@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace app\controller\admin;
 
 use app\BaseController;
+use app\model\Category as CategoryModel;
 use app\model\Influencer as InfluencerModel;
+use app\model\OutreachLog as OutreachLogModel;
 use app\service\InfluencerImportTaskRunner;
 use app\service\InfluencerService;
 use think\facade\Db;
@@ -47,6 +49,9 @@ class Influencer extends BaseController
         $keyword = trim((string) $this->request->param('keyword', ''));
         $status = $this->request->param('status', null);
         $category = trim((string) $this->request->param('category', ''));
+        $categoryId = (int) $this->request->param('category_id', 0);
+        $tag = trim((string) $this->request->param('tag', ''));
+        $sortByContact = (int) $this->request->param('sort_by_contact', 0);
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
         if ($pageSize <= 0) {
@@ -57,6 +62,11 @@ class Influencer extends BaseController
         }
 
         $query = InfluencerModel::order('id', 'desc');
+        if ($sortByContact === 1) {
+            $query = InfluencerModel::orderRaw('last_contacted_at IS NULL ASC')
+                ->order('last_contacted_at', 'desc')
+                ->order('id', 'desc');
+        }
         if ($keyword !== '') {
             $query->where(function ($sub) use ($keyword) {
                 $sub->whereLike('tiktok_id', '%' . $keyword . '%')
@@ -66,8 +76,16 @@ class Influencer extends BaseController
         if ($status !== null && $status !== '') {
             $query->where('status', (int) $status);
         }
+        if ($categoryId > 0) {
+            $query->where('category_id', $categoryId);
+        }
         if ($category !== '') {
-            $query->where('category_name', $category);
+            $query->where(function ($sub) use ($category) {
+                $sub->where('category_name', $category)->whereOr('category_id', (int) $category);
+            });
+        }
+        if ($tag !== '') {
+            $query->whereLike('tags_json', '%' . $tag . '%');
         }
 
         $list = $query->paginate([
@@ -88,6 +106,7 @@ class Influencer extends BaseController
                 'id' => (int) $row->id,
                 'tiktok_id' => (string) ($row->tiktok_id ?? ''),
                 'category_name' => (string) ($row->category_name ?? ''),
+                'category_id' => (int) ($row->category_id ?? 0),
                 'nickname' => (string) ($row->nickname ?? ''),
                 'avatar_url' => (string) ($row->avatar_url ?? ''),
                 'follower_count' => (int) ($row->follower_count ?? 0),
@@ -95,7 +114,11 @@ class Influencer extends BaseController
                 'contact_display' => $contactDisplay,
                 'contact_channels' => $channels,
                 'region' => (string) ($row->region ?? ''),
-                'status' => (int) ($row->status ?? 1),
+                'status' => (int) ($row->status ?? 0),
+                'sample_tracking_no' => (string) ($row->sample_tracking_no ?? ''),
+                'sample_status' => (int) ($row->sample_status ?? 0),
+                'tags' => $this->parseTags((string) ($row->tags_json ?? '')),
+                'last_contacted_at' => (string) ($row->last_contacted_at ?? ''),
                 'created_at' => (string) ($row->created_at ?? ''),
                 'updated_at' => (string) ($row->updated_at ?? ''),
             ];
@@ -103,11 +126,13 @@ class Influencer extends BaseController
 
         return $this->jsonOk([
             'items' => $items,
-            'categories' => InfluencerModel::whereNotNull('category_name')
-                ->where('category_name', '<>', '')
-                ->distinct(true)
-                ->order('category_name', 'asc')
-                ->column('category_name'),
+            'categories' => CategoryModel::where('type', 'influencer')
+                ->where('status', 1)
+                ->order('sort_order', 'asc')
+                ->order('id', 'desc')
+                ->field('id,name')
+                ->select()
+                ->toArray(),
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
@@ -315,9 +340,17 @@ class Influencer extends BaseController
             if (isset($payload['nickname'])) {
                 $row->nickname = trim((string) $payload['nickname']);
             }
-            if (array_key_exists('category_name', $payload)) {
-                $c = trim((string) $payload['category_name']);
-                $row->category_name = $c !== '' ? mb_substr($c, 0, 64) : null;
+            if (array_key_exists('category_id', $payload) || array_key_exists('category_name', $payload)) {
+                $categoryId = (int) ($payload['category_id'] ?? 0);
+                $categoryName = trim((string) ($payload['category_name'] ?? ''));
+                if ($categoryId > 0) {
+                    $cat = CategoryModel::where('id', $categoryId)->where('type', 'influencer')->find();
+                    if ($cat) {
+                        $categoryName = (string) ($cat->name ?? '');
+                    }
+                }
+                $row->category_id = $categoryId > 0 ? $categoryId : null;
+                $row->category_name = $categoryName !== '' ? mb_substr($categoryName, 0, 64) : null;
             }
             if (array_key_exists('avatar_url', $payload)) {
                 $a = trim((string) $payload['avatar_url']);
@@ -341,9 +374,27 @@ class Influencer extends BaseController
             }
             if (isset($payload['status'])) {
                 $st = (int) $payload['status'];
-                if ($st >= 0 && $st <= 2) {
+                if ($st >= 0 && $st <= 6) {
                     $row->status = $st;
                 }
+            }
+            if (array_key_exists('sample_tracking_no', $payload)) {
+                $s = trim((string) $payload['sample_tracking_no']);
+                $row->sample_tracking_no = $s !== '' ? mb_substr($s, 0, 64) : null;
+            }
+            if (array_key_exists('sample_status', $payload)) {
+                $ss = (int) $payload['sample_status'];
+                if ($ss < 0) {
+                    $ss = 0;
+                }
+                if ($ss > 2) {
+                    $ss = 2;
+                }
+                $row->sample_status = $ss;
+            }
+            if (array_key_exists('tags', $payload)) {
+                $tags = $this->normalizeTags($payload['tags']);
+                $row->tags_json = $tags !== [] ? json_encode($tags, JSON_UNESCAPED_UNICODE) : null;
             }
             $row->save();
 
@@ -387,6 +438,55 @@ class Influencer extends BaseController
         }
     }
 
+    public function updateStatus()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('仅支持 POST');
+        }
+        $payload = $this->parseJsonOrPost();
+        $id = (int) ($payload['id'] ?? 0);
+        $status = (int) ($payload['status'] ?? -1);
+        if ($id <= 0 || $status < 0 || $status > 6) {
+            return $this->jsonErr('参数错误');
+        }
+        $row = InfluencerModel::find($id);
+        if (!$row) {
+            return $this->jsonErr('记录不存在');
+        }
+        $row->status = $status;
+        $row->save();
+
+        return $this->jsonOk([], '已更新');
+    }
+
+    public function outreachHistory()
+    {
+        $id = (int) $this->request->param('influencer_id', 0);
+        if ($id <= 0) {
+            return $this->jsonErr('无效 influencer_id');
+        }
+        $rows = OutreachLogModel::where('influencer_id', $id)
+            ->order('id', 'desc')
+            ->limit(100)
+            ->select();
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row->id,
+                'template_id' => (int) ($row->template_id ?? 0),
+                'template_name' => (string) ($row->template_name ?? ''),
+                'template_lang' => (string) ($row->template_lang ?? 'zh'),
+                'product_id' => (int) ($row->product_id ?? 0),
+                'product_name' => (string) ($row->product_name ?? ''),
+                'channel' => (string) ($row->channel ?? 'render'),
+                'rendered_body' => (string) ($row->rendered_body ?? ''),
+                'created_at' => (string) ($row->created_at ?? ''),
+            ];
+        }
+
+        return $this->jsonOk(['items' => $items]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -401,5 +501,52 @@ class Influencer extends BaseController
         }
 
         return $this->request->post();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseTags(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+        $j = json_decode($raw, true);
+        if (!is_array($j)) {
+            return [];
+        }
+
+        return $this->normalizeTags($j);
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<string>
+     */
+    private function normalizeTags($raw): array
+    {
+        $arr = [];
+        if (is_string($raw)) {
+            $parts = preg_split('/[,，\n]/u', $raw) ?: [];
+            foreach ($parts as $part) {
+                $part = trim((string) $part);
+                if ($part !== '') {
+                    $arr[] = mb_substr($part, 0, 24);
+                }
+            }
+        } elseif (is_array($raw)) {
+            foreach ($raw as $item) {
+                $part = trim((string) $item);
+                if ($part !== '') {
+                    $arr[] = mb_substr($part, 0, 24);
+                }
+            }
+        }
+        $arr = array_values(array_unique($arr));
+        if (count($arr) > 20) {
+            $arr = array_slice($arr, 0, 20);
+        }
+
+        return $arr;
     }
 }

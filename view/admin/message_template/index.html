@@ -1,4 +1,4 @@
-﻿{extend name="admin/common/layout" /}
+{extend name="admin/common/layout" /}
 
 {block name="title"}璇濇湳{/block}
 {block name="page_title"}{/block}
@@ -24,7 +24,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260406_category1"></script>
+<script src="/static/i18n/i18n.js?v=20260408_modules"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -46,7 +46,7 @@
       const items = ref([]);
       const dlg = ref(false);
       const saving = ref(false);
-      const form = reactive({ id: 0, name: '', body: '', sort_order: 0, status: 1 });
+      const form = reactive({ id: 0, name: '', template_key: '', lang: 'zh', body: '', sort_order: 0, status: 1 });
 
       async function fetchList() {
         loading.value = true;
@@ -65,6 +65,8 @@
       function openAdd() {
         form.id = 0;
         form.name = '';
+        form.template_key = '';
+        form.lang = 'zh';
         form.body = '';
         form.sort_order = 0;
         form.status = 1;
@@ -74,6 +76,8 @@
       function openEdit(row) {
         form.id = row.id;
         form.name = row.name || '';
+        form.template_key = row.template_key || '';
+        form.lang = row.lang || 'zh';
         form.body = row.body || '';
         form.sort_order = row.sort_order != null ? Number(row.sort_order) : 0;
         form.status = row.status != null ? Number(row.status) : 1;
@@ -139,6 +143,8 @@
         <div class="admin-mt-hint">{{ tt('page.messageTemplate.hint') }}</div>
         <el-table :data="rows" v-loading="loading" stripe>
           <el-table-column prop="name" :label="tt('page.messageTemplate.colName')" min-width="140" />
+          <el-table-column prop="template_key" label="Key" min-width="120" />
+          <el-table-column prop="lang" label="Lang" width="90" />
           <el-table-column :label="tt('page.messageTemplate.colBody')" min-width="220">
             <template #default="{ row }"><div class="body-preview" :title="row.body">{{ row.body || '鈥? }}</div></template>
           </el-table-column>
@@ -161,6 +167,16 @@
           <el-form label-width="88px">
             <el-form-item :label="tt('page.messageTemplate.colName')">
               <el-input v-model="form.name" :placeholder="tt('page.messageTemplate.phName')" />
+            </el-form-item>
+            <el-form-item label="Key">
+              <el-input v-model="form.template_key" placeholder="same key for multi-language variants" />
+            </el-form-item>
+            <el-form-item label="Lang">
+              <el-select v-model="form.lang" style="width:140px;">
+                <el-option label="中文" value="zh" />
+                <el-option label="English" value="en" />
+                <el-option label="Tiếng Việt" value="vi" />
+              </el-select>
             </el-form-item>
             <el-form-item :label="tt('page.messageTemplate.colSort')">
               <el-input-number v-model="form.sort_order" :min="0" :step="1" style="width:140px;" />

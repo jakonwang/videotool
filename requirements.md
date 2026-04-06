@@ -4,6 +4,20 @@
 
 ## TikStar OPS 系统模块（2026-04）
 
+### 分类 + 达人 CRM + 话术增强（2026-04-06）
+
+- 新增后台模块 **分类管理**：`/admin.php/category`，支持 `product` / `influencer` 两类分类的 CRUD（名称、类型、排序、状态），接口：`listJson`、`options`、`save`、`delete`。
+- 商品表单 `view/admin/product/form.html` 改为分类下拉选择（`category_id` + `category_name` 双写入），选项来源 `GET /admin.php/category/options?type=product`。
+- 达人名录 `view/admin/influencer/index.html` 升级为 CRM：  
+  - `status` 扩展为 `0待联系/1已发私信/2已回复/3待寄样/4已寄样/5合作中/6黑名单`；  
+  - 增加快捷状态切换；  
+  - 支持 `category_id` 选择、标签（`tags_json`）筛选、`last_contacted_at` 排序；  
+  - 编辑弹窗新增寄样字段（`sample_tracking_no`、`sample_status`）；  
+  - 新增联系历史弹窗（数据源 `GET /admin.php/influencer/outreachHistory`）。
+- 话术渲染增强：`MessageOutreachService` 新增变量 `{{current_time_period}}`、`{{random_emoji}}`；模板支持 `lang(zh/en/vi)` + `template_key` 多语言分组，渲染时按达人 `region` 自动选语言版本。
+- 新增外联历史表 `outreach_logs`：每次渲染 `POST /admin.php/message_template/render` 记录模板、语言、商品与渲染正文，并自动更新 `influencers.last_contacted_at`。
+- 数据迁移脚本：`php database/run_migration_category_crm_outreach.php`（Windows 用反斜杠路径，Linux 用正斜杠路径）。
+
 ### 定位
 
 - **TikStar OPS** 作为运营中台，整合：**寻款**（商品/款式图搜索索引）、**达人运营**（TikTok `@handle` 名录、联系信息导入与更新、达人分发链、联系话术）、**素材库**（视频与商品归类、批量上传）、**终端**（平台/设备）与**系统**（设置、用户、桌面端发卡/版本、缓存与异常）。

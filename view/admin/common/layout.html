@@ -637,12 +637,12 @@
                         </a>
 
                         <div class="admin-sidenav-section" data-i18n="admin.menu.groupCreator">达人</div>
-                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Influencer' && $Request.controller != 'influencer' && $Request.controller != 'Distribute' && $Request.controller != 'distribute'}collapsed{/if} {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-creator" aria-expanded="{if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}true{else /}false{/if}" aria-controls="admin-nav-creator" role="button">
+                        <a href="javascript:void(0)" class="admin-sidenav-group-head {if $Request.controller != 'Influencer' && $Request.controller != 'influencer' && $Request.controller != 'Distribute' && $Request.controller != 'distribute' && $Request.controller != 'Category' && $Request.controller != 'category'}collapsed{/if} {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'Category' || $Request.controller == 'category'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-creator" aria-expanded="{if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'Category' || $Request.controller == 'category'}true{else /}false{/if}" aria-controls="admin-nav-creator" role="button">
                             <span class="admin-sidenav-ico"><i data-lucide="users"></i></span>
                             <span class="admin-sidenav-txt" data-i18n="admin.menu.groupCreatorMenu">达人运营</span>
                             <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
                         </a>
-                        <div id="admin-nav-creator" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute'}show{/if}">
+                        <div id="admin-nav-creator" class="collapse admin-sidenav-subwrap {if $Request.controller == 'Influencer' || $Request.controller == 'influencer' || $Request.controller == 'Distribute' || $Request.controller == 'distribute' || $Request.controller == 'Category' || $Request.controller == 'category'}show{/if}">
                             <ul class="admin-sidenav-sub">
                                 <li>
                                     <a href="/admin.php/influencer" class="admin-sidenav-sublink {if $Request.controller == 'Influencer' || $Request.controller == 'influencer'}active{/if}">
@@ -654,6 +654,12 @@
                                     <a href="/admin.php/distribute" class="admin-sidenav-sublink {if $Request.controller == 'Distribute' || $Request.controller == 'distribute'}active{/if}">
                                         <span class="admin-sidenav-subico"><i data-lucide="link-2"></i></span>
                                         <span class="admin-sidenav-subtxt" data-i18n="admin.menu.distribute">达人链</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="/admin.php/category" class="admin-sidenav-sublink {if $Request.controller == 'Category' || $Request.controller == 'category'}active{/if}">
+                                        <span class="admin-sidenav-subico"><i data-lucide="tag"></i></span>
+                                        <span class="admin-sidenav-subtxt" data-i18n="admin.menu.category">分类</span>
                                     </a>
                                 </li>
                             </ul>

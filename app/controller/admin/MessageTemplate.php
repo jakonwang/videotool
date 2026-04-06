@@ -4,8 +4,11 @@ declare(strict_types=1);
 namespace app\controller\admin;
 
 use app\BaseController;
+use app\model\Influencer as InfluencerModel;
 use app\model\MessageTemplate as MessageTemplateModel;
+use app\model\OutreachLog as OutreachLogModel;
 use app\service\MessageOutreachService;
+use think\facade\Db;
 use think\facade\View;
 
 /**
@@ -41,8 +44,12 @@ class MessageTemplate extends BaseController
 
         $query = MessageTemplateModel::order('sort_order', 'asc')->order('id', 'desc');
         $onlyEnabled = (string) $this->request->param('enabled', '');
+        $lang = trim((string) $this->request->param('lang', ''));
         if ($onlyEnabled === '1') {
             $query->where('status', 1);
+        }
+        if (in_array($lang, ['zh', 'en', 'vi'], true)) {
+            $query->where('lang', $lang);
         }
 
         $list = $query->paginate([
@@ -56,6 +63,8 @@ class MessageTemplate extends BaseController
             $items[] = [
                 'id' => (int) $row->id,
                 'name' => (string) ($row->name ?? ''),
+                'template_key' => (string) ($row->template_key ?? ''),
+                'lang' => (string) ($row->lang ?? 'zh'),
                 'body' => (string) ($row->body ?? ''),
                 'sort_order' => (int) ($row->sort_order ?? 0),
                 'status' => (int) ($row->status ?? 1),
@@ -83,6 +92,11 @@ class MessageTemplate extends BaseController
             return $this->jsonErr('请填写模板名称');
         }
         $body = (string) ($payload['body'] ?? '');
+        $lang = trim((string) ($payload['lang'] ?? 'zh'));
+        if (!in_array($lang, ['zh', 'en', 'vi'], true)) {
+            $lang = 'zh';
+        }
+        $templateKey = trim((string) ($payload['template_key'] ?? ''));
         $sortOrder = (int) ($payload['sort_order'] ?? 0);
         $status = (int) ($payload['status'] ?? 1);
         $status = $status === 0 ? 0 : 1;
@@ -93,17 +107,25 @@ class MessageTemplate extends BaseController
                 return $this->jsonErr('记录不存在');
             }
             $row->name = mb_substr($name, 0, 128);
+            $row->template_key = $templateKey !== '' ? mb_substr($templateKey, 0, 64) : (string) ($row->template_key ?? ('tpl_' . $row->id));
+            $row->lang = $lang;
             $row->body = $body;
             $row->sort_order = $sortOrder;
             $row->status = $status;
             $row->save();
         } else {
-            MessageTemplateModel::create([
+            $new = MessageTemplateModel::create([
                 'name' => mb_substr($name, 0, 128),
+                'template_key' => $templateKey !== '' ? mb_substr($templateKey, 0, 64) : '',
+                'lang' => $lang,
                 'body' => $body,
                 'sort_order' => $sortOrder,
                 'status' => $status,
             ]);
+            if ((string) ($new->template_key ?? '') === '') {
+                $new->template_key = 'tpl_' . (int) $new->id;
+                $new->save();
+            }
         }
 
         return $this->jsonOk([], '已保存');
@@ -143,6 +165,32 @@ class MessageTemplate extends BaseController
         if (!$tpl || (int) $tpl->status !== 1) {
             return $this->jsonErr('模板不存在或未启用');
         }
+        $inf = InfluencerModel::find($influencerId);
+        if (!$inf) {
+            return $this->jsonErr('达人不存在');
+        }
+        $wantedLang = MessageOutreachService::inferTemplateLangByRegion((string) ($inf->region ?? ''));
+        $pickedTpl = $tpl;
+        $tplKey = trim((string) ($tpl->template_key ?? ''));
+        if ($tplKey !== '') {
+            $variant = MessageTemplateModel::where('template_key', $tplKey)
+                ->where('lang', $wantedLang)
+                ->where('status', 1)
+                ->order('id', 'desc')
+                ->find();
+            if ($variant) {
+                $pickedTpl = $variant;
+            }
+        } elseif (in_array((string) ($tpl->lang ?? 'zh'), ['zh', 'en', 'vi'], true) && (string) ($tpl->lang ?? 'zh') !== $wantedLang) {
+            $variant2 = MessageTemplateModel::where('name', (string) ($tpl->name ?? ''))
+                ->where('lang', $wantedLang)
+                ->where('status', 1)
+                ->order('id', 'desc')
+                ->find();
+            if ($variant2) {
+                $pickedTpl = $variant2;
+            }
+        }
         $baseUrl = MessageOutreachService::adminBaseUrl();
         $vars = MessageOutreachService::buildRenderVars(
             $influencerId,
@@ -152,18 +200,41 @@ class MessageTemplate extends BaseController
         if ($vars === []) {
             return $this->jsonErr('达人不存在');
         }
-        $text = MessageOutreachService::renderBody((string) $tpl->body, $vars);
+        $text = MessageOutreachService::renderBody((string) $pickedTpl->body, $vars);
         $wa = '';
         if (($vars['whatsapp'] ?? '') !== '') {
             $wa = MessageOutreachService::waMeWithText($vars['whatsapp'], $text);
         }
         $zalo = ($vars['zalo'] ?? '') !== '' ? ('https://zalo.me/' . $vars['zalo']) : '';
 
+        // 渲染即视作一次联系动作，更新最后联系时间并记录历史
+        $now = date('Y-m-d H:i:s');
+        InfluencerModel::where('id', $influencerId)->update(['last_contacted_at' => $now]);
+        $productName = '';
+        if ($productId > 0) {
+            $p = Db::name('products')->where('id', $productId)->find();
+            if (is_array($p)) {
+                $productName = (string) ($p['name'] ?? '');
+            }
+        }
+        OutreachLogModel::create([
+            'influencer_id' => $influencerId,
+            'template_id' => (int) $pickedTpl->id,
+            'template_name' => (string) ($pickedTpl->name ?? ''),
+            'template_lang' => (string) ($pickedTpl->lang ?? 'zh'),
+            'product_id' => $productId > 0 ? $productId : null,
+            'product_name' => $productName !== '' ? $productName : null,
+            'channel' => 'render',
+            'rendered_body' => $text,
+        ]);
+
         return $this->jsonOk([
             'text' => $text,
             'wa_url' => $wa,
             'zalo_url' => $zalo,
             'vars' => $vars,
+            'template_lang' => (string) ($pickedTpl->lang ?? 'zh'),
+            'template_id' => (int) $pickedTpl->id,
         ]);
     }
 

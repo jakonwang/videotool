@@ -16,6 +16,7 @@ class Product extends Model
         'id'          => 'int',
         'name'        => 'string',
         'category_name' => 'string',
+        'category_id' => 'int',
         'goods_url'   => 'string',
         'thumb_url'   => 'string',
         'tiktok_shop_url' => 'string',

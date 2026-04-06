@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace app\controller\admin;
 
 use app\BaseController;
+use app\model\Category as CategoryModel;
 use app\model\Product as ProductModel;
 use think\facade\Db;
 use think\facade\View;
@@ -83,7 +84,9 @@ class Product extends BaseController
             $query->where('status', (int) $status);
         }
         if ($category !== '') {
-            $query->where('category_name', $category);
+            $query->where(function ($sub) use ($category) {
+                $sub->where('category_name', $category)->whereOr('category_id', (int) $category);
+            });
         }
 
         $list = $query->paginate([
@@ -129,6 +132,7 @@ class Product extends BaseController
                 'id' => $pid,
                 'name' => (string) ($p->name ?? ''),
                 'category_name' => (string) ($p->category_name ?? ''),
+                'category_id' => (int) ($p->category_id ?? 0),
                 'goods_url' => (string) ($p->goods_url ?? ''),
                 'thumb_url' => (string) ($p->thumb_url ?? ''),
                 'tiktok_shop_url' => (string) ($p->tiktok_shop_url ?? ''),
@@ -152,6 +156,13 @@ class Product extends BaseController
                     ->distinct(true)
                     ->order('category_name', 'asc')
                     ->column('category_name'),
+                'category_options' => CategoryModel::where('type', 'product')
+                    ->where('status', 1)
+                    ->order('sort_order', 'asc')
+                    ->order('id', 'desc')
+                    ->field('id,name')
+                    ->select()
+                    ->toArray(),
                 'total' => (int) $list->total(),
                 'page' => (int) $list->currentPage(),
                 'page_size' => (int) $list->listRows(),
@@ -167,9 +178,18 @@ class Product extends BaseController
             if ($name === '') {
                 return json(['code' => 1, 'msg' => '请填写商品名称']);
             }
+            $categoryId = (int) ($data['category_id'] ?? 0);
+            $categoryName = trim((string) ($data['category_name'] ?? ''));
+            if ($categoryId > 0) {
+                $cat = CategoryModel::where('id', $categoryId)->where('type', 'product')->find();
+                if ($cat) {
+                    $categoryName = (string) ($cat->name ?? '');
+                }
+            }
             ProductModel::create([
                 'name' => $name,
-                'category_name' => trim((string) ($data['category_name'] ?? '')) ?: null,
+                'category_name' => $categoryName !== '' ? $categoryName : null,
+                'category_id' => $categoryId > 0 ? $categoryId : null,
                 'goods_url' => trim((string) ($data['goods_url'] ?? '')) ?: null,
                 'thumb_url' => trim((string) ($data['thumb_url'] ?? '')) ?: null,
                 'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,
@@ -178,7 +198,14 @@ class Product extends BaseController
             ]);
             return json(['code' => 0, 'msg' => '添加成功']);
         }
-        return View::fetch('admin/product/form', ['info' => null]);
+        return View::fetch('admin/product/form', [
+            'info' => null,
+            'categories' => CategoryModel::where('type', 'product')
+                ->where('status', 1)
+                ->order('sort_order', 'asc')
+                ->order('id', 'desc')
+                ->select(),
+        ]);
     }
 
     public function edit()
@@ -190,9 +217,18 @@ class Product extends BaseController
             if ($name === '') {
                 return json(['code' => 1, 'msg' => '请填写商品名称']);
             }
+            $categoryId = (int) ($data['category_id'] ?? 0);
+            $categoryName = trim((string) ($data['category_name'] ?? ''));
+            if ($categoryId > 0) {
+                $cat = CategoryModel::where('id', $categoryId)->where('type', 'product')->find();
+                if ($cat) {
+                    $categoryName = (string) ($cat->name ?? '');
+                }
+            }
             ProductModel::where('id', $id)->update([
                 'name' => $name,
-                'category_name' => trim((string) ($data['category_name'] ?? '')) ?: null,
+                'category_name' => $categoryName !== '' ? $categoryName : null,
+                'category_id' => $categoryId > 0 ? $categoryId : null,
                 'goods_url' => trim((string) ($data['goods_url'] ?? '')) ?: null,
                 'thumb_url' => trim((string) ($data['thumb_url'] ?? '')) ?: null,
                 'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,
@@ -205,7 +241,14 @@ class Product extends BaseController
         if (!$info) {
             return '商品不存在';
         }
-        return View::fetch('admin/product/form', ['info' => $info]);
+        return View::fetch('admin/product/form', [
+            'info' => $info,
+            'categories' => CategoryModel::where('type', 'product')
+                ->where('status', 1)
+                ->order('sort_order', 'asc')
+                ->order('id', 'desc')
+                ->select(),
+        ]);
     }
 
     public function delete()

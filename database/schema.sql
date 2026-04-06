@@ -29,6 +29,7 @@ CREATE TABLE products (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品名称',
     category_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商品分类',
+    category_id INT UNSIGNED DEFAULT NULL COMMENT '分类ID',
     goods_url VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商品页外链',
     thumb_url VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '列表缩略图',
     tiktok_shop_url VARCHAR(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'TikTok商品链',
@@ -38,28 +39,50 @@ CREATE TABLE products (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_status (status),
+    INDEX idx_category_id (category_id),
     INDEX idx_category_name (category_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品表';
+
+-- 分类表（商品/达人）
+CREATE TABLE categories (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类名',
+    type VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'product|influencer',
+    sort_order INT NOT NULL DEFAULT 0,
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_type_name (type, name),
+    KEY idx_type_status_sort (type, status, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品/达人分类';
 
 -- TikTok 达人名录（tiktok_id 为 @handle，唯一）
 CREATE TABLE influencers (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     tiktok_id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'TikTok 用户名 @handle',
     category_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '达人分类',
+    category_id INT UNSIGNED DEFAULT NULL COMMENT '分类ID',
     nickname VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '昵称',
     avatar_url VARCHAR(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像 URL',
     follower_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '粉丝数',
     contact_info TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '联系方式 JSON 文本',
     region VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '地区',
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '0待联系 1合作中 2黑名单',
+    status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0待联系 1已发私信 2已回复 3待寄样 4已寄样 5合作中 6黑名单',
+    sample_tracking_no VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '寄样快递单号',
+    sample_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '寄样状态 0未寄 1已寄 2签收',
+    tags_json TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '标签JSON',
+    last_contacted_at DATETIME DEFAULT NULL COMMENT '最后联系时间',
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_tiktok_id (tiktok_id),
     KEY idx_status (status),
     KEY idx_category_name (category_name),
+    KEY idx_category_id (category_id),
     KEY idx_region (region),
-    KEY idx_updated (updated_at)
+    KEY idx_updated (updated_at),
+    KEY idx_last_contacted_at (last_contacted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='TikTok 达人名录';
 
 -- 达人名录异步导入任务
@@ -90,14 +113,35 @@ CREATE TABLE influencer_import_tasks (
 CREATE TABLE message_templates (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '模板名称',
+    template_key VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '多语言模板分组键',
+    lang VARCHAR(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'zh' COMMENT '语言 zh/en/vi',
     body MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '正文占位符',
     sort_order INT NOT NULL DEFAULT 0,
     status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1启用 0禁用',
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_status_sort (status, sort_order)
+    KEY idx_status_sort (status, sort_order),
+    KEY idx_template_lang (template_key, lang, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='达人联系话术模板';
+
+-- 达人外联历史
+CREATE TABLE outreach_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    influencer_id INT UNSIGNED NOT NULL,
+    template_id INT UNSIGNED NOT NULL DEFAULT 0,
+    template_name VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+    template_lang VARCHAR(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'zh',
+    product_id INT UNSIGNED DEFAULT NULL,
+    product_name VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    channel VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'render',
+    rendered_body MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_inf_created (influencer_id, created_at),
+    KEY idx_tpl (template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='达人外联历史记录';
 
 -- 达人分发链接（token 对应前台取片页）
 CREATE TABLE product_links (

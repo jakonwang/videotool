@@ -15,6 +15,8 @@ class MessageTemplate extends Model
     protected $schema = [
         'id'         => 'int',
         'name'       => 'string',
+        'template_key' => 'string',
+        'lang' => 'string',
         'body'       => 'string',
         'sort_order' => 'int',
         'status'     => 'int',
