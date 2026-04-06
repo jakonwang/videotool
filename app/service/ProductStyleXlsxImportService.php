@@ -357,6 +357,7 @@ class ProductStyleXlsxImportService
             $real = \realpath($sourceFilePath);
             $openPath = $real !== false ? $real : $sourceFilePath;
             $title = $sheet->getTitle();
+            $maxScanCol = \min(26, Coordinate::columnIndexFromString($sheet->getHighestColumn()));
             foreach ($tryCols as $col) {
                 foreach ([$r, $r - 1, $r + 1] as $rr) {
                     if ($rr < 2) {
@@ -372,7 +373,13 @@ class ProductStyleXlsxImportService
                 if ($rr < 2) {
                     continue;
                 }
-                foreach ($tryCols as $col) {
+                $scanCols = $tryCols;
+                for ($c = 1; $c <= $maxScanCol; $c++) {
+                    if (!\in_array($c, $scanCols, true)) {
+                        $scanCols[] = $c;
+                    }
+                }
+                foreach ($scanCols as $col) {
                     try {
                         $cell = $sheet->getCell(self::cellAddr($col, $rr));
                     } catch (\Throwable $e) {
@@ -382,10 +389,11 @@ class ProductStyleXlsxImportService
                     if (!\is_string($raw)) {
                         continue;
                     }
-                    if (\stripos($raw, 'DISPIMG(') === false && \stripos($raw, '"ID_') === false && \stripos($raw, '\'ID_') === false) {
+                    $id = ProductStyleXlsxZipEmbeddedImageService::extractDispImgIdFromFormula($raw);
+                    if ($id === null) {
                         continue;
                     }
-                    $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgFormula($openPath, $raw);
+                    $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgId($openPath, $id);
                     if ($tmp !== null) {
                         return $tmp;
                     }

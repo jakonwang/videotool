@@ -17,6 +17,9 @@ class ProductStyleXlsxZipEmbeddedImageService
 
     private const NS_ODR = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
+    /** @var array<string, array{id_to_media: array<string, string>}> */
+    private static array $dispImgMapCache = [];
+
     /**
      * 在指定工作表上，按 1-based 列、行查找锚点覆盖该格的第一张图片，写入临时文件并返回绝对路径。
      */
@@ -424,7 +427,80 @@ class ProductStyleXlsxZipEmbeddedImageService
     }
 
     /**
-     * 解析类似 =DISPIMG("ID_xxx",1) 的公式，直接从 xl/cellimages.xml 取图并写入临时文件。
+     * 从 xl/cellimages.xml + .rels 构建 ID => media 路径映射（用于 WPS DISPIMG）。
+     *
+     * @return array{id_to_media: array<string, string>}
+     */
+    public static function buildDispImgIdMediaMap(string $xlsxPath): array
+    {
+        $key = self::dispImgCacheKey($xlsxPath);
+        if ($key !== null && isset(self::$dispImgMapCache[$key])) {
+            return self::$dispImgMapCache[$key];
+        }
+
+        $out = ['id_to_media' => []];
+        if (!\is_file($xlsxPath) || !\is_readable($xlsxPath)) {
+            return $out;
+        }
+        $zip = new ZipArchive();
+        if ($zip->open($xlsxPath) !== true) {
+            return $out;
+        }
+        try {
+            $rels = self::parseRelationships($zip, 'xl/_rels/cellimages.xml.rels');
+            if ($rels === []) {
+                return $out;
+            }
+            $cellImagesXml = self::zipGetString($zip, 'xl/cellimages.xml');
+            if ($cellImagesXml === null) {
+                return $out;
+            }
+            $dom = self::loadDom($cellImagesXml);
+            $xp = new \DOMXPath($dom);
+            $nodes = $xp->query('//*[local-name()="cellImage"]');
+            if ($nodes->length === 0) {
+                return $out;
+            }
+            $map = [];
+            foreach ($nodes as $node) {
+                $nameNode = $xp->query('.//*[local-name()="cNvPr"]', $node)->item(0);
+                if (!($nameNode instanceof \DOMElement)) {
+                    continue;
+                }
+                $id = \trim((string) $nameNode->getAttribute('name'));
+                if ($id === '') {
+                    continue;
+                }
+                $blipNode = $xp->query('.//*[local-name()="blip"]', $node)->item(0);
+                if (!($blipNode instanceof \DOMElement)) {
+                    continue;
+                }
+                $rid = self::embedRidFromBlipNode($blipNode);
+                if ($rid === null || !isset($rels[$rid])) {
+                    continue;
+                }
+                $target = (string) $rels[$rid];
+                $mediaPath = self::joinXlPath('xl', $target);
+                if (\strpos($mediaPath, 'xl/media/') !== 0 && \strpos($mediaPath, 'media/') !== 0) {
+                    // 仅接收图片资源路径，忽略异常链接
+                    continue;
+                }
+                $map[$id] = $mediaPath;
+            }
+            $out['id_to_media'] = $map;
+        } finally {
+            $zip->close();
+        }
+
+        if ($key !== null) {
+            self::$dispImgMapCache[$key] = $out;
+        }
+
+        return $out;
+    }
+
+    /**
+     * 根据 DISPIMG 公式提取图片到临时文件。
      */
     public static function extractImageFromDispImgFormula(string $xlsxPath, string $formula): ?string
     {
@@ -432,57 +508,30 @@ class ProductStyleXlsxZipEmbeddedImageService
         if ($id === null) {
             return null;
         }
+
+        return self::extractImageFromDispImgId($xlsxPath, $id);
+    }
+
+    /**
+     * 根据 DISPIMG ID（例如 ID_BB9582...）提取图片到临时文件。
+     */
+    public static function extractImageFromDispImgId(string $xlsxPath, string $id): ?string
+    {
+        $id = \trim($id);
+        if ($id === '') {
+            return null;
+        }
+        $disp = self::buildDispImgIdMediaMap($xlsxPath);
+        $mediaPath = $disp['id_to_media'][$id] ?? null;
+        if (!\is_string($mediaPath) || $mediaPath === '') {
+            return null;
+        }
+
         $zip = new ZipArchive();
         if ($zip->open($xlsxPath) !== true) {
             return null;
         }
         try {
-            $rels = self::parseRelationships($zip, 'xl/_rels/cellimages.xml.rels');
-            if ($rels === []) {
-                return null;
-            }
-            $cellImagesXml = self::zipGetString($zip, 'xl/cellimages.xml');
-            if ($cellImagesXml === null) {
-                return null;
-            }
-            $dom = self::loadDom($cellImagesXml);
-            $xp = new \DOMXPath($dom);
-            $nodes = $xp->query('//*[local-name()="cellImage"]');
-            $rid = null;
-            foreach ($nodes as $node) {
-                $nameNode = $xp->query('.//*[local-name()="cNvPr"]', $node)->item(0);
-                if (!($nameNode instanceof \DOMElement)) {
-                    continue;
-                }
-                $name = (string) $nameNode->getAttribute('name');
-                if ($name === '') {
-                    continue;
-                }
-                if (\strcasecmp($name, $id) !== 0) {
-                    continue;
-                }
-                $blipNode = $xp->query('.//*[local-name()="blip"]', $node)->item(0);
-                if (!($blipNode instanceof \DOMElement)) {
-                    continue;
-                }
-                $rid = $blipNode->getAttributeNS(self::NS_ODR, 'embed');
-                if ($rid === '') {
-                    foreach ($blipNode->attributes ?? [] as $attr) {
-                        if ($attr->localName === 'embed' && $attr->value !== '') {
-                            $rid = (string) $attr->value;
-                            break;
-                        }
-                    }
-                }
-                if ($rid !== '') {
-                    break;
-                }
-            }
-            if ($rid === null || $rid === '' || !isset($rels[$rid])) {
-                return null;
-            }
-            $target = (string) $rels[$rid];
-            $mediaPath = self::joinXlPath('xl', $target);
             $bin = self::zipGetString($zip, $mediaPath);
             if ($bin === null || $bin === '') {
                 return null;
@@ -522,6 +571,15 @@ class ProductStyleXlsxZipEmbeddedImageService
         return $web;
     }
 
+    /**
+     * 从单元格公式中提取 DISPIMG ID。
+     * 参考匹配：^=DISPIMG\("([^"]+)"
+     */
+    public static function extractDispImgIdFromFormula(string $formula): ?string
+    {
+        return self::parseDispImgIdFromFormula($formula);
+    }
+
     private static function parseDispImgIdFromFormula(string $formula): ?string
     {
         $formula = \trim($formula);
@@ -541,5 +599,32 @@ class ProductStyleXlsxZipEmbeddedImageService
         }
 
         return null;
+    }
+
+    private static function embedRidFromBlipNode(\DOMElement $blipNode): ?string
+    {
+        $rid = $blipNode->getAttributeNS(self::NS_ODR, 'embed');
+        if ($rid !== '') {
+            return $rid;
+        }
+        foreach ($blipNode->attributes ?? [] as $attr) {
+            if ($attr->localName === 'embed' && $attr->value !== '') {
+                return (string) $attr->value;
+            }
+        }
+
+        return null;
+    }
+
+    private static function dispImgCacheKey(string $xlsxPath): ?string
+    {
+        $real = \realpath($xlsxPath);
+        $path = $real !== false ? $real : $xlsxPath;
+        if (!\is_file($path)) {
+            return null;
+        }
+        $mtime = @\filemtime($path);
+
+        return $path . '#' . (string) ($mtime === false ? 0 : $mtime);
     }
 }

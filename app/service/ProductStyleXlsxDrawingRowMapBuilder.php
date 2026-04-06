@@ -47,6 +47,7 @@ class ProductStyleXlsxDrawingRowMapBuilder
             $sheet = $spreadsheet->getActiveSheet();
             $hr = \max(1, (int) $sheet->getHighestRow());
             $hc = $sheet->getHighestColumn();
+            $hcIdx = Coordinate::columnIndexFromString($hc);
             $headerMatrix = $sheet->rangeToArray('A1:' . $hc . '1', null, true, false);
             $headerRow = \array_map(static function ($v) {
                 return \trim((string) ($v ?? ''));
@@ -111,26 +112,44 @@ class ProductStyleXlsxDrawingRowMapBuilder
 
             $real = \realpath($xlsxPath);
             $openPath = $real !== false ? $real : $xlsxPath;
+            ProductStyleXlsxZipEmbeddedImageService::buildDispImgIdMediaMap($openPath);
             // WPS/ET 的 DISPIMG 公式图片：例如 =DISPIMG("ID_xxx",1)
             for ($r = 2; $r <= $hr; $r++) {
                 if (isset($map[$r])) {
                     continue;
                 }
-                try {
-                    $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($imgCol) . $r);
-                } catch (\Throwable $e) {
-                    continue;
+                $cands = [$imgCol];
+                for ($c = 1; $c <= \min($hcIdx, 26); $c++) {
+                    if ($c !== $imgCol) {
+                        $cands[] = $c;
+                    }
                 }
-                $raw = $cell->getValue();
-                if (!\is_string($raw)) {
-                    continue;
-                }
-                if (\stripos($raw, 'DISPIMG(') === false && \stripos($raw, '"ID_') === false && \stripos($raw, '\'ID_') === false) {
-                    continue;
-                }
-                $web = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgFormulaToProductsDir($openPath, $raw, $publicRoot);
-                if ($web !== null) {
-                    $map[$r] = $web;
+                foreach ($cands as $c) {
+                    try {
+                        $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($c) . $r);
+                    } catch (\Throwable $e) {
+                        continue;
+                    }
+                    $raw = $cell->getValue();
+                    if (!\is_string($raw)) {
+                        continue;
+                    }
+                    $id = ProductStyleXlsxZipEmbeddedImageService::extractDispImgIdFromFormula($raw);
+                    if ($id === null) {
+                        continue;
+                    }
+                    $tmp = ProductStyleXlsxZipEmbeddedImageService::extractImageFromDispImgId($openPath, $id);
+                    if ($tmp === null || !\is_file($tmp)) {
+                        continue;
+                    }
+                    $web = ProductStyleImportService::saveImportImageToProductsDir($tmp, $publicRoot);
+                    if (\is_file($tmp)) {
+                        @\unlink($tmp);
+                    }
+                    if ($web !== null) {
+                        $map[$r] = $web;
+                        break;
+                    }
                 }
             }
 
