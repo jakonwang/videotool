@@ -3,6 +3,7 @@ declare (strict_types = 1);
 
 namespace app;
 
+use app\service\ModuleManagerService;
 use think\App;
 use think\exception\ValidateException;
 use think\facade\View;
@@ -54,9 +55,17 @@ abstract class BaseController
                 $ver = config('app.version');
                 View::assign('app_version', $ver ? (string) $ver : '1.0.2');
                 View::assign('app_year', date('Y'));
+                $curController = strtolower((string) $this->request->controller());
+                $curAction = strtolower((string) $this->request->action());
+                View::assign('current_controller', $curController);
+                View::assign('current_action', $curAction);
+                View::assign('sidebar_sections', ModuleManagerService::getEnabledMenus($curController, $curAction));
             } catch (\Throwable $e) {
                 View::assign('app_version', '1.0.2');
                 View::assign('app_year', date('Y'));
+                View::assign('current_controller', '');
+                View::assign('current_action', '');
+                View::assign('sidebar_sections', []);
             }
         }
 

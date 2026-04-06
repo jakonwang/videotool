@@ -4,6 +4,19 @@
 
 ## TikStar OPS 系统模块（2026-04）
 
+### Module Manager 模块化管理（2026-04-06）
+
+- 新增 `extensions` 表（模块清单）：`name`（唯一标识）、`title`（显示名）、`version`、`is_enabled`（0/1）、`config_json`（配置 JSON）。
+- 新增迁移脚本：`php database/run_migration_extensions.php`（Windows：`php database\run_migration_extensions.php`，Linux：`php database/run_migration_extensions.php`）。
+- 新增服务：`app/service/ModuleManagerService.php`，提供：
+  - `scanModules()`：扫描内置模块 + `extensions/*/module.json`，并自动同步到 `extensions` 表；
+  - `install($name)`：执行 `database/extensions/{name}/install.php|install.sql`（若存在）后启用模块；
+  - `uninstall($name, $purgeData=false)`：可选执行卸载脚本并禁用模块；
+  - `getEnabledMenus()`：返回当前已启用模块对应侧栏菜单。
+- 新增后台页：`/admin.php/extension`（`view/admin/extension/index.html`），以 `el-card` 管理模块安装/卸载/启停。
+- 后台侧栏改造：`view/admin/common/layout.html` 不再硬编码菜单，改由 `BaseController` 注入 `ModuleManagerService::getEnabledMenus(...)` 的结果并在 `view/admin/common/sidebar.html` 渲染。
+- 多语言规范：模块名称/描述在前端以 `AppI18n.t('extension.' + name + '.title')` 与 `AppI18n.t('extension.' + name + '.desc')` 动态获取；模块管理页所有文案均使用 `AppI18n.t`。
+
 ### 分类 + 达人 CRM + 话术增强（2026-04-06）
 
 - 新增后台模块 **分类管理**：`/admin.php/category`，支持 `product` / `influencer` 两类分类的 CRUD（名称、类型、排序、状态），接口：`listJson`、`options`、`save`、`delete`。

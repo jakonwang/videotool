@@ -1,0 +1,30 @@
+{volist name="sidebar_sections" id="sec"}
+<div class="admin-sidenav-section" data-i18n="{$sec.section_i18n}">{$sec.section_i18n}</div>
+{volist name="sec.items" id="item"}
+{if condition="$item.kind == 'link'"}
+<a href="{$item.href}" class="admin-sidenav-link {if condition='$item.active'}active{/if}">
+    <span class="admin-sidenav-ico"><i data-lucide="{$item.icon}"></i></span>
+    <span class="admin-sidenav-txt" data-i18n="{$item.text_i18n}">{$item.text_i18n}</span>
+</a>
+{else /}
+<a href="javascript:void(0)" class="admin-sidenav-group-head {if condition='!$item.expanded'}collapsed{/if} {if condition='$item.expanded'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-{$item.id}" aria-expanded="{if condition='$item.expanded'}true{else /}false{/if}" aria-controls="admin-nav-{$item.id}" role="button">
+    <span class="admin-sidenav-ico"><i data-lucide="{$item.icon}"></i></span>
+    <span class="admin-sidenav-txt" data-i18n="{$item.text_i18n}">{$item.text_i18n}</span>
+    <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
+</a>
+<div id="admin-nav-{$item.id}" class="collapse admin-sidenav-subwrap {if condition='$item.expanded'}show{/if}">
+    <ul class="admin-sidenav-sub">
+        {volist name="item.children" id="sub"}
+        <li>
+            <a href="{$sub.href}" class="admin-sidenav-sublink {if condition='$sub.active'}active{/if}">
+                <span class="admin-sidenav-subico"><i data-lucide="{$sub.icon}"></i></span>
+                <span class="admin-sidenav-subtxt" data-i18n="{$sub.text_i18n}">{$sub.text_i18n}</span>
+            </a>
+        </li>
+        {/volist}
+    </ul>
+</div>
+{/if}
+{/volist}
+{/volist}
+

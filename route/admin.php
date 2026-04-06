@@ -160,6 +160,14 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('category/delete', 'app\controller\admin\Category@delete');
     Route::get('category', 'app\controller\admin\Category@index');
 
+    // 模块管理
+    Route::get('extension/list', 'app\controller\admin\Extension@listJson');
+    Route::get('extension/listJson', 'app\controller\admin\Extension@listJson');
+    Route::post('extension/install', 'app\controller\admin\Extension@install');
+    Route::post('extension/uninstall', 'app\controller\admin\Extension@uninstall');
+    Route::post('extension/toggle', 'app\controller\admin\Extension@toggle');
+    Route::get('extension', 'app\controller\admin\Extension@index');
+
     // 达人联系话术模板
     Route::get('message_template/list', 'app\controller\admin\MessageTemplate@listJson');
     Route::get('message_template/listJson', 'app\controller\admin\MessageTemplate@listJson');

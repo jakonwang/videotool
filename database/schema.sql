@@ -57,6 +57,21 @@ CREATE TABLE categories (
     KEY idx_type_status_sort (type, status, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品/达人分类';
 
+-- 模块扩展管理（Module Manager）
+CREATE TABLE extensions (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模块唯一标识',
+    title VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '显示名称',
+    version VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '1.0.0' COMMENT '版本号',
+    is_enabled TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '是否启用 1是 0否',
+    config_json TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '扩展配置JSON',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_extension_name (name),
+    KEY idx_extension_enabled (is_enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模块扩展表';
+
 -- TikTok 达人名录（tiktok_id 为 @handle，唯一）
 CREATE TABLE influencers (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
