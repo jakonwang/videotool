@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -831,20 +831,20 @@
             <div class="float-right d-none d-sm-inline">
                 <strong>Version</strong> {$app_version}
             </div>
-            <strong>TikStar OPS</strong> 路 Copyright &copy; {:date('Y')}
+            <strong>TikStar OPS</strong> · Copyright &copy; <?php echo date('Y'); ?>
         </footer>
     </div>
 
     <div class="toast-container position-fixed p-3" style="right:0;">
         <div id="globalToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="2500">
             <div class="toast-header">
-                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">鎻愮ず</span></strong>
-                <small class="text-muted">鐜板湪</small>
+                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">提示</span></strong>
+                <small class="text-muted">现在</small>
                 <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="toast-body" id="toastBody">鎿嶄綔鎴愬姛</div>
+            <div class="toast-body" id="toastBody">操作成功</div>
         </div>
     </div>
 
@@ -852,15 +852,15 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="confirmTitle">璇风‘璁?/h5>
+                    <h5 class="modal-title" id="confirmTitle">请确认</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body" id="confirmMessage">纭鎵ц璇ユ搷浣滃悧锛?/div>
+                <div class="modal-body" id="confirmMessage">确认执行该操作吗？</div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">鍙栨秷</button>
-                    <button type="button" class="btn btn-danger" id="confirmOkBtn">纭</button>
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmOkBtn">确认</button>
                 </div>
             </div>
         </div>
@@ -890,10 +890,10 @@
             return {
                 showToast(type, message, title) {
                     const typeMap = {
-                        success: {icon: 'fa-check-circle', title: title || '鎴愬姛'},
-                        error: {icon: 'fa-times-circle', title: title || '閿欒'},
-                        warning: {icon: 'fa-exclamation-triangle', title: title || '鎻愰啋'},
-                        info: {icon: 'fa-info-circle', title: title || '鎻愮ず'}
+                        success: {icon: 'fa-check-circle', title: title || '成功'},
+                        error: {icon: 'fa-times-circle', title: title || '错误'},
+                        warning: {icon: 'fa-exclamation-triangle', title: title || '提醒'},
+                        info: {icon: 'fa-info-circle', title: title || '提示'}
                     };
                     const meta = typeMap[type] || typeMap.info;
                     toastTitle.html(`<i class="fas ${meta.icon} mr-1"></i>${meta.title}`);
@@ -901,7 +901,7 @@
                     toastEl.toast('show');
                 },
                 confirm(message, onOk) {
-                    confirmMessage.text(message || '纭鎵ц璇ユ搷浣滃悧锛?);
+                    confirmMessage.text(message || '确认执行该操作吗？');
                     confirmCallback = onOk;
                     confirmModal.modal('show');
                 }
@@ -918,7 +918,7 @@
         });
     </script>
     <script>
-        // 渚ф爮搴曢儴淇℃伅锛氳澶囨暟閲?/ uploads 鍗犵敤
+        // 侧栏底部信息：设备数量 / uploads 占用
         $(function () {
             function formatBytes(bytes) {
                 const b = parseInt(bytes || 0, 10);
@@ -930,7 +930,7 @@
             }
             $.get('/admin.php/stats/overview').done(function (res) {
                 if (res && res.code === 0 && res.data) {
-                    $('#sbDeviceCount').text(res.data.devices ?? '鈥?);
+                    $('#sbDeviceCount').text(res.data.devices ?? '—');
                 }
             });
             $.get('/admin.php/stats/storageUsage').done(function (res) {
@@ -941,7 +941,8 @@
         });
     </script>
     <script>
-        // 渚ф爮鍒嗙粍鑷姩灞曞紑锛氭寜褰撳墠 URL 鍖归厤瀛愯彍鍗曢摼鎺ワ紝閬垮厤鏈嶅姟绔懡鍚嶅樊寮傚鑷村叏閮ㄦ敹璧?        $(function () {
+        // 侧栏分组自动展开：按当前 URL 匹配子菜单链接，避免服务端命名差异导致全部收起
+        $(function () {
             const path = (window.location.pathname || '').replace(/\/+$/, '');
             const full = window.location.href || '';
 
@@ -989,12 +990,13 @@
         });
     </script>
     <script>
-        // 閫€鍑虹櫥褰曪紙鍏ㄥ眬锛?        $(function () {
+        // 退出登录（全局）
+        $(function () {
             function doLogout() {
                 $.post('/admin.php/auth/logout', {}, function () {
                     window.location.href = '/admin.php/auth/login';
                 }).fail(function () {
-                    // 闄嶇骇锛氬悗鍙?GET 閫€鍑猴紙褰?JS / POST 琚嫤鎴篃鑳介€€鍑猴級
+                    // 降级：后台 GET 退出（当 JS / POST 被拦截也能退出）
                     window.location.href = '/admin.php/auth/logout';
                 });
             }
@@ -1003,7 +1005,8 @@
         });
     </script>
     <script>
-        // i18n锛堝叏灞€锛歭ayout 鑿滃崟 + 椤舵爮/渚ф爮鍒囨崲锛?        (function () {
+        // i18n（全局：layout 菜单 + 顶栏/侧栏切换）
+        (function () {
             if (!window.AppI18n) return;
             const lang = window.AppI18n.getLang('zh');
             window.AppI18n.applyDom(document);
