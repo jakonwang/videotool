@@ -1,5 +1,18 @@
 # 502错误排查指南
 
+## 开启页面详细报错（便于复制给开发者）
+
+ThinkPHP 是否显示**完整异常与堆栈**由环境变量 **`APP_DEBUG`** 控制（见框架 `think\App::debugModeInit()`）。项目根目录若**没有** `.env`，默认相当于关闭调试，页面可能只显示「页面错误」类提示。
+
+**Windows / 本机调试：**
+
+1. 在项目根目录（与 `composer.json` 同级）放置 **`.env`**，内容至少包含一行：  
+   `APP_DEBUG = true`  
+2. 可参考仓库中的 **`.env.example`**：`Copy-Item .env.example .env`（PowerShell）。  
+3. 修改后**刷新页面**；线上 Linux 部署请改为 **`APP_DEBUG = false`**，避免泄露路径与 SQL。
+
+**说明：** `.env` 已在 `.gitignore` 中，勿把含密钥的 `.env` 提交到 Git。
+
 ## 常见原因和解决方法
 
 ### 1. PHP版本问题

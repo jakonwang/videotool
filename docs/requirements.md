@@ -82,6 +82,7 @@
 
 ### 多语言
 
+- **调试报错页**：根目录 **`.env`** 中 `APP_DEBUG = true` 时 ThinkPHP 在浏览器输出**完整异常与堆栈**（便于复制）；生产环境须 `false`。模板见 **`.env.example`**；细则见 **`TROUBLESHOOTING.md`**「开启页面详细报错」。
 - 运维速查：**`README.md`** 中有「多语言（i18n）与脚本缓存版本」总述。
 - `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）。修改脚本后需**全站**提高所有引用 `i18n.js` 的 **`?v=`**（当前示例：**`20260408_ops3`**），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页；达人前台另 bump `influencer_i18n.js` 的 `?v=`。
 
