@@ -85,6 +85,65 @@ location ~ \.php$ {
    - Apache: error.log
    - Nginx: error.log
 
+## 后台列表页出现 `Unexpected token '<'`
+
+### 错误现象
+
+后台分页列表页在打开或翻页时，浏览器控制台出现：
+
+```text
+Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+```
+
+### 根因
+
+前端把列表接口当 JSON 解析，但服务端实际返回了 HTML 页面。常见原因有两种：
+
+1. 列表请求地址写成了未注册的路由，比如前端请求 `/admin.php/product/listJson`，而路由里只注册了 `/admin.php/product/list`
+2. 未登录或路由异常，服务端返回了登录页 / 404 页面 / PHP 错误页
+
+### 现在项目的兼容规则
+
+后台列表接口已兼容两种地址：
+
+- `/list`
+- `/listJson`
+
+也就是说下面两种写法都应返回 JSON：
+
+```text
+/admin.php/product/list?page=1&page_size=10
+/admin.php/product/listJson?page=1&page_size=10
+```
+
+### 服务器快速验证
+
+在 Linux 服务器上执行：
+
+```bash
+cd /www/wwwroot/你的项目目录
+php think route:list | grep list
+```
+
+然后确认对应模块同时存在 `/list` 或 `/listJson` 路由。
+
+如果刚 `git pull` 完，务必继续执行：
+
+```bash
+rm -rf runtime/temp/* runtime/cache/*
+systemctl restart php-fpm || systemctl restart php-fpm.service || true
+```
+
+### 浏览器侧排查
+
+打开开发者工具 `Network`，点开失败请求，重点看：
+
+- `Request URL`
+- `Status Code`
+- `Response`
+
+如果 `Response` 里是 `<!DOCTYPE html>`，说明返回的不是 JSON，而是页面内容，需要继续检查路由或登录态。
+
 ## 路由控制器不存在错误
 
 ### 错误信息

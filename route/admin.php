@@ -27,6 +27,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 用户（管理员账号）
     Route::get('user/list', 'app\controller\admin\User@listJson');
+    Route::get('user/listJson', 'app\controller\admin\User@listJson');
     Route::post('user/create', 'app\controller\admin\User@create');
     Route::post('user/update', 'app\controller\admin\User@update');
     Route::post('user/toggle', 'app\controller\admin\User@toggle');
@@ -36,6 +37,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     
     // 平台管理 - 直接定义完整路径，避免路由组匹配问题
     Route::get('platform/list', 'app\controller\admin\Platform@listJson');
+    Route::get('platform/listJson', 'app\controller\admin\Platform@listJson');
     Route::get('platform/edit/<id>', 'app\controller\admin\Platform@edit');
     Route::post('platform/edit/<id>', 'app\controller\admin\Platform@edit');
     Route::post('platform/delete/<id>', 'app\controller\admin\Platform@delete');
@@ -45,6 +47,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     
     // 设备管理
     Route::get('device/list', 'app\controller\admin\Device@listJson');
+    Route::get('device/listJson', 'app\controller\admin\Device@listJson');
     Route::get('device/edit/<id>', 'app\controller\admin\Device@edit');
     Route::post('device/edit/<id>', 'app\controller\admin\Device@edit');
     Route::post('device/delete/<id>', 'app\controller\admin\Device@delete');
@@ -55,6 +58,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     
     // 商品
     Route::get('product/list', 'app\controller\admin\Product@listJson');
+    Route::get('product/listJson', 'app\controller\admin\Product@listJson');
     Route::get('product/edit/<id>', 'app\controller\admin\Product@edit');
     Route::post('product/edit/<id>', 'app\controller\admin\Product@edit');
     Route::post('product/delete/<id>', 'app\controller\admin\Product@delete');
@@ -65,6 +69,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 分发链接
     Route::get('distribute/list', 'app\controller\admin\Distribute@listJson');
+    Route::get('distribute/listJson', 'app\controller\admin\Distribute@listJson');
     Route::get('distribute/add', 'app\controller\admin\Distribute@add');
     Route::post('distribute/add', 'app\controller\admin\Distribute@add');
     Route::post('distribute/delete/<id>', 'app\controller\admin\Distribute@delete');
@@ -73,6 +78,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 视频管理
     Route::get('video/list', 'app\\controller\\admin\\Video@listJson');
+    Route::get('video/listJson', 'app\\controller\\admin\\Video@listJson');
     Route::get('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/delete/<id>', 'app\controller\admin\Video@delete');
@@ -86,6 +92,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 缓存管理
     Route::get('cache/list', 'app\controller\admin\Cache@listJson');
+    Route::get('cache/listJson', 'app\controller\admin\Cache@listJson');
     Route::get('cache', 'app\controller\admin\Cache@index');
     Route::post('cache/delete/<hash>', 'app\controller\admin\Cache@delete');
     Route::post('cache/clear', 'app\controller\admin\Cache@clear');
@@ -93,11 +100,13 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     
     // 下载错误监控
     Route::get('downloadLog/list', 'app\controller\admin\DownloadLog@listJson');
+    Route::get('downloadLog/listJson', 'app\controller\admin\DownloadLog@listJson');
     Route::get('downloadLog', 'app\controller\admin\DownloadLog@index');
     Route::post('downloadLog/clear', 'app\controller\admin\DownloadLog@clear');
 
     // 桌面端：发卡 / 版本
     Route::get('client_license/list', 'app\controller\admin\ClientLicense@listJson');
+    Route::get('client_license/listJson', 'app\controller\admin\ClientLicense@listJson');
     Route::post('client_license/add', 'app\controller\admin\ClientLicense@add');
     Route::post('client_license/update/<id>', 'app\controller\admin\ClientLicense@update');
     Route::post('client_license/toggle/<id>', 'app\controller\admin\ClientLicense@toggle');
@@ -106,6 +115,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('client_license', 'app\controller\admin\ClientLicense@index');
 
     Route::get('client_version/list', 'app\controller\admin\ClientVersion@listJson');
+    Route::get('client_version/listJson', 'app\controller\admin\ClientVersion@listJson');
     Route::post('client_version/add', 'app\controller\admin\ClientVersion@add');
     Route::post('client_version/uploadPackage', 'app\controller\admin\ClientVersion@uploadPackage');
     Route::post('client_version/update/<id>', 'app\controller\admin\ClientVersion@update');
@@ -115,6 +125,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 图片搜款式
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
+    Route::get('product_search/listJson', 'app\controller\admin\ProductSearch@listJson');
     Route::post('product_search/importCsv', 'app\controller\admin\ProductSearch@importCsv');
     Route::get('product_search/importTaskStatus', 'app\controller\admin\ProductSearch@importTaskStatus');
     Route::post('product_search/importTaskTick', 'app\controller\admin\ProductSearch@importTaskTick');
@@ -128,6 +139,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 达人名录（TikTok @handle）
     Route::get('influencer/list', 'app\controller\admin\Influencer@listJson');
+    Route::get('influencer/listJson', 'app\controller\admin\Influencer@listJson');
     Route::get('influencer/search', 'app\controller\admin\Influencer@searchJson');
     Route::post('influencer/importCsv', 'app\controller\admin\Influencer@importCsv');
     Route::get('influencer/importTaskStatus', 'app\controller\admin\Influencer@importTaskStatus');
@@ -140,6 +152,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // 达人联系话术模板
     Route::get('message_template/list', 'app\controller\admin\MessageTemplate@listJson');
+    Route::get('message_template/listJson', 'app\controller\admin\MessageTemplate@listJson');
     Route::post('message_template/save', 'app\controller\admin\MessageTemplate@save');
     Route::post('message_template/delete', 'app\controller\admin\MessageTemplate@delete');
     Route::post('message_template/render', 'app\controller\admin\MessageTemplate@render');
