@@ -5,6 +5,7 @@ namespace app;
 
 use think\App;
 use think\exception\ValidateException;
+use think\facade\View;
 use think\Validate;
 
 /**
@@ -45,6 +46,17 @@ abstract class BaseController
     {
         $this->app     = $app;
         $this->request = $this->app->request;
+
+        // Provide common view vars for all controllers.
+        // Avoid template compiling `$Think.config.app.version` into invalid PHP on some environments.
+        if (class_exists(View::class)) {
+            try {
+                $ver = config('app.version');
+                View::assign('app_version', $ver ? (string) $ver : '1.0.2');
+            } catch (\Throwable $e) {
+                View::assign('app_version', '1.0.2');
+            }
+        }
 
         // 控制器初始化
         $this->initialize();
