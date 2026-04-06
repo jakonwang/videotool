@@ -51,7 +51,7 @@
       async function fetchList() {
         loading.value = true;
         try {
-          const res = await fetch('/admin.php/message_template/list?page=1&page_size=200', { credentials: 'same-origin', headers: apiH });
+          const res = await fetch('/admin.php/message_template/listJson?page=1&page_size=200', { credentials: 'same-origin', headers: apiH });
           const json = parseJson(res, await res.text());
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
