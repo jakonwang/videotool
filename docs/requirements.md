@@ -84,7 +84,7 @@
 
 - **调试报错页**：根目录 **`.env`** 中 `APP_DEBUG = true` 时 ThinkPHP 在浏览器输出**完整异常与堆栈**（便于复制）；生产环境须 `false`。模板见 **`.env.example`**；细则见 **`TROUBLESHOOTING.md`**「开启页面详细报错」。
 - 运维速查：**`README.md`** 中有「多语言（i18n）与脚本缓存版本」总述。
-- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）。修改脚本后需**全站**提高所有引用 `i18n.js` 的 **`?v=`**（当前示例：**`20260408_ops3`**），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页；达人前台另 bump `influencer_i18n.js` 的 `?v=`。
+- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）。修改脚本后需**全站**提高所有引用 `i18n.js` 的 **`?v=`**（当前示例：**`20260406_product1`**），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页；达人前台另 bump `influencer_i18n.js` 的 `?v=`。
 
 ### 寻款索引 i18n（2026-04）
 
@@ -145,7 +145,7 @@
 ## 后台：视频 / 商品 / 达人链 / 平台 / 设备 / 缓存 / 下载异常（Vue3 + Element Plus）
 
 - **视频** `GET /admin.php/video/list`；`view/admin/video/index.html`。注意：脚本区「下拉选项」注释**不可**与 `const PLATFORM_OPTIONS = []` 写在同一行（`//` 会吞掉整行，导致未定义）；分页区「反选」按钮须正确闭合 `</el-button>`。**内联脚本中** `ElMessage.success('...')` 等字符串须**成对闭合引号**，否则未闭合字符串会延续到后面模板里的 `Home / Library / Videos`，浏览器报 **unexpected identifier "videos"**。列表/筛选/表头/弹窗等文案统一 `page.video.*` 与 `tt()`，避免乱码引号破坏属性（如 `:placeholder`）。
-- **商品** `GET /admin.php/product/list`（含 `thumb_url`、`tiktok_shop_url`）；`view/admin/product/index.html`；`POST /admin.php/product/uploadThumb`。列表表头、复制空内容/双空链、删除确认等均走 i18n（`page.product.colName` 等及 `page.product.deleteConfirmMsg`）。
+- **商品** `GET /admin.php/product/list`（含 `thumb_url`、`tiktok_shop_url`）；`view/admin/product/index.html`（列表「商品链接」列仅展示 **TikTok 商品链接** `tiktok_shop_url`，操作区 **复制链接** 仅复制该字段；行内 **编辑** 为弹窗，提交 `POST /admin.php/product/edit/{id}`，缩略图上传同 `POST /admin.php/product/uploadThumb`）；独立页 **添加商品** 仍为 `GET/POST /admin.php/product/add`，`view/admin/product/form.html`。列表表头、复制空内容、删除确认等均走 i18n（`page.product.colName`、`page.product.copyLink`、`page.product.editTitle` 等及 `page.product.deleteConfirmMsg`）。
 - **达人链** `GET /admin.php/distribute/list`；`view/admin/distribute/index.html`。
 - **平台** `GET /admin.php/platform/list`；`view/admin/platform/index.html`。
 - **设备** `GET /admin.php/device/list`；`view/admin/device/index.html`。

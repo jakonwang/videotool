@@ -89,7 +89,7 @@
 - **达人前台取片页**：`public/static/i18n/influencer_i18n.js`，页面 `view/index/influencer.html`（与后台语言存储互不干扰）。
 - **修改任一上述 JS 后**，必须在所有引用它的模板里**统一提高** URL 上的 **`?v=`** 查询参数（建议全站与 `view/admin/common/layout.html` 中 `i18n.js` 使用**同一版本字符串**），否则浏览器可能继续使用缓存中的旧脚本，界面会显示键名而非译文。
 - **需同步 bump 的典型位置**：`layout.html`、登录页、寻款/达人链等单独引入 `i18n.js` 的页面，以及各 Vue 独立页（缓存、用户、商品、视频、发卡、版本、终端、异常等）；前台另 bump `influencer_i18n.js`。
-- 当前全站 `i18n.js` / `influencer_i18n.js` 的 `?v=` 示例版本号：**`20260408_ops3`**（修改字典后请再次统一 bump）。更细的维护说明见 **`docs/requirements.md`** / 根目录 **`requirements.md`**（「多语言」及「多语言切换」相关小节）。
+- 当前全站 `i18n.js` / `influencer_i18n.js` 的 `?v=` 示例版本号：**`20260406_product1`**（修改字典后请再次统一 bump）。更细的维护说明见 **`docs/requirements.md`** / 根目录 **`requirements.md`**（「多语言」及「多语言切换」相关小节）。
 
 ## 系统架构
 
