@@ -6,7 +6,7 @@ namespace app\service;
 use think\facade\Db;
 
 /**
- * 模块管理服务
+ * 婵☆垪鈧櫕鍋ョ紒鐙呯磿閹﹪寮靛鍛潳
  */
 class ModuleManagerService
 {
@@ -14,7 +14,7 @@ class ModuleManagerService
     private const ROLE_OPERATOR = 'operator';
     private const ROLE_VIEWER = 'viewer';
 
-    /**
+        /**
      * @return array<string, array<string, mixed>>
      */
     private static function builtInModules(): array
@@ -22,34 +22,133 @@ class ModuleManagerService
         return [
             'overview' => [
                 'name' => 'overview',
-                'title' => '概览',
+                'title' => 'Overview',
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
                 'dependencies' => [],
                 'min_role' => self::ROLE_VIEWER,
             ],
-            'style_search' => [
-                'name' => 'style_search',
-                'title' => '寻款',
+            'product_search' => [
+                'name' => 'product_search',
+                'title' => 'Style Search',
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
                 'dependencies' => [],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'growth_hub' => [
+                'name' => 'growth_hub',
+                'title' => 'Growth Hub',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'industry_trend' => [
+                'name' => 'industry_trend',
+                'title' => 'Industry Trend',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'competitor_analysis' => [
+                'name' => 'competitor_analysis',
+                'title' => 'Competitor Analysis',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'ad_insight' => [
+                'name' => 'ad_insight',
+                'title' => 'Ad Insight',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'data_import' => [
+                'name' => 'data_import',
+                'title' => 'Data Import',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
                 'min_role' => self::ROLE_OPERATOR,
             ],
             'creator_crm' => [
                 'name' => 'creator_crm',
-                'title' => '达人CRM',
+                'title' => 'Creator CRM',
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
                 'dependencies' => [],
                 'min_role' => self::ROLE_OPERATOR,
             ],
+            'category' => [
+                'name' => 'category',
+                'title' => 'Category Config',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'influencer' => [
+                'name' => 'influencer',
+                'title' => 'Influencer List',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'outreach_workspace' => [
+                'name' => 'outreach_workspace',
+                'title' => 'Outreach Workspace',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'sample_management' => [
+                'name' => 'sample_management',
+                'title' => 'Sample Management',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'message_template' => [
+                'name' => 'message_template',
+                'title' => 'Message Templates',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
+            'distribute' => [
+                'name' => 'distribute',
+                'title' => 'Creator Links',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
             'material_distribution' => [
                 'name' => 'material_distribution',
-                'title' => '素材分发',
+                'title' => 'Material Distribution',
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
@@ -58,7 +157,7 @@ class ModuleManagerService
             ],
             'terminal_devices' => [
                 'name' => 'terminal_devices',
-                'title' => '终端设备',
+                'title' => 'Terminal Devices',
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
@@ -67,7 +166,7 @@ class ModuleManagerService
             ],
             'system_ops' => [
                 'name' => 'system_ops',
-                'title' => '系统管理',
+                'title' => 'System Ops',
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
@@ -76,7 +175,6 @@ class ModuleManagerService
             ],
         ];
     }
-
     /**
      * @return array<string>
      */
@@ -164,7 +262,7 @@ class ModuleManagerService
     }
 
     /**
-     * 扫描模块目录 + 内置模块并同步到数据库（若表存在）
+     * 闁规鍋呭鍨熼垾铏仴闁烩晩鍠栫紞?+ 闁告劕鎳愰悿鍡椢熼垾铏仴妤犵偠娉涢幃鎾愁潰閵夈儱鐓傞柡浣哄瀹撲焦鎯旈幙鍕闁兼眹鍎撮妴鍐偓娑櫭﹢顏堟晬?
      *
      * @return array<int, array<string, mixed>>
      */
@@ -772,7 +870,7 @@ class ModuleManagerService
         }
     }
 
-    /**
+        /**
      * @return array<string, int>
      */
     private static function menuBadges(): array
@@ -782,12 +880,17 @@ class ModuleManagerService
             'creator_links_total' => self::safeCount('product_links'),
             'creator_category_total' => self::safeCount('categories', ['type' => 'influencer']),
             'template_total' => self::safeCount('message_templates', ['status' => 1]),
+            'outreach_pending' => self::safeCount('influencer_outreach_tasks', ['task_status' => 0]),
+            'sample_pending' => self::safeCount('sample_shipments', ['shipment_status' => 0]) + self::safeCount('sample_shipments', ['shipment_status' => 1]),
+            'industry_total' => self::safeCount('growth_industry_metrics'),
+            'competitor_total' => self::safeCount('growth_competitors'),
+            'ad_total' => self::safeCount('growth_ad_creatives'),
+            'import_running' => self::safeCount('import_jobs', ['status' => 1]),
             'video_total' => self::safeCount('videos'),
             'product_total' => self::safeCount('products'),
             'ops_error_total' => self::safeCount('download_logs'),
         ];
     }
-
     /**
      * @param array<int, array<string, mixed>> $items
      */
@@ -808,7 +911,7 @@ class ModuleManagerService
     }
 
     /**
-     * 后台侧栏（仅返回已启用模块相关菜单）
+     * 闁告艾楠歌ぐ瀛樼瑹瑜庨悥顕€鏁嶉崼婊呯煂閺夆晜鏌ㄥú鏍ь啅閹绘帗鍎欓柣顫妽鑶╅柛褎顨堝ù澶愬礂鐎圭姴缍呴柛妤佹穿缁?
      *
      * @return array<int, array<string, mixed>>
      */
@@ -822,12 +925,30 @@ class ModuleManagerService
         $badges = self::menuBadges();
         $operatorOnly = $role === self::ROLE_OPERATOR;
 
-        $overviewEnabled = ($enabled['overview'] ?? 0) === 1;
-        $searchEnabled = (($enabled['style_search'] ?? 0) === 1) || (($enabled['product_search'] ?? 0) === 1);
-        $creatorEnabled = ($enabled['creator_crm'] ?? 0) === 1;
-        $materialEnabled = ($enabled['material_distribution'] ?? 0) === 1;
-        $terminalEnabled = ($enabled['terminal_devices'] ?? 0) === 1;
-        $systemEnabled = ($enabled['system_ops'] ?? 0) === 1;
+        $isEnabled = static function (string $moduleName, int $fallback = 0) use ($enabled): bool {
+            return (int) ($enabled[$moduleName] ?? $fallback) === 1;
+        };
+
+        $overviewEnabled = $isEnabled('overview');
+        $searchEnabled = $isEnabled('product_search', (int) ($enabled['style_search'] ?? 0));
+
+        $growthEnabled = $isEnabled('growth_hub');
+        $industryEnabled = $growthEnabled && $isEnabled('industry_trend', 1);
+        $competitorEnabled = $growthEnabled && $isEnabled('competitor_analysis', 1);
+        $adInsightEnabled = $growthEnabled && $isEnabled('ad_insight', 1);
+        $dataImportEnabled = $growthEnabled && $isEnabled('data_import', 1);
+
+        $creatorEnabled = $isEnabled('creator_crm');
+        $creatorCategoryEnabled = $creatorEnabled && $isEnabled('category', 1);
+        $creatorInfluencerEnabled = $creatorEnabled && $isEnabled('influencer', 1);
+        $creatorOutreachEnabled = $creatorEnabled && $isEnabled('outreach_workspace', 1);
+        $creatorSampleEnabled = $creatorEnabled && $isEnabled('sample_management', 1);
+        $creatorTemplateEnabled = $creatorEnabled && $isEnabled('message_template', 1);
+        $creatorDistributeEnabled = $creatorEnabled && $isEnabled('distribute', 1);
+
+        $materialEnabled = $isEnabled('material_distribution');
+        $terminalEnabled = $isEnabled('terminal_devices');
+        $systemEnabled = $isEnabled('system_ops');
 
         $menus = [];
 
@@ -861,54 +982,144 @@ class ModuleManagerService
             ];
         }
 
+        if (!$operatorOnly && $growthEnabled) {
+            $growthChildren = [];
+            if ($industryEnabled) {
+                $growthChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/industry_trend',
+                    'icon' => 'trending-up',
+                    'text_i18n' => 'admin.menu.industryTrend',
+                    'active' => $currentController === 'industrytrend',
+                    'badge' => ($badges['industry_total'] ?? 0) > 0 ? (string) $badges['industry_total'] : '',
+                ];
+            }
+            if ($competitorEnabled) {
+                $growthChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/competitor_analysis',
+                    'icon' => 'target',
+                    'text_i18n' => 'admin.menu.competitorAnalysis',
+                    'active' => $currentController === 'competitoranalysis',
+                    'badge' => ($badges['competitor_total'] ?? 0) > 0 ? (string) $badges['competitor_total'] : '',
+                ];
+            }
+            if ($adInsightEnabled) {
+                $growthChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/ad_insight',
+                    'icon' => 'megaphone',
+                    'text_i18n' => 'admin.menu.adInsight',
+                    'active' => $currentController === 'adinsight',
+                    'badge' => ($badges['ad_total'] ?? 0) > 0 ? (string) $badges['ad_total'] : '',
+                ];
+            }
+            if ($dataImportEnabled) {
+                $growthChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/data_import',
+                    'icon' => 'database',
+                    'text_i18n' => 'admin.menu.dataImport',
+                    'active' => $currentController === 'dataimport',
+                    'badge' => ($badges['import_running'] ?? 0) > 0 ? (string) $badges['import_running'] : '',
+                ];
+            }
+
+            if ($growthChildren !== []) {
+                $menus[] = [
+                    'section_i18n' => 'admin.menu.growthHub',
+                    'items' => [
+                        [
+                            'kind' => 'group',
+                            'id' => 'growth',
+                            'icon' => 'bar-chart-3',
+                            'text_i18n' => 'admin.menu.growthHubMenu',
+                            'expanded' => self::menuTreeHasActive($growthChildren),
+                            'children' => $growthChildren,
+                        ],
+                    ],
+                ];
+            }
+        }
+
         if ($creatorEnabled) {
-            $creatorChildren = [
-                [
+            $creatorChildren = [];
+            if ($creatorCategoryEnabled) {
+                $creatorChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/category',
                     'icon' => 'tag',
                     'text_i18n' => 'admin.menu.category',
                     'active' => $currentController === 'category',
                     'badge' => ($badges['creator_category_total'] ?? 0) > 0 ? (string) $badges['creator_category_total'] : '',
-                ],
-                [
+                ];
+            }
+            if ($creatorInfluencerEnabled) {
+                $creatorChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/influencer',
                     'icon' => 'users',
                     'text_i18n' => 'admin.menu.influencerList',
                     'active' => $currentController === 'influencer',
-                    'badge' => (string) ($badges['influencer_pending'] ?? 0),
-                ],
-                [
+                    'badge' => ($badges['influencer_pending'] ?? 0) > 0 ? (string) $badges['influencer_pending'] : '',
+                ];
+            }
+            if ($creatorOutreachEnabled) {
+                $creatorChildren[] = [
                     'kind' => 'link',
-                    'href' => '/admin.php/distribute',
-                    'icon' => 'link-2',
-                    'text_i18n' => 'admin.menu.distribute',
-                    'active' => $currentController === 'distribute',
-                    'badge' => ($badges['creator_links_total'] ?? 0) > 0 ? (string) $badges['creator_links_total'] : '',
-                ],
-                [
+                    'href' => '/admin.php/outreach_workspace',
+                    'icon' => 'send',
+                    'text_i18n' => 'admin.menu.outreachWorkspace',
+                    'active' => $currentController === 'outreachworkspace',
+                    'badge' => ($badges['outreach_pending'] ?? 0) > 0 ? (string) $badges['outreach_pending'] : '',
+                ];
+            }
+            if ($creatorSampleEnabled) {
+                $creatorChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/sample',
+                    'icon' => 'package',
+                    'text_i18n' => 'admin.menu.sampleManagement',
+                    'active' => $currentController === 'sample',
+                    'badge' => ($badges['sample_pending'] ?? 0) > 0 ? (string) $badges['sample_pending'] : '',
+                ];
+            }
+            if ($creatorTemplateEnabled) {
+                $creatorChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/message_template',
                     'icon' => 'message-circle',
                     'text_i18n' => 'admin.menu.messageTemplates',
                     'active' => $currentController === 'messagetemplate',
                     'badge' => ($badges['template_total'] ?? 0) > 0 ? (string) $badges['template_total'] : '',
-                ],
-            ];
-            $menus[] = [
-                'section_i18n' => 'admin.menu.groupCreator',
-                'items' => [
-                    [
-                        'kind' => 'group',
-                        'id' => 'creator',
-                        'icon' => 'users',
-                        'text_i18n' => 'admin.menu.groupCreatorMenu',
-                        'expanded' => self::menuTreeHasActive($creatorChildren),
-                        'children' => $creatorChildren,
+                ];
+            }
+            if ($creatorDistributeEnabled) {
+                $creatorChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/distribute',
+                    'icon' => 'link-2',
+                    'text_i18n' => 'admin.menu.distribute',
+                    'active' => $currentController === 'distribute',
+                    'badge' => ($badges['creator_links_total'] ?? 0) > 0 ? (string) $badges['creator_links_total'] : '',
+                ];
+            }
+
+            if ($creatorChildren !== []) {
+                $menus[] = [
+                    'section_i18n' => 'admin.menu.groupCreator',
+                    'items' => [
+                        [
+                            'kind' => 'group',
+                            'id' => 'creator',
+                            'icon' => 'users',
+                            'text_i18n' => 'admin.menu.groupCreatorMenu',
+                            'expanded' => self::menuTreeHasActive($creatorChildren),
+                            'children' => $creatorChildren,
+                        ],
                     ],
-                ],
-            ];
+                ];
+            }
         }
 
         if ($materialEnabled) {
@@ -985,37 +1196,7 @@ class ModuleManagerService
         }
 
         if (!$operatorOnly && $systemEnabled) {
-            $opsChildren = [
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/client_license',
-                    'icon' => 'key',
-                    'text_i18n' => 'admin.menu.clientLicense',
-                    'active' => $currentController === 'clientlicense',
-                ],
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/client_version',
-                    'icon' => 'package',
-                    'text_i18n' => 'admin.menu.clientVersion',
-                    'active' => $currentController === 'clientversion',
-                ],
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/cache',
-                    'icon' => 'database',
-                    'text_i18n' => 'admin.menu.cache',
-                    'active' => $currentController === 'cache',
-                ],
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/downloadLog',
-                    'icon' => 'triangle-alert',
-                    'text_i18n' => 'admin.menu.errors',
-                    'active' => $currentController === 'downloadlog',
-                    'badge' => ($badges['ops_error_total'] ?? 0) > 0 ? (string) $badges['ops_error_total'] : '',
-                ],
-            ];
+            $opsCenterActive = in_array($currentController, ['opscenter', 'clientlicense', 'clientversion', 'cache'], true);
             $systemChildren = [
                 [
                     'kind' => 'link',
@@ -1026,18 +1207,25 @@ class ModuleManagerService
                 ],
                 [
                     'kind' => 'link',
+                    'href' => '/admin.php/ops_center',
+                    'icon' => 'wrench',
+                    'text_i18n' => 'admin.menu.opsCenter',
+                    'active' => $opsCenterActive,
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/downloadLog',
+                    'icon' => 'triangle-alert',
+                    'text_i18n' => 'admin.menu.errors',
+                    'active' => $currentController === 'downloadlog',
+                    'badge' => ($badges['ops_error_total'] ?? 0) > 0 ? (string) $badges['ops_error_total'] : '',
+                ],
+                [
+                    'kind' => 'link',
                     'href' => '/admin.php/user',
                     'icon' => 'users',
                     'text_i18n' => 'admin.menu.user',
                     'active' => $currentController === 'user',
-                ],
-                [
-                    'kind' => 'group',
-                    'id' => 'ops_tools',
-                    'icon' => 'wrench',
-                    'text_i18n' => 'admin.menu.opsTools',
-                    'expanded' => self::menuTreeHasActive($opsChildren),
-                    'children' => $opsChildren,
                 ],
                 [
                     'kind' => 'link',

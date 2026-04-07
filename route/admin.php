@@ -1,19 +1,17 @@
 <?php
 use think\facade\Route;
 
-// 后台路由 - 使用完整命名空间避免大小写问题
-// 注意：由于入口文件是 admin.php，路由组不需要再加 admin 前缀
-// 只在后台入口文件时加载此路由
+// Admin routes are loaded only for admin.php entry.
 if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('/', 'app\controller\admin\Index@index');
 
-    // 后台认证
+    // Auth
     Route::get('auth/login', 'app\controller\admin\Auth@login');
     Route::post('auth/login', 'app\controller\admin\Auth@login');
     Route::get('auth/logout', 'app\controller\admin\Auth@logoutPage');
     Route::post('auth/logout', 'app\controller\admin\Auth@logout');
 
-    // 仪表盘统计（只读 JSON）
+    // Dashboard stats
     Route::get('stats/overview', 'app\controller\admin\Stats@overview');
     Route::get('stats/trends', 'app\controller\admin\Stats@trends');
     Route::get('stats/platformDistribution', 'app\controller\admin\Stats@platformDistribution');
@@ -25,7 +23,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('settings', 'app\controller\admin\Settings@index');
     Route::post('settings', 'app\controller\admin\Settings@index');
 
-    // 用户（管理员账号）
+    // Users
     Route::get('user/list', 'app\controller\admin\User@listJson');
     Route::get('user/listJson', 'app\controller\admin\User@listJson');
     Route::post('user/create', 'app\controller\admin\User@create');
@@ -34,8 +32,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('user/resetPassword', 'app\controller\admin\User@resetPassword');
     Route::post('user/delete', 'app\controller\admin\User@delete');
     Route::get('user', 'app\controller\admin\User@index');
-    
-    // 平台管理 - 直接定义完整路径，避免路由组匹配问题
+
+    // Platform
     Route::get('platform/list', 'app\controller\admin\Platform@listJson');
     Route::get('platform/listJson', 'app\controller\admin\Platform@listJson');
     Route::get('platform/edit/<id>', 'app\controller\admin\Platform@edit');
@@ -44,8 +42,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('platform/add', 'app\controller\admin\Platform@add');
     Route::post('platform/add', 'app\controller\admin\Platform@add');
     Route::get('platform', 'app\controller\admin\Platform@index');
-    
-    // 设备管理
+
+    // Device
     Route::get('device/list', 'app\controller\admin\Device@listJson');
     Route::get('device/listJson', 'app\controller\admin\Device@listJson');
     Route::get('device/edit/<id>', 'app\controller\admin\Device@edit');
@@ -55,8 +53,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('device/add', 'app\controller\admin\Device@add');
     Route::post('device/add', 'app\controller\admin\Device@add');
     Route::get('device', 'app\controller\admin\Device@index');
-    
-    // 商品
+
+    // Product
     Route::get('product/list', 'app\controller\admin\Product@listJson');
     Route::get('product/listJson', 'app\controller\admin\Product@listJson');
     Route::get('product/edit/<id>', 'app\controller\admin\Product@edit');
@@ -67,7 +65,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('product/uploadThumb', 'app\controller\admin\Product@uploadThumb');
     Route::get('product', 'app\controller\admin\Product@index');
 
-    // 分发链接
+    // Distribute
     Route::get('distribute/list', 'app\controller\admin\Distribute@listJson');
     Route::get('distribute/listJson', 'app\controller\admin\Distribute@listJson');
     Route::get('distribute/add', 'app\controller\admin\Distribute@add');
@@ -76,7 +74,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('distribute/toggle/<id>', 'app\controller\admin\Distribute@toggle');
     Route::get('distribute', 'app\controller\admin\Distribute@index');
 
-    // 视频管理
+    // Video
     Route::get('video/list', 'app\\controller\\admin\\Video@listJson');
     Route::get('video/listJson', 'app\\controller\\admin\\Video@listJson');
     Route::get('video/edit/<id>', 'app\controller\admin\Video@edit');
@@ -90,21 +88,21 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('video/batchEdit', 'app\controller\admin\Video@batchEdit');
     Route::get('video', 'app\controller\admin\Video@index');
 
-    // 缓存管理
+    // Cache
     Route::get('cache/list', 'app\controller\admin\Cache@listJson');
     Route::get('cache/listJson', 'app\controller\admin\Cache@listJson');
     Route::get('cache', 'app\controller\admin\Cache@index');
     Route::post('cache/delete/<hash>', 'app\controller\admin\Cache@delete');
     Route::post('cache/clear', 'app\controller\admin\Cache@clear');
     Route::get('cache/download/<hash>', 'app\controller\admin\Cache@download');
-    
-    // 下载错误监控
+
+    // Download log
     Route::get('downloadLog/list', 'app\controller\admin\DownloadLog@listJson');
     Route::get('downloadLog/listJson', 'app\controller\admin\DownloadLog@listJson');
     Route::get('downloadLog', 'app\controller\admin\DownloadLog@index');
     Route::post('downloadLog/clear', 'app\controller\admin\DownloadLog@clear');
 
-    // 桌面端：发卡 / 版本
+    // Client license/version + ops center
     Route::get('client_license/list', 'app\controller\admin\ClientLicense@listJson');
     Route::get('client_license/listJson', 'app\controller\admin\ClientLicense@listJson');
     Route::post('client_license/add', 'app\controller\admin\ClientLicense@add');
@@ -122,8 +120,9 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('client_version/toggle/<id>', 'app\controller\admin\ClientVersion@toggle');
     Route::post('client_version/delete/<id>', 'app\controller\admin\ClientVersion@delete');
     Route::get('client_version', 'app\controller\admin\ClientVersion@index');
+    Route::get('ops_center', 'app\controller\admin\OpsCenter@index');
 
-    // 图片搜款式
+    // Product search
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
     Route::get('product_search/listJson', 'app\controller\admin\ProductSearch@listJson');
     Route::post('product_search/importCsv', 'app\controller\admin\ProductSearch@importCsv');
@@ -137,7 +136,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('product_search/exportCsv', 'app\controller\admin\ProductSearch@exportCsv');
     Route::get('product_search', 'app\controller\admin\ProductSearch@index');
 
-    // 达人名录（TikTok @handle）
+    // Influencer CRM
     Route::get('influencer/list', 'app\controller\admin\Influencer@listJson');
     Route::get('influencer/listJson', 'app\controller\admin\Influencer@listJson');
     Route::get('influencer/search', 'app\controller\admin\Influencer@searchJson');
@@ -154,7 +153,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('influencer/delete', 'app\controller\admin\Influencer@delete');
     Route::get('influencer', 'app\controller\admin\Influencer@index');
 
-    // 分类管理（商品/达人）
+    // Category
     Route::get('category/list', 'app\controller\admin\Category@listJson');
     Route::get('category/listJson', 'app\controller\admin\Category@listJson');
     Route::get('category/options', 'app\controller\admin\Category@options');
@@ -162,7 +161,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('category/delete', 'app\controller\admin\Category@delete');
     Route::get('category', 'app\controller\admin\Category@index');
 
-    // 模块管理
+    // Module manager
     Route::get('extension/list', 'app\controller\admin\Extension@listJson');
     Route::get('extension/listJson', 'app\controller\admin\Extension@listJson');
     Route::get('extension/logs', 'app\controller\admin\Extension@logsJson');
@@ -173,11 +172,55 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('extension/savePermission', 'app\controller\admin\Extension@savePermission');
     Route::get('extension', 'app\controller\admin\Extension@index');
 
-    // 达人联系话术模板
+    // Message template
     Route::get('message_template/list', 'app\controller\admin\MessageTemplate@listJson');
     Route::get('message_template/listJson', 'app\controller\admin\MessageTemplate@listJson');
     Route::post('message_template/save', 'app\controller\admin\MessageTemplate@save');
     Route::post('message_template/delete', 'app\controller\admin\MessageTemplate@delete');
     Route::post('message_template/render', 'app\controller\admin\MessageTemplate@render');
     Route::get('message_template', 'app\controller\admin\MessageTemplate@index');
+
+    // Outreach workspace
+    Route::get('outreach_workspace/list', 'app\controller\admin\OutreachWorkspace@listJson');
+    Route::get('outreach_workspace/listJson', 'app\controller\admin\OutreachWorkspace@listJson');
+    Route::get('outreach_workspace/nextTask', 'app\controller\admin\OutreachWorkspace@nextTaskJson');
+    Route::post('outreach_workspace/generate', 'app\controller\admin\OutreachWorkspace@generate');
+    Route::post('outreach_workspace/action', 'app\controller\admin\OutreachWorkspace@action');
+    Route::get('outreach_workspace', 'app\controller\admin\OutreachWorkspace@index');
+
+    // Sample management
+    Route::get('sample/list', 'app\controller\admin\Sample@listJson');
+    Route::get('sample/listJson', 'app\controller\admin\Sample@listJson');
+    Route::post('sample/save', 'app\controller\admin\Sample@save');
+    Route::post('sample/createFromInfluencer', 'app\controller\admin\Sample@createFromInfluencer');
+    Route::post('sample/markReceived', 'app\controller\admin\Sample@markReceived');
+    Route::get('sample', 'app\controller\admin\Sample@index');
+
+    // Growth intelligence
+    Route::get('industry_trend/list', 'app\controller\admin\IndustryTrend@listJson');
+    Route::get('industry_trend/listJson', 'app\controller\admin\IndustryTrend@listJson');
+    Route::post('industry_trend/importCsv', 'app\controller\admin\IndustryTrend@importCsv');
+    Route::get('industry_trend', 'app\controller\admin\IndustryTrend@index');
+
+    Route::get('competitor_analysis/list', 'app\controller\admin\CompetitorAnalysis@listJson');
+    Route::get('competitor_analysis/listJson', 'app\controller\admin\CompetitorAnalysis@listJson');
+    Route::post('competitor_analysis/saveCompetitor', 'app\controller\admin\CompetitorAnalysis@saveCompetitor');
+    Route::post('competitor_analysis/importCsv', 'app\controller\admin\CompetitorAnalysis@importCsv');
+    Route::get('competitor_analysis', 'app\controller\admin\CompetitorAnalysis@index');
+
+    Route::get('ad_insight/list', 'app\controller\admin\AdInsight@listJson');
+    Route::get('ad_insight/listJson', 'app\controller\admin\AdInsight@listJson');
+    Route::post('ad_insight/importCsv', 'app\controller\admin\AdInsight@importCsv');
+    Route::get('ad_insight', 'app\controller\admin\AdInsight@index');
+
+    // Data import center
+    Route::get('data_import/sourceList', 'app\controller\admin\DataImport@sourceListJson');
+    Route::get('data_import/sourceListJson', 'app\controller\admin\DataImport@sourceListJson');
+    Route::post('data_import/sourceSave', 'app\controller\admin\DataImport@sourceSave');
+    Route::post('data_import/sourceDelete', 'app\controller\admin\DataImport@sourceDelete');
+    Route::get('data_import/jobList', 'app\controller\admin\DataImport@jobListJson');
+    Route::get('data_import/jobListJson', 'app\controller\admin\DataImport@jobListJson');
+    Route::get('data_import/jobLogs', 'app\controller\admin\DataImport@jobLogsJson');
+    Route::get('data_import/jobLogsJson', 'app\controller\admin\DataImport@jobLogsJson');
+    Route::get('data_import', 'app\controller\admin\DataImport@index');
 }

@@ -1,0 +1,298 @@
+﻿{extend name="admin/common/layout" /}
+
+{block name="title"}Data Import Center{/block}
+{block name="page_title"}<span data-i18n="page.dataImportCenter.title">Data Import Center</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.dataImportCenter.breadcrumb">Growth Hub / Data Import</span>{/block}
+
+{block name="content"}
+<div id="dataImportApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, reactive, ref, onMounted } = Vue;
+  const { ElMessage } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+  const headers = { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' };
+  const parseJson = (text) => { try { return JSON.parse(text); } catch (_) { return null; } };
+
+  createApp({
+    setup() {
+      const sourceLoading = ref(false);
+      const sources = ref([]);
+      const jobsLoading = ref(false);
+      const jobs = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(20);
+      const query = reactive({ domain: '', status: '' });
+
+      const sourceDialog = ref(false);
+      const sourceSaving = ref(false);
+      const sourceForm = reactive({ id: 0, code: '', name: '', source_type: 'csv', adapter_key: '', status: 1, config_json: '' });
+
+      const logsVisible = ref(false);
+      const logRows = ref([]);
+      const currentLogTitle = ref('');
+
+      async function fetchSources() {
+        sourceLoading.value = true;
+        try {
+          const res = await fetch('/admin.php/data_import/sourceListJson', { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          sources.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          sourceLoading.value = false;
+        }
+      }
+
+      async function fetchJobs() {
+        jobsLoading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(page.value));
+          p.set('page_size', String(pageSize.value));
+          if (query.domain) p.set('domain', query.domain);
+          if (query.status !== '' && query.status !== null) p.set('status', String(query.status));
+          const res = await fetch('/admin.php/data_import/jobListJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          jobs.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          total.value = json.data ? Number(json.data.total || 0) : 0;
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          jobsLoading.value = false;
+        }
+      }
+
+      function openSourceForm(row) {
+        if (row) {
+          sourceForm.id = row.id;
+          sourceForm.code = row.code || '';
+          sourceForm.name = row.name || '';
+          sourceForm.source_type = row.source_type || 'csv';
+          sourceForm.adapter_key = row.adapter_key || '';
+          sourceForm.status = Number(row.status || 1);
+          sourceForm.config_json = row.config_json || '';
+        } else {
+          sourceForm.id = 0;
+          sourceForm.code = '';
+          sourceForm.name = '';
+          sourceForm.source_type = 'csv';
+          sourceForm.adapter_key = '';
+          sourceForm.status = 1;
+          sourceForm.config_json = '';
+        }
+        sourceDialog.value = true;
+      }
+
+      async function saveSource() {
+        sourceSaving.value = true;
+        try {
+          const payload = {
+            id: sourceForm.id,
+            code: sourceForm.code,
+            name: sourceForm.name,
+            source_type: sourceForm.source_type,
+            adapter_key: sourceForm.adapter_key,
+            status: sourceForm.status,
+            config_json: sourceForm.config_json
+          };
+          const res = await fetch('/admin.php/data_import/sourceSave', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(payload)
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          sourceDialog.value = false;
+          fetchSources();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          sourceSaving.value = false;
+        }
+      }
+
+      async function deleteSource(row) {
+        try {
+          const res = await fetch('/admin.php/data_import/sourceDelete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ id: row.id })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.delete'));
+          ElMessage.success(tt('common.done'));
+          fetchSources();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        }
+      }
+
+      async function viewLogs(row) {
+        try {
+          const res = await fetch('/admin.php/data_import/jobLogsJson?job_id=' + encodeURIComponent(String(row.id)), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          logRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          currentLogTitle.value = String(row.id);
+          logsVisible.value = true;
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      }
+
+      function jobStatusText(s) {
+        const n = Number(s || 0);
+        if (n === 0) return tt('page.dataImportCenter.statusQueued');
+        if (n === 1) return tt('page.dataImportCenter.statusRunning');
+        if (n === 2) return tt('page.dataImportCenter.statusSuccess');
+        if (n === 3) return tt('page.dataImportCenter.statusFailed');
+        return tt('page.dataImportCenter.statusPartial');
+      }
+
+      onMounted(() => {
+        if (i18n) i18n.applyDom(document);
+        fetchSources();
+        fetchJobs();
+      });
+
+      return {
+        tt,
+        sourceLoading,
+        sources,
+        jobsLoading,
+        jobs,
+        total,
+        page,
+        pageSize,
+        query,
+        fetchJobs,
+        openSourceForm,
+        sourceDialog,
+        sourceForm,
+        sourceSaving,
+        saveSource,
+        deleteSource,
+        viewLogs,
+        logsVisible,
+        logRows,
+        currentLogTitle,
+        jobStatusText
+      };
+    },
+    template: `
+      <div class="admin-modern-card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <strong>{{ tt('page.dataImportCenter.sources') }}</strong>
+          <el-button type="primary" size="small" @click="openSourceForm(null)">{{ tt('common.add') }}</el-button>
+        </div>
+        <el-table :data="sources" stripe v-loading="sourceLoading">
+          <el-table-column prop="code" :label="tt('page.dataImportCenter.colCode')" width="120" />
+          <el-table-column prop="name" :label="tt('page.dataImportCenter.colName')" min-width="140" />
+          <el-table-column prop="source_type" :label="tt('page.dataImportCenter.colType')" width="100" />
+          <el-table-column prop="status" :label="tt('page.dataImportCenter.colStatus')" width="90" />
+          <el-table-column :label="tt('common.edit')" width="190" fixed="right">
+            <template #default="{row}">
+              <el-button size="small" @click="openSourceForm(row)">{{ tt('common.edit') }}</el-button>
+              <el-button size="small" type="danger" plain @click="deleteSource(row)">{{ tt('common.delete') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="admin-modern-card">
+        <el-form :inline="true" style="margin-bottom:12px;">
+          <el-form-item><el-input v-model="query.domain" :placeholder="tt('page.dataImportCenter.colDomain')" style="width:170px;" clearable /></el-form-item>
+          <el-form-item>
+            <el-select v-model="query.status" clearable style="width:140px;" :placeholder="tt('page.dataImportCenter.colStatus')">
+              <el-option :label="tt('common.statusAll')" value="" />
+              <el-option :label="tt('page.dataImportCenter.statusQueued')" :value="0" />
+              <el-option :label="tt('page.dataImportCenter.statusRunning')" :value="1" />
+              <el-option :label="tt('page.dataImportCenter.statusSuccess')" :value="2" />
+              <el-option :label="tt('page.dataImportCenter.statusFailed')" :value="3" />
+              <el-option :label="tt('page.dataImportCenter.statusPartial')" :value="4" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="page=1;fetchJobs()">{{ tt('common.search') }}</el-button>
+            <el-button @click="query.domain='';query.status='';page=1;fetchJobs()">{{ tt('common.reset') }}</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="jobs" stripe v-loading="jobsLoading">
+          <el-table-column prop="domain" :label="tt('page.dataImportCenter.colDomain')" width="120" />
+          <el-table-column prop="job_type" :label="tt('page.dataImportCenter.colJobType')" width="110" />
+          <el-table-column :label="tt('page.dataImportCenter.colRows')" min-width="150">
+            <template #default="{row}">{{ row.success_rows }}/{{ row.failed_rows }}/{{ row.total_rows }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('page.dataImportCenter.colStatus')" width="110">
+            <template #default="{row}">{{ jobStatusText(row.status) }}</template>
+          </el-table-column>
+          <el-table-column prop="started_at" :label="tt('page.dataImportCenter.colStartedAt')" min-width="150" />
+          <el-table-column prop="finished_at" :label="tt('page.dataImportCenter.colFinishedAt')" min-width="150" />
+          <el-table-column :label="tt('common.open')" width="120" fixed="right">
+            <template #default="{row}"><el-button size="small" @click="viewLogs(row)">{{ tt('page.dataImportCenter.viewLogs') }}</el-button></template>
+          </el-table-column>
+        </el-table>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            layout="total, prev, pager, next"
+            :total="total"
+            @update:current-page="fetchJobs"
+            @update:page-size="() => { page=1; fetchJobs(); }"
+          />
+        </div>
+      </div>
+
+      <el-dialog v-model="sourceDialog" :title="tt('page.dataImportCenter.sources')" width="520px">
+        <el-form label-width="120px">
+          <el-form-item :label="tt('page.dataImportCenter.colCode')"><el-input v-model="sourceForm.code" /></el-form-item>
+          <el-form-item :label="tt('page.dataImportCenter.colName')"><el-input v-model="sourceForm.name" /></el-form-item>
+          <el-form-item :label="tt('page.dataImportCenter.colType')">
+            <el-select v-model="sourceForm.source_type" style="width:100%;">
+              <el-option :label="tt('page.dataImportCenter.typeCsv')" value="csv" />
+              <el-option :label="tt('page.dataImportCenter.typeApi')" value="api" />
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="tt('page.dataImportCenter.adapterKey')"><el-input v-model="sourceForm.adapter_key" /></el-form-item>
+          <el-form-item :label="tt('page.dataImportCenter.configJson')"><el-input v-model="sourceForm.config_json" type="textarea" :rows="3" /></el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="sourceDialog=false">{{ tt('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="sourceSaving" @click="saveSource">{{ tt('common.save') }}</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="logsVisible" :title="tt('page.dataImportCenter.logsTitle') + ' #' + currentLogTitle" width="680px">
+        <el-table :data="logRows" stripe max-height="420">
+          <el-table-column prop="created_at" width="170" :label="tt('page.dataImportCenter.logTime')" />
+          <el-table-column prop="level" width="90" :label="tt('page.dataImportCenter.logLevel')" />
+          <el-table-column prop="message" min-width="220" :label="tt('page.dataImportCenter.logMessage')" />
+          <el-table-column prop="context_json" min-width="200" :label="tt('page.dataImportCenter.logContext')" show-overflow-tooltip />
+        </el-table>
+      </el-dialog>
+    `
+  }).use(ElementPlus).mount('#dataImportApp');
+})();
+{/literal}
+</script>
+{/block}

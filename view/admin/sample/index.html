@@ -1,0 +1,140 @@
+﻿{extend name="admin/common/layout" /}
+
+{block name="title"}Sample Management{/block}
+{block name="page_title"}<span data-i18n="page.sample.title">Sample Management</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.sample.breadcrumb">Creator Ops / Sample Management</span>{/block}
+
+{block name="content"}
+<div id="sampleApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, reactive, ref, onMounted } = Vue;
+  const { ElMessage } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+  const headers = { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' };
+  const parseJson = (text) => { try { return JSON.parse(text); } catch (_) { return null; } };
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const list = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(20);
+      const query = reactive({ keyword: '', shipment_status: '' });
+
+      const shipLabel = (s) => tt('page.sample.ship' + String(Number(s || 0)));
+      const receiptLabel = (s) => tt('page.sample.receipt' + String(Number(s || 0)));
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(page.value));
+          p.set('page_size', String(pageSize.value));
+          if (query.keyword) p.set('keyword', query.keyword);
+          if (query.shipment_status !== '' && query.shipment_status !== null) p.set('shipment_status', String(query.shipment_status));
+          const res = await fetch('/admin.php/sample/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          list.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          total.value = json.data ? Number(json.data.total || 0) : 0;
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      async function markReceived(row) {
+        try {
+          const res = await fetch('/admin.php/sample/markReceived', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ id: row.id })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        }
+      }
+
+      onMounted(() => {
+        if (i18n) i18n.applyDom(document);
+        fetchList();
+      });
+
+      return { tt, loading, list, total, page, pageSize, query, fetchList, markReceived, shipLabel, receiptLabel };
+    },
+    template: `
+      <div class="admin-modern-card">
+        <el-form :inline="true" style="margin-bottom:12px;">
+          <el-form-item>
+            <el-input v-model="query.keyword" :placeholder="tt('page.sample.filterKeyword')" clearable style="width:220px;" />
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="query.shipment_status" clearable style="width:170px;" :placeholder="tt('page.sample.filterStatus')">
+              <el-option :label="tt('common.statusAll')" value="" />
+              <el-option :label="tt('page.sample.ship0')" :value="0" />
+              <el-option :label="tt('page.sample.ship1')" :value="1" />
+              <el-option :label="tt('page.sample.ship2')" :value="2" />
+              <el-option :label="tt('page.sample.ship3')" :value="3" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="page=1;fetchList()">{{ tt('common.search') }}</el-button>
+            <el-button @click="query.keyword='';query.shipment_status='';page=1;fetchList()">{{ tt('common.reset') }}</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="list" stripe v-loading="loading">
+          <el-table-column :label="tt('page.sample.colInfluencer')" min-width="180">
+            <template #default="{row}">{{ row.tiktok_id }} / {{ row.nickname }}</template>
+          </el-table-column>
+          <el-table-column prop="tracking_no" :label="tt('page.sample.colTrackingNo')" min-width="140" />
+          <el-table-column prop="courier" :label="tt('page.sample.colCourier')" min-width="120" />
+          <el-table-column :label="tt('page.sample.colShipment')" width="110">
+            <template #default="{row}">{{ shipLabel(row.shipment_status) }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('page.sample.colReceipt')" width="110">
+            <template #default="{row}">{{ receiptLabel(row.receipt_status) }}</template>
+          </el-table-column>
+          <el-table-column prop="shipped_at" :label="tt('page.sample.colShippedAt')" min-width="150" />
+          <el-table-column prop="received_at" :label="tt('page.sample.colReceivedAt')" min-width="150" />
+          <el-table-column :label="tt('page.sample.colActions')" width="130" fixed="right">
+            <template #default="{row}">
+              <el-button size="small" type="primary" plain @click="markReceived(row)">{{ tt('page.sample.markReceived') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            layout="total, prev, pager, next"
+            :total="total"
+            @update:current-page="fetchList"
+            @update:page-size="() => { page=1; fetchList(); }"
+          />
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#sampleApp');
+})();
+{/literal}
+</script>
+{/block}

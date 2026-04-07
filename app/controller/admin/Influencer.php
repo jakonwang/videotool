@@ -9,6 +9,7 @@ use app\model\Influencer as InfluencerModel;
 use app\model\OutreachLog as OutreachLogModel;
 use app\service\InfluencerImportTaskRunner;
 use app\service\InfluencerService;
+use app\service\InfluencerStatusFlowService;
 use think\facade\Db;
 use think\facade\Log;
 use think\facade\View;
@@ -380,10 +381,11 @@ class Influencer extends BaseController
                 $r = trim((string) $payload['region']);
                 $row->region = $r !== '' ? mb_substr($r, 0, 64) : null;
             }
+            $statusTarget = null;
             if (isset($payload['status'])) {
                 $st = (int) $payload['status'];
                 if ($st >= 0 && $st <= 6) {
-                    $row->status = $st;
+                    $statusTarget = $st;
                 }
             }
             if (array_key_exists('sample_tracking_no', $payload)) {
@@ -405,6 +407,20 @@ class Influencer extends BaseController
                 $row->tags_json = $tags !== [] ? json_encode($tags, JSON_UNESCAPED_UNICODE) : null;
             }
             $row->save();
+
+            if ($statusTarget !== null) {
+                $flow = InfluencerStatusFlowService::transition(
+                    (int) $row->id,
+                    $statusTarget,
+                    'influencer_edit',
+                    '',
+                    ['api' => 'influencer/update'],
+                    true
+                );
+                if (!($flow['ok'] ?? false)) {
+                    return $this->jsonErr((string) ($flow['message'] ?? 'status_transition_failed'));
+                }
+            }
 
             return $this->jsonOk([], '已保存');
         } catch (\Throwable $e) {
@@ -457,12 +473,17 @@ class Influencer extends BaseController
         if ($id <= 0 || $status < 0 || $status > 6) {
             return $this->jsonErr('参数错误');
         }
-        $row = InfluencerModel::find($id);
-        if (!$row) {
-            return $this->jsonErr('记录不存在');
+        $flow = InfluencerStatusFlowService::transition(
+            $id,
+            $status,
+            'manual_status',
+            '',
+            ['api' => 'influencer/updateStatus'],
+            true
+        );
+        if (!($flow['ok'] ?? false)) {
+            return $this->jsonErr((string) ($flow['message'] ?? 'status_transition_failed'));
         }
-        $row->status = $status;
-        $row->save();
 
         return $this->jsonOk([], '已更新');
     }
@@ -478,6 +499,7 @@ class Influencer extends BaseController
         $payload = $this->parseJsonOrPost();
         $id = (int) ($payload['id'] ?? 0);
         $trackingNo = trim((string) ($payload['sample_tracking_no'] ?? ''));
+        $courier = trim((string) ($payload['courier'] ?? ''));
         if ($id <= 0) {
             return $this->jsonErr('无效 id');
         }
@@ -488,10 +510,59 @@ class Influencer extends BaseController
         if (!$row) {
             return $this->jsonErr('记录不存在');
         }
-        $row->sample_tracking_no = mb_substr($trackingNo, 0, 64);
-        $row->sample_status = 1;
-        $row->status = 4;
-        $row->save();
+
+        try {
+            Db::transaction(function () use ($row, $trackingNo, $courier): void {
+                $now = date('Y-m-d H:i:s');
+                $tracking = mb_substr($trackingNo, 0, 64);
+                $row->sample_tracking_no = $tracking;
+                $row->sample_status = 1;
+                $row->save();
+
+                try {
+                    Db::name('sample_shipments')->where('id', 0)->find();
+                    $shipment = Db::name('sample_shipments')
+                        ->where('influencer_id', (int) $row->id)
+                        ->where('tracking_no', $tracking)
+                        ->find();
+                    if ($shipment) {
+                        Db::name('sample_shipments')->where('id', (int) $shipment['id'])->update([
+                            'courier' => $courier !== '' ? mb_substr($courier, 0, 64) : null,
+                            'shipment_status' => 1,
+                            'shipped_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+                    } else {
+                        Db::name('sample_shipments')->insert([
+                            'influencer_id' => (int) $row->id,
+                            'tracking_no' => $tracking,
+                            'courier' => $courier !== '' ? mb_substr($courier, 0, 64) : null,
+                            'shipment_status' => 1,
+                            'receipt_status' => 0,
+                            'shipped_at' => $now,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    // sample_shipments table is optional before migration.
+                }
+
+                $flow = InfluencerStatusFlowService::transition(
+                    (int) $row->id,
+                    4,
+                    'quick_ship',
+                    '',
+                    ['api' => 'influencer/markSampleShipped', 'tracking_no' => $tracking],
+                    true
+                );
+                if (!($flow['ok'] ?? false)) {
+                    throw new \RuntimeException((string) ($flow['message'] ?? 'status_transition_failed'));
+                }
+            });
+        } catch (\Throwable $e) {
+            return $this->jsonErr('更新失败：' . $e->getMessage());
+        }
 
         return $this->jsonOk([], '已更新');
     }
@@ -544,6 +615,16 @@ class Influencer extends BaseController
             'rendered_body' => $renderedBody,
         ]);
         InfluencerModel::where('id', $influencerId)->update(['last_contacted_at' => date('Y-m-d H:i:s')]);
+        if (str_contains($channel, 'copy') || str_contains($channel, 'jump')) {
+            InfluencerStatusFlowService::transition(
+                $influencerId,
+                1,
+                'outreach_action',
+                '',
+                ['channel' => $channel, 'api' => 'influencer/logOutreachAction'],
+                true
+            );
+        }
 
         return $this->jsonOk([], '已记录');
     }

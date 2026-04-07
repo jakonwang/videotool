@@ -1,0 +1,145 @@
+﻿{extend name="admin/common/layout" /}
+
+{block name="title"}Industry Trend{/block}
+{block name="page_title"}<span data-i18n="page.industryTrend.title">Industry Trend</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.industryTrend.breadcrumb">Growth Hub / Industry Trend</span>{/block}
+
+{block name="content"}
+<div id="industryTrendApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, reactive, ref, onMounted } = Vue;
+  const { ElMessage } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+  const headers = { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' };
+  const parseJson = (text) => { try { return JSON.parse(text); } catch (_) { return null; } };
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const list = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(20);
+      const query = reactive({ country: '', category: '', date_from: '', date_to: '' });
+      const importLoading = ref(false);
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(page.value));
+          p.set('page_size', String(pageSize.value));
+          if (query.country) p.set('country', query.country);
+          if (query.category) p.set('category', query.category);
+          if (query.date_from) p.set('date_from', query.date_from);
+          if (query.date_to) p.set('date_to', query.date_to);
+          const res = await fetch('/admin.php/industry_trend/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          list.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          total.value = json.data ? Number(json.data.total || 0) : 0;
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      async function importCsv() {
+        const input = document.getElementById('industryCsvInput');
+        if (!input || !input.files || !input.files[0]) {
+          ElMessage.warning(tt('common.pickFile'));
+          return;
+        }
+        importLoading.value = true;
+        try {
+          const fd = new FormData();
+          fd.append('file', input.files[0]);
+          const res = await fetch('/admin.php/industry_trend/importCsv', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers,
+            body: fd
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.dataImport.importFailed'));
+          ElMessage.success(tt('common.done'));
+          input.value = '';
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.dataImport.importFailed'));
+        } finally {
+          importLoading.value = false;
+        }
+      }
+
+      onMounted(() => {
+        if (i18n) i18n.applyDom(document);
+        fetchList();
+      });
+
+      return { tt, loading, list, total, page, pageSize, query, fetchList, importCsv, importLoading };
+    },
+    template: `
+      <div class="admin-modern-card">
+        <el-form :inline="true" style="margin-bottom:12px;">
+          <el-form-item>
+            <el-input v-model="query.country" :placeholder="tt('page.industryTrend.filterCountry')" clearable style="width:120px;" />
+          </el-form-item>
+          <el-form-item>
+            <el-input v-model="query.category" :placeholder="tt('page.industryTrend.filterCategory')" clearable style="width:170px;" />
+          </el-form-item>
+          <el-form-item>
+            <el-date-picker v-model="query.date_from" type="date" value-format="YYYY-MM-DD" :placeholder="tt('page.industryTrend.dateFrom')" style="width:150px;" />
+          </el-form-item>
+          <el-form-item>
+            <el-date-picker v-model="query.date_to" type="date" value-format="YYYY-MM-DD" :placeholder="tt('page.industryTrend.dateTo')" style="width:150px;" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="page=1;fetchList()">{{ tt('common.search') }}</el-button>
+            <el-button @click="query.country='';query.category='';query.date_from='';query.date_to='';page=1;fetchList()">{{ tt('common.reset') }}</el-button>
+          </el-form-item>
+          <el-form-item style="margin-left:auto;">
+            <input type="file" id="industryCsvInput" accept=".csv" style="max-width:180px;" />
+            <el-button type="success" :loading="importLoading" @click="importCsv">{{ tt('page.industryTrend.importCsv') }}</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="list" stripe v-loading="loading">
+          <el-table-column prop="metric_date" :label="tt('page.industryTrend.colDate')" width="120" />
+          <el-table-column prop="country_code" :label="tt('page.industryTrend.colCountry')" width="100" />
+          <el-table-column prop="category_name" :label="tt('page.industryTrend.colCategory')" min-width="140" />
+          <el-table-column prop="heat_score" :label="tt('page.industryTrend.colHeat')" width="100" />
+          <el-table-column prop="content_count" :label="tt('page.industryTrend.colContent')" width="110" />
+          <el-table-column prop="engagement_rate" :label="tt('page.industryTrend.colEngagement')" width="110" />
+          <el-table-column prop="cpc" :label="tt('page.industryTrend.colCpc')" width="90" />
+          <el-table-column prop="cpm" :label="tt('page.industryTrend.colCpm')" width="90" />
+        </el-table>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            layout="total, prev, pager, next"
+            :total="total"
+            @update:current-page="fetchList"
+            @update:page-size="() => { page=1; fetchList(); }"
+          />
+        </div>
+      </div>
+    `
+  }).use(ElementPlus).mount('#industryTrendApp');
+})();
+{/literal}
+</script>
+{/block}

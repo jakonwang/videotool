@@ -12,11 +12,9 @@ class MessageOutreachService
     private const LANG_VI = 'vi';
 
     /**
-     * 10个亲和力 Emoji
-     *
      * @var list<string>
      */
-    private static array $emojiPool = ['🙂', '😊', '😄', '🤝', '✨', '🌟', '💖', '🙌', '🎉', '🔥'];
+    private static array $emojiPool = ['😊', '😁', '🤝', '✨', '🙏', '🙌', '👍', '💖', '🌟', '🔥'];
 
     public static function adminBaseUrl(): string
     {
@@ -31,9 +29,6 @@ class MessageOutreachService
         return $baseUrl;
     }
 
-    /**
-     * 优先匹配达人+商品的启用分销链；否则回退到该商品任意启用链
-     */
     public static function resolveDistributeLink(int $influencerId, int $productId, string $baseUrl): string
     {
         $row = Db::name('product_links')
@@ -77,7 +72,7 @@ class MessageOutreachService
             'goods_url' => '',
             'tiktok_shop_url' => '',
             'distribute_link' => '',
-            'current_time_period' => self::currentTimeGreeting(),
+            'current_time_period' => self::currentTimeGreeting((string) ($inf['region'] ?? '')),
             'random_emoji' => self::randomEmoji(),
         ];
 
@@ -95,8 +90,6 @@ class MessageOutreachService
     }
 
     /**
-     * 智能变量解析：支持 {{ var }} / {{var}}
-     *
      * @param array<string, string> $vars
      */
     public static function renderBody(string $body, array $vars): string
@@ -144,9 +137,6 @@ class MessageOutreachService
         return 'https://zalo.me/' . $normalized;
     }
 
-    /**
-     * 根据达人 region 推断模板语言；未知默认 en
-     */
     public static function inferTemplateLangByRegion(string $region): string
     {
         $r = mb_strtolower(trim($region), 'UTF-8');
@@ -167,8 +157,6 @@ class MessageOutreachService
     }
 
     /**
-     * 基于 region 选择最优模板语言，未命中时回退 en
-     *
      * @param array<string, mixed> $baseTemplate
      * @return array<string, mixed>
      */
@@ -210,12 +198,6 @@ class MessageOutreachService
         return $baseTemplate;
     }
 
-    /**
-     * 05-11: Chào buổi sáng
-     * 12-18: Chào buổi chiều
-     * 19-23: Chào buổi tối
-     * 00-04: Chào buổi tối
-     */
     public static function currentTimeGreeting(string $region = ''): string
     {
         $hour = (int) date('G');
@@ -232,6 +214,9 @@ class MessageOutreachService
     public static function randomEmoji(): string
     {
         $pool = self::$emojiPool;
+        if ($pool === []) {
+            return '😊';
+        }
         $idx = random_int(0, count($pool) - 1);
 
         return $pool[$idx];
