@@ -739,6 +739,74 @@ class ModuleManagerService
         return $map;
     }
 
+    private static function tableExists(string $table): bool
+    {
+        try {
+            Db::name($table)->where('id', 0)->find();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $where
+     */
+    private static function safeCount(string $table, array $where = []): int
+    {
+        if (!self::tableExists($table)) {
+            return 0;
+        }
+        try {
+            $query = Db::name($table);
+            foreach ($where as $k => $v) {
+                if (is_array($v) && count($v) === 2) {
+                    $query->where((string) $k, (string) $v[0], $v[1]);
+                } else {
+                    $query->where((string) $k, $v);
+                }
+            }
+            return (int) $query->count();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function menuBadges(): array
+    {
+        return [
+            'influencer_pending' => self::safeCount('influencers', ['status' => 0]),
+            'creator_links_total' => self::safeCount('product_links'),
+            'creator_category_total' => self::safeCount('categories', ['type' => 'influencer']),
+            'template_total' => self::safeCount('message_templates', ['status' => 1]),
+            'video_total' => self::safeCount('videos'),
+            'product_total' => self::safeCount('products'),
+            'ops_error_total' => self::safeCount('download_logs'),
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     */
+    private static function menuTreeHasActive(array $items): bool
+    {
+        foreach ($items as $item) {
+            if (!empty($item['hidden'])) {
+                continue;
+            }
+            if (!empty($item['active'])) {
+                return true;
+            }
+            if (!empty($item['children']) && is_array($item['children']) && self::menuTreeHasActive($item['children'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * 后台侧栏（仅返回已启用模块相关菜单）
      *
@@ -751,10 +819,19 @@ class ModuleManagerService
         $isBatchUploadAction = in_array($currentAction, ['batchupload', 'batch_upload', 'batch-upload'], true);
         $role = AdminAuthService::role();
         $enabled = self::enabledModuleMap();
+        $badges = self::menuBadges();
+        $operatorOnly = $role === self::ROLE_OPERATOR;
+
+        $overviewEnabled = ($enabled['overview'] ?? 0) === 1;
+        $searchEnabled = (($enabled['style_search'] ?? 0) === 1) || (($enabled['product_search'] ?? 0) === 1);
+        $creatorEnabled = ($enabled['creator_crm'] ?? 0) === 1;
+        $materialEnabled = ($enabled['material_distribution'] ?? 0) === 1;
+        $terminalEnabled = ($enabled['terminal_devices'] ?? 0) === 1;
+        $systemEnabled = ($enabled['system_ops'] ?? 0) === 1;
 
         $menus = [];
 
-        if (($enabled['overview'] ?? 0) === 1) {
+        if (!$operatorOnly && $overviewEnabled) {
             $menus[] = [
                 'section_i18n' => 'admin.menu.overview',
                 'items' => [
@@ -769,7 +846,7 @@ class ModuleManagerService
             ];
         }
 
-        if (($enabled['style_search'] ?? 0) === 1) {
+        if (!$operatorOnly && $searchEnabled) {
             $menus[] = [
                 'section_i18n' => 'admin.menu.groupSearch',
                 'items' => [
@@ -784,40 +861,41 @@ class ModuleManagerService
             ];
         }
 
-        if (($enabled['creator_crm'] ?? 0) === 1) {
+        if ($creatorEnabled) {
             $creatorChildren = [
                 [
-                    'href' => '/admin.php/influencer',
-                    'icon' => 'users',
-                    'text_i18n' => 'admin.menu.influencerList',
-                    'active' => $currentController === 'influencer',
-                ],
-                [
-                    'href' => '/admin.php/distribute',
-                    'icon' => 'link-2',
-                    'text_i18n' => 'admin.menu.distribute',
-                    'active' => $currentController === 'distribute',
-                ],
-                [
+                    'kind' => 'link',
                     'href' => '/admin.php/category',
                     'icon' => 'tag',
                     'text_i18n' => 'admin.menu.category',
                     'active' => $currentController === 'category',
+                    'badge' => ($badges['creator_category_total'] ?? 0) > 0 ? (string) $badges['creator_category_total'] : '',
                 ],
                 [
+                    'kind' => 'link',
+                    'href' => '/admin.php/influencer',
+                    'icon' => 'users',
+                    'text_i18n' => 'admin.menu.influencerList',
+                    'active' => $currentController === 'influencer',
+                    'badge' => (string) ($badges['influencer_pending'] ?? 0),
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/distribute',
+                    'icon' => 'link-2',
+                    'text_i18n' => 'admin.menu.distribute',
+                    'active' => $currentController === 'distribute',
+                    'badge' => ($badges['creator_links_total'] ?? 0) > 0 ? (string) $badges['creator_links_total'] : '',
+                ],
+                [
+                    'kind' => 'link',
                     'href' => '/admin.php/message_template',
                     'icon' => 'message-circle',
                     'text_i18n' => 'admin.menu.messageTemplates',
                     'active' => $currentController === 'messagetemplate',
+                    'badge' => ($badges['template_total'] ?? 0) > 0 ? (string) $badges['template_total'] : '',
                 ],
             ];
-            $expanded = false;
-            foreach ($creatorChildren as $child) {
-                if (!empty($child['active'])) {
-                    $expanded = true;
-                    break;
-                }
-            }
             $menus[] = [
                 'section_i18n' => 'admin.menu.groupCreator',
                 'items' => [
@@ -826,41 +904,39 @@ class ModuleManagerService
                         'id' => 'creator',
                         'icon' => 'users',
                         'text_i18n' => 'admin.menu.groupCreatorMenu',
-                        'expanded' => $expanded,
+                        'expanded' => self::menuTreeHasActive($creatorChildren),
                         'children' => $creatorChildren,
                     ],
                 ],
             ];
         }
 
-        if (($enabled['material_distribution'] ?? 0) === 1) {
+        if ($materialEnabled) {
             $materialChildren = [
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/video',
                     'icon' => 'video',
                     'text_i18n' => 'admin.menu.video',
                     'active' => $currentController === 'video' && !$isBatchUploadAction,
+                    'badge' => ($badges['video_total'] ?? 0) > 0 ? (string) $badges['video_total'] : '',
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/video/batchUpload',
                     'icon' => 'cloud-upload',
                     'text_i18n' => 'admin.menu.upload',
                     'active' => $currentController === 'video' && $isBatchUploadAction,
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/product',
                     'icon' => 'shopping-bag',
-                    'text_i18n' => 'admin.menu.product',
+                    'text_i18n' => 'admin.menu.contentDistribution',
                     'active' => $currentController === 'product',
+                    'badge' => ($badges['product_total'] ?? 0) > 0 ? (string) $badges['product_total'] : '',
                 ],
             ];
-            $expanded = false;
-            foreach ($materialChildren as $child) {
-                if (!empty($child['active'])) {
-                    $expanded = true;
-                    break;
-                }
-            }
             $menus[] = [
                 'section_i18n' => 'admin.menu.material',
                 'items' => [
@@ -869,35 +945,30 @@ class ModuleManagerService
                         'id' => 'material',
                         'icon' => 'folder',
                         'text_i18n' => 'admin.menu.materialMenu',
-                        'expanded' => $expanded,
+                        'expanded' => self::menuTreeHasActive($materialChildren),
                         'children' => $materialChildren,
                     ],
                 ],
             ];
         }
 
-        if (($enabled['terminal_devices'] ?? 0) === 1) {
+        if (!$operatorOnly && $terminalEnabled) {
             $terminalChildren = [
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/platform',
                     'icon' => 'layers',
                     'text_i18n' => 'admin.menu.platform',
                     'active' => $currentController === 'platform',
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/device',
                     'icon' => 'smartphone',
                     'text_i18n' => 'admin.menu.device',
                     'active' => $currentController === 'device',
                 ],
             ];
-            $expanded = false;
-            foreach ($terminalChildren as $child) {
-                if (!empty($child['active'])) {
-                    $expanded = true;
-                    break;
-                }
-            }
             $menus[] = [
                 'section_i18n' => 'admin.menu.terminalSection',
                 'items' => [
@@ -906,52 +977,70 @@ class ModuleManagerService
                         'id' => 'terminal',
                         'icon' => 'monitor-smartphone',
                         'text_i18n' => 'admin.menu.terminal',
-                        'expanded' => $expanded,
+                        'expanded' => self::menuTreeHasActive($terminalChildren),
                         'children' => $terminalChildren,
                     ],
                 ],
             ];
         }
 
-        if (($enabled['system_ops'] ?? 0) === 1) {
-            $systemChildren = [
+        if (!$operatorOnly && $systemEnabled) {
+            $opsChildren = [
                 [
-                    'href' => '/admin.php/settings',
-                    'icon' => 'sliders-horizontal',
-                    'text_i18n' => 'admin.menu.settings',
-                    'active' => $currentController === 'settings',
-                ],
-                [
-                    'href' => '/admin.php/user',
-                    'icon' => 'users',
-                    'text_i18n' => 'admin.menu.user',
-                    'active' => $currentController === 'user',
-                ],
-                [
+                    'kind' => 'link',
                     'href' => '/admin.php/client_license',
                     'icon' => 'key',
                     'text_i18n' => 'admin.menu.clientLicense',
                     'active' => $currentController === 'clientlicense',
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/client_version',
                     'icon' => 'package',
                     'text_i18n' => 'admin.menu.clientVersion',
                     'active' => $currentController === 'clientversion',
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/cache',
                     'icon' => 'database',
                     'text_i18n' => 'admin.menu.cache',
                     'active' => $currentController === 'cache',
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/downloadLog',
                     'icon' => 'triangle-alert',
                     'text_i18n' => 'admin.menu.errors',
                     'active' => $currentController === 'downloadlog',
+                    'badge' => ($badges['ops_error_total'] ?? 0) > 0 ? (string) $badges['ops_error_total'] : '',
+                ],
+            ];
+            $systemChildren = [
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/settings',
+                    'icon' => 'sliders-horizontal',
+                    'text_i18n' => 'admin.menu.settings',
+                    'active' => $currentController === 'settings',
                 ],
                 [
+                    'kind' => 'link',
+                    'href' => '/admin.php/user',
+                    'icon' => 'users',
+                    'text_i18n' => 'admin.menu.user',
+                    'active' => $currentController === 'user',
+                ],
+                [
+                    'kind' => 'group',
+                    'id' => 'ops_tools',
+                    'icon' => 'wrench',
+                    'text_i18n' => 'admin.menu.opsTools',
+                    'expanded' => self::menuTreeHasActive($opsChildren),
+                    'children' => $opsChildren,
+                ],
+                [
+                    'kind' => 'link',
                     'href' => '/admin.php/extension',
                     'icon' => 'puzzle',
                     'text_i18n' => 'admin.menu.extensionManager',
@@ -959,22 +1048,13 @@ class ModuleManagerService
                     'hidden' => !self::canManageModules($role),
                 ],
                 [
+                    'kind' => 'link',
                     'href' => '/admin.php/auth/logout',
                     'icon' => 'log-out',
                     'text_i18n' => 'admin.menu.logout',
                     'active' => false,
                 ],
             ];
-            $expanded = false;
-            foreach ($systemChildren as $child) {
-                if (!empty($child['hidden'])) {
-                    continue;
-                }
-                if (!empty($child['active'])) {
-                    $expanded = true;
-                    break;
-                }
-            }
             $systemChildren = array_values(array_filter($systemChildren, static function ($item) {
                 return empty($item['hidden']);
             }));
@@ -986,7 +1066,7 @@ class ModuleManagerService
                         'id' => 'system',
                         'icon' => 'settings',
                         'text_i18n' => 'admin.menu.system',
-                        'expanded' => $expanded,
+                        'expanded' => self::menuTreeHasActive($systemChildren),
                         'children' => $systemChildren,
                     ],
                 ],
@@ -996,4 +1076,3 @@ class ModuleManagerService
         return $menus;
     }
 }
-

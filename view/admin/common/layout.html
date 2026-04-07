@@ -234,6 +234,84 @@
             flex: 1 1 auto;
             min-width: 0;
         }
+        .dark-dashboard .sidebar .admin-sidenav-badge {
+            margin-left: 8px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 6px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #dbeafe;
+            background: rgba(99,102,241,0.28);
+            border: 1px solid rgba(129,140,248,0.45);
+            flex: 0 0 auto;
+            line-height: 1;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head,
+        .dark-dashboard .sidebar .admin-sidenav-sub2link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px 8px 40px;
+            margin: 2px 0;
+            border-radius: 10px;
+            color: #9CA3AF;
+            font-size: 13px;
+            text-decoration: none !important;
+            transition: background 0.2s ease, color 0.2s ease;
+            line-height: 1.2;
+            position: relative;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head .admin-sidenav-chev {
+            font-size: 0.66rem;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head.admin-sidenav-subgroup-head--hot,
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head:not(.collapsed),
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head:hover,
+        .dark-dashboard .sidebar .admin-sidenav-sub2link:hover {
+            color: #FFFFFF;
+            background: rgba(255,255,255,0.04);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head:not(.collapsed) .admin-sidenav-chev,
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head.admin-sidenav-subgroup-head--hot .admin-sidenav-chev {
+            transform: rotate(180deg);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head:not(.collapsed) .admin-sidenav-subico,
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head.admin-sidenav-subgroup-head--hot .admin-sidenav-subico,
+        .dark-dashboard .sidebar .admin-sidenav-sub2link.active .admin-sidenav-subico {
+            color: var(--dash-sidebar-primary);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sub2wrap {
+            padding: 0 0 4px 0;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sub2 {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sub2link {
+            padding-left: 52px;
+            font-size: 12px;
+            color: rgba(156,163,175,0.9);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sub2link.active {
+            color: #FFFFFF;
+            background: rgba(30,41,59,0.55);
+        }
+        .dark-dashboard .sidebar .admin-sidenav-sub2link.active::before {
+            content: "";
+            position: absolute;
+            left: 24px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            border-radius: 2px;
+            background: var(--dash-sidebar-primary);
+        }
         .dark-dashboard .sidebar .admin-sidenav-sublink:hover {
             background: rgba(255,255,255,0.04);
             color: #FFFFFF;
@@ -263,8 +341,27 @@
         }
         .dark-dashboard .sidebar .admin-sidenav-link,
         .dark-dashboard .sidebar .admin-sidenav-group-head,
-        .dark-dashboard .sidebar .admin-sidenav-sublink {
+        .dark-dashboard .sidebar .admin-sidenav-sublink,
+        .dark-dashboard .sidebar .admin-sidenav-subgroup-head,
+        .dark-dashboard .sidebar .admin-sidenav-sub2link {
             will-change: transform;
+        }
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-section,
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-txt,
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-subwrap,
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-chev,
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-badge,
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-footer {
+            display: none !important;
+        }
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-link,
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-group-head {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        .sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-ico {
+            margin: 0 auto;
         }
 
         .dark-dashboard .sidebar .admin-sidenav-footer {
@@ -311,6 +408,8 @@
             .dark-dashboard .sidebar .admin-sidenav-link,
             .dark-dashboard .sidebar .admin-sidenav-group-head,
             .dark-dashboard .sidebar .admin-sidenav-sublink,
+            .dark-dashboard .sidebar .admin-sidenav-subgroup-head,
+            .dark-dashboard .sidebar .admin-sidenav-sub2link,
             .dark-dashboard .sidebar .admin-sidenav-chev {
                 transition: none !important;
             }
@@ -802,21 +901,27 @@
             const path = (window.location.pathname || '').replace(/\/+$/, '');
             const full = window.location.href || '';
 
-            function syncGroupHead($collapseEl) {
+            function syncCollapseHead($collapseEl) {
                 const id = $collapseEl.attr('id');
                 if (!id) return;
-                const $head = $('.admin-sidenav-group-head[data-target="#' + id + '"]');
+                const $head = $('[data-target="#' + id + '"]');
                 if ($head.length) {
-                    $head.removeClass('collapsed').addClass('admin-sidenav-group-head--hot');
+                    $head.removeClass('collapsed');
+                    if ($head.hasClass('admin-sidenav-group-head')) {
+                        $head.addClass('admin-sidenav-group-head--hot');
+                    }
+                    if ($head.hasClass('admin-sidenav-subgroup-head')) {
+                        $head.addClass('admin-sidenav-subgroup-head--hot');
+                    }
                 }
             }
 
             // 只处理我们自己的分组容器
-            const $collapses = $('.admin-sidenav-subwrap.collapse');
+            const $collapses = $('.admin-sidenav-subwrap.collapse, .admin-sidenav-sub2wrap.collapse');
             if (!$collapses.length) return;
 
             let matched = false;
-            $('.admin-sidenav-sublink').each(function () {
+            $('.admin-sidenav-sublink, .admin-sidenav-sub2link').each(function () {
                 const href = ($(this).attr('href') || '').replace(/\/+$/, '');
                 if (!href) return;
 
@@ -826,7 +931,12 @@
                     const $collapse = $(this).closest('.collapse');
                     if ($collapse.length) {
                         $collapse.collapse('show');
-                        syncGroupHead($collapse);
+                        syncCollapseHead($collapse);
+                        $collapse.parents('.collapse').each(function () {
+                            const $parent = $(this);
+                            $parent.collapse('show');
+                            syncCollapseHead($parent);
+                        });
                         matched = true;
                         return false;
                     }
@@ -838,7 +948,7 @@
                 $collapses.each(function () {
                     const $c = $(this);
                     if ($c.hasClass('show')) {
-                        syncGroupHead($c);
+                        syncCollapseHead($c);
                         return false;
                     }
                 });

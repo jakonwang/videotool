@@ -5,22 +5,59 @@
 <a href="{$item.href}" class="admin-sidenav-link {if condition='$item.active'}active{/if}">
     <span class="admin-sidenav-ico"><i data-lucide="{$item.icon}"></i></span>
     <span class="admin-sidenav-txt" data-i18n="{$item.text_i18n}">{$item.text_i18n}</span>
+    {if condition="isset($item.badge) && $item.badge !== ''"}
+    <span class="admin-sidenav-badge">{$item.badge}</span>
+    {/if}
 </a>
 {else /}
 <a href="javascript:void(0)" class="admin-sidenav-group-head {if condition='!$item.expanded'}collapsed{/if} {if condition='$item.expanded'}admin-sidenav-group-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-{$item.id}" aria-expanded="{if condition='$item.expanded'}true{else /}false{/if}" aria-controls="admin-nav-{$item.id}" role="button">
     <span class="admin-sidenav-ico"><i data-lucide="{$item.icon}"></i></span>
     <span class="admin-sidenav-txt" data-i18n="{$item.text_i18n}">{$item.text_i18n}</span>
+    {if condition="isset($item.badge) && $item.badge !== ''"}
+    <span class="admin-sidenav-badge">{$item.badge}</span>
+    {/if}
     <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
 </a>
 <div id="admin-nav-{$item.id}" class="collapse admin-sidenav-subwrap {if condition='$item.expanded'}show{/if}">
     <ul class="admin-sidenav-sub">
         {volist name="item.children" id="sub"}
+        {if condition="$sub.kind == 'group'"}
+        <li>
+            <a href="javascript:void(0)" class="admin-sidenav-subgroup-head {if condition='!$sub.expanded'}collapsed{/if} {if condition='$sub.expanded'}admin-sidenav-subgroup-head--hot{/if}" data-toggle="collapse" data-target="#admin-nav-{$item.id}-{$sub.id}" aria-expanded="{if condition='$sub.expanded'}true{else /}false{/if}" aria-controls="admin-nav-{$item.id}-{$sub.id}" role="button">
+                <span class="admin-sidenav-subico"><i data-lucide="{$sub.icon}"></i></span>
+                <span class="admin-sidenav-subtxt" data-i18n="{$sub.text_i18n}">{$sub.text_i18n}</span>
+                {if condition="isset($sub.badge) && $sub.badge !== ''"}
+                <span class="admin-sidenav-badge">{$sub.badge}</span>
+                {/if}
+                <i class="fas fa-chevron-down admin-sidenav-chev" aria-hidden="true"></i>
+            </a>
+            <div id="admin-nav-{$item.id}-{$sub.id}" class="collapse admin-sidenav-sub2wrap {if condition='$sub.expanded'}show{/if}">
+                <ul class="admin-sidenav-sub2">
+                    {volist name="sub.children" id="leaf"}
+                    <li>
+                        <a href="{$leaf.href}" class="admin-sidenav-sub2link {if condition='$leaf.active'}active{/if}">
+                            <span class="admin-sidenav-subico"><i data-lucide="{$leaf.icon}"></i></span>
+                            <span class="admin-sidenav-subtxt" data-i18n="{$leaf.text_i18n}">{$leaf.text_i18n}</span>
+                            {if condition="isset($leaf.badge) && $leaf.badge !== ''"}
+                            <span class="admin-sidenav-badge">{$leaf.badge}</span>
+                            {/if}
+                        </a>
+                    </li>
+                    {/volist}
+                </ul>
+            </div>
+        </li>
+        {else /}
         <li>
             <a href="{$sub.href}" class="admin-sidenav-sublink {if condition='$sub.active'}active{/if}">
                 <span class="admin-sidenav-subico"><i data-lucide="{$sub.icon}"></i></span>
                 <span class="admin-sidenav-subtxt" data-i18n="{$sub.text_i18n}">{$sub.text_i18n}</span>
+                {if condition="isset($sub.badge) && $sub.badge !== ''"}
+                <span class="admin-sidenav-badge">{$sub.badge}</span>
+                {/if}
             </a>
         </li>
+        {/if}
         {/volist}
     </ul>
 </div>
