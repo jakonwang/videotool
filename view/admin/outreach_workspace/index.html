@@ -184,10 +184,16 @@
           });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
-          ElMessage.success(tt('common.done'));
-          generateVisible.value = false;
-          fetchList();
-          fetchNextTask();
+          const created = Number((json.data && json.data.created) || 0);
+          const skipped = Number((json.data && json.data.skipped) || 0);
+          if (created > 0) {
+            ElMessage.success(tt('page.outreach.generateResult', { created, skipped }));
+            generateVisible.value = false;
+            fetchList();
+            fetchNextTask();
+          } else {
+            ElMessage.warning(tt('page.outreach.generateEmpty', { skipped }));
+          }
         } catch (e) {
           ElMessage.error(e.message || tt('common.saveFailed'));
         } finally {

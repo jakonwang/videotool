@@ -55,6 +55,8 @@
       'page.outreach.generateTitle': '批量生成外联任务',
       'page.outreach.limit': '数量上限',
       'page.outreach.noTask': '暂无可处理任务',
+      'page.outreach.generateResult': '生成完成：新增 {created} 条，跳过 {skipped} 条',
+      'page.outreach.generateEmpty': '未生成新任务，请检查筛选条件（已跳过 {skipped} 条）',
 
       'page.sample.title': '寄样管理',
       'page.sample.breadcrumb': '达人运营 / 寄样管理',
@@ -239,6 +241,8 @@
       'page.outreach.generateTitle': 'Batch Generate Outreach Tasks',
       'page.outreach.limit': 'Limit',
       'page.outreach.noTask': 'No task available',
+      'page.outreach.generateResult': 'Generation complete: created {created}, skipped {skipped}',
+      'page.outreach.generateEmpty': 'No new task was generated. Please adjust filters (skipped {skipped})',
 
       'page.sample.title': 'Sample Management',
       'page.sample.breadcrumb': 'Creator Ops / Sample Management',
@@ -423,6 +427,8 @@
       'page.outreach.generateTitle': 'Tạo hàng loạt nhiệm vụ outreach',
       'page.outreach.limit': 'Giới hạn',
       'page.outreach.noTask': 'Chưa có nhiệm vụ',
+      'page.outreach.generateResult': 'Đã tạo xong: thêm {created}, bỏ qua {skipped}',
+      'page.outreach.generateEmpty': 'Không tạo được nhiệm vụ mới, vui lòng điều chỉnh bộ lọc (đã bỏ qua {skipped})',
 
       'page.sample.title': 'Quản lý gửi mẫu',
       'page.sample.breadcrumb': 'Vận hành creator / Quản lý gửi mẫu',
