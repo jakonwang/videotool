@@ -163,9 +163,12 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // 模块管理
     Route::get('extension/list', 'app\controller\admin\Extension@listJson');
     Route::get('extension/listJson', 'app\controller\admin\Extension@listJson');
+    Route::get('extension/logs', 'app\controller\admin\Extension@logsJson');
+    Route::get('extension/permissionMatrix', 'app\controller\admin\Extension@permissionMatrix');
     Route::post('extension/install', 'app\controller\admin\Extension@install');
     Route::post('extension/uninstall', 'app\controller\admin\Extension@uninstall');
     Route::post('extension/toggle', 'app\controller\admin\Extension@toggle');
+    Route::post('extension/savePermission', 'app\controller\admin\Extension@savePermission');
     Route::get('extension', 'app\controller\admin\Extension@index');
 
     // 达人联系话术模板

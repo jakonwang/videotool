@@ -10,6 +10,10 @@ use think\facade\Db;
  */
 class ModuleManagerService
 {
+    private const ROLE_SUPER_ADMIN = 'super_admin';
+    private const ROLE_OPERATOR = 'operator';
+    private const ROLE_VIEWER = 'viewer';
+
     /**
      * @return array<string, array<string, mixed>>
      */
@@ -22,6 +26,8 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_VIEWER,
             ],
             'style_search' => [
                 'name' => 'style_search',
@@ -29,6 +35,8 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_OPERATOR,
             ],
             'creator_crm' => [
                 'name' => 'creator_crm',
@@ -36,6 +44,8 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_OPERATOR,
             ],
             'material_distribution' => [
                 'name' => 'material_distribution',
@@ -43,6 +53,8 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_OPERATOR,
             ],
             'terminal_devices' => [
                 'name' => 'terminal_devices',
@@ -50,6 +62,8 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_OPERATOR,
             ],
             'system_ops' => [
                 'name' => 'system_ops',
@@ -57,8 +71,51 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
+                'dependencies' => [],
+                'min_role' => self::ROLE_SUPER_ADMIN,
             ],
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    private static function normalizeDependencies($dependencies): array
+    {
+        if (!is_array($dependencies)) {
+            return [];
+        }
+        $out = [];
+        foreach ($dependencies as $dep) {
+            $v = trim((string) $dep);
+            if ($v !== '') {
+                $out[] = $v;
+            }
+        }
+        $out = array_values(array_unique($out));
+        sort($out);
+        return $out;
+    }
+
+    private static function normalizeRole(string $role, string $fallback = self::ROLE_OPERATOR): string
+    {
+        $r = trim($role);
+        if (!in_array($r, [self::ROLE_SUPER_ADMIN, self::ROLE_OPERATOR, self::ROLE_VIEWER], true)) {
+            return $fallback;
+        }
+        return $r;
+    }
+
+    private static function roleRank(string $role): int
+    {
+        $r = self::normalizeRole($role, self::ROLE_VIEWER);
+        if ($r === self::ROLE_SUPER_ADMIN) {
+            return 3;
+        }
+        if ($r === self::ROLE_OPERATOR) {
+            return 2;
+        }
+        return 1;
     }
 
     private static function extensionTableExists(): bool
@@ -69,6 +126,41 @@ class ModuleManagerService
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private static function dependencyTableExists(): bool
+    {
+        try {
+            Db::name('extension_dependencies')->where('id', 0)->find();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function rolePermissionTableExists(): bool
+    {
+        try {
+            Db::name('extension_role_permissions')->where('id', 0)->find();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function logTableExists(): bool
+    {
+        try {
+            Db::name('extension_install_logs')->where('id', 0)->find();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function canManageModules(string $role): bool
+    {
+        return self::roleRank($role) >= self::roleRank(self::ROLE_OPERATOR);
     }
 
     /**
@@ -115,6 +207,8 @@ class ModuleManagerService
                         'version' => (string) ($json['version'] ?? '1.0.0'),
                         'default_enabled' => (int) ($json['default_enabled'] ?? 0),
                         'can_uninstall' => (int) ($json['can_uninstall'] ?? 1),
+                        'dependencies' => self::normalizeDependencies($json['dependencies'] ?? []),
+                        'min_role' => self::normalizeRole((string) ($json['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR),
                     ];
                 }
             }
@@ -127,6 +221,11 @@ class ModuleManagerService
                     Db::name('extensions')->where('name', $name)->update([
                         'title' => (string) $meta['title'],
                         'version' => (string) $meta['version'],
+                        'config_json' => json_encode([
+                            'can_uninstall' => (int) $meta['can_uninstall'],
+                            'dependencies' => self::normalizeDependencies($meta['dependencies'] ?? []),
+                            'min_role' => self::normalizeRole((string) ($meta['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR),
+                        ], JSON_UNESCAPED_UNICODE),
                         'updated_at' => date('Y-m-d H:i:s'),
                     ]);
                     continue;
@@ -138,6 +237,8 @@ class ModuleManagerService
                     'is_enabled' => (int) $meta['default_enabled'],
                     'config_json' => json_encode([
                         'can_uninstall' => (int) $meta['can_uninstall'],
+                        'dependencies' => self::normalizeDependencies($meta['dependencies'] ?? []),
+                        'min_role' => self::normalizeRole((string) ($meta['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR),
                     ], JSON_UNESCAPED_UNICODE),
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s'),
@@ -145,9 +246,48 @@ class ModuleManagerService
             }
         }
 
+        if (self::dependencyTableExists()) {
+            foreach ($modules as $name => $meta) {
+                $deps = self::normalizeDependencies($meta['dependencies'] ?? []);
+                Db::name('extension_dependencies')->where('extension_name', $name)->delete();
+                foreach ($deps as $dep) {
+                    Db::name('extension_dependencies')->insert([
+                        'extension_name' => $name,
+                        'depends_on' => $dep,
+                        'created_at' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+        }
+
+        if (self::rolePermissionTableExists()) {
+            $roles = [self::ROLE_SUPER_ADMIN, self::ROLE_OPERATOR, self::ROLE_VIEWER];
+            foreach ($modules as $name => $meta) {
+                $minRole = self::normalizeRole((string) ($meta['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR);
+                foreach ($roles as $role) {
+                    $allow = self::roleRank($role) >= self::roleRank($minRole) ? 1 : 0;
+                    $exists = Db::name('extension_role_permissions')
+                        ->where('role', $role)
+                        ->where('extension_name', $name)
+                        ->find();
+                    if (!$exists) {
+                        Db::name('extension_role_permissions')->insert([
+                            'role' => $role,
+                            'extension_name' => $name,
+                            'can_view' => $allow,
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s'),
+                        ]);
+                    }
+                }
+            }
+        }
+
         $rows = [];
         foreach ($modules as $meta) {
             $meta['is_enabled'] = (int) $meta['default_enabled'];
+            $meta['dependencies'] = self::normalizeDependencies($meta['dependencies'] ?? []);
+            $meta['min_role'] = self::normalizeRole((string) ($meta['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR);
             $rows[] = $meta;
         }
 
@@ -162,6 +302,14 @@ class ModuleManagerService
                     }
                 }
                 $row['can_uninstall'] = (int) ($cfg['can_uninstall'] ?? (isset($builtIns[$row['name']]) ? 0 : 1));
+                $row['dependencies'] = self::normalizeDependencies($cfg['dependencies'] ?? []);
+                if (self::dependencyTableExists()) {
+                    $deps = Db::name('extension_dependencies')
+                        ->where('extension_name', (string) $row['name'])
+                        ->column('depends_on');
+                    $row['dependencies'] = self::normalizeDependencies($deps);
+                }
+                $row['min_role'] = self::normalizeRole((string) ($cfg['min_role'] ?? ($builtIns[$row['name']]['min_role'] ?? self::ROLE_OPERATOR)), self::ROLE_OPERATOR);
             }
             return $dbRows;
         }
@@ -198,8 +346,131 @@ class ModuleManagerService
         }
     }
 
+    /**
+     * @return array<string>
+     */
+    private static function dependenciesFor(string $name): array
+    {
+        if (self::dependencyTableExists()) {
+            $deps = Db::name('extension_dependencies')->where('extension_name', $name)->column('depends_on');
+            return self::normalizeDependencies($deps);
+        }
+        $rows = self::scanModules();
+        foreach ($rows as $r) {
+            if ((string) $r['name'] === $name) {
+                return self::normalizeDependencies($r['dependencies'] ?? []);
+            }
+        }
+        return [];
+    }
+
+    /**
+     * @return array<string>
+     */
+    private static function enabledModuleNames(): array
+    {
+        $rows = self::scanModules();
+        $out = [];
+        foreach ($rows as $r) {
+            if ((int) ($r['is_enabled'] ?? 0) === 1) {
+                $out[] = (string) $r['name'];
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @return array<string>
+     */
+    private static function enabledDependentsOf(string $name): array
+    {
+        $all = self::scanModules();
+        $enabled = self::enabledModuleNames();
+        $enabledMap = array_fill_keys($enabled, 1);
+        $dependents = [];
+        foreach ($all as $row) {
+            $moduleName = (string) ($row['name'] ?? '');
+            if ($moduleName === '' || !isset($enabledMap[$moduleName])) {
+                continue;
+            }
+            $deps = self::dependenciesFor($moduleName);
+            if (in_array($name, $deps, true)) {
+                $dependents[] = $moduleName;
+            }
+        }
+        return array_values(array_unique($dependents));
+    }
+
+    /**
+     * @return array{ok:bool,message:string,missing?:array<string>}
+     */
+    private static function checkDependenciesReady(string $name): array
+    {
+        $deps = self::dependenciesFor($name);
+        if (!$deps) {
+            return ['ok' => true, 'message' => 'ok'];
+        }
+        $enabled = self::enabledModuleNames();
+        $enabledMap = array_fill_keys($enabled, 1);
+        $missing = [];
+        foreach ($deps as $dep) {
+            if (!isset($enabledMap[$dep])) {
+                $missing[] = $dep;
+            }
+        }
+        if ($missing) {
+            return [
+                'ok' => false,
+                'message' => 'missing dependencies: ' . implode(', ', $missing),
+                'missing' => $missing,
+            ];
+        }
+        return ['ok' => true, 'message' => 'ok'];
+    }
+
+    /**
+     * @return array{ok:bool,message:string,dependents?:array<string>}
+     */
+    private static function checkNoEnabledDependents(string $name): array
+    {
+        $dependents = self::enabledDependentsOf($name);
+        if (!$dependents) {
+            return ['ok' => true, 'message' => 'ok'];
+        }
+        return [
+            'ok' => false,
+            'message' => 'enabled dependent modules: ' . implode(', ', $dependents),
+            'dependents' => $dependents,
+        ];
+    }
+
+    private static function writeLog(string $extensionName, string $action, bool $ok, string $message = '', array $detail = []): void
+    {
+        if (!self::logTableExists()) {
+            return;
+        }
+        try {
+            Db::name('extension_install_logs')->insert([
+                'extension_name' => $extensionName,
+                'action' => $action,
+                'operator_id' => AdminAuthService::userId() > 0 ? AdminAuthService::userId() : null,
+                'operator_name' => AdminAuthService::username() !== '' ? AdminAuthService::username() : null,
+                'result' => $ok ? 1 : 0,
+                'message' => $message !== '' ? $message : null,
+                'detail_json' => $detail ? json_encode($detail, JSON_UNESCAPED_UNICODE) : null,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $e) {
+            // ignore log failure
+        }
+    }
+
     public static function install(string $name): array
     {
+        $role = AdminAuthService::role();
+        if (!self::canManageModules($role)) {
+            return ['ok' => false, 'message' => 'permission denied'];
+        }
         $name = trim($name);
         if ($name === '') {
             return ['ok' => false, 'message' => 'module name is required'];
@@ -213,20 +484,32 @@ class ModuleManagerService
             return ['ok' => false, 'message' => 'module not found'];
         }
 
+        $depCheck = self::checkDependenciesReady($name);
+        if (!($depCheck['ok'] ?? false)) {
+            self::writeLog($name, 'install', false, (string) ($depCheck['message'] ?? 'dependency failed'), $depCheck);
+            return ['ok' => false, 'message' => (string) ($depCheck['message'] ?? 'dependency failed')];
+        }
+
         try {
             self::runScriptIfExists($name, 'install');
             Db::name('extensions')->where('name', $name)->update([
                 'is_enabled' => 1,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
+            self::writeLog($name, 'install', true, 'installed');
             return ['ok' => true];
         } catch (\Throwable $e) {
+            self::writeLog($name, 'install', false, $e->getMessage());
             return ['ok' => false, 'message' => $e->getMessage()];
         }
     }
 
     public static function uninstall(string $name, bool $purgeData = false): array
     {
+        $role = AdminAuthService::role();
+        if ($role !== self::ROLE_SUPER_ADMIN) {
+            return ['ok' => false, 'message' => 'permission denied'];
+        }
         $name = trim($name);
         if ($name === '') {
             return ['ok' => false, 'message' => 'module name is required'];
@@ -249,6 +532,12 @@ class ModuleManagerService
             return ['ok' => false, 'message' => 'core module cannot be uninstalled'];
         }
 
+        $depCheck = self::checkNoEnabledDependents($name);
+        if (!($depCheck['ok'] ?? false)) {
+            self::writeLog($name, 'uninstall', false, (string) ($depCheck['message'] ?? 'dependent check failed'), $depCheck);
+            return ['ok' => false, 'message' => (string) ($depCheck['message'] ?? 'dependent check failed')];
+        }
+
         try {
             if ($purgeData) {
                 self::runScriptIfExists($name, 'uninstall');
@@ -257,14 +546,20 @@ class ModuleManagerService
                 'is_enabled' => 0,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
+            self::writeLog($name, 'uninstall', true, $purgeData ? 'uninstalled with purge' : 'uninstalled');
             return ['ok' => true];
         } catch (\Throwable $e) {
+            self::writeLog($name, 'uninstall', false, $e->getMessage(), ['purge_data' => $purgeData ? 1 : 0]);
             return ['ok' => false, 'message' => $e->getMessage()];
         }
     }
 
     public static function toggle(string $name, int $isEnabled): array
     {
+        $role = AdminAuthService::role();
+        if (!self::canManageModules($role)) {
+            return ['ok' => false, 'message' => 'permission denied'];
+        }
         $name = trim($name);
         $isEnabled = $isEnabled === 1 ? 1 : 0;
         if ($name === '') {
@@ -278,11 +573,157 @@ class ModuleManagerService
         if (!$row) {
             return ['ok' => false, 'message' => 'module not found'];
         }
+
+        if ($isEnabled === 1) {
+            $depCheck = self::checkDependenciesReady($name);
+            if (!($depCheck['ok'] ?? false)) {
+                self::writeLog($name, 'toggle', false, (string) ($depCheck['message'] ?? 'dependency failed'), array_merge($depCheck, ['target' => 1]));
+                return ['ok' => false, 'message' => (string) ($depCheck['message'] ?? 'dependency failed')];
+            }
+        } else {
+            $depCheck = self::checkNoEnabledDependents($name);
+            if (!($depCheck['ok'] ?? false)) {
+                self::writeLog($name, 'toggle', false, (string) ($depCheck['message'] ?? 'dependent check failed'), array_merge($depCheck, ['target' => 0]));
+                return ['ok' => false, 'message' => (string) ($depCheck['message'] ?? 'dependent check failed')];
+            }
+        }
+
         Db::name('extensions')->where('name', $name)->update([
             'is_enabled' => $isEnabled,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
+        self::writeLog($name, 'toggle', true, 'toggled', ['target' => $isEnabled]);
         return ['ok' => true];
+    }
+
+    public static function updateRolePermission(string $role, string $moduleName, int $canView): array
+    {
+        if (AdminAuthService::role() !== self::ROLE_SUPER_ADMIN) {
+            return ['ok' => false, 'message' => 'permission denied'];
+        }
+        if (!self::rolePermissionTableExists()) {
+            return ['ok' => false, 'message' => 'permission table not found'];
+        }
+        $role = self::normalizeRole($role, '');
+        $moduleName = trim($moduleName);
+        if ($role === '' || $moduleName === '') {
+            return ['ok' => false, 'message' => 'invalid params'];
+        }
+
+        $exists = Db::name('extension_role_permissions')
+            ->where('role', $role)
+            ->where('extension_name', $moduleName)
+            ->find();
+        if ($exists) {
+            Db::name('extension_role_permissions')
+                ->where('id', (int) $exists['id'])
+                ->update([
+                    'can_view' => $canView === 1 ? 1 : 0,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+        } else {
+            Db::name('extension_role_permissions')->insert([
+                'role' => $role,
+                'extension_name' => $moduleName,
+                'can_view' => $canView === 1 ? 1 : 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        return ['ok' => true];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function permissionMatrix(): array
+    {
+        $rows = self::scanModules();
+        $permMap = [];
+        if (self::rolePermissionTableExists()) {
+            $pers = Db::name('extension_role_permissions')->select()->toArray();
+            foreach ($pers as $p) {
+                $permMap[(string) $p['extension_name'] . '::' . (string) $p['role']] = (int) ($p['can_view'] ?? 0);
+            }
+        }
+        $roles = [self::ROLE_SUPER_ADMIN, self::ROLE_OPERATOR, self::ROLE_VIEWER];
+        foreach ($rows as &$row) {
+            $moduleName = (string) $row['name'];
+            $minRole = self::normalizeRole((string) ($row['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR);
+            $permissions = [];
+            foreach ($roles as $role) {
+                $k = $moduleName . '::' . $role;
+                if (array_key_exists($k, $permMap)) {
+                    $permissions[$role] = (int) $permMap[$k];
+                } else {
+                    $permissions[$role] = self::roleRank($role) >= self::roleRank($minRole) ? 1 : 0;
+                }
+            }
+            $row['permissions'] = $permissions;
+        }
+        return $rows;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function logs(int $limit = 50): array
+    {
+        $limit = max(1, min(200, $limit));
+        if (!self::logTableExists()) {
+            return [];
+        }
+        $rows = Db::name('extension_install_logs')->order('id', 'desc')->limit($limit)->select()->toArray();
+        foreach ($rows as &$row) {
+            $detail = [];
+            if (!empty($row['detail_json'])) {
+                $tmp = json_decode((string) $row['detail_json'], true);
+                if (is_array($tmp)) {
+                    $detail = $tmp;
+                }
+            }
+            $row['detail'] = $detail;
+        }
+        return $rows;
+    }
+
+    private static function canViewByRole(string $moduleName, string $role, string $minRole): bool
+    {
+        if (self::rolePermissionTableExists()) {
+            $row = Db::name('extension_role_permissions')
+                ->where('role', $role)
+                ->where('extension_name', $moduleName)
+                ->find();
+            if ($row) {
+                return (int) ($row['can_view'] ?? 0) === 1;
+            }
+        }
+        return self::roleRank($role) >= self::roleRank($minRole);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function modulesForCurrentRole(bool $includeDisabled = true): array
+    {
+        $role = AdminAuthService::role();
+        $rows = self::permissionMatrix();
+        $out = [];
+        foreach ($rows as $row) {
+            $name = (string) ($row['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $minRole = self::normalizeRole((string) ($row['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR);
+            if (!self::canViewByRole($name, $role, $minRole)) {
+                continue;
+            }
+            if (!$includeDisabled && (int) ($row['is_enabled'] ?? 0) !== 1) {
+                continue;
+            }
+            $out[] = $row;
+        }
+        return $out;
     }
 
     /**
@@ -291,7 +732,7 @@ class ModuleManagerService
     private static function enabledModuleMap(): array
     {
         $map = [];
-        $rows = self::scanModules();
+        $rows = self::modulesForCurrentRole(true);
         foreach ($rows as $row) {
             $map[(string) $row['name']] = (int) ($row['is_enabled'] ?? 0);
         }
@@ -308,6 +749,7 @@ class ModuleManagerService
         $currentController = strtolower(trim($currentController));
         $currentAction = strtolower(trim($currentAction));
         $isBatchUploadAction = in_array($currentAction, ['batchupload', 'batch_upload', 'batch-upload'], true);
+        $role = AdminAuthService::role();
         $enabled = self::enabledModuleMap();
 
         $menus = [];
@@ -514,6 +956,7 @@ class ModuleManagerService
                     'icon' => 'puzzle',
                     'text_i18n' => 'admin.menu.extensionManager',
                     'active' => $currentController === 'extension',
+                    'hidden' => !self::canManageModules($role),
                 ],
                 [
                     'href' => '/admin.php/auth/logout',
@@ -524,11 +967,17 @@ class ModuleManagerService
             ];
             $expanded = false;
             foreach ($systemChildren as $child) {
+                if (!empty($child['hidden'])) {
+                    continue;
+                }
                 if (!empty($child['active'])) {
                     $expanded = true;
                     break;
                 }
             }
+            $systemChildren = array_values(array_filter($systemChildren, static function ($item) {
+                return empty($item['hidden']);
+            }));
             $menus[] = [
                 'section_i18n' => 'admin.menu.system',
                 'items' => [

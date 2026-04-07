@@ -10,6 +10,7 @@ class AdminAuthService
 {
     public const SESSION_UID = 'admin_user_id';
     public const SESSION_UNAME = 'admin_username';
+    public const SESSION_ROLE = 'admin_role';
 
     public static function userId(): int
     {
@@ -26,14 +27,24 @@ class AdminAuthService
         return self::userId() > 0;
     }
 
+    public static function role(): string
+    {
+        $r = trim((string) Session::get(self::SESSION_ROLE, ''));
+        if (!in_array($r, ['super_admin', 'operator', 'viewer'], true)) {
+            return 'super_admin';
+        }
+        return $r;
+    }
+
     public static function logout(): void
     {
         Session::delete(self::SESSION_UID);
         Session::delete(self::SESSION_UNAME);
+        Session::delete(self::SESSION_ROLE);
     }
 
     /**
-     * @return array{ok:bool,msg:string,user?:array{id:int,username:string}}
+     * @return array{ok:bool,msg:string,user?:array{id:int,username:string,role:string}}
      */
     public static function attemptLogin(string $username, string $password, string $ip = ''): array
     {
@@ -58,6 +69,7 @@ class AdminAuthService
 
         Session::set(self::SESSION_UID, (int) $user->id);
         Session::set(self::SESSION_UNAME, (string) $user->username);
+        Session::set(self::SESSION_ROLE, (string) ($user->role ?: 'super_admin'));
 
         $user->last_login_ip = $ip ?: null;
         $user->last_login_at = date('Y-m-d H:i:s');
@@ -66,7 +78,11 @@ class AdminAuthService
         return [
             'ok' => true,
             'msg' => '登录成功',
-            'user' => ['id' => (int) $user->id, 'username' => (string) $user->username],
+            'user' => [
+                'id' => (int) $user->id,
+                'username' => (string) $user->username,
+                'role' => (string) ($user->role ?: 'super_admin'),
+            ],
         ];
     }
 }

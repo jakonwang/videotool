@@ -72,6 +72,47 @@ CREATE TABLE extensions (
     KEY idx_extension_enabled (is_enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模块扩展表';
 
+-- 模块安装/卸载/启停日志
+CREATE TABLE extension_install_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    extension_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    action VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'install/uninstall/toggle',
+    operator_id INT UNSIGNED DEFAULT NULL,
+    operator_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    result TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '1成功 0失败',
+    message VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    detail_json MEDIUMTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_ext_created (extension_name, created_at),
+    KEY idx_operator_created (operator_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模块安装卸载日志';
+
+-- 模块依赖关系（A 依赖 B）
+CREATE TABLE extension_dependencies (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    extension_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    depends_on VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ext_dep (extension_name, depends_on),
+    KEY idx_depends_on (depends_on)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模块依赖关系';
+
+-- 模块角色可见权限
+CREATE TABLE extension_role_permissions (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    role VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'super_admin/operator/viewer',
+    extension_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    can_view TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_extension (role, extension_name),
+    KEY idx_role (role),
+    KEY idx_extension (extension_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模块角色可见权限';
+
 -- TikTok 达人名录（tiktok_id 为 @handle，唯一）
 CREATE TABLE influencers (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -230,6 +271,7 @@ INSERT IGNORE INTO system_settings (skey, svalue) VALUES
 CREATE TABLE admin_users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名',
+    role VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'super_admin' COMMENT '角色 super_admin/operator/viewer',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
     status TINYINT(1) DEFAULT 1 COMMENT '状态 1启用 0禁用',
     last_login_at TIMESTAMP NULL DEFAULT NULL COMMENT '最后登录时间',

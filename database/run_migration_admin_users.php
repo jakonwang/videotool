@@ -68,6 +68,7 @@ $pdo->exec(<<<'SQL'
 CREATE TABLE IF NOT EXISTS admin_users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名',
+    role VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'super_admin' COMMENT '角色 super_admin/operator/viewer',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
     status TINYINT(1) DEFAULT 1 COMMENT '状态 1启用 0禁用',
     last_login_at TIMESTAMP NULL DEFAULT NULL COMMENT '最后登录时间',
@@ -84,8 +85,9 @@ echo "[2/2] 初始化默认管理员账号（若不存在）…\n";
 $defaultUser = 'admin';
 $defaultPass = 'admin123';
 $hash = password_hash($defaultPass, PASSWORD_BCRYPT);
-$st = $pdo->prepare('INSERT IGNORE INTO admin_users (username, password_hash, status) VALUES (?, ?, 1)');
-$st->execute([$defaultUser, $hash]);
+$st = $pdo->prepare('INSERT IGNORE INTO admin_users (username, role, password_hash, status) VALUES (?, ?, ?, 1)');
+$role = 'super_admin';
+$st->execute([$defaultUser, $role, $hash]);
 echo "      完成（默认账号：admin / admin123；请登录后尽快修改）。\n";
 
 echo "\n全部处理完毕。\n";

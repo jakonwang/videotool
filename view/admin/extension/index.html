@@ -85,6 +85,12 @@ createApp({
   setup() {
     const loading = ref(false);
     const items = ref([]);
+    const myRole = ref('super_admin');
+    const canManage = ref(0);
+    const canEditPermissions = ref(0);
+    const logs = ref([]);
+    const permItems = ref([]);
+    const activeTab = ref('modules');
 
     async function fetchList() {
       loading.value = true;
@@ -93,10 +99,35 @@ createApp({
         const json = parseJson(res, await res.text());
         if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
         items.value = (json.data && json.data.items) ? json.data.items : [];
+        myRole.value = (json.data && json.data.role) ? json.data.role : 'super_admin';
+        canManage.value = (json.data && Number(json.data.can_manage) === 1) ? 1 : 0;
+        canEditPermissions.value = (json.data && Number(json.data.can_edit_permissions) === 1) ? 1 : 0;
       } catch (e) {
         ElMessage.error(e.message || tt('common.loadingFailed'));
       } finally {
         loading.value = false;
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/admin.php/extension/logs?limit=30', { credentials: 'same-origin', headers: apiH });
+        const json = parseJson(res, await res.text());
+        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+        logs.value = (json.data && json.data.items) ? json.data.items : [];
+      } catch (e) {
+        ElMessage.error(e.message || tt('common.loadingFailed'));
+      }
+    }
+
+    async function fetchPermissions() {
+      try {
+        const res = await fetch('/admin.php/extension/permissionMatrix', { credentials: 'same-origin', headers: apiH });
+        const json = parseJson(res, await res.text());
+        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+        permItems.value = (json.data && json.data.items) ? json.data.items : [];
+      } catch (e) {
+        ElMessage.error(e.message || tt('common.loadingFailed'));
       }
     }
 
@@ -115,6 +146,10 @@ createApp({
     }
 
     async function install(row) {
+      if (Number(canManage.value) !== 1) {
+        ElMessage.warning(tt('page.extension.noPermission'));
+        return;
+      }
       try {
         const res = await fetch('/admin.php/extension/install', {
           method: 'POST',
@@ -132,6 +167,10 @@ createApp({
     }
 
     async function uninstall(row) {
+      if (Number(canManage.value) !== 1) {
+        ElMessage.warning(tt('page.extension.noPermission'));
+        return;
+      }
       try {
         await ElMessageBox.confirm(tt('page.extension.uninstallConfirm'), tt('page.extension.uninstallTitle'), { type: 'warning' });
       } catch { return; }
@@ -152,6 +191,11 @@ createApp({
     }
 
     async function toggleEnabled(row, val) {
+      if (Number(canManage.value) !== 1) {
+        row.is_enabled = row.is_enabled ? 0 : 1;
+        ElMessage.warning(tt('page.extension.noPermission'));
+        return;
+      }
       try {
         const res = await fetch('/admin.php/extension/toggle', {
           method: 'POST',
@@ -168,8 +212,64 @@ createApp({
       }
     }
 
-    onMounted(() => fetchList());
-    return { tt, loading, items, fetchList, moduleTitle, moduleDesc, install, uninstall, toggleEnabled };
+    function depsText(row) {
+      const deps = Array.isArray(row.dependencies) ? row.dependencies : [];
+      if (!deps.length) return tt('page.extension.noDependencies');
+      return deps.join(', ');
+    }
+
+    function isDependencyReady(row) {
+      const deps = Array.isArray(row.dependencies) ? row.dependencies : [];
+      if (!deps.length) return true;
+      const enabledMap = {};
+      (items.value || []).forEach((m) => { enabledMap[m.name] = Number(m.is_enabled) === 1; });
+      return deps.every((d) => !!enabledMap[d]);
+    }
+
+    function roleLabel(role) {
+      if (role === 'super_admin') return tt('page.user.roleSuperAdmin');
+      if (role === 'viewer') return tt('page.user.roleViewer');
+      return tt('page.user.roleOperator');
+    }
+
+    function actionLabel(action) {
+      if (action === 'install') return tt('page.extension.install');
+      if (action === 'uninstall') return tt('page.extension.uninstall');
+      return tt('page.extension.toggleAction');
+    }
+
+    async function savePerm(row, role, canView) {
+      if (Number(canEditPermissions.value) !== 1) {
+        ElMessage.warning(tt('page.extension.permissionOnlySuperAdmin'));
+        return;
+      }
+      try {
+        const res = await fetch('/admin.php/extension/savePermission', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { ...apiH, 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({ name: row.name, role, can_view: canView ? 1 : 0 }),
+        });
+        const json = parseJson(res, await res.text());
+        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.extension.toggleFail'));
+      } catch (e) {
+        row.permissions[role] = row.permissions[role] ? 0 : 1;
+        ElMessage.error(e.message || tt('page.extension.toggleFail'));
+      }
+    }
+
+    function refreshAll() {
+      fetchList();
+      fetchLogs();
+      fetchPermissions();
+    }
+
+    onMounted(() => refreshAll());
+    return {
+      tt, loading, items, logs, permItems, activeTab, myRole, canManage, canEditPermissions,
+      fetchList, fetchLogs, fetchPermissions, refreshAll, moduleTitle, moduleDesc,
+      install, uninstall, toggleEnabled, depsText, isDependencyReady, roleLabel, actionLabel, savePerm,
+    };
   },
   template: `
     <div>
@@ -178,32 +278,85 @@ createApp({
           <div class="ext-breadcrumb">{{ tt('page.extension.breadcrumb') }}</div>
           <div class="ext-title">{{ tt('page.extension.title') }}</div>
         </div>
-        <el-button :loading="loading" @click="fetchList">{{ tt('common.refresh') }}</el-button>
+        <el-button :loading="loading" @click="refreshAll">{{ tt('common.refresh') }}</el-button>
       </div>
 
-      <el-row :gutter="16" v-loading="loading">
-        <el-col :xs="24" :sm="12" :md="8" v-for="row in items" :key="row.name" style="margin-bottom:16px;">
-          <el-card shadow="hover" class="ext-card">
-            <div class="ext-name">{{ moduleTitle(row) }}</div>
-            <div class="ext-meta">{{ tt('page.extension.version') }}: {{ row.version || '1.0.0' }}</div>
-            <div class="ext-desc">{{ moduleDesc(row) }}</div>
-            <div class="ext-actions">
-              <div>
-                <el-button v-if="Number(row.is_enabled)!==1" type="primary" size="small" @click="install(row)">{{ tt('page.extension.install') }}</el-button>
-                <el-button v-if="Number(row.is_enabled)===1 && Number(row.can_uninstall)===1" type="danger" size="small" plain @click="uninstall(row)">{{ tt('page.extension.uninstall') }}</el-button>
-                <el-tag v-if="Number(row.can_uninstall)!==1" size="small">{{ tt('page.extension.coreTag') }}</el-tag>
-              </div>
-              <el-switch
-                v-model="row.is_enabled"
-                :active-value="1"
-                :inactive-value="0"
-                :active-text="tt('common.statusEnabled')"
-                :inactive-text="tt('common.statusDisabled')"
-                @change="(v)=>toggleEnabled(row, v===1)" />
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+      <el-tabs v-model="activeTab">
+        <el-tab-pane name="modules" :label="tt('page.extension.tabModules')">
+          <el-row :gutter="16" v-loading="loading">
+            <el-col :xs="24" :sm="12" :md="8" v-for="row in items" :key="row.name" style="margin-bottom:16px;">
+              <el-card shadow="hover" class="ext-card">
+                <div class="ext-name">{{ moduleTitle(row) }}</div>
+                <div class="ext-meta">{{ tt('page.extension.version') }}: {{ row.version || '1.0.0' }}</div>
+                <div class="ext-desc">{{ moduleDesc(row) }}</div>
+                <div class="ext-meta">
+                  {{ tt('page.extension.dependencies') }}: {{ depsText(row) }}
+                  <el-tag size="small" :type="isDependencyReady(row) ? 'success' : 'warning'" style="margin-left:6px;">
+                    {{ isDependencyReady(row) ? tt('page.extension.depReady') : tt('page.extension.depMissing') }}
+                  </el-tag>
+                </div>
+                <div class="ext-actions">
+                  <div>
+                    <el-button v-if="Number(row.is_enabled)!==1" type="primary" size="small" @click="install(row)">{{ tt('page.extension.install') }}</el-button>
+                    <el-button v-if="Number(row.is_enabled)===1 && Number(row.can_uninstall)===1" type="danger" size="small" plain @click="uninstall(row)">{{ tt('page.extension.uninstall') }}</el-button>
+                    <el-tag v-if="Number(row.can_uninstall)!==1" size="small">{{ tt('page.extension.coreTag') }}</el-tag>
+                  </div>
+                  <el-switch
+                    v-model="row.is_enabled"
+                    :active-value="1"
+                    :inactive-value="0"
+                    :active-text="tt('common.statusEnabled')"
+                    :inactive-text="tt('common.statusDisabled')"
+                    @change="(v)=>toggleEnabled(row, v===1)" />
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
+        </el-tab-pane>
+
+        <el-tab-pane name="permissions" :label="tt('page.extension.tabPermissions')">
+          <el-alert :title="tt('page.extension.permissionTip')" type="info" show-icon :closable="false" style="margin-bottom:12px;" />
+          <el-table :data="permItems" stripe>
+            <el-table-column prop="name" :label="tt('page.extension.colModule')" min-width="180">
+              <template #default="{ row }">{{ moduleTitle(row) }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.user.roleSuperAdmin')" width="180">
+              <template #default="{ row }">
+                <el-switch v-model="row.permissions.super_admin" :active-value="1" :inactive-value="0" :disabled="Number(canEditPermissions)!==1" @change="(v)=>savePerm(row,'super_admin',v===1)" />
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.user.roleOperator')" width="180">
+              <template #default="{ row }">
+                <el-switch v-model="row.permissions.operator" :active-value="1" :inactive-value="0" :disabled="Number(canEditPermissions)!==1" @change="(v)=>savePerm(row,'operator',v===1)" />
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.user.roleViewer')" width="180">
+              <template #default="{ row }">
+                <el-switch v-model="row.permissions.viewer" :active-value="1" :inactive-value="0" :disabled="Number(canEditPermissions)!==1" @change="(v)=>savePerm(row,'viewer',v===1)" />
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane name="logs" :label="tt('page.extension.tabLogs')">
+          <el-table :data="logs" stripe>
+            <el-table-column prop="created_at" :label="tt('page.extension.logTime')" width="180" />
+            <el-table-column prop="extension_name" :label="tt('page.extension.colModule')" width="160" />
+            <el-table-column :label="tt('page.extension.logAction')" width="130">
+              <template #default="{ row }">{{ actionLabel(row.action) }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.extension.logOperator')" width="160">
+              <template #default="{ row }">{{ row.operator_name || '-' }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.extension.logResult')" width="120">
+              <template #default="{ row }">
+                <el-tag size="small" :type="Number(row.result)===1 ? 'success' : 'danger'">{{ Number(row.result)===1 ? tt('page.extension.logOk') : tt('page.extension.logFail') }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="message" :label="tt('page.extension.logMessage')" min-width="220" />
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
     </div>
   `
 }).use(ElementPlus).mount('#extensionApp');

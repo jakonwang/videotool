@@ -17,6 +17,15 @@
 - 后台侧栏改造：`view/admin/common/layout.html` 不再硬编码菜单，改由 `BaseController` 注入 `ModuleManagerService::getEnabledMenus(...)` 的结果并在 `view/admin/common/sidebar.html` 渲染。
 - 多语言规范：模块名称/描述在前端以 `AppI18n.t('extension.' + name + '.title')` 与 `AppI18n.t('extension.' + name + '.desc')` 动态获取；模块管理页所有文案均使用 `AppI18n.t`。
 
+### Module Manager 治理增强（2026-04-06）
+
+- 新增迁移脚本：`php database/run_migration_module_governance.php`（Windows：`php database\run_migration_module_governance.php`，Linux：`php database/run_migration_module_governance.php`）。
+- 新增模块安装日志表 `extension_install_logs`：记录 `install/uninstall/toggle` 的操作人、结果、错误消息与详情。
+- 新增模块依赖表 `extension_dependencies`：支持 `A -> B` 依赖关系；启用/安装前自动校验依赖是否已启用，禁用/卸载前校验是否存在启用中的反向依赖模块。
+- 新增角色权限表 `extension_role_permissions`：按角色（`super_admin/operator/viewer`）控制模块可见范围。
+- 管理员角色增强：`admin_users` 新增 `role` 字段（默认 `super_admin`）；登录后写入 Session 并参与模块菜单可见性判定。
+- 模块管理页增强：`/admin.php/extension` 新增“模块 / 权限 / 日志”三页签，可查看依赖状态、维护角色可见权限（仅超级管理员可改）与审计日志。
+
 ### 分类 + 达人 CRM + 话术增强（2026-04-06）
 
 - 新增后台模块 **分类管理**：`/admin.php/category`，支持 `product` / `influencer` 两类分类的 CRUD（名称、类型、排序、状态），接口：`listJson`、`options`、`save`、`delete`。

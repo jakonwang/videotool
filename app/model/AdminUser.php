@@ -15,6 +15,7 @@ class AdminUser extends Model
     protected $schema = [
         'id'            => 'int',
         'username'      => 'string',
+        'role'          => 'string',
         'password_hash' => 'string',
         'status'        => 'int',
         'last_login_at' => 'datetime',

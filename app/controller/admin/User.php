@@ -13,6 +13,15 @@ use think\facade\View;
  */
 class User extends BaseController
 {
+    private function normalizeRole(string $role): string
+    {
+        $r = trim($role);
+        if (!in_array($r, ['super_admin', 'operator', 'viewer'], true)) {
+            return 'operator';
+        }
+        return $r;
+    }
+
     public function index()
     {
         return View::fetch('admin/user/index');
@@ -48,6 +57,7 @@ class User extends BaseController
                 'id' => (int) $u->id,
                 'username' => (string) ($u->username ?? ''),
                 'status' => (int) ($u->status ?? 0),
+                'role' => (string) ($u->role ?? 'super_admin'),
                 'last_login_at' => (string) ($u->last_login_at ?? ''),
                 'last_login_ip' => (string) ($u->last_login_ip ?? ''),
                 'created_at' => (string) ($u->created_at ?? ''),
@@ -65,6 +75,7 @@ class User extends BaseController
                 'me' => [
                     'id' => AdminAuthService::userId(),
                     'username' => AdminAuthService::username(),
+                    'role' => AdminAuthService::role(),
                 ],
             ],
         ]);
@@ -75,6 +86,11 @@ class User extends BaseController
         $username = trim((string) $this->request->post('username', ''));
         $password = (string) $this->request->post('password', '');
         $status = (int) $this->request->post('status', 1);
+        $role = $this->normalizeRole((string) $this->request->post('role', 'operator'));
+        $meRole = AdminAuthService::role();
+        if ($meRole !== 'super_admin' && $role === 'super_admin') {
+            return json(['code' => 1, 'msg' => '仅超级管理员可创建超级管理员']);
+        }
 
         if ($username === '') {
             return json(['code' => 1, 'msg' => '请输入用户名']);
@@ -92,6 +108,7 @@ class User extends BaseController
 
         AdminUserModel::create([
             'username' => $username,
+            'role' => $role,
             'password_hash' => password_hash($password, PASSWORD_BCRYPT),
             'status' => $status === 1 ? 1 : 0,
         ]);
@@ -104,6 +121,11 @@ class User extends BaseController
         $id = (int) $this->request->post('id', 0);
         $username = trim((string) $this->request->post('username', ''));
         $status = (int) $this->request->post('status', 1);
+        $role = $this->normalizeRole((string) $this->request->post('role', 'operator'));
+        $meRole = AdminAuthService::role();
+        if ($meRole !== 'super_admin' && $role === 'super_admin') {
+            return json(['code' => 1, 'msg' => '仅超级管理员可设置超级管理员角色']);
+        }
 
         if ($id <= 0) {
             return json(['code' => 1, 'msg' => '参数错误']);
@@ -132,6 +154,7 @@ class User extends BaseController
 
         $row->username = $username;
         $row->status = $status === 1 ? 1 : 0;
+        $row->role = $role;
         $row->save();
 
         return json(['code' => 0, 'msg' => '已保存']);
