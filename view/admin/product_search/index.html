@@ -365,6 +365,35 @@
         window.open('/index.php/searchByImage', '_blank', 'noopener');
       }
 
+      function openCatalogH5() {
+        window.open('/index.php/styleCatalog', '_blank', 'noopener');
+      }
+
+      async function copyCatalogLink() {
+        const url = window.location.origin + '/index.php/styleCatalog';
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && window.isSecureContext) {
+            await navigator.clipboard.writeText(url);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.setAttribute('readonly', 'readonly');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (!ok) throw new Error('copy-failed');
+          }
+          ElMessage.success(tt('common.copyDone'));
+        } catch (e) {
+          ElMessage.error(tt('common.copyFail'));
+        }
+      }
+
       /** 可直链预览的图片地址（http(s)、站内 /、data:image） */
       function imageDisplayUrl(ref) {
         const s = String(ref || '').trim();
@@ -450,7 +479,7 @@
         tableRef, selectedRows, batchDeleting,
         visionDescribeOnImport, visionDescCount, volcArkEnabled, visionAnyProviderReady,
         editVisible, editSaving, editImageInputKey, editForm,
-        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, lang, tt,
+        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, openCatalogH5, copyCatalogLink, lang, tt,
         imageDisplayUrl, isImagePreviewable,
       };
     },
@@ -462,6 +491,8 @@
             <div style="font-size:18px;font-weight:600;color:#111827;">{{ tt('page.styleSearch.pageTitle') }}</div>
             <div class="admin-action-buttons">
               <el-button type="default" @click="openH5">{{ tt('page.styleSearch.openH5') }}</el-button>
+              <el-button type="default" @click="openCatalogH5">{{ tt('common.open') }} Catalog</el-button>
+              <el-button type="default" @click="copyCatalogLink">{{ tt('page.product.copyLink') }}</el-button>
               <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/sampleCsv" style="border-radius:8px;">{{ tt('page.styleSearch.sampleCsv') }}</a>
               <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/exportCsv" rel="noopener" style="border-radius:8px;">{{ tt('page.styleSearch.exportCsv') }}</a>
             </div>

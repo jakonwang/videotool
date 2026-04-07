@@ -19,5 +19,5 @@ Route::group('api', function() {
     Route::post('product_search/searchByImage', 'app\controller\api\Search@searchByImage');
     Route::post('search/searchByImage', 'app\controller\api\Search@searchByImage');
     Route::get('product_search/searchByCode', 'app\controller\api\ProductSearch@searchByCode');
+    Route::get('product_search/catalog', 'app\controller\api\ProductSearch@catalogList');
 });
-

@@ -54,4 +54,60 @@ class ProductSearch extends BaseController
             'data' => ['items' => $items],
         ]);
     }
+
+    /**
+     * GET catalog list for mobile showroom.
+     */
+    public function catalogList()
+    {
+        $keyword = trim((string) $this->request->param('keyword', ''));
+        $page = (int) $this->request->param('page', 1);
+        $pageSize = (int) $this->request->param('page_size', 30);
+        if ($page < 1) {
+            $page = 1;
+        }
+        if ($pageSize < 1) {
+            $pageSize = 30;
+        }
+        if ($pageSize > 120) {
+            $pageSize = 120;
+        }
+
+        $query = ItemModel::where('status', 1)->order('id', 'desc');
+        if ($keyword !== '') {
+            $query->whereLike('product_code', '%' . $keyword . '%');
+        }
+
+        $list = $query->paginate([
+            'list_rows' => $pageSize,
+            'page' => $page,
+        ]);
+
+        $items = [];
+        foreach ($list as $row) {
+            $items[] = [
+                'id' => (int) ($row->id ?? 0),
+                'product_code' => trim((string) ($row->product_code ?? '')),
+                'image_ref' => trim((string) ($row->image_ref ?? '')),
+                'hot_type' => trim((string) ($row->hot_type ?? '')),
+            ];
+        }
+
+        $total = (int) $list->total();
+        $current = (int) $list->currentPage();
+        $rows = (int) $list->listRows();
+        $hasMore = ($current * $rows) < $total;
+
+        return $this->jsonOut([
+            'code' => 0,
+            'msg' => 'ok',
+            'data' => [
+                'items' => $items,
+                'total' => $total,
+                'page' => $current,
+                'page_size' => $rows,
+                'has_more' => $hasMore,
+            ],
+        ]);
+    }
 }
