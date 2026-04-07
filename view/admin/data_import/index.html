@@ -1,6 +1,6 @@
 ﻿{extend name="admin/common/layout" /}
 
-{block name="title"}Data Import Center{/block}
+{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.dataImportCenter.title') : 'Data Import Center' }}{/literal}{/block}
 {block name="page_title"}<span data-i18n="page.dataImportCenter.title">Data Import Center</span>{/block}
 {block name="breadcrumb"}<span data-i18n="page.dataImportCenter.breadcrumb">Growth Hub / Data Import</span>{/block}
 
@@ -22,6 +22,14 @@
   const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
   const headers = { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' };
   const parseJson = (text) => { try { return JSON.parse(text); } catch (_) { return null; } };
+  const resolveApiMessage = (json, fallbackKey) => {
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    return tt(fallbackKey || 'common.operationFailed');
+  };
 
   createApp({
     setup() {
@@ -48,7 +56,7 @@
         try {
           const res = await fetch('/admin.php/data_import/sourceListJson', { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           sources.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -61,7 +69,7 @@
         try {
           const res = await fetch('/admin.php/data_import/adapterListJson', { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           adapterOptions.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -78,7 +86,7 @@
           if (query.status !== '' && query.status !== null) p.set('status', String(query.status));
           const res = await fetch('/admin.php/data_import/jobListJson?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           jobs.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
           total.value = json.data ? Number(json.data.total || 0) : 0;
         } catch (e) {
@@ -131,7 +139,7 @@
             body: JSON.stringify(payload)
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
           ElMessage.success(tt('common.done'));
           sourceDialog.value = false;
           fetchSources();
@@ -152,7 +160,7 @@
             body: JSON.stringify({ source_id: row.id, domain: row.domain || '' })
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.dataImportCenter.runFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.dataImportCenter.runFailed'));
           ElMessage.success(tt('common.done'));
           fetchJobs();
         } catch (e) {
@@ -169,7 +177,7 @@
             body: JSON.stringify({ id: row.id })
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.delete'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.deleteFailed'));
           ElMessage.success(tt('common.done'));
           fetchSources();
         } catch (e) {
@@ -181,7 +189,7 @@
         try {
           const res = await fetch('/admin.php/data_import/jobLogsJson?job_id=' + encodeURIComponent(String(row.id)), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           logRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
           currentLogTitle.value = String(row.id);
           logsVisible.value = true;
@@ -200,7 +208,7 @@
             body: JSON.stringify({ job_id: row.id })
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
           ElMessage.success(tt('common.done'));
           fetchJobs();
         } catch (e) {

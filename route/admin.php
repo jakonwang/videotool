@@ -202,17 +202,20 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('industry_trend/summary', 'app\controller\admin\IndustryTrend@summaryJson');
     Route::get('industry_trend/summaryJson', 'app\controller\admin\IndustryTrend@summaryJson');
     Route::post('industry_trend/importCsv', 'app\controller\admin\IndustryTrend@importCsv');
+    Route::get('industry_trend/exportCsv', 'app\controller\admin\IndustryTrend@exportCsv');
     Route::get('industry_trend', 'app\controller\admin\IndustryTrend@index');
 
     Route::get('competitor_analysis/list', 'app\controller\admin\CompetitorAnalysis@listJson');
     Route::get('competitor_analysis/listJson', 'app\controller\admin\CompetitorAnalysis@listJson');
     Route::post('competitor_analysis/saveCompetitor', 'app\controller\admin\CompetitorAnalysis@saveCompetitor');
     Route::post('competitor_analysis/importCsv', 'app\controller\admin\CompetitorAnalysis@importCsv');
+    Route::get('competitor_analysis/exportCsv', 'app\controller\admin\CompetitorAnalysis@exportCsv');
     Route::get('competitor_analysis', 'app\controller\admin\CompetitorAnalysis@index');
 
     Route::get('ad_insight/list', 'app\controller\admin\AdInsight@listJson');
     Route::get('ad_insight/listJson', 'app\controller\admin\AdInsight@listJson');
     Route::post('ad_insight/importCsv', 'app\controller\admin\AdInsight@importCsv');
+    Route::get('ad_insight/exportCsv', 'app\controller\admin\AdInsight@exportCsv');
     Route::get('ad_insight', 'app\controller\admin\AdInsight@index');
 
     // Data import center

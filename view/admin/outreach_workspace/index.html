@@ -39,6 +39,14 @@
   function parseJson(text) {
     try { return JSON.parse(text); } catch (_) { return null; }
   }
+  function resolveApiMessage(json, fallbackKey) {
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    return tt(fallbackKey || 'common.operationFailed');
+  }
 
   createApp({
     setup() {
@@ -86,7 +94,7 @@
           if (Number(query.assigned_only) === 1) p.set('assigned_only', '1');
           const res = await fetch('/admin.php/outreach_workspace/listJson?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           list.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? Number(json.data.total) : 0;
         } catch (e) {
@@ -100,7 +108,7 @@
         try {
           const res = await fetch('/admin.php/outreach_workspace/nextTask', { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           nextItem.value = json.data ? (json.data.item || null) : null;
           previewText.value = '';
           jumpWa.value = '';
@@ -147,7 +155,7 @@
             })
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           const d = json.data || {};
           previewText.value = d.text || '';
           jumpWa.value = d.wa_url || '';
@@ -175,7 +183,7 @@
             })
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
           ElMessage.success(tt('common.done'));
           generateVisible.value = false;
           fetchList();
@@ -215,7 +223,7 @@
             })
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
           ElMessage.success(tt('common.done'));
           nextItem.value = json.data ? (json.data.next_item || null) : null;
           previewText.value = '';

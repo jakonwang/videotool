@@ -1,6 +1,6 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}模块管理{/block}
+{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.extension.title') : 'Module Manager' }}{/literal}{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -65,7 +65,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
+<script src="/static/i18n/i18n.js?v=20260407_i18n_governance1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -79,6 +79,14 @@ const apiH = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest
 
 function parseJson(res, text) {
   try { return JSON.parse(text); } catch (e) { throw new Error(tt('page.styleSearch.errNonJson', { status: res.status })); }
+}
+function resolveApiMessage(json, fallbackKey) {
+  if (json && json.error_key) {
+    const key = String(json.error_key);
+    const translated = tt(key);
+    if (translated && translated !== key) return translated;
+  }
+  return tt(fallbackKey || 'common.operationFailed');
 }
 
 createApp({
@@ -97,7 +105,7 @@ createApp({
       try {
         const res = await fetch('/admin.php/extension/listJson', { credentials: 'same-origin', headers: apiH });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
         items.value = (json.data && json.data.items) ? json.data.items : [];
         myRole.value = (json.data && json.data.role) ? json.data.role : 'super_admin';
         canManage.value = (json.data && Number(json.data.can_manage) === 1) ? 1 : 0;
@@ -113,7 +121,7 @@ createApp({
       try {
         const res = await fetch('/admin.php/extension/logs?limit=30', { credentials: 'same-origin', headers: apiH });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
         logs.value = (json.data && json.data.items) ? json.data.items : [];
       } catch (e) {
         ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -124,7 +132,7 @@ createApp({
       try {
         const res = await fetch('/admin.php/extension/permissionMatrix', { credentials: 'same-origin', headers: apiH });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
         permItems.value = (json.data && json.data.items) ? json.data.items : [];
       } catch (e) {
         ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -158,7 +166,7 @@ createApp({
           body: JSON.stringify({ name: row.name }),
         });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.extension.installFail'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.extension.installFail'));
         ElMessage.success(tt('page.extension.installOk'));
         fetchList();
       } catch (e) {
@@ -182,7 +190,7 @@ createApp({
           body: JSON.stringify({ name: row.name, purge_data: 0 }),
         });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.extension.uninstallFail'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.extension.uninstallFail'));
         ElMessage.success(tt('page.extension.uninstallOk'));
         fetchList();
       } catch (e) {
@@ -204,7 +212,7 @@ createApp({
           body: JSON.stringify({ name: row.name, is_enabled: val ? 1 : 0 }),
         });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.extension.toggleFail'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.extension.toggleFail'));
         ElMessage.success(tt('common.updated'));
       } catch (e) {
         row.is_enabled = row.is_enabled ? 0 : 1;
@@ -251,7 +259,7 @@ createApp({
           body: JSON.stringify({ name: row.name, role, can_view: canView ? 1 : 0 }),
         });
         const json = parseJson(res, await res.text());
-        if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.extension.toggleFail'));
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.extension.toggleFail'));
       } catch (e) {
         row.permissions[role] = row.permissions[role] ? 0 : 1;
         ElMessage.error(e.message || tt('page.extension.toggleFail'));

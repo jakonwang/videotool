@@ -13,12 +13,12 @@ class CompetitorAnalysis extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
     private function jsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg, 'error_key' => $errorKey, 'data' => $data]);
+        return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
     public function index()
@@ -162,6 +162,63 @@ class CompetitorAnalysis extends BaseController
             DataImportService::finishJob($jobId, DataImportService::JOB_FAILED, 0, 0, 0, 'import_exception');
             return $this->jsonErr('import_failed', 1, ['job_id' => $jobId], 'page.dataImport.importFailed');
         }
+    }
+
+    public function exportCsv()
+    {
+        $keyword = trim((string) $this->request->param('keyword', ''));
+        $platform = trim((string) $this->request->param('platform', ''));
+        try {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $filename = 'competitor_analysis_' . date('Ymd_His') . '.csv';
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['id', 'name', 'platform', 'region', 'category_name', 'status', 'latest_metric_date', 'latest_followers', 'latest_engagement_rate', 'latest_content_count', 'latest_conversion_proxy', 'updated_at']);
+
+            $query = GrowthCompetitorModel::alias('c')
+                ->field('c.*')
+                ->order('c.id', 'desc');
+            if ($keyword !== '') {
+                $query->whereLike('c.name', '%' . $keyword . '%');
+            }
+            if ($platform !== '') {
+                $query->where('c.platform', $platform);
+            }
+            $rows = $query->select();
+            foreach ($rows as $row) {
+                $r = is_array($row) ? $row : $row->toArray();
+                $latestMetric = GrowthCompetitorMetricModel::where('competitor_id', (int) ($r['id'] ?? 0))
+                    ->order('metric_date', 'desc')
+                    ->find();
+                fputcsv($out, [
+                    (int) ($r['id'] ?? 0),
+                    (string) ($r['name'] ?? ''),
+                    (string) ($r['platform'] ?? ''),
+                    (string) ($r['region'] ?? ''),
+                    (string) ($r['category_name'] ?? ''),
+                    (int) ($r['status'] ?? 1),
+                    (string) ($latestMetric->metric_date ?? ''),
+                    (int) ($latestMetric->followers ?? 0),
+                    (float) ($latestMetric->engagement_rate ?? 0),
+                    (int) ($latestMetric->content_count ?? 0),
+                    (float) ($latestMetric->conversion_proxy ?? 0),
+                    (string) ($r['updated_at'] ?? ''),
+                ]);
+            }
+            fclose($out);
+        } catch (\Throwable $e) {
+            if (!headers_sent()) {
+                return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
+            }
+        }
+        exit;
     }
 
     /**

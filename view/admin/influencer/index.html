@@ -27,7 +27,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260416_influencer_crm2"></script>
+<script src="/static/i18n/i18n.js?v=20260407_i18n_governance1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -47,6 +47,14 @@
     try { return JSON.parse(text); } catch (e) {
       throw new Error(tt('page.styleSearch.errNonJson', { status: res.status }));
     }
+  }
+  function resolveApiMessage(json, fallbackKey) {
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    return tt(fallbackKey || 'common.operationFailed');
   }
 
   const headerCellStyle = {
@@ -168,7 +176,7 @@
             return;
           }
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || tt('page.styleSearch.taskPushFail'));
+            ElMessage.error(resolveApiMessage(json, 'page.styleSearch.taskPushFail'));
             stopImportPolling();
             return;
           }
@@ -233,7 +241,7 @@
           if (Number(query.sort_by_contact) === 1) p.set('sort_by_contact', '1');
           const res = await fetch('/admin.php/influencer/listJson?' + p.toString(), { credentials: 'same-origin', headers: { ...apiFetchHeaders } });
           const json = parseJsonBody(res, await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           if (json.data && Array.isArray(json.data.tag_options)) {
             mergeTagOptions(json.data.tag_options);
@@ -292,7 +300,7 @@
             startImportPolling();
             return;
           }
-          ElMessage.error((json && json.msg) || tt('page.styleSearch.importFail'));
+          ElMessage.error(resolveApiMessage(json, 'page.styleSearch.importFail'));
         } catch (e) {
           ElMessage.error(e.message || tt('page.styleSearch.importFail'));
         } finally {
@@ -456,10 +464,10 @@
             return;
           }
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            ElMessage.error(resolveApiMessage(json, 'common.loadingFailed'));
             return;
           }
-          ElMessage.success(json.msg || tt('common.saved'));
+          ElMessage.success(tt('common.saved'));
           editVisible.value = false;
           fetchList();
         } catch (e) {
@@ -492,10 +500,10 @@
             return;
           }
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            ElMessage.error(resolveApiMessage(json, 'common.loadingFailed'));
             return;
           }
-          ElMessage.success(json.msg || tt('common.deleted'));
+          ElMessage.success(tt('common.deleted'));
           fetchList();
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -548,7 +556,7 @@
           });
           const json = parseJsonBody(res, await res.text());
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            ElMessage.error(resolveApiMessage(json, 'common.loadingFailed'));
             return;
           }
           ElMessage.success(tt('common.updated'));
@@ -590,7 +598,7 @@
             return;
           }
           if (!json || json.code !== 0) {
-            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            ElMessage.error(resolveApiMessage(json, 'common.loadingFailed'));
             return;
           }
           ElMessage.success(tt('common.updated'));
@@ -630,7 +638,7 @@
             return;
           }
           if (!json || json.code !== 0) {
-            outreachPreview.value = (json && json.msg) || tt('common.loadingFailed');
+            outreachPreview.value = resolveApiMessage(json, 'common.loadingFailed');
             outreachWaUrl.value = '';
             outreachZaloUrl.value = '';
             return;
@@ -665,9 +673,7 @@
         if (json && json.code === 401) {
           throw new Error(tt('common.sessionExpired'));
         }
-        if (!json || json.code !== 0) {
-          throw new Error((json && json.msg) || tt('common.loadingFailed'));
-        }
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
       }
 
       async function copyOutreachText() {

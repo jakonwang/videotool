@@ -12,12 +12,12 @@ class IndustryTrend extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
     private function jsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg, 'error_key' => $errorKey, 'data' => $data]);
+        return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
     public function index()
@@ -173,6 +173,63 @@ class IndustryTrend extends BaseController
             DataImportService::finishJob($jobId, DataImportService::JOB_FAILED, 0, 0, 0, 'import_exception');
             return $this->jsonErr('import_failed', 1, ['job_id' => $jobId], 'page.dataImport.importFailed');
         }
+    }
+
+    public function exportCsv()
+    {
+        $country = trim((string) $this->request->param('country', ''));
+        $category = trim((string) $this->request->param('category', ''));
+        $dateFrom = trim((string) $this->request->param('date_from', ''));
+        $dateTo = trim((string) $this->request->param('date_to', ''));
+        try {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $filename = 'industry_trend_' . date('Ymd_His') . '.csv';
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['metric_date', 'country_code', 'category_name', 'heat_score', 'content_count', 'engagement_rate', 'cpc', 'cpm', 'updated_at']);
+
+            $query = GrowthIndustryMetricModel::order('metric_date', 'desc')->order('id', 'desc');
+            if ($country !== '') {
+                $query->where('country_code', strtoupper($country));
+            }
+            if ($category !== '') {
+                $query->where('category_name', $category);
+            }
+            if ($dateFrom !== '') {
+                $query->where('metric_date', '>=', $dateFrom);
+            }
+            if ($dateTo !== '') {
+                $query->where('metric_date', '<=', $dateTo);
+            }
+            $rows = $query->select();
+            foreach ($rows as $row) {
+                $r = is_array($row) ? $row : $row->toArray();
+                fputcsv($out, [
+                    (string) ($r['metric_date'] ?? ''),
+                    (string) ($r['country_code'] ?? ''),
+                    (string) ($r['category_name'] ?? ''),
+                    (float) ($r['heat_score'] ?? 0),
+                    (int) ($r['content_count'] ?? 0),
+                    (float) ($r['engagement_rate'] ?? 0),
+                    (float) ($r['cpc'] ?? 0),
+                    (float) ($r['cpm'] ?? 0),
+                    (string) ($r['updated_at'] ?? ''),
+                ]);
+            }
+            fclose($out);
+        } catch (\Throwable $e) {
+            if (!headers_sent()) {
+                return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
+            }
+        }
+        exit;
     }
 
     /**

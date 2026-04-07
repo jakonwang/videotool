@@ -1,6 +1,6 @@
 ﻿{extend name="admin/common/layout" /}
 
-{block name="title"}Industry Trend{/block}
+{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.industryTrend.title') : 'Industry Trend' }}{/literal}{/block}
 {block name="page_title"}<span data-i18n="page.industryTrend.title">Industry Trend</span>{/block}
 {block name="breadcrumb"}<span data-i18n="page.industryTrend.breadcrumb">Growth Hub / Industry Trend</span>{/block}
 
@@ -22,6 +22,14 @@
   const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
   const headers = { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' };
   const parseJson = (text) => { try { return JSON.parse(text); } catch (_) { return null; } };
+  const resolveApiMessage = (json, fallbackKey) => {
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    return tt(fallbackKey || 'common.operationFailed');
+  };
 
   createApp({
     setup() {
@@ -51,7 +59,7 @@
           if (query.date_to) p.set('date_to', query.date_to);
           const res = await fetch('/admin.php/industry_trend/listJson?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           list.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
           total.value = json.data ? Number(json.data.total || 0) : 0;
         } catch (e) {
@@ -71,7 +79,7 @@
           if (query.date_to) p.set('date_to', query.date_to);
           const res = await fetch('/admin.php/industry_trend/summaryJson?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           const d = json.data || {};
           const cur = d.current || {};
           const mom = d.mom || {};
@@ -119,7 +127,7 @@
             body: fd
           });
           const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.dataImport.importFailed'));
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.dataImport.importFailed'));
           ElMessage.success(tt('common.done'));
           input.value = '';
           fetchList();
@@ -131,13 +139,23 @@
         }
       }
 
+      function exportCsv() {
+        const p = new URLSearchParams();
+        if (query.country) p.set('country', query.country);
+        if (query.category) p.set('category', query.category);
+        if (query.date_from) p.set('date_from', query.date_from);
+        if (query.date_to) p.set('date_to', query.date_to);
+        const url = '/admin.php/industry_trend/exportCsv' + (p.toString() ? ('?' + p.toString()) : '');
+        window.open(url, '_blank', 'noopener');
+      }
+
       onMounted(() => {
         if (i18n) i18n.applyDom(document);
         fetchList();
         fetchSummary();
       });
 
-      return { tt, loading, list, total, page, pageSize, query, fetchList, importCsv, importLoading, summaryLoading, summary, fetchSummary, formatRate };
+      return { tt, loading, list, total, page, pageSize, query, fetchList, importCsv, exportCsv, importLoading, summaryLoading, summary, fetchSummary, formatRate };
     },
     template: `
       <div class="admin-modern-card">
@@ -161,6 +179,7 @@
           <el-form-item style="margin-left:auto;">
             <input type="file" id="industryCsvInput" accept=".csv" style="max-width:180px;" />
             <el-button type="success" :loading="importLoading" @click="importCsv">{{ tt('page.industryTrend.importCsv') }}</el-button>
+            <el-button @click="exportCsv">{{ tt('page.styleSearch.exportCsv') }}</el-button>
           </el-form-item>
         </el-form>
 

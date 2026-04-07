@@ -13,12 +13,12 @@ class AdInsight extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
     private function jsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg, 'error_key' => $errorKey, 'data' => $data]);
+        return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
     public function index()
@@ -126,5 +126,65 @@ class AdInsight extends BaseController
             DataImportService::finishJob($jobId, DataImportService::JOB_FAILED, 0, 0, 0, 'import_exception');
             return $this->jsonErr('import_failed', 1, ['job_id' => $jobId], 'page.dataImport.importFailed');
         }
+    }
+
+    public function exportCsv()
+    {
+        $keyword = trim((string) $this->request->param('keyword', ''));
+        $platform = trim((string) $this->request->param('platform', ''));
+        try {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $filename = 'ad_insight_' . date('Ymd_His') . '.csv';
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['id', 'creative_code', 'title', 'platform', 'region', 'category_name', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'est_spend', 'active_days', 'updated_at']);
+
+            $query = GrowthAdCreativeModel::order('id', 'desc');
+            if ($keyword !== '') {
+                $query->where(function ($sub) use ($keyword) {
+                    $sub->whereLike('creative_code', '%' . $keyword . '%')
+                        ->whereOr('title', 'like', '%' . $keyword . '%');
+                });
+            }
+            if ($platform !== '') {
+                $query->where('platform', $platform);
+            }
+            $rows = $query->select();
+            foreach ($rows as $row) {
+                $r = is_array($row) ? $row : $row->toArray();
+                $latestMetric = GrowthAdMetricModel::where('creative_id', (int) ($r['id'] ?? 0))
+                    ->order('metric_date', 'desc')
+                    ->find();
+                fputcsv($out, [
+                    (int) ($r['id'] ?? 0),
+                    (string) ($r['creative_code'] ?? ''),
+                    (string) ($r['title'] ?? ''),
+                    (string) ($r['platform'] ?? ''),
+                    (string) ($r['region'] ?? ''),
+                    (string) ($r['category_name'] ?? ''),
+                    (int) ($latestMetric->impressions ?? 0),
+                    (int) ($latestMetric->clicks ?? 0),
+                    (float) ($latestMetric->ctr ?? 0),
+                    (float) ($latestMetric->cpc ?? 0),
+                    (float) ($latestMetric->cpm ?? 0),
+                    (float) ($latestMetric->est_spend ?? 0),
+                    (int) ($latestMetric->active_days ?? 0),
+                    (string) ($r['updated_at'] ?? ''),
+                ]);
+            }
+            fclose($out);
+        } catch (\Throwable $e) {
+            if (!headers_sent()) {
+                return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
+            }
+        }
+        exit;
     }
 }
