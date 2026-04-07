@@ -1,277 +1,925 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>款式图册</title>
+  <title>Style Catalog</title>
   <script>{if isset($h5_api_entry_js) && $h5_api_entry_js != ''}window.__H5_API_ENTRY__={$h5_api_entry_js|raw};{else /}window.__H5_API_ENTRY__='/index.php';{/if}</script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
   <style>
-    .style-track {
+    :root {
+      --bg: #f4f7fb;
+      --ink: #0f172a;
+      --sub: #64748b;
+      --line: #dbe3ef;
+      --card: #ffffff;
+      --brand: #0ea5e9;
+      --brand-ink: #0369a1;
+      --ok: #16a34a;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .app { max-width: 760px; margin: 0 auto; min-height: 100vh; padding: 0 12px 88px; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      background: rgba(244, 247, 251, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 2px;
+    }
+    .head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .title { font-size: 18px; font-weight: 800; line-height: 1.2; }
+    .subtitle { margin-top: 4px; color: var(--sub); font-size: 12px; line-height: 1.4; }
+    .lang-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: #fff; }
+    .lang-switch button {
+      border: 0;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fff;
+      color: var(--sub);
+    }
+    .lang-switch button.active { background: var(--brand); color: #fff; font-weight: 600; }
+
+    .filter {
+      margin-top: 10px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
       display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: 88%;
-      gap: 12px;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      padding-bottom: 6px;
-      -webkit-overflow-scrolling: touch;
+      gap: 8px;
     }
-    .style-track::-webkit-scrollbar {
-      height: 6px;
+    .filter-row { display: grid; grid-template-columns: 1fr 128px; gap: 8px; }
+    .control {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 14px;
+      color: var(--ink);
+      background: #fff;
+      outline: none;
     }
-    .style-track::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 999px;
+    .control:focus { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-ghost { background: #e9f4fb; color: var(--brand-ink); }
+    .summary { font-size: 12px; color: var(--sub); }
+
+    .loading, .empty, .error-box {
+      margin-top: 12px;
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px 12px;
+      color: var(--sub);
+      font-size: 14px;
+    }
+    .error-box { color: var(--danger); background: #fff5f5; border-color: #fecaca; }
+
+    .masonry {
+      margin-top: 12px;
+      column-count: 2;
+      column-gap: 12px;
     }
     .style-card {
-      scroll-snap-align: center;
-      scroll-snap-stop: always;
+      break-inside: avoid;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+    }
+    .thumb-wrap {
+      position: relative;
+      background: #f1f5f9;
+      min-height: 120px;
+      cursor: zoom-in;
+    }
+    .thumb {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      min-height: 120px;
+      max-height: 320px;
+    }
+    .price-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(15, 23, 42, 0.82);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      line-height: 1;
+      max-width: calc(100% - 16px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-body { padding: 10px; }
+    .code { font-size: 15px; font-weight: 800; line-height: 1.35; word-break: break-word; }
+    .meta { margin-top: 4px; color: var(--sub); font-size: 12px; }
+    .qty-row { margin-top: 10px; display: grid; grid-template-columns: 30px 1fr 30px; gap: 6px; align-items: center; }
+    .qty-btn {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+    }
+    .qty-input {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 700;
+      width: 100%;
+    }
+    .add-btn {
+      margin-top: 8px;
+      width: 100%;
+      border: 0;
+      border-radius: 9px;
+      background: #0f766e;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 10px;
+    }
+    .load-more-wrap { margin-top: 6px; }
+    .load-more {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .load-more:disabled { opacity: 0.6; }
+
+    .fab {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 0;
+      background: var(--ok);
+      color: #fff;
+      box-shadow: 0 14px 24px rgba(22, 163, 74, 0.35);
+      font-size: 26px;
+      line-height: 1;
+    }
+    .fab-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+    }
+
+    .mask {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(2, 6, 23, 0.55);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+    }
+    .sheet {
+      width: min(760px, 100%);
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sheet-head {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .sheet-title { font-size: 16px; font-weight: 800; }
+    .sheet-tools { display: inline-flex; gap: 8px; }
+    .text-btn {
+      border: 0;
+      background: transparent;
+      color: var(--brand-ink);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 6px;
+    }
+    .sheet-body {
+      overflow: auto;
+      padding: 10px 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .cart-empty {
+      text-align: center;
+      color: var(--sub);
+      padding: 20px 0;
+      font-size: 14px;
+    }
+    .cart-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 56px 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .cart-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #f1f5f9;
+      border: 1px solid var(--line);
+    }
+    .cart-code { font-size: 13px; font-weight: 700; }
+    .cart-sub { margin-top: 2px; color: var(--sub); font-size: 12px; }
+    .cart-right { text-align: right; }
+    .sheet-foot {
+      border-top: 1px solid var(--line);
+      padding: 10px 12px 14px;
+      background: #fff;
+    }
+    .total-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .submit-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      background: var(--ok);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 10px 12px;
+    }
+    .submit-btn:disabled { opacity: 0.6; }
+
+    .dialog-mask {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: rgba(15, 23, 42, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+    .dialog {
+      width: min(520px, 100%);
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.26);
+    }
+    .dialog-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .dialog-body {
+      padding: 12px 14px;
+      display: grid;
+      gap: 8px;
+    }
+    .dialog-foot {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .form-label {
+      font-size: 12px;
+      color: var(--sub);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .hint {
+      font-size: 12px;
+      color: var(--sub);
+      line-height: 1.4;
+    }
+    .preview-img {
+      max-width: 100%;
+      max-height: 84vh;
+      display: block;
+      margin: 0 auto;
+      object-fit: contain;
+      border-radius: 12px;
+      background: #0f172a;
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 88px;
+      z-index: 40;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      background: rgba(15, 23, 42, 0.88);
+      max-width: calc(100vw - 32px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .toast.error { background: rgba(185, 28, 28, 0.92); }
+    .toast.ok { background: rgba(22, 163, 74, 0.92); }
+
+    @media (max-width: 410px) {
+      .masonry { column-count: 1; }
+      .filter-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-900">
-<div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col pb-8">
-  <header class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3">
-    <h1 class="text-lg font-bold">款式图册</h1>
-    <p class="text-xs text-slate-500 mt-1">可分享给客户，左右滑动查看款式图片和编号</p>
-  </header>
-
-  <main class="flex-1 px-4 pt-4 space-y-4">
-    <section class="bg-white rounded-2xl border border-slate-200 p-3">
-      <div class="flex gap-2">
-        <input
-          v-model.trim="keyword"
-          type="text"
-          class="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-          placeholder="输入款号筛选，如 EH001"
-          @keyup.enter="applyKeyword"
-        />
-        <button type="button" class="rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-semibold" @click="applyKeyword">搜索</button>
-      </div>
-      <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
-        <div>{{ activeKeyword ? ('筛选: ' + activeKeyword) : '全部款式' }}</div>
-        <div>已加载 {{ items.length }} / {{ total || items.length }}</div>
-      </div>
-    </section>
-
-    <section v-if="loading && !items.length" class="bg-white rounded-2xl border border-slate-200 p-5 text-center text-sm text-slate-500">
-      加载中...
-    </section>
-
-    <section v-else-if="!loading && !items.length" class="bg-white rounded-2xl border border-slate-200 p-5 text-center text-sm text-slate-500">
-      没有可展示的款式
-    </section>
-
-    <section v-else class="space-y-3">
-      <div ref="trackEl" class="style-track" @scroll.passive="onTrackScroll">
-        <article v-for="(item, idx) in items" :key="item.id + '-' + idx" class="style-card bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <div class="aspect-square bg-slate-100 flex items-center justify-center">
-            <img
-              v-if="imgUrl(item.image_ref)"
-              :src="imgUrl(item.image_ref)"
-              class="w-full h-full object-cover cursor-zoom-in"
-              :alt="item.product_code || ('style-' + idx)"
-              @error="hideImg"
-              @click="openPreview(imgUrl(item.image_ref))"
-            />
-            <div v-else class="text-xs text-slate-400">NO IMAGE</div>
-          </div>
-          <div class="p-3">
-            <div class="text-lg font-extrabold tracking-wide break-all">{{ item.product_code || '-' }}</div>
-            <div v-if="item.hot_type" class="mt-1 text-xs text-amber-700">{{ item.hot_type }}</div>
-            <div class="mt-2 text-xs text-slate-500">#{{ idx + 1 }}</div>
-          </div>
-        </article>
-      </div>
-
-      <div class="flex items-center justify-between text-xs text-slate-600">
-        <div>{{ items.length ? (currentIndex + 1) : 0 }} / {{ items.length }}</div>
-        <div class="flex gap-2">
-          <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5" @click="scrollPrev">←</button>
-          <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5" @click="scrollNext">→</button>
+<body>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="head-row">
+        <div>
+          <div class="title">{{ tt('catalog.title') }}</div>
+          <div class="subtitle">{{ tt('catalog.subtitle') }}</div>
+        </div>
+        <div class="lang-switch">
+          <button type="button" :class="{ active: currentLang==='zh' }" @click="switchLang('zh')">中</button>
+          <button type="button" :class="{ active: currentLang==='vi' }" @click="switchLang('vi')">VI</button>
         </div>
       </div>
+      <div class="filter">
+        <div class="filter-row">
+          <input
+            v-model.trim="keyword"
+            class="control"
+            :placeholder="tt('catalog.keywordPlaceholder')"
+            @keyup.enter="applyFilter"
+          />
+          <select v-model="category" class="control">
+            <option value="">{{ tt('catalog.categoryAll') }}</option>
+            <option v-for="item in categories" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" @click="applyFilter">{{ tt('catalog.search') }}</button>
+          <button type="button" class="btn btn-ghost" @click="resetFilter">{{ tt('catalog.reset') }}</button>
+        </div>
+        <div class="summary">{{ tt('catalog.loaded', { loaded: items.length, total: total || items.length }) }}</div>
+      </div>
+    </header>
+
+    <div v-if="loading && !items.length" class="loading">{{ tt('catalog.loading') }}</div>
+    <div v-else-if="!loading && !items.length" class="empty">{{ tt('catalog.empty') }}</div>
+
+    <section v-else class="masonry">
+      <article v-for="item in items" :key="item.id" class="style-card">
+        <div class="thumb-wrap" @click="openPreview(imgUrl(item.image_ref))">
+          <img v-if="imgUrl(item.image_ref)" :src="imgUrl(item.image_ref)" class="thumb" :alt="item.product_code || ''" />
+          <div class="price-badge">{{ tt('catalog.priceLabel') }}: {{ tt('catalog.currency') }}{{ formatPrice(item.wholesale_price) }}</div>
+        </div>
+        <div class="card-body">
+          <div class="code">{{ item.product_code || '-' }}</div>
+          <div class="meta">{{ item.category || '-' }}</div>
+          <div class="meta">{{ tt('catalog.minQty', { qty: item.min_order_qty || 1 }) }}</div>
+
+          <div class="qty-row">
+            <button type="button" class="qty-btn" @click="decreaseDraft(item)">-</button>
+            <input
+              type="number"
+              class="qty-input"
+              :value="qtyDraft[item.id] || (item.min_order_qty || 1)"
+              min="1"
+              @change="onDraftChange(item, $event)"
+            />
+            <button type="button" class="qty-btn" @click="increaseDraft(item)">+</button>
+          </div>
+
+          <button type="button" class="add-btn" @click="addToCart(item)">{{ tt('catalog.addToCart') }}</button>
+        </div>
+      </article>
     </section>
 
-    <section class="pb-2">
-      <button
-        type="button"
-        class="w-full rounded-xl border border-slate-300 bg-white py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50"
-        :disabled="loadingMore || !hasMore"
-        @click="loadMore"
-      >
-        {{ loadingMore ? '加载中...' : (hasMore ? '加载更多' : '已到底部') }}
+    <div class="load-more-wrap">
+      <button type="button" class="load-more" :disabled="loadingMore || !hasMore" @click="loadMore">
+        {{ loadingMore ? tt('catalog.loading') : (hasMore ? tt('catalog.loadMore') : tt('catalog.noMore')) }}
       </button>
-    </section>
+    </div>
 
-    <p v-if="errMsg" class="text-center text-sm text-red-600 bg-red-50 rounded-xl py-2 px-3">{{ errMsg }}</p>
-  </main>
+    <div v-if="errorMsg" class="error-box">{{ errorMsg }}</div>
 
-  <div
-    v-if="previewVisible"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-    @click.self="closePreview"
-  >
-    <button
-      type="button"
-      class="absolute top-4 right-4 rounded-lg bg-white/20 text-white px-3 py-1.5 text-sm"
-      @click="closePreview"
-    >Close</button>
-    <img :src="previewImage" class="max-w-full max-h-[88vh] rounded-xl shadow-2xl object-contain" alt="preview" />
+    <button type="button" class="fab" @click="openCart">
+      🛒
+      <span class="fab-badge" v-if="cartCount > 0">{{ cartCount }}</span>
+    </button>
+
+    <div v-if="cartOpen" class="mask" @click.self="cartOpen=false">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="sheet-title">{{ tt('catalog.cart') }}</div>
+          <div class="sheet-tools">
+            <button type="button" class="text-btn" @click="clearCart">{{ tt('catalog.clearCart') }}</button>
+            <button type="button" class="text-btn" @click="cartOpen=false">{{ tt('catalog.close') }}</button>
+          </div>
+        </div>
+        <div class="sheet-body">
+          <div v-if="cartItems.length === 0" class="cart-empty">{{ tt('catalog.cartEmpty') }}</div>
+          <div v-for="item in cartItems" :key="'c-' + item.style_id" class="cart-item">
+            <img :src="imgUrl(item.image_ref)" class="cart-thumb" :alt="item.product_code || ''" />
+            <div>
+              <div class="cart-code">{{ item.product_code || '-' }}</div>
+              <div class="cart-sub">{{ tt('catalog.currency') }}{{ formatPrice(item.unit_price) }}</div>
+              <div class="cart-sub">{{ tt('catalog.minQty', { qty: item.min_order_qty || 1 }) }}</div>
+            </div>
+            <div class="cart-right">
+              <div class="qty-row" style="margin-top:0; grid-template-columns:26px 52px 26px;">
+                <button type="button" class="qty-btn" @click="decreaseCartQty(item)">-</button>
+                <input type="number" class="qty-input" :value="item.qty" min="1" @change="onCartQtyChange(item, $event)" />
+                <button type="button" class="qty-btn" @click="increaseCartQty(item)">+</button>
+              </div>
+              <button type="button" class="text-btn" style="color:#dc2626;" @click="removeFromCart(item.style_id)">{{ tt('catalog.remove') }}</button>
+            </div>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <div class="total-line">
+            <span>{{ tt('catalog.total') }}</span>
+            <span>{{ tt('catalog.currency') }}{{ formatPrice(cartTotal) }}</span>
+          </div>
+          <button type="button" class="submit-btn" :disabled="!cartItems.length" @click="openContactDialog">
+            {{ tt('catalog.submitReserve') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="contactOpen" class="dialog-mask" @click.self="contactOpen=false">
+      <div class="dialog">
+        <div class="dialog-head">{{ tt('catalog.contactTitle') }}</div>
+        <div class="dialog-body">
+          <div>
+            <div class="form-label">{{ tt('catalog.customerName') }}</div>
+            <input v-model.trim="customer.name" class="control" :placeholder="tt('catalog.customerNamePh')" />
+          </div>
+          <div>
+            <div class="form-label">{{ tt('catalog.phone') }}</div>
+            <input v-model.trim="customer.phone" class="control" :placeholder="tt('catalog.phonePh')" />
+          </div>
+          <div>
+            <div class="form-label">{{ tt('catalog.whatsapp') }}</div>
+            <input v-model.trim="customer.whatsapp" class="control" :placeholder="tt('catalog.whatsappPh')" />
+          </div>
+          <div>
+            <div class="form-label">{{ tt('catalog.zalo') }}</div>
+            <input v-model.trim="customer.zalo" class="control" :placeholder="tt('catalog.zaloPh')" />
+          </div>
+          <div class="hint">{{ tt('catalog.contactHint') }}</div>
+        </div>
+        <div class="dialog-foot">
+          <button type="button" class="btn btn-ghost" @click="contactOpen=false">{{ tt('catalog.cancel') }}</button>
+          <button type="button" class="btn btn-primary" :disabled="submitting" @click="submitOrder">
+            {{ submitting ? tt('catalog.submitting') : tt('catalog.submit') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="previewVisible" class="dialog-mask" @click.self="closePreview">
+      <div class="dialog" style="width:min(840px,100%);">
+        <div class="dialog-head">{{ tt('catalog.previewTitle') }}</div>
+        <div class="dialog-body">
+          <img :src="previewImage" alt="preview" class="preview-img" />
+        </div>
+        <div class="dialog-foot">
+          <button type="button" class="btn btn-ghost" @click="closePreview">{{ tt('catalog.close') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="toast.show" :class="['toast', toast.type]">{{ toast.message }}</div>
   </div>
-</div>
 
-<script>
-const { createApp, ref, onMounted, onUnmounted, nextTick } = Vue;
+  <script src="/static/i18n/influencer_i18n.js?v=20260417_catalog1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+  <script>
+    (function () {
+      const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
 
-createApp({
-  setup() {
-    const API_ENTRY = (typeof window !== 'undefined' && window.__H5_API_ENTRY__ != null && String(window.__H5_API_ENTRY__).trim() !== '')
-      ? String(window.__H5_API_ENTRY__).trim()
-      : '/index.php';
+      createApp({
+        setup() {
+          const API_ENTRY = (typeof window !== 'undefined' && window.__H5_API_ENTRY__ != null && String(window.__H5_API_ENTRY__).trim() !== '')
+            ? String(window.__H5_API_ENTRY__).trim()
+            : '/index.php';
+          const i18n = window.InfluencerI18n;
+          const currentLang = ref(i18n ? i18n.getLang('vi') : 'vi');
+          if (i18n && i18n.applyHtmlLang) i18n.applyHtmlLang(currentLang.value);
+          if (i18n && typeof i18n.t === 'function') {
+            document.title = i18n.t('catalog.title', null, currentLang.value);
+          }
 
-    const keyword = ref('');
-    const activeKeyword = ref('');
-    const items = ref([]);
-    const total = ref(0);
-    const page = ref(1);
-    const pageSize = ref(30);
-    const hasMore = ref(false);
-    const loading = ref(false);
-    const loadingMore = ref(false);
-    const errMsg = ref('');
-    const currentIndex = ref(0);
-    const trackEl = ref(null);
-    const previewVisible = ref(false);
-    const previewImage = ref('');
+          const keyword = ref('');
+          const category = ref('');
+          const categories = ref([]);
+          const items = ref([]);
+          const page = ref(1);
+          const pageSize = ref(20);
+          const total = ref(0);
+          const hasMore = ref(false);
+          const loading = ref(false);
+          const loadingMore = ref(false);
+          const errorMsg = ref('');
 
-    function imgUrl(ref) {
-      const s = String(ref || '').trim();
-      if (!s) return '';
-      if (/^https?:\/\//i.test(s)) return s;
-      if (s.startsWith('//')) return location.protocol + s;
-      if (s.startsWith('/')) return location.origin + s;
-      return location.origin + '/' + s.replace(/^\.\//, '');
-    }
+          const qtyDraft = reactive({});
+          const cartMap = reactive({});
+          const cartOpen = ref(false);
+          const contactOpen = ref(false);
+          const submitting = ref(false);
+          const customer = reactive({
+            name: '',
+            phone: '',
+            whatsapp: '',
+            zalo: '',
+          });
 
-    function hideImg(e) {
-      if (e && e.target) e.target.style.display = 'none';
-    }
+          const previewVisible = ref(false);
+          const previewImage = ref('');
+          const toast = reactive({ show: false, message: '', type: '' });
+          let toastTimer = null;
 
-    function openPreview(url) {
-      if (!url) return;
-      previewImage.value = url;
-      previewVisible.value = true;
-    }
+          function tt(key, vars) {
+            return i18n ? i18n.t(key, vars || null, currentLang.value) : key;
+          }
 
-    function closePreview() {
-      previewVisible.value = false;
-      previewImage.value = '';
-    }
+          function showToast(message, type) {
+            toast.message = String(message || '');
+            toast.type = type || '';
+            toast.show = true;
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+              toast.show = false;
+            }, 1900);
+          }
 
-    async function fetchPage(targetPage, reset) {
-      errMsg.value = '';
-      if (reset) loading.value = true;
-      else loadingMore.value = true;
-      try {
-        const qs = new URLSearchParams({
-          page: String(targetPage),
-          page_size: String(pageSize.value),
-        });
-        if (activeKeyword.value) qs.set('keyword', activeKeyword.value);
-        const res = await fetch(API_ENTRY + '/api/product_search/catalog?' + qs.toString(), {
-          credentials: 'same-origin',
-        });
-        const json = await res.json();
-        if (!json || json.code !== 0) {
-          throw new Error((json && json.msg) || '加载失败');
-        }
-        const data = json.data || {};
-        const incoming = Array.isArray(data.items) ? data.items : [];
-        if (reset) {
-          items.value = incoming;
-          await nextTick();
-          if (trackEl.value) trackEl.value.scrollLeft = 0;
-          currentIndex.value = 0;
-        } else {
-          items.value = items.value.concat(incoming);
-        }
-        total.value = Number(data.total || 0);
-        page.value = Number(data.page || targetPage);
-        hasMore.value = !!data.has_more;
-      } catch (e) {
-        errMsg.value = (e && e.message) ? e.message : '网络错误';
-      } finally {
-        loading.value = false;
-        loadingMore.value = false;
-      }
-    }
+          function switchLang(lang) {
+            if (!i18n || typeof i18n.setLang !== 'function') return;
+            i18n.setLang(lang);
+          }
 
-    function applyKeyword() {
-      activeKeyword.value = keyword.value.trim();
-      fetchPage(1, true);
-    }
+          function imgUrl(refValue) {
+            const s = String(refValue || '').trim();
+            if (!s) return '';
+            if (/^https?:\/\//i.test(s)) return s;
+            if (s.startsWith('//')) return window.location.protocol + s;
+            if (s.startsWith('/')) return window.location.origin + s;
+            return window.location.origin + '/' + s.replace(/^\.\//, '');
+          }
 
-    function loadMore() {
-      if (loadingMore.value || !hasMore.value) return;
-      fetchPage(page.value + 1, false);
-    }
+          function toNumber(v) {
+            const n = Number(v);
+            return Number.isFinite(n) ? n : 0;
+          }
 
-    function onTrackScroll() {
-      const el = trackEl.value;
-      if (!el) return;
-      const first = el.querySelector('.style-card');
-      if (!first) return;
-      const style = window.getComputedStyle(el);
-      const gap = parseFloat(style.columnGap || style.gap || '0') || 0;
-      const step = first.getBoundingClientRect().width + gap;
-      if (step <= 0) return;
-      const idx = Math.round(el.scrollLeft / step);
-      currentIndex.value = Math.min(Math.max(idx, 0), Math.max(items.value.length - 1, 0));
-    }
+          function formatPrice(v) {
+            const n = toNumber(v);
+            return n.toFixed(2).replace(/\.00$/, '');
+          }
 
-    function scrollByStep(dir) {
-      const el = trackEl.value;
-      if (!el) return;
-      const first = el.querySelector('.style-card');
-      if (!first) return;
-      const style = window.getComputedStyle(el);
-      const gap = parseFloat(style.columnGap || style.gap || '0') || 0;
-      const step = first.getBoundingClientRect().width + gap;
-      el.scrollBy({ left: step * dir, behavior: 'smooth' });
-    }
+          function ensureDraft(item) {
+            const minQty = Math.max(1, Number(item && item.min_order_qty ? item.min_order_qty : 1));
+            if (!qtyDraft[item.id] || Number(qtyDraft[item.id]) < minQty) {
+              qtyDraft[item.id] = minQty;
+            }
+            return Number(qtyDraft[item.id] || minQty);
+          }
 
-    function scrollPrev() {
-      scrollByStep(-1);
-    }
+          function onDraftChange(item, ev) {
+            const minQty = Math.max(1, Number(item && item.min_order_qty ? item.min_order_qty : 1));
+            const n = parseInt((ev && ev.target ? ev.target.value : '0'), 10);
+            qtyDraft[item.id] = Number.isFinite(n) && n > 0 ? Math.max(minQty, n) : minQty;
+          }
 
-    function scrollNext() {
-      scrollByStep(1);
-    }
+          function increaseDraft(item) {
+            const cur = ensureDraft(item);
+            qtyDraft[item.id] = cur + 1;
+          }
 
-    function onKeyDown(e) {
-      if (!items.value.length || previewVisible.value) return;
-      if (e.key === 'ArrowLeft') scrollPrev();
-      if (e.key === 'ArrowRight') scrollNext();
-    }
+          function decreaseDraft(item) {
+            const minQty = Math.max(1, Number(item && item.min_order_qty ? item.min_order_qty : 1));
+            const cur = ensureDraft(item);
+            qtyDraft[item.id] = Math.max(minQty, cur - 1);
+          }
 
-    onMounted(() => {
-      fetchPage(1, true);
-      window.addEventListener('keydown', onKeyDown);
-    });
-    onUnmounted(() => {
-      window.removeEventListener('keydown', onKeyDown);
-    });
+          async function fetchCategories() {
+            try {
+              const res = await fetch(API_ENTRY + '/api/product_search/categories', { credentials: 'same-origin' });
+              const json = await res.json();
+              if (!json || json.code !== 0) return;
+              const d = json.data || {};
+              categories.value = Array.isArray(d.items) ? d.items : [];
+            } catch (e) {
+              categories.value = [];
+            }
+          }
 
-    return {
-      keyword, activeKeyword, items, total, hasMore, loading, loadingMore, errMsg, currentIndex, trackEl,
-      previewVisible, previewImage,
-      imgUrl, hideImg, openPreview, closePreview, applyKeyword, loadMore, onTrackScroll, scrollPrev, scrollNext,
-    };
-  },
-}).mount('#app');
-</script>
+          async function fetchList(targetPage, reset) {
+            errorMsg.value = '';
+            if (reset) loading.value = true;
+            else loadingMore.value = true;
+            try {
+              const p = new URLSearchParams();
+              p.set('page', String(targetPage));
+              p.set('page_size', String(pageSize.value));
+              if (keyword.value) p.set('keyword', keyword.value.trim());
+              if (category.value) p.set('category', category.value.trim());
+              const res = await fetch(API_ENTRY + '/api/product_search/catalog?' + p.toString(), {
+                credentials: 'same-origin',
+              });
+              const text = await res.text();
+              let json = null;
+              try {
+                json = JSON.parse(text);
+              } catch (e) {
+                throw new Error(tt('catalog.networkError'));
+              }
+              if (!json || json.code !== 0) {
+                throw new Error((json && json.msg) ? json.msg : tt('catalog.networkError'));
+              }
+              const data = json.data || {};
+              const incoming = Array.isArray(data.items) ? data.items : [];
+              if (reset) {
+                items.value = incoming;
+                await nextTick();
+              } else {
+                items.value = items.value.concat(incoming);
+              }
+              total.value = Number(data.total || 0);
+              page.value = Number(data.page || targetPage);
+              hasMore.value = !!data.has_more;
+            } catch (e) {
+              errorMsg.value = e && e.message ? e.message : tt('catalog.networkError');
+            } finally {
+              loading.value = false;
+              loadingMore.value = false;
+            }
+          }
+
+          function applyFilter() {
+            fetchList(1, true);
+          }
+
+          function resetFilter() {
+            keyword.value = '';
+            category.value = '';
+            fetchList(1, true);
+          }
+
+          function loadMore() {
+            if (loadingMore.value || !hasMore.value) return;
+            fetchList(page.value + 1, false);
+          }
+
+          function addToCart(item) {
+            const qty = ensureDraft(item);
+            const id = Number(item.id || 0);
+            if (id <= 0) return;
+            const exists = cartMap[id];
+            if (exists) {
+              exists.qty += qty;
+            } else {
+              cartMap[id] = {
+                style_id: id,
+                product_code: String(item.product_code || ''),
+                image_ref: String(item.image_ref || ''),
+                unit_price: toNumber(item.wholesale_price),
+                min_order_qty: Math.max(1, Number(item.min_order_qty || 1)),
+                qty: qty,
+              };
+            }
+            showToast(tt('catalog.addedToCart'), 'ok');
+          }
+
+          const cartItems = computed(() => Object.keys(cartMap).map((k) => cartMap[k]));
+          const cartCount = computed(() => {
+            let count = 0;
+            cartItems.value.forEach((it) => { count += Number(it.qty || 0); });
+            return count;
+          });
+          const cartTotal = computed(() => {
+            let sum = 0;
+            cartItems.value.forEach((it) => {
+              sum += toNumber(it.unit_price) * Math.max(1, Number(it.qty || 1));
+            });
+            return sum;
+          });
+
+          function openCart() {
+            cartOpen.value = true;
+          }
+
+          function removeFromCart(styleId) {
+            const id = Number(styleId || 0);
+            if (id > 0 && cartMap[id]) {
+              delete cartMap[id];
+            }
+          }
+
+          function clearCart() {
+            Object.keys(cartMap).forEach((k) => delete cartMap[k]);
+          }
+
+          function increaseCartQty(item) {
+            item.qty = Math.max(1, Number(item.qty || 1)) + 1;
+          }
+
+          function decreaseCartQty(item) {
+            const minQty = Math.max(1, Number(item.min_order_qty || 1));
+            item.qty = Math.max(minQty, Math.max(1, Number(item.qty || 1)) - 1);
+          }
+
+          function onCartQtyChange(item, ev) {
+            const minQty = Math.max(1, Number(item.min_order_qty || 1));
+            const n = parseInt((ev && ev.target ? ev.target.value : '0'), 10);
+            item.qty = Number.isFinite(n) && n > 0 ? Math.max(minQty, n) : minQty;
+          }
+
+          function openContactDialog() {
+            if (!cartItems.value.length) {
+              showToast(tt('catalog.cartEmpty'), 'error');
+              return;
+            }
+            contactOpen.value = true;
+          }
+
+          async function submitOrder() {
+            const name = String(customer.name || '').trim();
+            const phone = String(customer.phone || '').trim();
+            const whatsapp = String(customer.whatsapp || '').trim();
+            const zalo = String(customer.zalo || '').trim();
+            if (!name) {
+              showToast(tt('catalog.customerNameRequired'), 'error');
+              return;
+            }
+            if (!phone && !whatsapp && !zalo) {
+              showToast(tt('catalog.contactRequired'), 'error');
+              return;
+            }
+            if (!cartItems.value.length) {
+              showToast(tt('catalog.cartEmpty'), 'error');
+              return;
+            }
+            submitting.value = true;
+            try {
+              const payload = {
+                customer: { name, phone, whatsapp, zalo },
+                items: cartItems.value.map((it) => ({
+                  style_id: Number(it.style_id || 0),
+                  qty: Math.max(1, Number(it.qty || 1)),
+                })),
+              };
+              const res = await fetch(API_ENTRY + '/api/product_search/offlineOrder', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                body: JSON.stringify(payload),
+              });
+              const text = await res.text();
+              let json = null;
+              try {
+                json = JSON.parse(text);
+              } catch (e) {
+                throw new Error(tt('catalog.submitFailed'));
+              }
+              if (!json || json.code !== 0) {
+                throw new Error((json && json.msg) ? json.msg : tt('catalog.submitFailed'));
+              }
+              const orderNo = json.data && json.data.order_no ? String(json.data.order_no) : '';
+              contactOpen.value = false;
+              cartOpen.value = false;
+              clearCart();
+              customer.name = '';
+              customer.phone = '';
+              customer.whatsapp = '';
+              customer.zalo = '';
+              showToast(tt('catalog.orderCreated') + (orderNo ? ' · ' + tt('catalog.orderNo') + ': ' + orderNo : ''), 'ok');
+            } catch (e) {
+              showToast((e && e.message) ? e.message : tt('catalog.submitFailed'), 'error');
+            } finally {
+              submitting.value = false;
+            }
+          }
+
+          function openPreview(url) {
+            if (!url) return;
+            previewImage.value = url;
+            previewVisible.value = true;
+          }
+
+          function closePreview() {
+            previewVisible.value = false;
+            previewImage.value = '';
+          }
+
+          onMounted(() => {
+            fetchCategories();
+            fetchList(1, true);
+          });
+
+          return {
+            currentLang,
+            keyword,
+            category,
+            categories,
+            items,
+            total,
+            hasMore,
+            loading,
+            loadingMore,
+            errorMsg,
+            qtyDraft,
+            cartOpen,
+            contactOpen,
+            customer,
+            submitting,
+            previewVisible,
+            previewImage,
+            toast,
+            cartItems,
+            cartCount,
+            cartTotal,
+            tt,
+            switchLang,
+            imgUrl,
+            formatPrice,
+            applyFilter,
+            resetFilter,
+            loadMore,
+            increaseDraft,
+            decreaseDraft,
+            onDraftChange,
+            addToCart,
+            openCart,
+            clearCart,
+            removeFromCart,
+            increaseCartQty,
+            decreaseCartQty,
+            onCartQtyChange,
+            openContactDialog,
+            submitOrder,
+            openPreview,
+            closePreview,
+          };
+        },
+      }).mount('#app');
+    })();
+  </script>
 </body>
 </html>

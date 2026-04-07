@@ -135,6 +135,11 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('product_search/sampleCsv', 'app\controller\admin\ProductSearch@sampleCsv');
     Route::get('product_search/exportCsv', 'app\controller\admin\ProductSearch@exportCsv');
     Route::get('product_search', 'app\controller\admin\ProductSearch@index');
+    Route::get('offline_order/list', 'app\controller\admin\OfflineOrder@listJson');
+    Route::get('offline_order/listJson', 'app\controller\admin\OfflineOrder@listJson');
+    Route::post('offline_order/updateStatus', 'app\controller\admin\OfflineOrder@updateStatus');
+    Route::get('offline_order/exportXlsx', 'app\controller\admin\OfflineOrder@exportXlsx');
+    Route::get('offline_order', 'app\controller\admin\OfflineOrder@index');
 
     // Influencer CRM
     Route::get('influencer/list', 'app\controller\admin\Influencer@listJson');

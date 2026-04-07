@@ -20,4 +20,6 @@ Route::group('api', function() {
     Route::post('search/searchByImage', 'app\controller\api\Search@searchByImage');
     Route::get('product_search/searchByCode', 'app\controller\api\ProductSearch@searchByCode');
     Route::get('product_search/catalog', 'app\controller\api\ProductSearch@catalogList');
+    Route::get('product_search/categories', 'app\controller\api\ProductSearch@categoryOptions');
+    Route::post('product_search/offlineOrder', 'app\controller\api\ProductSearch@createOfflineOrder');
 });

@@ -18,6 +18,8 @@ class ProductStyleItem extends Model
         'image_ref'    => 'string',
         'image_path'   => 'string',
         'hot_type'     => 'string',
+        'wholesale_price' => 'float',
+        'min_order_qty' => 'int',
         'ai_description' => 'string',
         'embedding'    => 'string',
         'status'       => 'int',

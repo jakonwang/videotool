@@ -15,6 +15,7 @@ if (!defined('ENTRY_FILE') || ENTRY_FILE === 'index') {
     Route::get('index/download', 'app\controller\index\Download@index');
     Route::get('searchByImage', 'app\controller\index\SearchByImage@index');
     Route::get('styleCatalog', 'app\controller\index\StyleCatalog@index');
+    Route::get('product_search', 'app\controller\index\StyleCatalog@index');
 }
 
 // 只加载 API 路由，不加载后台路由

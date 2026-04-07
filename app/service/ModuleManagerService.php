@@ -877,6 +877,7 @@ class ModuleManagerService
     {
         return [
             'influencer_pending' => self::safeCount('influencers', ['status' => 0]),
+            'offline_order_pending' => self::safeCount('offline_orders', ['status' => 0]),
             'creator_links_total' => self::safeCount('product_links'),
             'creator_category_total' => self::safeCount('categories', ['type' => 'influencer']),
             'template_total' => self::safeCount('message_templates', ['status' => 1]),
@@ -977,6 +978,14 @@ class ModuleManagerService
                         'icon' => 'camera',
                         'text_i18n' => 'admin.menu.styleSearch',
                         'active' => $currentController === 'productsearch',
+                    ],
+                    [
+                        'kind' => 'link',
+                        'href' => '/admin.php/offline_order',
+                        'icon' => 'shopping-cart',
+                        'text_i18n' => 'admin.menu.offlineOrders',
+                        'active' => $currentController === 'offlineorder',
+                        'badge' => ($badges['offline_order_pending'] ?? 0) > 0 ? (string) $badges['offline_order_pending'] : '',
                     ],
                 ],
             ];

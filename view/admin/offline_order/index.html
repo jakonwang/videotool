@@ -1,0 +1,246 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}线下预定{/block}
+{block name="page_title"}{/block}
+{block name="breadcrumb"}{/block}
+{block name="page_actions"}{/block}
+
+{block name="style"}
+<style>
+    .content-header { display: none; }
+    .order-contact { font-size: 12px; color: #6b7280; line-height: 1.5; }
+    .order-items-panel { max-height: 360px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; }
+    .order-item-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e5e7eb; }
+    .order-item-row:last-child { border-bottom: none; }
+    .order-item-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb; background: #f3f4f6; }
+</style>
+{/block}
+
+{block name="content"}
+<div id="offlineOrderApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+  {literal}
+  const { createApp, ref, reactive, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const items = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(20);
+      const query = reactive({ keyword: '', status: '' });
+      const detailVisible = ref(false);
+      const current = ref(null);
+
+      function statusTagType(status) {
+        if (Number(status) === 1) return 'success';
+        if (Number(status) === 2) return 'danger';
+        return 'warning';
+      }
+
+      function statusText(status) {
+        if (Number(status) === 1) return tt('page.offlineOrders.statusConfirmed');
+        if (Number(status) === 2) return tt('page.offlineOrders.statusCancelled');
+        return tt('page.offlineOrders.statusPending');
+      }
+
+      function toAbsImage(ref) {
+        const s = String(ref || '').trim();
+        if (!s) return '';
+        if (/^https?:\/\//i.test(s)) return s;
+        if (s.startsWith('//')) return location.protocol + s;
+        if (s.startsWith('/')) return location.origin + s;
+        return location.origin + '/' + s.replace(/^\.\//, '');
+      }
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(page.value));
+          p.set('page_size', String(pageSize.value));
+          if (query.keyword) p.set('keyword', query.keyword);
+          if (query.status !== '') p.set('status', String(query.status));
+          const res = await fetch('/admin.php/offline_order/listJson?' + p.toString(), {
+            credentials: 'same-origin',
+          });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          const d = json.data || {};
+          items.value = Array.isArray(d.items) ? d.items : [];
+          total.value = Number(d.total || 0);
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function openDetail(row) {
+        current.value = row;
+        detailVisible.value = true;
+      }
+
+      async function markStatus(row, status) {
+        const statusMap = {
+          0: tt('page.offlineOrders.statusPending'),
+          1: tt('page.offlineOrders.statusConfirmed'),
+          2: tt('page.offlineOrders.statusCancelled'),
+        };
+        try {
+          await ElMessageBox.confirm(
+            tt('page.offlineOrders.changeStatusConfirm', { status: statusMap[status] || String(status) }),
+            tt('common.ok'),
+            { type: 'warning', confirmButtonText: tt('common.ok'), cancelButtonText: tt('common.cancel') }
+          );
+        } catch {
+          return;
+        }
+        try {
+          const body = new URLSearchParams();
+          body.set('id', String(row.id));
+          body.set('status', String(status));
+          const res = await fetch('/admin.php/offline_order/updateStatus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            credentials: 'same-origin',
+            body: body.toString(),
+          });
+          const json = await res.json();
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          ElMessage.success(tt('common.saved'));
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      }
+
+      function exportXlsx() {
+        const p = new URLSearchParams();
+        if (query.keyword) p.set('keyword', query.keyword);
+        if (query.status !== '') p.set('status', String(query.status));
+        window.open('/admin.php/offline_order/exportXlsx?' + p.toString(), '_blank', 'noopener');
+      }
+
+      onMounted(fetchList);
+
+      return {
+        loading, items, total, page, pageSize, query,
+        detailVisible, current,
+        statusTagType, statusText, toAbsImage, fetchList, openDetail, markStatus, exportXlsx, tt,
+      };
+    },
+    template: `
+      <div class="admin-modern-card">
+        <div class="admin-header-actions">
+          <div class="admin-breadcrumb">{{ tt('page.offlineOrders.breadcrumb') }}</div>
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div style="font-size:18px;font-weight:600;color:#111827;">{{ tt('page.offlineOrders.title') }}</div>
+            <div class="admin-action-buttons">
+              <el-button type="success" @click="exportXlsx">{{ tt('page.offlineOrders.exportXlsx') }}</el-button>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-filter-section">
+          <div class="admin-custom-form">
+            <el-input v-model="query.keyword" clearable style="width:220px;" :placeholder="tt('page.offlineOrders.keywordPh')" @keyup.enter="()=>{page=1;fetchList();}" />
+            <el-select v-model="query.status" clearable style="width:160px;" :placeholder="tt('page.offlineOrders.statusFilter')">
+              <el-option :label="tt('page.offlineOrders.statusPending')" :value="0" />
+              <el-option :label="tt('page.offlineOrders.statusConfirmed')" :value="1" />
+              <el-option :label="tt('page.offlineOrders.statusCancelled')" :value="2" />
+            </el-select>
+            <div class="admin-filter-buttons">
+              <el-button type="primary" @click="()=>{page=1;fetchList();}">{{ tt('common.filter') }}</el-button>
+            </div>
+          </div>
+        </div>
+
+        <el-table :data="items" stripe v-loading="loading">
+          <el-table-column prop="order_no" :label="tt('page.offlineOrders.colOrderNo')" min-width="170" />
+          <el-table-column :label="tt('page.offlineOrders.colCustomer')" min-width="180">
+            <template #default="{ row }">
+              <div>{{ row.customer_name || '-' }}</div>
+              <div class="order-contact">{{ row.customer_phone || '-' }} / {{ row.customer_whatsapp || row.customer_zalo || '-' }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="item_count" :label="tt('page.offlineOrders.colItems')" width="90" align="center" />
+          <el-table-column prop="total_amount" :label="tt('page.offlineOrders.colTotal')" width="120" align="right">
+            <template #default="{ row }">{{ Number(row.total_amount || 0).toFixed(2) }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('page.offlineOrders.colStatus')" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag :type="statusTagType(row.status)">{{ statusText(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" :label="tt('page.offlineOrders.colCreatedAt')" width="170" />
+          <el-table-column :label="tt('page.offlineOrders.colActions')" width="260" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openDetail(row)">{{ tt('page.offlineOrders.viewDetail') }}</el-button>
+              <el-button link type="success" @click="markStatus(row, 1)">{{ tt('page.offlineOrders.markConfirmed') }}</el-button>
+              <el-button link type="danger" @click="markStatus(row, 2)">{{ tt('page.offlineOrders.markCancelled') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="admin-footer-pagination" style="margin-top:16px;">
+          <span style="color:#6b7280;font-size:13px;">{{ tt('page.styleSearch.totalRows', { total: total }) }}</span>
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            background
+            layout="prev, pager, next"
+            :total="total"
+            @update:current-page="(p)=>{page=p;fetchList();}"
+            @update:page-size="(s)=>{pageSize=s;page=1;fetchList();}"
+          />
+        </div>
+
+        <el-dialog v-model="detailVisible" :title="tt('page.offlineOrders.detailTitle')" width="720px" destroy-on-close>
+          <template v-if="current">
+            <div style="margin-bottom:10px;">
+              <strong>{{ tt('page.offlineOrders.colOrderNo') }}:</strong> {{ current.order_no }}
+            </div>
+            <div style="margin-bottom:10px;">
+              <strong>{{ tt('page.offlineOrders.colCustomer') }}:</strong>
+              {{ current.customer_name || '-' }} / {{ current.customer_phone || '-' }}
+              <span v-if="current.customer_whatsapp"> | WA: {{ current.customer_whatsapp }}</span>
+              <span v-if="current.customer_zalo"> | Zalo: {{ current.customer_zalo }}</span>
+            </div>
+            <div class="order-items-panel">
+              <div v-for="(it, idx) in (current.items || [])" :key="idx" class="order-item-row">
+                <img v-if="it.image_ref" :src="toAbsImage(it.image_ref)" class="order-item-thumb" />
+                <div v-else class="order-item-thumb"></div>
+                <div>
+                  <div style="font-weight:600;">{{ it.product_code || '-' }}</div>
+                  <div class="order-contact">{{ tt('page.offlineOrders.unitPrice') }}: {{ Number(it.unit_price || 0).toFixed(2) }}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div>{{ tt('page.offlineOrders.qty') }}: {{ it.qty || 0 }}</div>
+                  <div>{{ tt('page.offlineOrders.subtotal') }}: {{ Number(it.subtotal || 0).toFixed(2) }}</div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #footer>
+            <el-button @click="detailVisible=false">{{ tt('common.cancel') }}</el-button>
+          </template>
+        </el-dialog>
+      </div>
+    `
+  }).use(ElementPlus).mount('#offlineOrderApp');
+  {/literal}
+</script>
+{/block}

@@ -23,12 +23,12 @@ class ProductSearch extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
-    private function jsonErr(string $msg, int $code = 1, $data = null)
+    private function jsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
     public function index()
@@ -68,6 +68,8 @@ class ProductSearch extends BaseController
                 'product_code' => (string) ($row->product_code ?? ''),
                 'image_ref' => (string) ($row->image_ref ?? ''),
                 'hot_type' => (string) ($row->hot_type ?? ''),
+                'wholesale_price' => round((float) ($row->wholesale_price ?? 0), 2),
+                'min_order_qty' => max(1, (int) ($row->min_order_qty ?? 1)),
                 'ai_description' => $aiDesc,
                 'ai_description_short' => $aiDesc !== '' ? (mb_strlen($aiDesc) > 60 ? mb_substr($aiDesc, 0, 60) . '…' : $aiDesc) : '',
                 'has_embedding' => $emb !== '' && $emb[0] === '[',
@@ -347,11 +349,22 @@ class ProductSearch extends BaseController
             }
             $hotType = trim((string) $this->request->param('hot_type', ''));
             $imageRefInput = trim((string) $this->request->param('image_ref', ''));
+            $wholesalePrice = (float) $this->request->param('wholesale_price', (string) ($row->wholesale_price ?? '0'));
+            if (!is_finite($wholesalePrice) || $wholesalePrice < 0) {
+                return $this->jsonErr('鎵归噺浠锋牸鏍煎紡閿欒');
+            }
+            $wholesalePrice = round($wholesalePrice, 2);
+            $minOrderQty = (int) $this->request->param('min_order_qty', (string) ($row->min_order_qty ?? '1'));
+            if ($minOrderQty < 1) {
+                $minOrderQty = 1;
+            }
             $publicRoot = root_path() . 'public';
 
             $update = [
                 'product_code' => $productCode,
                 'hot_type' => $hotType,
+                'wholesale_price' => $wholesalePrice,
+                'min_order_qty' => $minOrderQty,
             ];
 
             $file = $this->request->file('image');
