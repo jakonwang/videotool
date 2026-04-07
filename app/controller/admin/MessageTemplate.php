@@ -169,28 +169,14 @@ class MessageTemplate extends BaseController
         if (!$inf) {
             return $this->jsonErr('达人不存在');
         }
-        $wantedLang = MessageOutreachService::inferTemplateLangByRegion((string) ($inf->region ?? ''));
-        $pickedTpl = $tpl;
-        $tplKey = trim((string) ($tpl->template_key ?? ''));
-        if ($tplKey !== '') {
-            $variant = MessageTemplateModel::where('template_key', $tplKey)
-                ->where('lang', $wantedLang)
-                ->where('status', 1)
-                ->order('id', 'desc')
-                ->find();
-            if ($variant) {
-                $pickedTpl = $variant;
-            }
-        } elseif (in_array((string) ($tpl->lang ?? 'zh'), ['zh', 'en', 'vi'], true) && (string) ($tpl->lang ?? 'zh') !== $wantedLang) {
-            $variant2 = MessageTemplateModel::where('name', (string) ($tpl->name ?? ''))
-                ->where('lang', $wantedLang)
-                ->where('status', 1)
-                ->order('id', 'desc')
-                ->find();
-            if ($variant2) {
-                $pickedTpl = $variant2;
-            }
-        }
+        $pickedTpl = MessageOutreachService::pickTemplateVariantByRegion([
+            'id' => (int) $tpl->id,
+            'name' => (string) ($tpl->name ?? ''),
+            'template_key' => (string) ($tpl->template_key ?? ''),
+            'lang' => (string) ($tpl->lang ?? 'en'),
+            'body' => (string) ($tpl->body ?? ''),
+            'status' => (int) ($tpl->status ?? 1),
+        ], (string) ($inf->region ?? ''));
         $baseUrl = MessageOutreachService::adminBaseUrl();
         $vars = MessageOutreachService::buildRenderVars(
             $influencerId,
@@ -200,12 +186,9 @@ class MessageTemplate extends BaseController
         if ($vars === []) {
             return $this->jsonErr('达人不存在');
         }
-        $text = MessageOutreachService::renderBody((string) $pickedTpl->body, $vars);
-        $wa = '';
-        if (($vars['whatsapp'] ?? '') !== '') {
-            $wa = MessageOutreachService::waMeWithText($vars['whatsapp'], $text);
-        }
-        $zalo = ($vars['zalo'] ?? '') !== '' ? ('https://zalo.me/' . $vars['zalo']) : '';
+        $text = MessageOutreachService::renderBody((string) ($pickedTpl['body'] ?? ''), $vars);
+        $wa = MessageOutreachService::waMeWithText((string) ($vars['whatsapp'] ?? ''), $text);
+        $zalo = MessageOutreachService::buildZaloUrl((string) ($vars['zalo'] ?? ''));
 
         // 渲染即视作一次联系动作，更新最后联系时间并记录历史
         $now = date('Y-m-d H:i:s');
@@ -219,9 +202,9 @@ class MessageTemplate extends BaseController
         }
         OutreachLogModel::create([
             'influencer_id' => $influencerId,
-            'template_id' => (int) $pickedTpl->id,
-            'template_name' => (string) ($pickedTpl->name ?? ''),
-            'template_lang' => (string) ($pickedTpl->lang ?? 'zh'),
+            'template_id' => (int) ($pickedTpl['id'] ?? 0),
+            'template_name' => (string) ($pickedTpl['name'] ?? ''),
+            'template_lang' => (string) ($pickedTpl['lang'] ?? 'en'),
             'product_id' => $productId > 0 ? $productId : null,
             'product_name' => $productName !== '' ? $productName : null,
             'channel' => 'render',
@@ -233,8 +216,8 @@ class MessageTemplate extends BaseController
             'wa_url' => $wa,
             'zalo_url' => $zalo,
             'vars' => $vars,
-            'template_lang' => (string) ($pickedTpl->lang ?? 'zh'),
-            'template_id' => (int) $pickedTpl->id,
+            'template_lang' => (string) ($pickedTpl['lang'] ?? 'en'),
+            'template_id' => (int) ($pickedTpl['id'] ?? 0),
         ]);
     }
 

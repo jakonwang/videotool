@@ -16,6 +16,8 @@
     .admin-inf-hint { margin: 6px 0 12px; color: #6b7280; font-size: 12px; line-height: 1.5; }
     .import-log-viewer { background: #0f172a; color: #e2e8f0; font-family: ui-monospace, monospace; font-size: 12px; max-height: 220px; overflow-y: auto; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; }
     .admin-inf-card .el-table__inner-wrapper::before { height: 0; }
+    .inf-filter-form .el-form-item { margin-bottom: 0; }
+    .inf-nowrap { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 {/block}
 
@@ -233,9 +235,6 @@
           const json = parseJsonBody(res, await res.text());
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
-          if (!categoryOptions.value.length && json.data && Array.isArray(json.data.categories)) {
-            categoryOptions.value = json.data.categories;
-          }
           if (json.data && Array.isArray(json.data.tag_options)) {
             mergeTagOptions(json.data.tag_options);
           }
@@ -334,6 +333,48 @@
         if (n === 4) return tt('page.influencer.status4');
         if (n === 5) return tt('page.influencer.status5');
         return tt('page.influencer.status6');
+      }
+
+      function statusTagType(s) {
+        const n = Number(s);
+        if (n === 6) return 'danger';
+        if (n === 5) return 'success';
+        if (n === 4) return 'warning';
+        if (n === 0) return 'info';
+        return '';
+      }
+
+      function formatFollowers(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n) || n <= 0) return '0';
+        if (n >= 10000) {
+          const w = Math.round((n / 10000) * 10) / 10;
+          return String(w).replace(/\.0$/, '') + 'w';
+        }
+        return String(Math.trunc(n));
+      }
+
+      function handleMoreAction(row, command) {
+        if (!row || !command) return;
+        const cmd = String(command);
+        if (cmd.indexOf('status:') === 0) {
+          const status = Number(cmd.slice(7));
+          if (Number.isInteger(status) && status >= 0 && status <= 6) {
+            quickSetStatus(row, status);
+          }
+          return;
+        }
+        if (cmd === 'history') {
+          openHistory(row);
+          return;
+        }
+        if (cmd === 'edit') {
+          openEdit(row);
+          return;
+        }
+        if (cmd === 'delete') {
+          deleteRow(row);
+        }
       }
 
       async function openEdit(row) {
@@ -644,7 +685,7 @@
         const t = outreachPreview.value || '';
         if (!t) return;
         await copyText(t);
-        const u = outreachZaloUrl.value || (outreachRow.value && outreachRow.value.contact_channels && outreachRow.value.contact_channels.zalo_open);
+        const u = outreachZaloUrl.value || '';
         if (u) {
           window.open(u, '_blank', 'noopener');
           try {
@@ -667,7 +708,7 @@
         if (!t) return;
         await copyText(t);
         const wa = outreachWaUrl.value || '';
-        const zalo = outreachZaloUrl.value || (outreachRow.value && outreachRow.value.contact_channels && outreachRow.value.contact_channels.zalo_open) || '';
+        const zalo = outreachZaloUrl.value || '';
         const u = wa || zalo;
         if (u) {
           window.open(u, '_blank', 'noopener');
@@ -713,6 +754,12 @@
       }
 
       const rows = computed(() => items.value || []);
+      const hasWaJump = computed(() => String(outreachWaUrl.value || '').trim() !== '');
+      const hasZaloJump = computed(() => String(outreachZaloUrl.value || '').trim() !== '');
+      const hasAnyJump = computed(() => hasWaJump.value || hasZaloJump.value);
+      const noWaReason = computed(() => tt('page.influencer.noWhatsapp'));
+      const noZaloReason = computed(() => tt('page.influencer.noZalo'));
+      const noJumpReason = computed(() => tt('page.influencer.noJumpTarget'));
 
       onMounted(() => {
         if (typeof document !== 'undefined') {
@@ -748,6 +795,9 @@
         closeImportDialog,
         copyText,
         statusLabel,
+        statusTagType,
+        formatFollowers,
+        handleMoreAction,
         editVisible,
         editSaving,
         editForm,
@@ -782,6 +832,12 @@
         sampleShipVisible,
         sampleShipSaving,
         sampleShipForm,
+        hasWaJump,
+        hasZaloJump,
+        hasAnyJump,
+        noWaReason,
+        noZaloReason,
+        noJumpReason,
         historyVisible,
         historyRows,
         openHistory,
@@ -803,55 +859,79 @@
         </div>
         <div class="admin-inf-hint">{{ tt('page.influencer.hint') }}</div>
 
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
-          <el-input v-model="query.keyword" clearable :placeholder="tt('page.influencer.searchPh')" style="width:220px;" @keyup.enter="onSearch" />
-          <el-select v-model="query.status" clearable :placeholder="tt('page.influencer.statusFilter')" style="width:150px;">
-            <el-option :label="tt('common.statusAll')" value="" />
-            <el-option :label="tt('page.influencer.status0')" value="0" />
-            <el-option :label="tt('page.influencer.status1')" value="1" />
-            <el-option :label="tt('page.influencer.status2')" value="2" />
-            <el-option :label="tt('page.influencer.status3')" value="3" />
-            <el-option :label="tt('page.influencer.status4')" value="4" />
-            <el-option :label="tt('page.influencer.status5')" value="5" />
-            <el-option :label="tt('page.influencer.status6')" value="6" />
-          </el-select>
-          <el-select v-model="query.category_id" clearable filterable :placeholder="tt('page.influencer.filterCategory')" style="width:180px;">
-            <el-option v-for="c in categoryOptions" :key="c.id" :label="c.name" :value="c.id" />
-          </el-select>
-          <el-select
-            v-model="query.tag_list"
-            multiple
-            clearable
-            filterable
-            allow-create
-            default-first-option
-            collapse-tags
-            collapse-tags-tooltip
-            :placeholder="tt('page.influencer.tagFilter')"
-            style="width:260px;"
-          >
-            <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
-          </el-select>
-          <el-select v-model="query.sort_by_contact" style="width:170px;">
-            <el-option :label="tt('common.reset')" :value="0" />
-            <el-option :label="tt('page.influencer.sortLastContact')" :value="1" />
-          </el-select>
-          <el-button type="primary" @click="onSearch">{{ tt('common.search') }}</el-button>
-          <el-button @click="onReset">{{ tt('common.reset') }}</el-button>
-        </div>
+        <el-form :inline="true" class="inf-filter-form" style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px;">
+          <el-form-item>
+            <el-input v-model="query.keyword" clearable :placeholder="tt('page.influencer.searchPh')" style="width:180px;" @keyup.enter="onSearch" />
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="query.status" clearable :placeholder="tt('page.influencer.statusFilter')" style="width:180px;">
+              <el-option :label="tt('common.statusAll')" value="" />
+              <el-option :label="tt('page.influencer.status0')" value="0" />
+              <el-option :label="tt('page.influencer.status1')" value="1" />
+              <el-option :label="tt('page.influencer.status2')" value="2" />
+              <el-option :label="tt('page.influencer.status3')" value="3" />
+              <el-option :label="tt('page.influencer.status4')" value="4" />
+              <el-option :label="tt('page.influencer.status5')" value="5" />
+              <el-option :label="tt('page.influencer.status6')" value="6" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="query.category_id" clearable filterable :placeholder="tt('page.influencer.filterCategory')" style="width:180px;">
+              <el-option v-for="c in categoryOptions" :key="c.id" :label="c.name" :value="c.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-select
+              v-model="query.tag_list"
+              multiple
+              clearable
+              filterable
+              allow-create
+              default-first-option
+              collapse-tags
+              collapse-tags-tooltip
+              :placeholder="tt('page.influencer.tagFilter')"
+              style="width:180px;"
+            >
+              <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="query.sort_by_contact" style="width:180px;">
+              <el-option :label="tt('common.reset')" :value="0" />
+              <el-option :label="tt('page.influencer.sortLastContact')" :value="1" />
+            </el-select>
+          </el-form-item>
+          <el-form-item style="margin-left:auto;">
+            <el-button type="primary" @click="onSearch">{{ tt('common.search') }}</el-button>
+            <el-button @click="onReset">{{ tt('common.reset') }}</el-button>
+          </el-form-item>
+        </el-form>
 
-        <el-table :data="rows" stripe v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle" row-key="id">
-          <el-table-column prop="tiktok_id" :label="tt('page.influencer.colHandle')" min-width="140" />
-          <el-table-column prop="category_name" :label="tt('page.influencer.colCategory')" min-width="120" />
-          <el-table-column prop="nickname" :label="tt('page.influencer.colNick')" min-width="120" />
-          <el-table-column prop="follower_count" :label="tt('page.influencer.colFans')" width="100" />
-          <el-table-column prop="region" :label="tt('page.influencer.colRegion')" width="100" />
-          <el-table-column :label="tt('page.influencer.colStatus')" width="100">
+        <el-table :data="rows" stripe v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle" row-key="id" table-layout="fixed">
+          <el-table-column prop="tiktok_id" :label="tt('page.influencer.colHandle')" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-tag size="small" :type="Number(row.status)===6 ? 'danger' : (Number(row.status)===0 ? 'info' : 'success')">{{ statusLabel(row.status) }}</el-tag>
+              <span class="inf-nowrap">{{ row.tiktok_id }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('page.influencer.colTags')" min-width="160">
+          <el-table-column :label="tt('page.influencer.colCategory')" width="100" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="inf-nowrap">{{ row.category_name || tt('page.influencer.uncategorized') }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="nickname" :label="tt('page.influencer.colNick')" min-width="120" show-overflow-tooltip />
+          <el-table-column :label="tt('page.influencer.colFans')" width="100" align="center">
+            <template #default="{ row }">
+              {{ formatFollowers(row.follower_count) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="region" :label="tt('page.influencer.colRegion')" width="100" />
+          <el-table-column :label="tt('page.influencer.colStatus')" min-width="120">
+            <template #default="{ row }">
+              <el-tag size="small" :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.influencer.colTags')" min-width="120">
             <template #default="{ row }">
               <el-tag v-for="(tg, idx) in (row.tags || [])" :key="idx" size="small" style="margin-right:4px; margin-bottom:4px;">{{ tg }}</el-tag>
             </template>
@@ -869,27 +949,29 @@
           </el-table-column>
           <el-table-column prop="last_contacted_at" :label="tt('page.influencer.colLastContacted')" min-width="160" />
           <el-table-column prop="updated_at" :label="tt('page.influencer.colUpdated')" min-width="160" />
-          <el-table-column :label="tt('page.influencer.colActions')" width="320" fixed="right">
+          <el-table-column :label="tt('page.influencer.colActions')" width="260" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" link type="primary" @click="openOutreach(row)">{{ tt('page.influencer.outreach') }}</el-button>
-              <el-button size="small" link type="success" @click="openSampleShipDialog(row)">{{ tt('page.influencer.quickShip') }}</el-button>
-              <el-dropdown trigger="click">
-                <el-button size="small" link type="warning">{{ tt('page.influencer.quickStatus') }}</el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="quickSetStatus(row,0)">{{ tt('page.influencer.status0') }}</el-dropdown-item>
-                    <el-dropdown-item @click="quickSetStatus(row,1)">{{ tt('page.influencer.status1') }}</el-dropdown-item>
-                    <el-dropdown-item @click="quickSetStatus(row,2)">{{ tt('page.influencer.status2') }}</el-dropdown-item>
-                    <el-dropdown-item @click="quickSetStatus(row,3)">{{ tt('page.influencer.status3') }}</el-dropdown-item>
-                    <el-dropdown-item @click="quickSetStatus(row,4)">{{ tt('page.influencer.status4') }}</el-dropdown-item>
-                    <el-dropdown-item @click="quickSetStatus(row,5)">{{ tt('page.influencer.status5') }}</el-dropdown-item>
-                    <el-dropdown-item @click="quickSetStatus(row,6)">{{ tt('page.influencer.status6') }}</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-              <el-button size="small" link type="info" @click="openHistory(row)">{{ tt('page.influencer.history') }}</el-button>
-              <el-button size="small" link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
-              <el-button size="small" link type="danger" @click="deleteRow(row)">{{ tt('common.delete') }}</el-button>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                <el-button size="small" type="primary" plain @click="openOutreach(row)">💬 {{ tt('page.influencer.outreach') }}</el-button>
+                <el-button size="small" type="success" plain @click="openSampleShipDialog(row)">📦 {{ tt('page.influencer.quickShip') }}</el-button>
+                <el-dropdown trigger="click" @command="handleMoreAction(row, $event)">
+                  <el-button size="small" link type="info">{{ tt('page.influencer.colActions') }}</el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="status:0">{{ tt('page.influencer.status0') }}</el-dropdown-item>
+                      <el-dropdown-item command="status:1">{{ tt('page.influencer.status1') }}</el-dropdown-item>
+                      <el-dropdown-item command="status:2">{{ tt('page.influencer.status2') }}</el-dropdown-item>
+                      <el-dropdown-item command="status:3">{{ tt('page.influencer.status3') }}</el-dropdown-item>
+                      <el-dropdown-item command="status:4">{{ tt('page.influencer.status4') }}</el-dropdown-item>
+                      <el-dropdown-item command="status:5">{{ tt('page.influencer.status5') }}</el-dropdown-item>
+                      <el-dropdown-item command="status:6">{{ tt('page.influencer.status6') }}</el-dropdown-item>
+                      <el-dropdown-item divided command="history">{{ tt('page.influencer.history') }}</el-dropdown-item>
+                      <el-dropdown-item command="edit">{{ tt('common.edit') }}</el-dropdown-item>
+                      <el-dropdown-item command="delete">{{ tt('common.delete') }}</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
             </template>
           </el-table-column>
           <template #empty>
@@ -916,9 +998,9 @@
           </div>
         </el-dialog>
 
-        <el-dialog v-model="outreachVisible" :title="tt('page.influencer.outreachTitle')" width="560px" destroy-on-close>
+        <el-dialog v-model="outreachVisible" :title="tt('page.influencer.outreachTitle')" width="680px" destroy-on-close>
           <div v-if="outreachRow" style="margin-bottom:8px;font-size:13px;color:#606266;">{{ outreachRow.tiktok_id }} · {{ outreachRow.nickname }}</div>
-          <el-form label-width="100px" size="default">
+          <el-form label-position="top" size="default">
             <el-form-item :label="tt('page.influencer.pickTemplate')">
               <el-select v-model="outreachTplId" style="width:100%;" filterable @change="renderOutreachPreview">
                 <el-option v-for="t in tplList" :key="t.id" :label="t.name" :value="t.id" />
@@ -929,19 +1011,44 @@
                 <el-option v-for="p in productList" :key="p.id" :label="p.name" :value="p.id" />
               </el-select>
             </el-form-item>
-            <el-form-item :label="tt('page.influencer.renderPreview')">
+            <el-form-item>
+              <div style="margin-bottom:8px;font-size:13px;font-weight:700;color:#1f2937;">{{ tt('page.influencer.previewRenderedTitle') }}</div>
               <div v-loading="outreachRendering">
-                <el-input v-model="outreachPreview" type="textarea" :rows="8" readonly />
+                <el-input v-model="outreachPreview" type="textarea" :rows="8" style="width:100%;" readonly />
+              </div>
+              <div style="margin-top:12px;">
+                <el-tooltip :content="noWaReason" :disabled="hasWaJump" placement="top">
+                  <span style="display:block;">
+                    <el-button
+                      type="success"
+                      size="large"
+                      :disabled="!hasWaJump"
+                      @click="openWaPrefill"
+                      style="width:100%;background:#25D366;border-color:#25D366;color:#fff;font-weight:600;"
+                    >{{ tt('page.influencer.openWaPrefill') }}</el-button>
+                  </span>
+                </el-tooltip>
               </div>
             </el-form-item>
           </el-form>
           <div style="font-size:12px;color:#909399;margin-bottom:8px;">{{ tt('page.influencer.zaloHint') }}</div>
           <template #footer>
-            <el-button @click="outreachVisible=false">{{ tt('common.cancel') }}</el-button>
-            <el-button @click="copyOutreachText">{{ tt('common.copy') }}</el-button>
-            <el-button type="primary" @click="copyThenOpenApp">{{ tt('page.influencer.copyThenOpen') }}</el-button>
-            <el-button type="primary" plain @click="copyThenOpenZalo">{{ tt('page.influencer.copyThenZalo') }}</el-button>
-            <el-button type="success" @click="openWaPrefill">{{ tt('page.influencer.openWaPrefill') }}</el-button>
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+              <el-button @click="outreachVisible=false">{{ tt('common.cancel') }}</el-button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <el-button @click="copyOutreachText">{{ tt('common.copy') }}</el-button>
+                <el-tooltip :content="noJumpReason" :disabled="hasAnyJump" placement="top">
+                  <span style="display:inline-block;">
+                    <el-button type="primary" :disabled="!hasAnyJump" @click="copyThenOpenApp">{{ tt('page.influencer.copyThenOpen') }}</el-button>
+                  </span>
+                </el-tooltip>
+                <el-tooltip :content="noZaloReason" :disabled="hasZaloJump" placement="top">
+                  <span style="display:inline-block;">
+                    <el-button type="primary" plain :disabled="!hasZaloJump" @click="copyThenOpenZalo">{{ tt('page.influencer.copyThenZalo') }}</el-button>
+                  </span>
+                </el-tooltip>
+              </div>
+            </div>
           </template>
         </el-dialog>
 
