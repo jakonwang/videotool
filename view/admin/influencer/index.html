@@ -1,6 +1,6 @@
 {extend name="admin/common/layout" /}
 
-{block name="title"}达人{/block}
+{block name="title"}{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -25,12 +25,12 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
+<script src="/static/i18n/i18n.js?v=20260416_influencer_crm2"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
-  const { createApp, reactive, ref, computed, onMounted, onUnmounted } = Vue;
+  const { createApp, reactive, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
@@ -62,8 +62,9 @@
       const total = ref(0);
       const page = ref(1);
       const pageSize = ref(10);
-      const query = reactive({ keyword: '', status: '', category_id: '', tag: '', sort_by_contact: 0 });
+      const query = reactive({ keyword: '', status: '', category_id: '', tag_list: [], sort_by_contact: 0 });
       const categoryOptions = ref([]);
+      const tagOptions = ref([]);
       const importing = ref(false);
       const importDialogVisible = ref(false);
       const importTaskId = ref(0);
@@ -89,7 +90,18 @@
         status: 0,
         sample_tracking_no: '',
         sample_status: 0,
-        tags_text: '',
+        tags: [],
+      });
+      const editTagInputVisible = ref(false);
+      const editTagInputValue = ref('');
+      const editTagInputRef = ref(null);
+      const sampleShipVisible = ref(false);
+      const sampleShipSaving = ref(false);
+      const sampleShipForm = reactive({
+        id: 0,
+        tiktok_id: '',
+        nickname: '',
+        sample_tracking_no: '',
       });
 
       const outreachVisible = ref(false);
@@ -109,6 +121,30 @@
         if (importPollTimer) {
           clearTimeout(importPollTimer);
           importPollTimer = null;
+        }
+      }
+
+      function mergeTagOptions(tags) {
+        const merged = new Set(Array.isArray(tagOptions.value) ? tagOptions.value : []);
+        if (Array.isArray(tags)) {
+          tags.forEach((tag) => {
+            const v = String(tag || '').trim();
+            if (v) merged.add(v);
+          });
+        }
+        tagOptions.value = Array.from(merged).sort((a, b) => a.localeCompare(b));
+      }
+
+      async function loadCategoryOptions(forceReload = false) {
+        if (!forceReload && Array.isArray(categoryOptions.value) && categoryOptions.value.length) return;
+        try {
+          const res = await fetch('/admin.php/category/options?type=influencer', { credentials: 'same-origin', headers: { ...apiFetchHeaders } });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 0 && json.data && Array.isArray(json.data.items)) {
+            categoryOptions.value = json.data.items;
+          }
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
         }
       }
 
@@ -186,13 +222,24 @@
           if (query.keyword) p.set('keyword', query.keyword);
           if (query.status !== '' && query.status != null) p.set('status', String(query.status));
           if (query.category_id) p.set('category_id', String(query.category_id));
-          if (query.tag) p.set('tag', String(query.tag));
+          if (Array.isArray(query.tag_list) && query.tag_list.length) {
+            query.tag_list.forEach((tag) => {
+              const v = String(tag || '').trim();
+              if (v) p.append('tags[]', v);
+            });
+          }
           if (Number(query.sort_by_contact) === 1) p.set('sort_by_contact', '1');
           const res = await fetch('/admin.php/influencer/listJson?' + p.toString(), { credentials: 'same-origin', headers: { ...apiFetchHeaders } });
           const json = parseJsonBody(res, await res.text());
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
-          categoryOptions.value = (json.data && Array.isArray(json.data.categories)) ? json.data.categories : [];
+          if (!categoryOptions.value.length && json.data && Array.isArray(json.data.categories)) {
+            categoryOptions.value = json.data.categories;
+          }
+          if (json.data && Array.isArray(json.data.tag_options)) {
+            mergeTagOptions(json.data.tag_options);
+          }
+          items.value.forEach((row) => mergeTagOptions(row.tags || []));
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
@@ -210,7 +257,7 @@
         query.keyword = '';
         query.status = '';
         query.category_id = '';
-        query.tag = '';
+        query.tag_list = [];
         query.sort_by_contact = 0;
         page.value = 1;
         fetchList();
@@ -289,7 +336,8 @@
         return tt('page.influencer.status6');
       }
 
-      function openEdit(row) {
+      async function openEdit(row) {
+        await loadCategoryOptions(true);
         const ch = row.contact_channels || {};
         editForm.id = row.id;
         editForm.tiktok_id = row.tiktok_id || '';
@@ -305,8 +353,35 @@
         editForm.status = row.status != null ? Number(row.status) : 0;
         editForm.sample_tracking_no = row.sample_tracking_no || '';
         editForm.sample_status = row.sample_status != null ? Number(row.sample_status) : 0;
-        editForm.tags_text = Array.isArray(row.tags) ? row.tags.join(',') : '';
+        editForm.tags = Array.isArray(row.tags) ? [...row.tags] : [];
+        mergeTagOptions(editForm.tags);
+        editTagInputVisible.value = false;
+        editTagInputValue.value = '';
         editVisible.value = true;
+      }
+
+      function removeEditTag(tag) {
+        const value = String(tag || '').trim();
+        if (!value) return;
+        editForm.tags = (editForm.tags || []).filter((item) => String(item || '').trim() !== value);
+      }
+
+      async function showEditTagInput() {
+        editTagInputVisible.value = true;
+        await nextTick();
+        if (editTagInputRef.value && typeof editTagInputRef.value.focus === 'function') {
+          editTagInputRef.value.focus();
+        }
+      }
+
+      function confirmEditTagInput() {
+        const value = String(editTagInputValue.value || '').trim();
+        if (value && !(editForm.tags || []).some((item) => String(item || '').trim() === value)) {
+          editForm.tags = [...(editForm.tags || []), value];
+          mergeTagOptions([value]);
+        }
+        editTagInputVisible.value = false;
+        editTagInputValue.value = '';
       }
 
       async function saveEdit() {
@@ -331,7 +406,7 @@
               status: editForm.status,
               sample_tracking_no: editForm.sample_tracking_no,
               sample_status: editForm.sample_status,
-              tags: String(editForm.tags_text || '').split(',').map(x => x.trim()).filter(Boolean),
+              tags: Array.isArray(editForm.tags) ? editForm.tags : [],
             }),
           });
           const json = parseJsonBody(res, await res.text());
@@ -442,6 +517,51 @@
         }
       }
 
+      function openSampleShipDialog(row) {
+        sampleShipForm.id = Number(row.id || 0);
+        sampleShipForm.tiktok_id = row.tiktok_id || '';
+        sampleShipForm.nickname = row.nickname || '';
+        sampleShipForm.sample_tracking_no = row.sample_tracking_no || '';
+        sampleShipVisible.value = true;
+      }
+
+      async function submitSampleShip() {
+        if (!sampleShipForm.id) return;
+        const trackingNo = String(sampleShipForm.sample_tracking_no || '').trim();
+        if (!trackingNo) {
+          ElMessage.warning(tt('page.influencer.sampleTrackingRequired'));
+          return;
+        }
+        sampleShipSaving.value = true;
+        try {
+          const res = await fetch('/admin.php/influencer/markSampleShipped', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              id: sampleShipForm.id,
+              sample_tracking_no: trackingNo,
+            }),
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 401) {
+            ElMessage.error(tt('common.sessionExpired'));
+            return;
+          }
+          if (!json || json.code !== 0) {
+            ElMessage.error((json && json.msg) || tt('common.loadingFailed'));
+            return;
+          }
+          ElMessage.success(tt('common.updated'));
+          sampleShipVisible.value = false;
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          sampleShipSaving.value = false;
+        }
+      }
+
       async function renderOutreachPreview() {
         const row = outreachRow.value;
         if (!row || !outreachTplId.value) {
@@ -485,13 +605,61 @@
         }
       }
 
+      async function trackOutreachAction(action) {
+        const row = outreachRow.value;
+        if (!row || !outreachTplId.value) return;
+        const res = await fetch('/admin.php/influencer/logOutreachAction', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({
+            influencer_id: row.id,
+            template_id: outreachTplId.value,
+            product_id: outreachProductId.value || 0,
+            action: action,
+            rendered_body: outreachPreview.value || '',
+          }),
+        });
+        const json = parseJsonBody(res, await res.text());
+        if (json && json.code === 401) {
+          throw new Error(tt('common.sessionExpired'));
+        }
+        if (!json || json.code !== 0) {
+          throw new Error((json && json.msg) || tt('common.loadingFailed'));
+        }
+      }
+
+      async function copyOutreachText() {
+        const t = outreachPreview.value || '';
+        if (!t) return;
+        await copyText(t);
+        try {
+          await trackOutreachAction('copy');
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      }
+
       async function copyThenOpenZalo() {
         const t = outreachPreview.value || '';
         if (!t) return;
         await copyText(t);
         const u = outreachZaloUrl.value || (outreachRow.value && outreachRow.value.contact_channels && outreachRow.value.contact_channels.zalo_open);
-        if (u) window.open(u, '_blank', 'noopener');
-        else ElMessage.warning(tt('page.influencer.zaloHint'));
+        if (u) {
+          window.open(u, '_blank', 'noopener');
+          try {
+            await trackOutreachAction('copy_jump_zalo');
+          } catch (e) {
+            ElMessage.error(e.message || tt('common.loadingFailed'));
+          }
+        } else {
+          try {
+            await trackOutreachAction('copy');
+          } catch (e) {
+            ElMessage.error(e.message || tt('common.loadingFailed'));
+          }
+          ElMessage.warning(tt('page.influencer.zaloHint'));
+        }
       }
 
       async function copyThenOpenApp() {
@@ -501,12 +669,32 @@
         const wa = outreachWaUrl.value || '';
         const zalo = outreachZaloUrl.value || (outreachRow.value && outreachRow.value.contact_channels && outreachRow.value.contact_channels.zalo_open) || '';
         const u = wa || zalo;
-        if (u) window.open(u, '_blank', 'noopener');
+        if (u) {
+          window.open(u, '_blank', 'noopener');
+          try {
+            await trackOutreachAction(wa ? 'copy_jump_wa' : 'copy_jump_zalo');
+          } catch (e) {
+            ElMessage.error(e.message || tt('common.loadingFailed'));
+          }
+        } else {
+          try {
+            await trackOutreachAction('copy');
+          } catch (e) {
+            ElMessage.error(e.message || tt('common.loadingFailed'));
+          }
+        }
       }
 
-      function openWaPrefill() {
+      async function openWaPrefill() {
         const u = outreachWaUrl.value;
-        if (u) window.open(u, '_blank', 'noopener');
+        if (u) {
+          window.open(u, '_blank', 'noopener');
+          try {
+            await trackOutreachAction('jump_wa');
+          } catch (e) {
+            ElMessage.error(e.message || tt('common.loadingFailed'));
+          }
+        }
         else ElMessage.warning(tt('page.influencer.noWhatsapp'));
       }
 
@@ -526,7 +714,13 @@
 
       const rows = computed(() => items.value || []);
 
-      onMounted(() => { fetchList(); });
+      onMounted(() => {
+        if (typeof document !== 'undefined') {
+          document.title = tt('page.influencer.title');
+        }
+        loadCategoryOptions();
+        fetchList();
+      });
       onUnmounted(() => { stopImportPolling(); });
 
       return {
@@ -537,6 +731,7 @@
         pageSize,
         query,
         categoryOptions,
+        tagOptions,
         importing,
         importDialogVisible,
         importPercent,
@@ -558,6 +753,12 @@
         editForm,
         openEdit,
         saveEdit,
+        editTagInputVisible,
+        editTagInputValue,
+        editTagInputRef,
+        removeEditTag,
+        showEditTagInput,
+        confirmEditTagInput,
         deleteRow,
         outreachVisible,
         outreachRow,
@@ -571,10 +772,16 @@
         outreachRendering,
         openOutreach,
         renderOutreachPreview,
+        copyOutreachText,
         copyThenOpenZalo,
         openWaPrefill,
         copyThenOpenApp,
         quickSetStatus,
+        openSampleShipDialog,
+        submitSampleShip,
+        sampleShipVisible,
+        sampleShipSaving,
+        sampleShipForm,
         historyVisible,
         historyRows,
         openHistory,
@@ -611,7 +818,20 @@
           <el-select v-model="query.category_id" clearable filterable :placeholder="tt('page.influencer.filterCategory')" style="width:180px;">
             <el-option v-for="c in categoryOptions" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
-          <el-input v-model="query.tag" clearable :placeholder="tt('page.influencer.tagFilter')" style="width:160px;" @keyup.enter="onSearch" />
+          <el-select
+            v-model="query.tag_list"
+            multiple
+            clearable
+            filterable
+            allow-create
+            default-first-option
+            collapse-tags
+            collapse-tags-tooltip
+            :placeholder="tt('page.influencer.tagFilter')"
+            style="width:260px;"
+          >
+            <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+          </el-select>
           <el-select v-model="query.sort_by_contact" style="width:170px;">
             <el-option :label="tt('common.reset')" :value="0" />
             <el-option :label="tt('page.influencer.sortLastContact')" :value="1" />
@@ -649,9 +869,10 @@
           </el-table-column>
           <el-table-column prop="last_contacted_at" :label="tt('page.influencer.colLastContacted')" min-width="160" />
           <el-table-column prop="updated_at" :label="tt('page.influencer.colUpdated')" min-width="160" />
-          <el-table-column :label="tt('page.influencer.colActions')" width="260" fixed="right">
+          <el-table-column :label="tt('page.influencer.colActions')" width="320" fixed="right">
             <template #default="{ row }">
               <el-button size="small" link type="primary" @click="openOutreach(row)">{{ tt('page.influencer.outreach') }}</el-button>
+              <el-button size="small" link type="success" @click="openSampleShipDialog(row)">{{ tt('page.influencer.quickShip') }}</el-button>
               <el-dropdown trigger="click">
                 <el-button size="small" link type="warning">{{ tt('page.influencer.quickStatus') }}</el-button>
                 <template #dropdown>
@@ -717,7 +938,7 @@
           <div style="font-size:12px;color:#909399;margin-bottom:8px;">{{ tt('page.influencer.zaloHint') }}</div>
           <template #footer>
             <el-button @click="outreachVisible=false">{{ tt('common.cancel') }}</el-button>
-            <el-button @click="copyText(outreachPreview)">{{ tt('common.copy') }}</el-button>
+            <el-button @click="copyOutreachText">{{ tt('common.copy') }}</el-button>
             <el-button type="primary" @click="copyThenOpenApp">{{ tt('page.influencer.copyThenOpen') }}</el-button>
             <el-button type="primary" plain @click="copyThenOpenZalo">{{ tt('page.influencer.copyThenZalo') }}</el-button>
             <el-button type="success" @click="openWaPrefill">{{ tt('page.influencer.openWaPrefill') }}</el-button>
@@ -747,10 +968,10 @@
               <el-input v-model="editForm.region" />
             </el-form-item>
             <el-form-item :label="tt('page.influencer.editWhatsapp')">
-              <el-input v-model="editForm.contact_whatsapp" placeholder="84912345678" />
+              <el-input v-model="editForm.contact_whatsapp" :placeholder="tt('page.influencer.editWhatsappPh')" />
             </el-form-item>
             <el-form-item :label="tt('page.influencer.editZalo')">
-              <el-input v-model="editForm.contact_zalo" placeholder="84912345678 或 zalo.me 后缀" />
+              <el-input v-model="editForm.contact_zalo" :placeholder="tt('page.influencer.editZaloPh')" />
             </el-form-item>
             <el-form-item :label="tt('page.influencer.editNote')">
               <el-input v-model="editForm.contact_note" type="textarea" :rows="2" />
@@ -766,7 +987,26 @@
               </el-select>
             </el-form-item>
             <el-form-item :label="tt('page.influencer.colTags')">
-              <el-input v-model="editForm.tags_text" :placeholder="tt('page.influencer.tagsPlaceholder')" />
+              <div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;">
+                <el-tag
+                  v-for="tag in (editForm.tags || [])"
+                  :key="tag"
+                  closable
+                  size="small"
+                  @close="removeEditTag(tag)"
+                >{{ tag }}</el-tag>
+                <el-input
+                  v-if="editTagInputVisible"
+                  ref="editTagInputRef"
+                  v-model="editTagInputValue"
+                  size="small"
+                  :placeholder="tt('page.influencer.tagInputPh')"
+                  style="width:140px;"
+                  @keyup.enter="confirmEditTagInput"
+                  @blur="confirmEditTagInput"
+                />
+                <el-button v-else size="small" @click="showEditTagInput">{{ tt('page.influencer.addTag') }}</el-button>
+              </div>
             </el-form-item>
             <el-form-item :label="tt('page.influencer.colStatus')">
               <el-select v-model="editForm.status" style="width:100%;">
@@ -783,6 +1023,24 @@
           <template #footer>
             <el-button @click="editVisible=false">{{ tt('common.cancel') }}</el-button>
             <el-button type="primary" :loading="editSaving" @click="saveEdit">{{ tt('common.save') }}</el-button>
+          </template>
+        </el-dialog>
+
+        <el-dialog v-model="sampleShipVisible" :title="tt('page.influencer.quickShipTitle')" width="460px" destroy-on-close>
+          <div style="margin-bottom:10px;color:#606266;font-size:13px;">
+            {{ sampleShipForm.tiktok_id }} · {{ sampleShipForm.nickname }}
+          </div>
+          <el-form label-width="110px" size="default">
+            <el-form-item :label="tt('page.influencer.sampleTrackingNo')">
+              <el-input v-model="sampleShipForm.sample_tracking_no" :placeholder="tt('page.influencer.sampleTrackingPh')" />
+            </el-form-item>
+            <el-form-item>
+              <div style="font-size:12px;color:#909399;">{{ tt('page.influencer.quickShipHint') }}</div>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="sampleShipVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" :loading="sampleShipSaving" @click="submitSampleShip">{{ tt('page.influencer.quickShipSubmit') }}</el-button>
           </template>
         </el-dialog>
 

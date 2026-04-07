@@ -148,6 +148,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('influencer/exportCsv', 'app\controller\admin\Influencer@exportCsv');
     Route::post('influencer/update', 'app\controller\admin\Influencer@update');
     Route::post('influencer/updateStatus', 'app\controller\admin\Influencer@updateStatus');
+    Route::post('influencer/markSampleShipped', 'app\controller\admin\Influencer@markSampleShipped');
+    Route::post('influencer/logOutreachAction', 'app\controller\admin\Influencer@logOutreachAction');
     Route::get('influencer/outreachHistory', 'app\controller\admin\Influencer@outreachHistory');
     Route::post('influencer/delete', 'app\controller\admin\Influencer@delete');
     Route::get('influencer', 'app\controller\admin\Influencer@index');
@@ -179,4 +181,3 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('message_template/render', 'app\controller\admin\MessageTemplate@render');
     Route::get('message_template', 'app\controller\admin\MessageTemplate@index');
 }
-

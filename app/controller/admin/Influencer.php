@@ -51,6 +51,10 @@ class Influencer extends BaseController
         $category = trim((string) $this->request->param('category', ''));
         $categoryId = (int) $this->request->param('category_id', 0);
         $tag = trim((string) $this->request->param('tag', ''));
+        $tagFilters = $this->normalizeTags($this->request->param('tags', []));
+        if ($tagFilters === [] && $tag !== '') {
+            $tagFilters = $this->normalizeTags($tag);
+        }
         $sortByContact = (int) $this->request->param('sort_by_contact', 0);
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
@@ -84,8 +88,11 @@ class Influencer extends BaseController
                 $sub->where('category_name', $category)->whereOr('category_id', (int) $category);
             });
         }
-        if ($tag !== '') {
-            $query->whereLike('tags_json', '%' . $tag . '%');
+        if ($tagFilters !== []) {
+            foreach ($tagFilters as $tagItem) {
+                $like = '%"' . addcslashes($tagItem, '\\"_%') . '"%';
+                $query->whereLike('tags_json', $like);
+            }
         }
 
         $list = $query->paginate([
@@ -133,6 +140,7 @@ class Influencer extends BaseController
                 ->field('id,name')
                 ->select()
                 ->toArray(),
+            'tag_options' => $this->collectTagOptions(),
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
@@ -459,6 +467,87 @@ class Influencer extends BaseController
         return $this->jsonOk([], '已更新');
     }
 
+    /**
+     * 快捷寄样：写入快递单号并将状态置为「已寄样(4)」
+     */
+    public function markSampleShipped()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('仅支持 POST');
+        }
+        $payload = $this->parseJsonOrPost();
+        $id = (int) ($payload['id'] ?? 0);
+        $trackingNo = trim((string) ($payload['sample_tracking_no'] ?? ''));
+        if ($id <= 0) {
+            return $this->jsonErr('无效 id');
+        }
+        if ($trackingNo === '') {
+            return $this->jsonErr('请填写快递单号');
+        }
+        $row = InfluencerModel::find($id);
+        if (!$row) {
+            return $this->jsonErr('记录不存在');
+        }
+        $row->sample_tracking_no = mb_substr($trackingNo, 0, 64);
+        $row->sample_status = 1;
+        $row->status = 4;
+        $row->save();
+
+        return $this->jsonOk([], '已更新');
+    }
+
+    /**
+     * 记录外联动作日志（复制 / 跳转），并刷新最后联系时间
+     */
+    public function logOutreachAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('仅支持 POST');
+        }
+        $payload = $this->parseJsonOrPost();
+        $influencerId = (int) ($payload['influencer_id'] ?? 0);
+        $templateId = (int) ($payload['template_id'] ?? 0);
+        $productId = (int) ($payload['product_id'] ?? 0);
+        $action = trim((string) ($payload['action'] ?? ''));
+        $renderedBody = (string) ($payload['rendered_body'] ?? '');
+        if ($influencerId <= 0 || $templateId <= 0) {
+            return $this->jsonErr('参数错误');
+        }
+        $inf = InfluencerModel::find($influencerId);
+        if (!$inf) {
+            return $this->jsonErr('达人不存在');
+        }
+        $tpl = Db::name('message_templates')->where('id', $templateId)->find();
+        if (!$tpl) {
+            return $this->jsonErr('模板不存在');
+        }
+        $productName = '';
+        if ($productId > 0) {
+            $p = Db::name('products')->where('id', $productId)->find();
+            if (is_array($p)) {
+                $productName = (string) ($p['name'] ?? '');
+            }
+        }
+        $channel = 'action_copy';
+        if ($action !== '') {
+            $channel = 'action_' . preg_replace('/[^a-z0-9_]+/i', '_', strtolower($action));
+            $channel = mb_substr($channel, 0, 32);
+        }
+        OutreachLogModel::create([
+            'influencer_id' => $influencerId,
+            'template_id' => (int) ($tpl['id'] ?? 0),
+            'template_name' => (string) ($tpl['name'] ?? ''),
+            'template_lang' => (string) ($tpl['lang'] ?? 'zh'),
+            'product_id' => $productId > 0 ? $productId : null,
+            'product_name' => $productName !== '' ? $productName : null,
+            'channel' => $channel,
+            'rendered_body' => $renderedBody,
+        ]);
+        InfluencerModel::where('id', $influencerId)->update(['last_contacted_at' => date('Y-m-d H:i:s')]);
+
+        return $this->jsonOk([], '已记录');
+    }
+
     public function outreachHistory()
     {
         $id = (int) $this->request->param('influencer_id', 0);
@@ -527,6 +616,15 @@ class Influencer extends BaseController
     {
         $arr = [];
         if (is_string($raw)) {
+            $str = trim($raw);
+            if ($str !== '' && ($str[0] === '[' || $str[0] === '{')) {
+                $decoded = json_decode($str, true);
+                if (is_array($decoded)) {
+                    $raw = $decoded;
+                }
+            }
+        }
+        if (is_string($raw)) {
             $parts = preg_split('/[,，\n]/u', $raw) ?: [];
             foreach ($parts as $part) {
                 $part = trim((string) $part);
@@ -548,5 +646,34 @@ class Influencer extends BaseController
         }
 
         return $arr;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectTagOptions(): array
+    {
+        $rows = Db::name('influencers')
+            ->whereNotNull('tags_json')
+            ->where('tags_json', '<>', '')
+            ->field('tags_json')
+            ->order('id', 'desc')
+            ->limit(500)
+            ->select()
+            ->toArray();
+        $all = [];
+        foreach ($rows as $row) {
+            $raw = (string) ($row['tags_json'] ?? '');
+            if ($raw === '') {
+                continue;
+            }
+            foreach ($this->parseTags($raw) as $tag) {
+                $all[$tag] = $tag;
+            }
+        }
+        $items = array_values($all);
+        sort($items);
+
+        return array_slice($items, 0, 200);
     }
 }
