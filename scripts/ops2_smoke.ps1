@@ -124,11 +124,49 @@ if (`$uid > 0) {
 `$st->execute([`$sourceCode]);
 `$sourceId = (int)`$st->fetchColumn();
 
+`$apiSourceCode = '__' . `$token . '_api_source';
+`$apiPayload = json_encode([
+  'domain' => 'industry',
+  'rows' => [[
+    'metric_date' => `$metricDate,
+    'country_code' => 'VN',
+    'category_name' => '__' . `$token . '_industry_api',
+    'heat_score' => '91.2',
+    'content_count' => '21',
+    'engagement_rate' => '0.17',
+    'cpc' => '0.71',
+    'cpm' => '8.33'
+  ]]
+], JSON_UNESCAPED_UNICODE);
+`$st = `$pdo->prepare("INSERT INTO data_sources(code,name,source_type,adapter_key,status,config_json,created_at,updated_at) VALUES(?,?, 'api', 'mock_static', 1, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE name=VALUES(name),source_type='api',adapter_key='mock_static',status=1,config_json=VALUES(config_json),updated_at=NOW()");
+`$st->execute([`$apiSourceCode, '__' . `$token . '_api_source_name', `$apiPayload]);
+`$st = `$pdo->prepare("SELECT id FROM data_sources WHERE code=? LIMIT 1");
+`$st->execute([`$apiSourceCode]);
+`$apiSourceId = (int)`$st->fetchColumn();
+
 `$st = `$pdo->prepare("INSERT INTO import_jobs(source_id,domain,job_type,file_name,status,total_rows,success_rows,failed_rows,error_message,payload_json,started_at,finished_at,created_at,updated_at) VALUES(?, 'industry', 'csv', ?, 2, 1, 1, 0, NULL, NULL, NOW(), NOW(), NOW(), NOW())");
 `$st->execute([`$sourceId, '__' . `$token . '.csv']);
 `$jobId = (int)`$pdo->lastInsertId();
 `$st = `$pdo->prepare("INSERT INTO import_job_logs(job_id,level,message,context_json,created_at,updated_at) VALUES(?, 'info', 'smoke_log', ?, NOW(), NOW())");
 `$st->execute([`$jobId, '{"smoke":1}']);
+
+`$retryPayload = json_encode([
+  'rows' => [[
+    'metric_date' => `$metricDate,
+    'country_code' => 'VN',
+    'category_name' => '__' . `$token . '_industry_retry',
+    'heat_score' => '90.1',
+    'content_count' => '12',
+    'engagement_rate' => '0.22',
+    'cpc' => '0.66',
+    'cpm' => '8.01'
+  ]]
+], JSON_UNESCAPED_UNICODE);
+`$st = `$pdo->prepare("INSERT INTO import_jobs(source_id,domain,job_type,file_name,status,total_rows,success_rows,failed_rows,error_message,payload_json,started_at,finished_at,created_at,updated_at) VALUES(?, 'industry', 'csv', ?, 3, 1, 0, 1, 'seed_failed_for_retry', ?, NOW(), NOW(), NOW(), NOW())");
+`$st->execute([`$sourceId, '__' . `$token . '_retry.csv', `$retryPayload]);
+`$retryJobId = (int)`$pdo->lastInsertId();
+`$st = `$pdo->prepare("INSERT INTO import_job_logs(job_id,level,message,context_json,created_at,updated_at) VALUES(?, 'error', 'seed_retry_fail', ?, NOW(), NOW())");
+`$st->execute([`$retryJobId, '{"seed_retry":1}']);
 
 echo json_encode([
   'token' => `$token,
@@ -142,11 +180,15 @@ echo json_encode([
   'competitor_id' => `$competitorId,
   'creative_id' => `$creativeId,
   'source_id' => `$sourceId,
+  'api_source_id' => `$apiSourceId,
   'job_id' => `$jobId,
+  'retry_job_id' => `$retryJobId,
   'tiktok_id' => `$tiktokId,
   'creative_code' => `$creativeCode,
   'competitor_name' => `$compName,
   'source_code' => `$sourceCode,
+  'api_source_code' => `$apiSourceCode,
+  'industry_category_api' => '__' . `$token . '_industry_api',
   'industry_category' => '__' . `$token . '_industry'
 ], JSON_UNESCAPED_UNICODE);
 "@
@@ -200,6 +242,8 @@ if (!function_exists('env')) {
 `$creativeId = (int)`$argv[7];
 `$sourceId = (int)`$argv[8];
 `$jobId = (int)`$argv[9];
+`$retryJobId = (int)`$argv[10];
+`$apiSourceId = (int)`$argv[11];
 
 `$pdo->prepare('DELETE FROM influencer_status_logs WHERE influencer_id=?')->execute([`$influencerId]);
 `$pdo->prepare('DELETE FROM outreach_logs WHERE influencer_id=?')->execute([`$influencerId]);
@@ -215,9 +259,18 @@ if (!function_exists('env')) {
 `$pdo->prepare('DELETE FROM growth_ad_metrics WHERE creative_id=?')->execute([`$creativeId]);
 `$pdo->prepare('DELETE FROM growth_ad_creatives WHERE id=?')->execute([`$creativeId]);
 `$pdo->prepare('DELETE FROM growth_industry_metrics WHERE category_name=?')->execute(['__' . `$token . '_industry']);
+`$pdo->prepare('DELETE FROM growth_industry_metrics WHERE category_name=?')->execute(['__' . `$token . '_industry_retry']);
+`$pdo->prepare('DELETE FROM growth_industry_metrics WHERE category_name=?')->execute(['__' . `$token . '_industry_api']);
+`$pdo->prepare('DELETE FROM import_job_logs WHERE job_id IN (SELECT id FROM import_jobs WHERE source_id=?)')->execute([`$sourceId]);
+`$pdo->prepare('DELETE FROM import_jobs WHERE source_id=?')->execute([`$sourceId]);
+`$pdo->prepare('DELETE FROM import_job_logs WHERE job_id IN (SELECT id FROM import_jobs WHERE source_id=?)')->execute([`$apiSourceId]);
+`$pdo->prepare('DELETE FROM import_jobs WHERE source_id=?')->execute([`$apiSourceId]);
 `$pdo->prepare('DELETE FROM import_job_logs WHERE job_id=?')->execute([`$jobId]);
 `$pdo->prepare('DELETE FROM import_jobs WHERE id=?')->execute([`$jobId]);
+`$pdo->prepare('DELETE FROM import_job_logs WHERE job_id=?')->execute([`$retryJobId]);
+`$pdo->prepare('DELETE FROM import_jobs WHERE id=?')->execute([`$retryJobId]);
 `$pdo->prepare('DELETE FROM data_sources WHERE id=?')->execute([`$sourceId]);
+`$pdo->prepare('DELETE FROM data_sources WHERE id=?')->execute([`$apiSourceId]);
 "@
 
 $seed = $null
@@ -286,11 +339,16 @@ try {
     Assert-Ok 'crm.sample.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/sample/listJson?keyword=' + [uri]::EscapeDataString($trackingNo)) -Session $ws)
 
     Assert-Ok 'intel.industry.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/listJson?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category)) -Session $ws)
+    Assert-Ok 'intel.industry.summary' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/summaryJson?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category)) -Session $ws)
     Assert-Ok 'intel.competitor.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/competitor_analysis/listJson?keyword=' + [uri]::EscapeDataString([string]$seed.competitor_name)) -Session $ws)
     Assert-Ok 'intel.ad.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/ad_insight/listJson?keyword=' + [uri]::EscapeDataString([string]$seed.creative_code)) -Session $ws)
     Assert-Ok 'intel.data_import.sourceList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/sourceListJson' -Session $ws)
+    Assert-Ok 'intel.data_import.adapterList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/adapterListJson' -Session $ws)
     Assert-Ok 'intel.data_import.jobList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/jobListJson?domain=industry' -Session $ws)
     Assert-Ok 'intel.data_import.jobLogs' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/data_import/jobLogsJson?job_id=' + [int]$seed.job_id) -Session $ws)
+    Assert-Ok 'intel.data_import.retryJob' (Invoke-ApiJson -Method 'POST' -Path '/admin.php/data_import/retryJob' -Body @{ job_id = [int]$seed.retry_job_id } -Session $ws)
+    Assert-Ok 'intel.data_import.runSource' (Invoke-ApiJson -Method 'POST' -Path '/admin.php/data_import/runSource' -Body @{ source_id = [int]$seed.api_source_id } -Session $ws)
+    Assert-Ok 'intel.industry.list.apiSource' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/listJson?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category_api)) -Session $ws)
 
     $verifyRaw = php $verifyFile $seed.influencer_id $seed.token
     $verify = $verifyRaw | ConvertFrom-Json
@@ -311,7 +369,7 @@ finally {
         Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
     }
     if ($seed) {
-        php $cleanupFile $seed.token $seed.influencer_id $seed.template_id $seed.product_id $seed.category_id $seed.competitor_id $seed.creative_id $seed.source_id $seed.job_id | Out-Null
+        php $cleanupFile $seed.token $seed.influencer_id $seed.template_id $seed.product_id $seed.category_id $seed.competitor_id $seed.creative_id $seed.source_id $seed.job_id $seed.retry_job_id $seed.api_source_id | Out-Null
         Write-Step 'cleanup done'
     }
     foreach ($f in @($seedFile, $verifyFile, $cleanupFile)) {

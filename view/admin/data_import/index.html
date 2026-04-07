@@ -27,6 +27,7 @@
     setup() {
       const sourceLoading = ref(false);
       const sources = ref([]);
+      const adapterOptions = ref([]);
       const jobsLoading = ref(false);
       const jobs = ref([]);
       const total = ref(0);
@@ -36,7 +37,7 @@
 
       const sourceDialog = ref(false);
       const sourceSaving = ref(false);
-      const sourceForm = reactive({ id: 0, code: '', name: '', source_type: 'csv', adapter_key: '', status: 1, config_json: '' });
+      const sourceForm = reactive({ id: 0, code: '', name: '', source_type: 'csv', adapter_key: '', domain: '', status: 1, config_json: '' });
 
       const logsVisible = ref(false);
       const logRows = ref([]);
@@ -53,6 +54,17 @@
           ElMessage.error(e.message || tt('common.loadingFailed'));
         } finally {
           sourceLoading.value = false;
+        }
+      }
+
+      async function fetchAdapters() {
+        try {
+          const res = await fetch('/admin.php/data_import/adapterListJson', { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          adapterOptions.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
         }
       }
 
@@ -83,6 +95,7 @@
           sourceForm.name = row.name || '';
           sourceForm.source_type = row.source_type || 'csv';
           sourceForm.adapter_key = row.adapter_key || '';
+          sourceForm.domain = row.domain || '';
           sourceForm.status = Number(row.status || 1);
           sourceForm.config_json = row.config_json || '';
         } else {
@@ -91,6 +104,7 @@
           sourceForm.name = '';
           sourceForm.source_type = 'csv';
           sourceForm.adapter_key = '';
+          sourceForm.domain = '';
           sourceForm.status = 1;
           sourceForm.config_json = '';
         }
@@ -106,6 +120,7 @@
             name: sourceForm.name,
             source_type: sourceForm.source_type,
             adapter_key: sourceForm.adapter_key,
+            domain: sourceForm.domain,
             status: sourceForm.status,
             config_json: sourceForm.config_json
           };
@@ -124,6 +139,24 @@
           ElMessage.error(e.message || tt('common.saveFailed'));
         } finally {
           sourceSaving.value = false;
+        }
+      }
+
+      async function runSource(row) {
+        if (!row || !row.id) return;
+        try {
+          const res = await fetch('/admin.php/data_import/runSource', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ source_id: row.id, domain: row.domain || '' })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('page.dataImportCenter.runFailed'));
+          ElMessage.success(tt('common.done'));
+          fetchJobs();
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.dataImportCenter.runFailed'));
         }
       }
 
@@ -157,6 +190,24 @@
         }
       }
 
+      async function retryJob(row) {
+        if (!row || !row.id) return;
+        try {
+          const res = await fetch('/admin.php/data_import/retryJob', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ job_id: row.id })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          fetchJobs();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        }
+      }
+
       function jobStatusText(s) {
         const n = Number(s || 0);
         if (n === 0) return tt('page.dataImportCenter.statusQueued');
@@ -169,6 +220,7 @@
       onMounted(() => {
         if (i18n) i18n.applyDom(document);
         fetchSources();
+        fetchAdapters();
         fetchJobs();
       });
 
@@ -176,6 +228,7 @@
         tt,
         sourceLoading,
         sources,
+        adapterOptions,
         jobsLoading,
         jobs,
         total,
@@ -189,11 +242,13 @@
         sourceSaving,
         saveSource,
         deleteSource,
+        runSource,
         viewLogs,
         logsVisible,
         logRows,
         currentLogTitle,
-        jobStatusText
+        jobStatusText,
+        retryJob
       };
     },
     template: `
@@ -206,9 +261,12 @@
           <el-table-column prop="code" :label="tt('page.dataImportCenter.colCode')" width="120" />
           <el-table-column prop="name" :label="tt('page.dataImportCenter.colName')" min-width="140" />
           <el-table-column prop="source_type" :label="tt('page.dataImportCenter.colType')" width="100" />
+          <el-table-column prop="domain" :label="tt('page.dataImportCenter.colDomain')" width="120" />
+          <el-table-column prop="adapter_key" :label="tt('page.dataImportCenter.adapterKey')" min-width="140" />
           <el-table-column prop="status" :label="tt('page.dataImportCenter.colStatus')" width="90" />
-          <el-table-column :label="tt('common.edit')" width="190" fixed="right">
+          <el-table-column :label="tt('page.dataImportCenter.colActions')" width="280" fixed="right">
             <template #default="{row}">
+              <el-button size="small" type="success" plain @click="runSource(row)">{{ tt('page.dataImportCenter.runSource') }}</el-button>
               <el-button size="small" @click="openSourceForm(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="small" type="danger" plain @click="deleteSource(row)">{{ tt('common.delete') }}</el-button>
             </template>
@@ -246,8 +304,11 @@
           </el-table-column>
           <el-table-column prop="started_at" :label="tt('page.dataImportCenter.colStartedAt')" min-width="150" />
           <el-table-column prop="finished_at" :label="tt('page.dataImportCenter.colFinishedAt')" min-width="150" />
-          <el-table-column :label="tt('common.open')" width="120" fixed="right">
-            <template #default="{row}"><el-button size="small" @click="viewLogs(row)">{{ tt('page.dataImportCenter.viewLogs') }}</el-button></template>
+          <el-table-column :label="tt('page.dataImportCenter.colActions')" width="200" fixed="right">
+            <template #default="{row}">
+              <el-button size="small" @click="viewLogs(row)">{{ tt('page.dataImportCenter.viewLogs') }}</el-button>
+              <el-button size="small" type="warning" plain :disabled="!row.can_retry" @click="retryJob(row)">{{ tt('page.dataImportCenter.retry') }}</el-button>
+            </template>
           </el-table-column>
         </el-table>
 
@@ -273,7 +334,23 @@
               <el-option :label="tt('page.dataImportCenter.typeApi')" value="api" />
             </el-select>
           </el-form-item>
-          <el-form-item :label="tt('page.dataImportCenter.adapterKey')"><el-input v-model="sourceForm.adapter_key" /></el-form-item>
+          <el-form-item :label="tt('page.dataImportCenter.colDomain')">
+            <el-select v-model="sourceForm.domain" clearable style="width:100%;">
+              <el-option :label="tt('page.dataImportCenter.domainIndustry')" value="industry" />
+              <el-option :label="tt('page.dataImportCenter.domainCompetitor')" value="competitor" />
+              <el-option :label="tt('page.dataImportCenter.domainAds')" value="ads" />
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="tt('page.dataImportCenter.adapterKey')">
+            <el-select v-model="sourceForm.adapter_key" clearable filterable style="width:100%;">
+              <el-option
+                v-for="a in adapterOptions"
+                :key="a.key"
+                :label="tt(a.name_i18n)"
+                :value="a.key"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item :label="tt('page.dataImportCenter.configJson')"><el-input v-model="sourceForm.config_json" type="textarea" :rows="3" /></el-form-item>
         </el-form>
         <template #footer>

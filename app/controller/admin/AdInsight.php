@@ -106,80 +106,25 @@ class AdInsight extends BaseController
             return $this->jsonErr('file_unreadable', 1, null, 'common.loadingFailed');
         }
 
-        $jobId = DataImportService::createJob('ads', 'csv', (string) $file->getOriginalName());
         try {
             $parsed = DataImportService::parseCsvFile($tmp);
             $rows = $parsed['rows'];
-            $total = count($rows);
-            $ok = 0;
-            $fail = 0;
-            foreach ($rows as $idx => $r) {
-                $creativeCode = trim((string) ($r['creative_code'] ?? ($r['creative_id'] ?? '')));
-                $metricDate = trim((string) ($r['metric_date'] ?? ($r['date'] ?? '')));
-                if ($creativeCode === '' || $metricDate === '') {
-                    $fail++;
-                    if ($fail <= 20) {
-                        DataImportService::addJobLog($jobId, 'warn', 'missing_required_fields', ['row' => $idx + 2]);
-                    }
-                    continue;
-                }
-                $creative = GrowthAdCreativeModel::where('creative_code', $creativeCode)->find();
-                if (!$creative) {
-                    $creative = GrowthAdCreativeModel::create([
-                        'creative_code' => mb_substr($creativeCode, 0, 64),
-                        'title' => mb_substr((string) ($r['title'] ?? ''), 0, 255),
-                        'platform' => mb_substr(trim((string) ($r['platform'] ?? 'tiktok')), 0, 32),
-                        'region' => trim((string) ($r['region'] ?? '')) ?: null,
-                        'category_name' => trim((string) ($r['category_name'] ?? ($r['category'] ?? ''))) ?: null,
-                        'landing_url' => trim((string) ($r['landing_url'] ?? '')) ?: null,
-                        'first_seen_at' => trim((string) ($r['first_seen_at'] ?? '')) ?: null,
-                        'last_seen_at' => trim((string) ($r['last_seen_at'] ?? '')) ?: null,
-                        'status' => 1,
-                    ]);
-                } else {
-                    $creative->title = trim((string) ($r['title'] ?? '')) !== '' ? mb_substr((string) ($r['title'] ?? ''), 0, 255) : (string) $creative->title;
-                    $creative->platform = trim((string) ($r['platform'] ?? '')) !== '' ? mb_substr((string) ($r['platform'] ?? ''), 0, 32) : (string) $creative->platform;
-                    $creative->region = trim((string) ($r['region'] ?? '')) !== '' ? mb_substr((string) ($r['region'] ?? ''), 0, 16) : $creative->region;
-                    $creative->category_name = trim((string) ($r['category_name'] ?? ($r['category'] ?? ''))) !== '' ? mb_substr((string) ($r['category_name'] ?? ($r['category'] ?? '')), 0, 64) : $creative->category_name;
-                    $creative->landing_url = trim((string) ($r['landing_url'] ?? '')) !== '' ? mb_substr((string) ($r['landing_url'] ?? ''), 0, 512) : $creative->landing_url;
-                    $creative->first_seen_at = trim((string) ($r['first_seen_at'] ?? '')) !== '' ? (string) ($r['first_seen_at'] ?? '') : $creative->first_seen_at;
-                    $creative->last_seen_at = trim((string) ($r['last_seen_at'] ?? '')) !== '' ? (string) ($r['last_seen_at'] ?? '') : $creative->last_seen_at;
-                    $creative->save();
-                }
-                $payload = [
-                    'creative_id' => (int) $creative->id,
-                    'metric_date' => $metricDate,
-                    'impressions' => max(0, (int) ($r['impressions'] ?? 0)),
-                    'clicks' => max(0, (int) ($r['clicks'] ?? 0)),
-                    'ctr' => (float) ($r['ctr'] ?? 0),
-                    'cpc' => (float) ($r['cpc'] ?? 0),
-                    'cpm' => (float) ($r['cpm'] ?? 0),
-                    'est_spend' => (float) ($r['est_spend'] ?? ($r['spend'] ?? 0)),
-                    'active_days' => max(0, (int) ($r['active_days'] ?? 0)),
-                ];
-                $exists = GrowthAdMetricModel::where('creative_id', $payload['creative_id'])
-                    ->where('metric_date', $payload['metric_date'])
-                    ->find();
-                if ($exists) {
-                    $exists->save($payload);
-                } else {
-                    GrowthAdMetricModel::create($payload);
-                }
-                $ok++;
-            }
-            $status = $fail > 0 ? ($ok > 0 ? DataImportService::JOB_PARTIAL : DataImportService::JOB_FAILED) : DataImportService::JOB_SUCCESS;
-            DataImportService::finishJob($jobId, $status, $total, $ok, $fail, $fail > 0 && $ok === 0 ? 'all_rows_failed' : '');
+            $jobId = DataImportService::createJob('ads', 'csv', (string) $file->getOriginalName(), null, [
+                'headers' => $parsed['headers'],
+                'rows' => $rows,
+            ]);
+            $result = DataImportService::runDomainImport('ads', $rows, $jobId);
             return $this->jsonOk([
                 'job_id' => $jobId,
-                'total_rows' => $total,
-                'success_rows' => $ok,
-                'failed_rows' => $fail,
+                'total_rows' => (int) $result['total_rows'],
+                'success_rows' => (int) $result['success_rows'],
+                'failed_rows' => (int) $result['failed_rows'],
             ], 'imported');
         } catch (\Throwable $e) {
+            $jobId = DataImportService::createJob('ads', 'csv', (string) $file->getOriginalName());
             DataImportService::addJobLog($jobId, 'error', 'import_exception', ['message' => $e->getMessage()]);
             DataImportService::finishJob($jobId, DataImportService::JOB_FAILED, 0, 0, 0, 'import_exception');
             return $this->jsonErr('import_failed', 1, ['job_id' => $jobId], 'page.dataImport.importFailed');
         }
     }
 }
-

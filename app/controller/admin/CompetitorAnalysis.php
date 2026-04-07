@@ -7,7 +7,6 @@ use app\BaseController;
 use app\model\GrowthCompetitor as GrowthCompetitorModel;
 use app\model\GrowthCompetitorMetric as GrowthCompetitorMetricModel;
 use app\service\DataImportService;
-use think\facade\Db;
 use think\facade\View;
 
 class CompetitorAnalysis extends BaseController
@@ -143,61 +142,22 @@ class CompetitorAnalysis extends BaseController
             return $this->jsonErr('file_unreadable', 1, null, 'common.loadingFailed');
         }
 
-        $jobId = DataImportService::createJob('competitor', 'csv', (string) $file->getOriginalName());
         try {
             $parsed = DataImportService::parseCsvFile($tmp);
             $rows = $parsed['rows'];
-            $total = count($rows);
-            $ok = 0;
-            $fail = 0;
-            foreach ($rows as $idx => $r) {
-                $name = trim((string) ($r['competitor_name'] ?? ($r['name'] ?? '')));
-                $platform = trim((string) ($r['platform'] ?? 'tiktok'));
-                $metricDate = trim((string) ($r['metric_date'] ?? ($r['date'] ?? '')));
-                if ($name === '' || $metricDate === '') {
-                    $fail++;
-                    if ($fail <= 20) {
-                        DataImportService::addJobLog($jobId, 'warn', 'missing_required_fields', ['row' => $idx + 2]);
-                    }
-                    continue;
-                }
-                $competitor = GrowthCompetitorModel::where('name', $name)->where('platform', $platform)->find();
-                if (!$competitor) {
-                    $competitor = GrowthCompetitorModel::create([
-                        'name' => mb_substr($name, 0, 128),
-                        'platform' => mb_substr($platform, 0, 32),
-                        'region' => trim((string) ($r['region'] ?? '')) ?: null,
-                        'category_name' => trim((string) ($r['category_name'] ?? ($r['category'] ?? ''))) ?: null,
-                        'status' => 1,
-                    ]);
-                }
-                $payload = [
-                    'competitor_id' => (int) $competitor->id,
-                    'metric_date' => $metricDate,
-                    'followers' => max(0, (int) ($r['followers'] ?? 0)),
-                    'engagement_rate' => (float) ($r['engagement_rate'] ?? 0),
-                    'content_count' => max(0, (int) ($r['content_count'] ?? 0)),
-                    'conversion_proxy' => (float) ($r['conversion_proxy'] ?? 0),
-                ];
-                $exists = GrowthCompetitorMetricModel::where('competitor_id', $payload['competitor_id'])
-                    ->where('metric_date', $payload['metric_date'])
-                    ->find();
-                if ($exists) {
-                    $exists->save($payload);
-                } else {
-                    GrowthCompetitorMetricModel::create($payload);
-                }
-                $ok++;
-            }
-            $status = $fail > 0 ? ($ok > 0 ? DataImportService::JOB_PARTIAL : DataImportService::JOB_FAILED) : DataImportService::JOB_SUCCESS;
-            DataImportService::finishJob($jobId, $status, $total, $ok, $fail, $fail > 0 && $ok === 0 ? 'all_rows_failed' : '');
+            $jobId = DataImportService::createJob('competitor', 'csv', (string) $file->getOriginalName(), null, [
+                'headers' => $parsed['headers'],
+                'rows' => $rows,
+            ]);
+            $result = DataImportService::runDomainImport('competitor', $rows, $jobId);
             return $this->jsonOk([
                 'job_id' => $jobId,
-                'total_rows' => $total,
-                'success_rows' => $ok,
-                'failed_rows' => $fail,
+                'total_rows' => (int) $result['total_rows'],
+                'success_rows' => (int) $result['success_rows'],
+                'failed_rows' => (int) $result['failed_rows'],
             ], 'imported');
         } catch (\Throwable $e) {
+            $jobId = DataImportService::createJob('competitor', 'csv', (string) $file->getOriginalName());
             DataImportService::addJobLog($jobId, 'error', 'import_exception', ['message' => $e->getMessage()]);
             DataImportService::finishJob($jobId, DataImportService::JOB_FAILED, 0, 0, 0, 'import_exception');
             return $this->jsonErr('import_failed', 1, ['job_id' => $jobId], 'page.dataImport.importFailed');
@@ -219,4 +179,3 @@ class CompetitorAnalysis extends BaseController
         return $this->request->post();
     }
 }
-

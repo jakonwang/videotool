@@ -199,6 +199,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // Growth intelligence
     Route::get('industry_trend/list', 'app\controller\admin\IndustryTrend@listJson');
     Route::get('industry_trend/listJson', 'app\controller\admin\IndustryTrend@listJson');
+    Route::get('industry_trend/summary', 'app\controller\admin\IndustryTrend@summaryJson');
+    Route::get('industry_trend/summaryJson', 'app\controller\admin\IndustryTrend@summaryJson');
     Route::post('industry_trend/importCsv', 'app\controller\admin\IndustryTrend@importCsv');
     Route::get('industry_trend', 'app\controller\admin\IndustryTrend@index');
 
@@ -216,11 +218,15 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // Data import center
     Route::get('data_import/sourceList', 'app\controller\admin\DataImport@sourceListJson');
     Route::get('data_import/sourceListJson', 'app\controller\admin\DataImport@sourceListJson');
+    Route::get('data_import/adapterList', 'app\controller\admin\DataImport@adapterListJson');
+    Route::get('data_import/adapterListJson', 'app\controller\admin\DataImport@adapterListJson');
     Route::post('data_import/sourceSave', 'app\controller\admin\DataImport@sourceSave');
     Route::post('data_import/sourceDelete', 'app\controller\admin\DataImport@sourceDelete');
+    Route::post('data_import/runSource', 'app\controller\admin\DataImport@runSource');
     Route::get('data_import/jobList', 'app\controller\admin\DataImport@jobListJson');
     Route::get('data_import/jobListJson', 'app\controller\admin\DataImport@jobListJson');
     Route::get('data_import/jobLogs', 'app\controller\admin\DataImport@jobLogsJson');
     Route::get('data_import/jobLogsJson', 'app\controller\admin\DataImport@jobLogsJson');
+    Route::post('data_import/retryJob', 'app\controller\admin\DataImport@retryJob');
     Route::get('data_import', 'app\controller\admin\DataImport@index');
 }

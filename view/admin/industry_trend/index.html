@@ -32,6 +32,12 @@
       const pageSize = ref(20);
       const query = reactive({ country: '', category: '', date_from: '', date_to: '' });
       const importLoading = ref(false);
+      const summaryLoading = ref(false);
+      const summary = reactive({
+        current: { heat_score_avg: 0, content_total: 0, engagement_rate_avg: 0, cpc_avg: 0, cpm_avg: 0, row_count: 0 },
+        mom: { heat_rate: null, content_rate: null, engagement_rate: null },
+        yoy: { heat_rate: null, content_rate: null, engagement_rate: null }
+      });
 
       async function fetchList() {
         loading.value = true;
@@ -55,6 +61,47 @@
         }
       }
 
+      async function fetchSummary() {
+        summaryLoading.value = true;
+        try {
+          const p = new URLSearchParams();
+          if (query.country) p.set('country', query.country);
+          if (query.category) p.set('category', query.category);
+          if (query.date_from) p.set('date_from', query.date_from);
+          if (query.date_to) p.set('date_to', query.date_to);
+          const res = await fetch('/admin.php/industry_trend/summaryJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          const d = json.data || {};
+          const cur = d.current || {};
+          const mom = d.mom || {};
+          const yoy = d.yoy || {};
+          summary.current.heat_score_avg = Number(cur.heat_score_avg || 0);
+          summary.current.content_total = Number(cur.content_total || 0);
+          summary.current.engagement_rate_avg = Number(cur.engagement_rate_avg || 0);
+          summary.current.cpc_avg = Number(cur.cpc_avg || 0);
+          summary.current.cpm_avg = Number(cur.cpm_avg || 0);
+          summary.current.row_count = Number(cur.row_count || 0);
+          summary.mom.heat_rate = mom.heat_rate == null ? null : Number(mom.heat_rate);
+          summary.mom.content_rate = mom.content_rate == null ? null : Number(mom.content_rate);
+          summary.mom.engagement_rate = mom.engagement_rate == null ? null : Number(mom.engagement_rate);
+          summary.yoy.heat_rate = yoy.heat_rate == null ? null : Number(yoy.heat_rate);
+          summary.yoy.content_rate = yoy.content_rate == null ? null : Number(yoy.content_rate);
+          summary.yoy.engagement_rate = yoy.engagement_rate == null ? null : Number(yoy.engagement_rate);
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          summaryLoading.value = false;
+        }
+      }
+
+      function formatRate(value) {
+        if (value == null || Number.isNaN(Number(value))) return '--';
+        const n = Number(value);
+        const sign = n > 0 ? '+' : '';
+        return sign + n.toFixed(1) + '%';
+      }
+
       async function importCsv() {
         const input = document.getElementById('industryCsvInput');
         if (!input || !input.files || !input.files[0]) {
@@ -76,6 +123,7 @@
           ElMessage.success(tt('common.done'));
           input.value = '';
           fetchList();
+          fetchSummary();
         } catch (e) {
           ElMessage.error(e.message || tt('page.dataImport.importFailed'));
         } finally {
@@ -86,9 +134,10 @@
       onMounted(() => {
         if (i18n) i18n.applyDom(document);
         fetchList();
+        fetchSummary();
       });
 
-      return { tt, loading, list, total, page, pageSize, query, fetchList, importCsv, importLoading };
+      return { tt, loading, list, total, page, pageSize, query, fetchList, importCsv, importLoading, summaryLoading, summary, fetchSummary, formatRate };
     },
     template: `
       <div class="admin-modern-card">
@@ -106,14 +155,41 @@
             <el-date-picker v-model="query.date_to" type="date" value-format="YYYY-MM-DD" :placeholder="tt('page.industryTrend.dateTo')" style="width:150px;" />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="page=1;fetchList()">{{ tt('common.search') }}</el-button>
-            <el-button @click="query.country='';query.category='';query.date_from='';query.date_to='';page=1;fetchList()">{{ tt('common.reset') }}</el-button>
+            <el-button type="primary" @click="page=1;fetchList();fetchSummary()">{{ tt('common.search') }}</el-button>
+            <el-button @click="query.country='';query.category='';query.date_from='';query.date_to='';page=1;fetchList();fetchSummary()">{{ tt('common.reset') }}</el-button>
           </el-form-item>
           <el-form-item style="margin-left:auto;">
             <input type="file" id="industryCsvInput" accept=".csv" style="max-width:180px;" />
             <el-button type="success" :loading="importLoading" @click="importCsv">{{ tt('page.industryTrend.importCsv') }}</el-button>
           </el-form-item>
         </el-form>
+
+        <div v-loading="summaryLoading" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px;">
+          <div style="border:1px solid #ebeef5;border-radius:10px;padding:12px;background:#fff;">
+            <div style="font-size:12px;color:#909399;">{{ tt('page.industryTrend.summaryHeat') }}</div>
+            <div style="font-size:24px;font-weight:700;color:#111827;">{{ summary.current.heat_score_avg.toFixed(2) }}</div>
+            <div style="font-size:12px;color:#606266;">
+              {{ tt('page.industryTrend.summaryMom') }} {{ formatRate(summary.mom.heat_rate) }} ·
+              {{ tt('page.industryTrend.summaryYoy') }} {{ formatRate(summary.yoy.heat_rate) }}
+            </div>
+          </div>
+          <div style="border:1px solid #ebeef5;border-radius:10px;padding:12px;background:#fff;">
+            <div style="font-size:12px;color:#909399;">{{ tt('page.industryTrend.summaryContent') }}</div>
+            <div style="font-size:24px;font-weight:700;color:#111827;">{{ summary.current.content_total }}</div>
+            <div style="font-size:12px;color:#606266;">
+              {{ tt('page.industryTrend.summaryMom') }} {{ formatRate(summary.mom.content_rate) }} ·
+              {{ tt('page.industryTrend.summaryYoy') }} {{ formatRate(summary.yoy.content_rate) }}
+            </div>
+          </div>
+          <div style="border:1px solid #ebeef5;border-radius:10px;padding:12px;background:#fff;">
+            <div style="font-size:12px;color:#909399;">{{ tt('page.industryTrend.summaryEngagement') }}</div>
+            <div style="font-size:24px;font-weight:700;color:#111827;">{{ (summary.current.engagement_rate_avg * 100).toFixed(2) }}%</div>
+            <div style="font-size:12px;color:#606266;">
+              {{ tt('page.industryTrend.summaryMom') }} {{ formatRate(summary.mom.engagement_rate) }} ·
+              {{ tt('page.industryTrend.summaryYoy') }} {{ formatRate(summary.yoy.engagement_rate) }}
+            </div>
+          </div>
+        </div>
 
         <el-table :data="list" stripe v-loading="loading">
           <el-table-column prop="metric_date" :label="tt('page.industryTrend.colDate')" width="120" />
