@@ -6,7 +6,7 @@ namespace app\service;
 use think\facade\Db;
 
 /**
- * 婵☆垪鈧櫕鍋ョ紒鐙呯磿閹﹪寮靛鍛潳
+ * Dynamic module and sidebar menu manager.
  */
 class ModuleManagerService
 {
@@ -14,7 +14,7 @@ class ModuleManagerService
     private const ROLE_OPERATOR = 'operator';
     private const ROLE_VIEWER = 'viewer';
 
-        /**
+    /**
      * @return array<string, array<string, mixed>>
      */
     private static function builtInModules(): array
@@ -262,7 +262,7 @@ class ModuleManagerService
     }
 
     /**
-     * 闁规鍋呭鍨熼垾铏仴闁烩晩鍠栫紞?+ 闁告劕鎳愰悿鍡椢熼垾铏仴妤犵偠娉涢幃鎾愁潰閵夈儱鐓傞柡浣哄瀹撲焦鎯旈幙鍕闁兼眹鍎撮妴鍐偓娑櫭﹢顏堟晬?
+     * Scan built-in and extension modules and sync metadata to DB when available.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -870,7 +870,7 @@ class ModuleManagerService
         }
     }
 
-        /**
+    /**
      * @return array<string, int>
      */
     private static function menuBadges(): array
@@ -911,7 +911,7 @@ class ModuleManagerService
     }
 
     /**
-     * 闁告艾楠歌ぐ瀛樼瑹瑜庨悥顕€鏁嶉崼婊呯煂閺夆晜鏌ㄥú鏍ь啅閹绘帗鍎欓柣顫妽鑶╅柛褎顨堝ù澶愬礂鐎圭姴缍呴柛妤佹穿缁?
+     * Build enabled sidebar menus for current role and controller/action context.
      *
      * @return array<int, array<string, mixed>>
      */
