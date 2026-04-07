@@ -63,7 +63,14 @@
       <div v-for="(r,i) in codeResults" :key="'c'+i" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div class="p-4 border-b border-slate-100 flex gap-3">
           <div class="w-20 h-20 rounded-lg bg-slate-100 shrink-0 overflow-hidden">
-            <img v-if="imgUrl(r.image_ref)" :src="imgUrl(r.image_ref)" class="w-full h-full object-cover" alt="" @error="hideImg" />
+            <img
+              v-if="imgUrl(r.image_ref)"
+              :src="imgUrl(r.image_ref)"
+              class="w-full h-full object-cover cursor-zoom-in"
+              alt=""
+              @error="hideImg"
+              @click="openPreview(imgUrl(r.image_ref))"
+            />
           </div>
           <div class="min-w-0 flex-1">
             <div class="code-xl text-slate-900 break-all">{{ r.product_code }}</div>
@@ -82,7 +89,13 @@
         </div>
         <div class="p-4 flex gap-3">
           <div class="w-24 h-24 rounded-lg bg-slate-100 shrink-0 overflow-hidden border border-slate-100">
-            <img v-if="imgUrl(r.image_ref)" :src="imgUrl(r.image_ref)" class="w-full h-full object-cover" alt="" />
+            <img
+              v-if="imgUrl(r.image_ref)"
+              :src="imgUrl(r.image_ref)"
+              class="w-full h-full object-cover cursor-zoom-in"
+              alt=""
+              @click="openPreview(imgUrl(r.image_ref))"
+            />
           </div>
           <div class="min-w-0 flex-1">
             <div class="code-xl text-indigo-950 break-all">{{ r.product_code }}</div>
@@ -101,6 +114,18 @@
     <p v-if="fallbackNote" class="text-center text-sm text-amber-800 bg-amber-50 rounded-xl py-2 px-3">{{ fallbackNote }}</p>
     <p v-if="errMsg" class="text-center text-sm text-red-600 bg-red-50 rounded-xl py-2 px-3">{{ errMsg }}</p>
   </main>
+  <div
+    v-if="previewVisible"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+    @click.self="closePreview"
+  >
+    <button
+      type="button"
+      class="absolute top-4 right-4 rounded-lg bg-white/20 text-white px-3 py-1.5 text-sm"
+      @click="closePreview"
+    >Close</button>
+    <img :src="previewImage" class="max-w-full max-h-[88vh] rounded-xl shadow-2xl object-contain" alt="preview" />
+  </div>
 </div>
 
 <script>
@@ -116,6 +141,8 @@ createApp({
     const extraHint = ref('');
     const fallbackNote = ref('');
     const cameraOn = ref(false);
+    const previewVisible = ref(false);
+    const previewImage = ref('');
     const videoEl = ref(null);
     const canvasEl = ref(null);
     const fileInput = ref(null);
@@ -220,6 +247,17 @@ createApp({
 
     function hideImg(e) {
       if (e.target) e.target.style.display = 'none';
+    }
+
+    function openPreview(url) {
+      if (!url) return;
+      previewImage.value = url;
+      previewVisible.value = true;
+    }
+
+    function closePreview() {
+      previewVisible.value = false;
+      previewImage.value = '';
     }
 
     async function searchByCode() {
@@ -342,8 +380,8 @@ createApp({
     onUnmounted(() => stopCamera());
 
     return {
-      manualQ, loading, imgResults, codeResults, errMsg, extraHint, fallbackNote, cameraOn, videoEl, canvasEl, fileInput,
-      imgUrl, hideImg, searchByCode, openCamera, stopCamera, capture, onFile,
+      manualQ, loading, imgResults, codeResults, errMsg, extraHint, fallbackNote, cameraOn, previewVisible, previewImage, videoEl, canvasEl, fileInput,
+      imgUrl, hideImg, openPreview, closePreview, searchByCode, openCamera, stopCamera, capture, onFile,
     };
   }
 }).mount('#app');
