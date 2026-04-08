@@ -27,7 +27,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
+<script src="/static/i18n/i18n.js?v=20260408_mobile_agent1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -126,6 +126,7 @@
       const outreachRendering = ref(false);
       const historyVisible = ref(false);
       const historyRows = ref([]);
+      const mobileTaskLoadingMap = ref({});
 
       function stopImportPolling() {
         if (importPollTimer) {
@@ -546,6 +547,75 @@
         await renderOutreachPreview();
       }
 
+      function mobileTaskLoading(id) {
+        const key = Number(id || 0);
+        if (!key) return false;
+        return !!mobileTaskLoadingMap.value[key];
+      }
+
+      function setMobileTaskLoading(id, loading) {
+        const key = Number(id || 0);
+        if (!key) return;
+        mobileTaskLoadingMap.value = {
+          ...mobileTaskLoadingMap.value,
+          [key]: !!loading,
+        };
+      }
+
+      async function createMobileTask(row, taskType) {
+        if (!row || !row.id) return;
+        const influencerId = Number(row.id || 0);
+        if (!influencerId) return;
+        setMobileTaskLoading(influencerId, true);
+        try {
+          const res = await fetch('/admin.php/mobile_task/create_batch', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              influencer_ids: [influencerId],
+              task_type: taskType,
+              preferred_channel: 'auto',
+              limit: 1,
+            }),
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (json && json.code === 401) {
+            ElMessage.error(tt('common.sessionExpired'));
+            return;
+          }
+          if (!json || json.code !== 0) {
+            ElMessage.error(resolveApiMessage(json, 'page.influencer.mobileTaskFailed'));
+            return;
+          }
+          const data = json.data || {};
+          const created = Number(data.created || 0);
+          const skippedExisting = Number(data.skipped_existing || 0);
+          const blocked24h = Number(data.blocked_24h || 0);
+          if (created > 0) {
+            ElMessage.success(tt('page.influencer.mobileTaskCreated', { count: created }));
+          } else if (skippedExisting > 0) {
+            ElMessage.warning(tt('page.influencer.mobileTaskSkipped'));
+          } else if (blocked24h > 0) {
+            ElMessage.warning(tt('page.influencer.mobileTaskBlocked'));
+          } else {
+            ElMessage.warning(tt('page.influencer.mobileTaskFailed'));
+          }
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.influencer.mobileTaskFailed'));
+        } finally {
+          setMobileTaskLoading(influencerId, false);
+        }
+      }
+
+      async function queueMobileWarmup(row) {
+        return createMobileTask(row, 'comment_warmup');
+      }
+
+      async function queueMobileDm(row) {
+        return createMobileTask(row, 'tiktok_dm');
+      }
+
       async function quickSetStatus(row, status) {
         try {
           const res = await fetch('/admin.php/influencer/updateStatus', {
@@ -847,6 +917,9 @@
         historyVisible,
         historyRows,
         openHistory,
+        mobileTaskLoading,
+        queueMobileWarmup,
+        queueMobileDm,
       };
     },
     template: `
@@ -955,11 +1028,13 @@
           </el-table-column>
           <el-table-column prop="last_contacted_at" :label="tt('page.influencer.colLastContacted')" min-width="160" />
           <el-table-column prop="updated_at" :label="tt('page.influencer.colUpdated')" min-width="160" />
-          <el-table-column :label="tt('page.influencer.colActions')" width="260" fixed="right">
+          <el-table-column :label="tt('page.influencer.colActions')" width="320" fixed="right">
             <template #default="{ row }">
               <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                <el-button size="small" type="primary" plain @click="openOutreach(row)">💬 {{ tt('page.influencer.outreach') }}</el-button>
-                <el-button size="small" type="success" plain @click="openSampleShipDialog(row)">📦 {{ tt('page.influencer.quickShip') }}</el-button>
+                <el-button size="small" type="primary" plain @click="openOutreach(row)">{{ tt('page.influencer.outreach') }}</el-button>
+                <el-button size="small" type="success" plain @click="openSampleShipDialog(row)">{{ tt('page.influencer.quickShip') }}</el-button>
+                <el-button size="small" type="warning" plain :loading="mobileTaskLoading(row.id)" @click="queueMobileWarmup(row)">{{ tt('page.influencer.mobileWarmup') }}</el-button>
+                <el-button size="small" type="info" plain :loading="mobileTaskLoading(row.id)" @click="queueMobileDm(row)">{{ tt('page.influencer.mobileDm') }}</el-button>
                 <el-dropdown trigger="click" @command="handleMoreAction(row, $event)">
                   <el-button size="small" link type="info">{{ tt('page.influencer.colActions') }}</el-button>
                   <template #dropdown>
@@ -1005,7 +1080,7 @@
         </el-dialog>
 
         <el-dialog v-model="outreachVisible" :title="tt('page.influencer.outreachTitle')" width="680px" destroy-on-close>
-          <div v-if="outreachRow" style="margin-bottom:8px;font-size:13px;color:#606266;">{{ outreachRow.tiktok_id }} · {{ outreachRow.nickname }}</div>
+          <div v-if="outreachRow" style="margin-bottom:8px;font-size:13px;color:#606266;">{{ outreachRow.tiktok_id }} / {{ outreachRow.nickname }}</div>
           <el-form label-position="top" size="default">
             <el-form-item :label="tt('page.influencer.pickTemplate')">
               <el-select v-model="outreachTplId" style="width:100%;" filterable @change="renderOutreachPreview">
@@ -1141,7 +1216,7 @@
 
         <el-dialog v-model="sampleShipVisible" :title="tt('page.influencer.quickShipTitle')" width="460px" destroy-on-close>
           <div style="margin-bottom:10px;color:#606266;font-size:13px;">
-            {{ sampleShipForm.tiktok_id }} · {{ sampleShipForm.nickname }}
+            {{ sampleShipForm.tiktok_id }} / {{ sampleShipForm.nickname }}
           </div>
           <el-form label-width="110px" size="default">
             <el-form-item :label="tt('page.influencer.sampleTrackingNo')">
@@ -1173,4 +1248,7 @@
   {/literal}
 </script>
 {/block}
+
+
+
 

@@ -77,6 +77,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // Video
     Route::get('video/list', 'app\\controller\\admin\\Video@listJson');
     Route::get('video/listJson', 'app\\controller\\admin\\Video@listJson');
+    Route::post('video/mixSuggestion', 'app\\controller\\admin\\Video@mixSuggestion');
     Route::get('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/delete/<id>', 'app\controller\admin\Video@delete');
@@ -193,6 +194,18 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('outreach_workspace/generate', 'app\controller\admin\OutreachWorkspace@generate');
     Route::post('outreach_workspace/action', 'app\controller\admin\OutreachWorkspace@action');
     Route::get('outreach_workspace', 'app\controller\admin\OutreachWorkspace@index');
+
+    // Mobile outreach tasking (Android + Appium agent)
+    Route::get('mobile_task/list', 'app\controller\admin\MobileTask@listJson');
+    Route::get('mobile_task/listJson', 'app\controller\admin\MobileTask@listJson');
+    Route::post('mobile_task/create_batch', 'app\controller\admin\MobileTask@createBatch');
+    Route::post('mobile_task/retry', 'app\controller\admin\MobileTask@retry');
+
+    Route::get('mobile_device/list', 'app\controller\admin\MobileDevice@listJson');
+    Route::get('mobile_device/listJson', 'app\controller\admin\MobileDevice@listJson');
+
+    Route::post('mobile_agent/pull', 'app\controller\admin\MobileAgent@pull');
+    Route::post('mobile_agent/report', 'app\controller\admin\MobileAgent@report');
 
     // Sample management
     Route::get('sample/list', 'app\controller\admin\Sample@listJson');

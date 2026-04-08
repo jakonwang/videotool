@@ -178,5 +178,160 @@
 3. Use Advanced filters for category/price/MOQ constraints.
 4. Hover a card to run operations, or open AI modal to copy selling points for customer chat.
 
+## 13. 2026-04-08 深度优化补充（素材风控 + SaaS 隔离）
+
+### 13.1 素材风控（Material）
+- `videos` 新增字段：
+  - `video_md5`：用于上传去重（同租户范围）
+  - `ad_creative_code`：用于关联广告创意表现
+- 上传去重规则：
+  - 入口覆盖 `batchUpload`、分片上传 `uploadChunk`、编辑替换视频
+  - 若同租户存在相同 `video_md5`，拒绝上传并返回“素材已存在，请进行混剪去重”
+
+### 13.2 素材表现归因（与广告情报联动）
+- `GET /admin.php/video/listJson` 每条素材新增返回：
+  - `used_by_influencers`：该素材所属商品被多少达人使用（按 `product_links` 聚合）
+  - `total_gmv`：按 `ad_creative_code -> growth_ad_creatives -> growth_ad_metrics.est_gmv` 聚合
+  - `ad_creative_code`
+- 素材列表页 `view/admin/video/index.html` 新增列：
+  - 使用达人数
+  - 总 GMV
+  - 创意编码
+
+### 13.3 AI 混剪建议
+- 新接口：`POST /admin.php/video/mixSuggestion`
+  - 入参：`video_id`
+  - 出参：`suggestion`、`source`、`used_by_influencers`、`total_gmv`
+- 页面入口：素材操作菜单新增“AI 混剪建议”
+  - 优先调用 `VolcArkVisionService::generateVideoRemixSuggestion()`
+  - 失败时使用后端 fallback 策略生成可执行建议文本
+  - 前端自动复制建议文本（兼容 `navigator.clipboard` 与 `execCommand` 回退）
+
+### 13.4 SaaS 租户隔离增强
+- 新迁移脚本：`database/run_migration_tenant_saas_material.php`
+  - 新增 `tenants`
+  - 批量为业务表补 `tenant_id` + 索引
+  - 新增 `tenant_module_subscriptions`
+  - 新增 `admin_logs`（含硬件指纹字段）
+  - `videos` 扩展字段与索引
+  - `growth_ad_metrics` 增加 `est_gmv`
+- 权限与菜单：
+  - `AdminAuthMiddleware` 增加“模块到期/禁用 -> API 403”
+  - `ModuleManagerService::getEnabledMenus()` 按租户订阅与角色动态过滤
+- 敏感审计：
+  - 新增 `AdminAuditService`
+  - 覆盖联系人导出、批发价变更等敏感动作，记录操作者指纹
+
+### 13.5 外联话术服务的租户安全
+- `app/service/MessageOutreachService.php` 已重构：
+  - 模板语言回退查询（`pickTemplateVariantByRegion`）增加租户过滤
+  - 变量构建（`buildRenderVars`）中达人/商品查询增加租户过滤
+  - 分发链接解析（`resolveDistributeLink`）增加租户过滤
+- `MessageTemplate::render` 调用已传入当前租户 ID，避免跨租户串读
+
+### 13.6 业务控制器补齐租户过滤
+- 本轮补齐：
+  - `app/controller/admin/Product.php`
+  - `app/controller/admin/Distribute.php`
+- 关键点：
+  - 列表、详情、创建、删除、状态切换均使用 `scopeTenant()`
+  - 新增写入统一经 `withTenantPayload()` 注入 `tenant_id`
+
+### 13.7 执行与验证（Windows 开发 / Linux 部署通用）
+1. 执行迁移（先基础，再本轮）：
+   - `php database/run_migration_tikstar_ops2.php`
+   - `php database/run_migration_product_style_orders.php`
+   - `php database/run_migration_product_style_price_levels.php`
+   - `php database/run_migration_tenant_saas_material.php`
+2. 语法检查：
+   - `php -l app/service/MessageOutreachService.php`
+   - `php -l app/controller/admin/Video.php`
+   - `php -l app/controller/admin/Product.php`
+   - `php -l app/controller/admin/Distribute.php`
+3. 冒烟脚本：
+   - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+
+### 13.8 当前已知验证前提
+- 若冒烟脚本提示 `SQLSTATE[HY000] [2002]`（目标计算机拒绝连接），表示 MySQL 未启动或连接参数不通。
+- 需先确认 `.env` 中数据库主机/端口与 phpStudy/MySQL 实例一致，再执行冒烟。
+
+## 14. 2026-04-08 移动端强触达（Android + Appium）
+
+### 14.1 目标与边界
+- 执行层切换为：`后台编排 -> Mobile Agent -> 手机 App 执行 -> 日志回传`。
+- 自动化边界固定为：**自动填充 + 人工发送**（不做无人值守自动发送）。
+- 渠道支持：TikTok 评论预热、TikTok DM、Zalo、WhatsApp。
+
+### 14.2 数据结构与迁移
+- 新迁移脚本：`database/run_migration_mobile_outreach.php`
+- 新增表：
+  - `mobile_devices`
+  - `mobile_action_tasks`
+  - `mobile_action_logs`
+- `influencers` 新增字段：
+  - `last_commented_at`
+  - `quality_score`
+  - `quality_grade`
+  - `contact_confidence`
+
+### 14.3 后端接口
+- 任务域：
+  - `POST /admin.php/mobile_task/create_batch`
+  - `GET /admin.php/mobile_task/list`（兼容 `listJson`）
+  - `POST /admin.php/mobile_task/retry`
+- 设备域：
+  - `GET /admin.php/mobile_device/list`（兼容 `listJson`）
+- Agent 域：
+  - `POST /admin.php/mobile_agent/pull`
+  - `POST /admin.php/mobile_agent/report`
+
+### 14.4 中间件与鉴权
+- `AdminAuthMiddleware` 已放行 `mobile_agent/pull|report`，改为 `token` 鉴权（设备级）。
+- `mobile_task/mobile_device/mobile_agent` 已纳入模块映射（`creator_crm`）。
+
+### 14.5 页面改造
+- `view/admin/influencer/index.html`
+  - 新增按钮：
+    - `预热评论（手机）`
+    - `私信触达（手机）`
+  - 点击后调用 `mobile_task/create_batch` 为单个达人生成移动任务。
+- `view/admin/outreach_workspace/index.html`
+  - 新增“移动端任务队列”区块。
+  - 支持设备筛选、查看失败原因、任务重试。
+  - 支持从“下一条任务”直接下发：
+    - 评论预热任务
+    - 私信触达任务
+
+### 14.6 Agent 执行脚本
+- 目录：`tools/mobile_agent/`
+  - `agent.py`
+  - `requirements.txt`
+  - `README.md`
+- 技术栈：ADB + Appium（可降级 ADB-only）。
+- 回传动作支持：
+  - `comment_prepared`
+  - `comment_sent`
+  - `dm_prepared`
+  - `im_prepared`
+
+### 14.7 i18n
+- 新增移动触达相关文案，覆盖 `zh/en/vi`：
+  - `public/static/i18n/i18n.js`（达人页新增键）
+  - `public/static/i18n/i18n.ops2.js`（外联工作台新增键）
+- 新增 UI 文案均通过 `AppI18n.t` 调用。
+
+### 14.8 执行顺序（Windows 开发 / Linux 部署）
+1. 执行数据库迁移：
+   - `php database/run_migration_mobile_outreach.php`
+2. 启动 Web 服务并登录后台，验证：
+   - 达人页“手机触达”按钮可创建任务
+   - 外联工作台可看到移动任务队列
+3. 启动 Agent：
+   - 参考 `tools/mobile_agent/README.md` 设置环境变量并运行 `agent.py`
+4. 冒烟：
+   - `创建任务 -> Agent 拉取 -> 手机打开渠道并准备文本 -> 人工发送 -> report 回传`
+5. 配额说明：
+   - `mobile_devices.daily_used` 仅在任务终态（`done/failed/skipped/canceled`）计数，`prepared` 不计数。
+
 
 

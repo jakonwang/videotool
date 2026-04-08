@@ -105,11 +105,35 @@
         influencer_status: '',
         tags: ''
       });
+      const mobileLoading = ref(false);
+      const mobileDispatching = ref(false);
+      const mobileDevices = ref([]);
+      const mobileDeviceId = ref('');
+      const mobileTasks = ref([]);
+      const mobileRetryingMap = ref({});
 
       const statusLabel = (s) => {
         const key = 'page.outreach.status' + String(Number(s || 0));
         return tt(key);
       };
+
+      const mobileTypeLabel = (type) => {
+        const key = 'page.outreach.mobileType.' + String(type || '').trim();
+        const label = tt(key);
+        return label && label !== key ? label : String(type || '');
+      };
+
+      function setMobileRetrying(id, loading) {
+        const key = Number(id || 0);
+        if (!key) return;
+        mobileRetryingMap.value = { ...mobileRetryingMap.value, [key]: !!loading };
+      }
+
+      function isMobileRetrying(id) {
+        const key = Number(id || 0);
+        if (!key) return false;
+        return !!mobileRetryingMap.value[key];
+      }
 
       async function fetchList() {
         loading.value = true;
@@ -160,6 +184,37 @@
           templates.value = tplJson && tplJson.code === 0 && tplJson.data && Array.isArray(tplJson.data.items) ? tplJson.data.items : [];
           products.value = prodJson && prodJson.code === 0 && prodJson.data && Array.isArray(prodJson.data.items) ? prodJson.data.items : [];
         } catch (_) {}
+      }
+
+      async function loadMobileDevices() {
+        try {
+          const res = await fetch('/admin.php/mobile_device/listJson', { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          mobileDevices.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      }
+
+      async function fetchMobileTasks() {
+        mobileLoading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', '1');
+          p.set('page_size', '20');
+          if (mobileDeviceId.value !== '' && mobileDeviceId.value !== null) {
+            p.set('device_id', String(mobileDeviceId.value));
+          }
+          const res = await fetch('/admin.php/mobile_task/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          mobileTasks.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          mobileLoading.value = false;
+        }
       }
 
       async function doRenderCurrent() {
@@ -296,11 +351,81 @@
         }
       }
 
+      async function queueCurrentMobile(taskType) {
+        const item = nextItem.value;
+        if (!item || !item.influencer_id) return;
+        mobileDispatching.value = true;
+        try {
+          const body = {
+            influencer_ids: [item.influencer_id],
+            task_type: taskType,
+            preferred_channel: String(jumpChannel.value || 'auto'),
+            template_id: Number(item.template_id || 0),
+            product_id: Number(item.product_id || 0)
+          };
+          const res = await fetch('/admin.php/mobile_task/create_batch', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(body)
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          const d = json.data || {};
+          const created = Number(d.created || 0);
+          const skipped = Number(d.skipped_existing || 0);
+          const blocked = Number(d.blocked_24h || 0);
+          if (created > 0) {
+            ElMessage.success(tt('page.outreach.mobileQueueOk', { created, skipped, blocked }));
+          } else if (blocked > 0) {
+            ElMessage.warning(tt('page.outreach.mobileQueueBlocked'));
+          } else {
+            ElMessage.warning(tt('page.outreach.mobileQueueSkip'));
+          }
+          fetchMobileTasks();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          mobileDispatching.value = false;
+        }
+      }
+
+      function mobileTaskCanRetry(row) {
+        if (!row) return false;
+        const status = Number(row.task_status || 0);
+        return status === 4 || status === 5 || status === 6;
+      }
+
+      async function retryMobileTask(row) {
+        if (!row || !row.id || !mobileTaskCanRetry(row)) return;
+        const taskId = Number(row.id || 0);
+        if (!taskId) return;
+        setMobileRetrying(taskId, true);
+        try {
+          const res = await fetch('/admin.php/mobile_task/retry', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ task_id: taskId })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          fetchMobileTasks();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          setMobileRetrying(taskId, false);
+        }
+      }
+
       onMounted(async () => {
         if (i18n) i18n.applyDom(document);
         await loadBaseOptions();
+        await loadMobileDevices();
         await fetchList();
         await fetchNextTask();
+        await fetchMobileTasks();
       });
 
       return {
@@ -328,7 +453,18 @@
         fetchNextTask,
         doRenderCurrent,
         doAction,
-        processing
+        processing,
+        mobileLoading,
+        mobileDispatching,
+        mobileDevices,
+        mobileDeviceId,
+        mobileTasks,
+        mobileTypeLabel,
+        queueCurrentMobile,
+        mobileTaskCanRetry,
+        retryMobileTask,
+        isMobileRetrying,
+        fetchMobileTasks
       };
     },
     template: `
@@ -345,6 +481,8 @@
               <el-option :label="tt('page.outreach.status2')" :value="2" />
               <el-option :label="tt('page.outreach.status3')" :value="3" />
               <el-option :label="tt('page.outreach.status4')" :value="4" />
+              <el-option :label="tt('page.outreach.status5')" :value="5" />
+              <el-option :label="tt('page.outreach.status6')" :value="6" />
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -382,6 +520,8 @@
               <el-button size="small" type="primary" :loading="processing" @click="doAction('jump', true)">{{ tt('page.outreach.copyAndOpen') }}</el-button>
               <el-button size="small" type="success" :loading="processing" @click="doAction('complete', false)">{{ tt('page.outreach.complete') }}</el-button>
               <el-button size="small" :loading="processing" @click="doAction('skip', false)">{{ tt('page.outreach.skip') }}</el-button>
+              <el-button size="small" type="warning" :loading="mobileDispatching" @click="queueCurrentMobile('comment_warmup')">{{ tt('page.outreach.dispatchComment') }}</el-button>
+              <el-button size="small" type="info" :loading="mobileDispatching" @click="queueCurrentMobile('tiktok_dm')">{{ tt('page.outreach.dispatchMobile') }}</el-button>
             </div>
           </template>
           <template v-else>
@@ -411,6 +551,56 @@
             @update:current-page="fetchList"
             @update:page-size="() => { page=1; fetchList(); }"
           />
+        </div>
+
+        <div class="outreach-next" style="margin-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+            <strong>{{ tt('page.outreach.mobileSection') }}</strong>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <el-select v-model="mobileDeviceId" clearable style="width:240px;" :placeholder="tt('page.outreach.mobileDevicePh')" @change="fetchMobileTasks">
+                <el-option :label="tt('page.outreach.allDevices')" value="" />
+                <el-option
+                  v-for="d in mobileDevices"
+                  :key="d.id"
+                  :label="(d.device_name || d.device_code) + ' / ' + (d.is_online ? tt('page.outreach.deviceOnline') : tt('page.outreach.deviceOffline'))"
+                  :value="d.id"
+                />
+              </el-select>
+              <el-button size="small" @click="fetchMobileTasks">{{ tt('page.outreach.refresh') }}</el-button>
+            </div>
+          </div>
+
+          <el-table :data="mobileTasks" v-loading="mobileLoading" stripe>
+            <el-table-column :label="tt('page.outreach.colInfluencer')" min-width="190">
+              <template #default="{row}">{{ row.tiktok_id }} / {{ row.nickname }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.outreach.mobileTaskType')" width="140">
+              <template #default="{row}">{{ mobileTypeLabel(row.task_type) }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.outreach.mobileTarget')" width="120">
+              <template #default="{row}">{{ row.target_channel || '-' }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.outreach.colStatus')" width="120">
+              <template #default="{row}">{{ statusLabel(row.task_status) }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('page.outreach.mobileDevice')" min-width="170">
+              <template #default="{row}">{{ row.device_name || row.device_code || '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="last_error_message" :label="tt('page.outreach.mobileFailReason')" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="updated_at" :label="tt('page.outreach.mobileUpdatedAt')" min-width="160" />
+            <el-table-column :label="tt('page.outreach.colActions')" width="120">
+              <template #default="{row}">
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  :loading="isMobileRetrying(row.id)"
+                  :disabled="!mobileTaskCanRetry(row)"
+                  @click="retryMobileTask(row)"
+                >{{ tt('page.outreach.mobileRetry') }}</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
 
         <el-dialog v-model="generateVisible" :title="tt('page.outreach.generateTitle')" width="560px">

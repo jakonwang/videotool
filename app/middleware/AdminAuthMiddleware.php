@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace app\middleware;
 
 use app\service\AdminAuthService;
+use app\service\TenantModuleService;
 use Closure;
 use think\Request;
+use think\facade\Db;
 
 class AdminAuthMiddleware
 {
@@ -17,19 +19,54 @@ class AdminAuthMiddleware
 
         $path = '/' . ltrim((string) $request->pathinfo(), '/');
         $path = rtrim($path, '/');
-        if ($path === '') $path = '/';
+        if ($path === '') {
+            $path = '/';
+        }
 
-        // 放行：登录与退出
+        // Whitelist login/logout routes.
         if ($path === '/auth/login' || $path === '/auth/logout') {
             return $next($request);
         }
 
+        if ($path === '/mobile_agent/pull' || $path === '/mobile_agent/report') {
+            if ($this->passesMobileAgentAuth($request)) {
+                return $next($request);
+            }
+            return json([
+                'code' => 401,
+                'msg' => 'token_required',
+                'error_key' => 'common.forbidden',
+                'data' => null,
+            ]);
+        }
+
         if (AdminAuthService::isLoggedIn()) {
+            $moduleName = $this->resolveModuleName($path);
+            if ($moduleName !== '') {
+                $state = TenantModuleService::moduleState($moduleName, AdminAuthService::tenantId());
+                if (!(bool) ($state['allowed'] ?? true)) {
+                    if ($this->expectsJson($request, $path)) {
+                        return json([
+                            'code' => 403,
+                            'msg' => 'module_forbidden',
+                            'error_key' => 'common.forbidden',
+                            'data' => [
+                                'module' => $moduleName,
+                                'reason' => (string) ($state['reason'] ?? 'forbidden'),
+                                'expires_at' => $state['expires_at'] ?? null,
+                            ],
+                        ]);
+                    }
+
+                    return redirect('/admin.php');
+                }
+            }
+
             return $next($request);
         }
 
         if ($this->expectsJson($request, $path)) {
-            return json(['code' => 401, 'msg' => '未登录', 'data' => null]);
+            return json(['code' => 401, 'msg' => 'not_logged_in', 'error_key' => 'common.sessionExpired', 'data' => null]);
         }
 
         $redirect = $this->buildAdminRedirect($request, $path);
@@ -37,9 +74,44 @@ class AdminAuthMiddleware
         return redirect($to);
     }
 
+    private function resolveModuleName(string $path): string
+    {
+        if ($path === '/' || str_starts_with($path, '/stats/')) {
+            return 'overview';
+        }
+        if (preg_match('#^/(product_search|offline_order)(/|$)#i', $path)) {
+            return 'product_search';
+        }
+        if (preg_match('#^/industry_trend(/|$)#i', $path)) {
+            return 'industry_trend';
+        }
+        if (preg_match('#^/competitor_analysis(/|$)#i', $path)) {
+            return 'competitor_analysis';
+        }
+        if (preg_match('#^/ad_insight(/|$)#i', $path)) {
+            return 'ad_insight';
+        }
+        if (preg_match('#^/data_import(/|$)#i', $path)) {
+            return 'data_import';
+        }
+        if (preg_match('#^/(influencer|outreach_workspace|sample|category|message_template|distribute|mobile_task|mobile_device|mobile_agent)(/|$)#i', $path)) {
+            return 'creator_crm';
+        }
+        if (preg_match('#^/(video|product)(/|$)#i', $path)) {
+            return 'material_distribution';
+        }
+        if (preg_match('#^/(platform|device)(/|$)#i', $path)) {
+            return 'terminal_devices';
+        }
+        if (preg_match('#^/(settings|ops_center|client_license|client_version|cache|downloadlog|download_log|user|extension)(/|$)#i', $path)) {
+            return 'system_ops';
+        }
+
+        return '';
+    }
+
     private function buildAdminRedirect(Request $request, string $path): string
     {
-        // 统一生成后台可回跳地址，避免某些环境下 url(true) 变成站点根（前端入口）
         $base = '/admin.php';
         $uri = ($path === '/' ? $base : ($base . $path));
 
@@ -50,6 +122,7 @@ class AdminAuthMiddleware
                 $uri .= '?' . $qs;
             }
         }
+
         return $uri;
     }
 
@@ -62,26 +135,52 @@ class AdminAuthMiddleware
         if ($request->isAjax()) {
             return true;
         }
-        // list 接口约定：多为 JSON
-        if (preg_match('#/(list|listJson)$#i', $path)) {
+        if (preg_match('#/(list|listJson|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
             return true;
         }
-        // 桌面端发卡/版本：POST/JSON 接口在未登录时须返回 JSON，避免 fetch 收到登录页 HTML
+        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|stats|mobile_task|mobile_device|mobile_agent)/#i', $path)) {
+            return true;
+        }
         if (preg_match('#^/(client_version|client_license)/(list|add|batchGenerate|update|toggle|delete|unbind|uploadPackage)#i', $path)) {
             return true;
         }
-        if (preg_match('#^/product_search/(list|importCsv|importTaskStatus|importTaskTick|syncAliyunQueue|batchDelete|update|delete|sampleCsv)#i', $path)) {
-            return true;
-        }
-        if (preg_match('#^/influencer/(list|search|importCsv|importTaskStatus|importTaskTick|update|updateStatus|markSampleShipped|logOutreachAction|delete)#i', $path)) {
-            return true;
-        }
-        if (preg_match('#^/category/options#i', $path)) {
-            return true;
-        }
-        if (preg_match('#^/extension/(list|listJson|logs|permissionMatrix|install|uninstall|toggle|savePermission)#i', $path)) {
-            return true;
-        }
+
         return false;
+    }
+
+    private function passesMobileAgentAuth(Request $request): bool
+    {
+        $token = trim((string) $request->header('x-mobile-agent-token', ''));
+        if ($token === '') {
+            $auth = trim((string) $request->header('authorization', ''));
+            if (stripos($auth, 'bearer ') === 0) {
+                $token = trim(substr($auth, 7));
+            }
+        }
+        if ($token === '') {
+            $raw = (string) $request->getContent();
+            if ($raw !== '' && ($raw[0] === '{' || $raw[0] === '[')) {
+                $json = json_decode($raw, true);
+                if (is_array($json)) {
+                    $token = trim((string) ($json['token'] ?? ''));
+                }
+            }
+        }
+        if ($token === '') {
+            $token = trim((string) $request->param('token', ''));
+        }
+        if ($token === '') {
+            return false;
+        }
+
+        try {
+            $exists = Db::name('mobile_devices')
+                ->where('agent_token', $token)
+                ->where('status', 1)
+                ->count();
+            return (int) $exists > 0;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }
