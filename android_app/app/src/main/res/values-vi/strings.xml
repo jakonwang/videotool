@@ -1,0 +1,139 @@
+<resources>
+    <string name="app_name">TikStar Mobile Agent</string>
+
+    <string name="lang_zh">Tiếng Trung</string>
+    <string name="lang_en">Tiếng Anh</string>
+    <string name="lang_vi">Tiếng Việt</string>
+
+    <string name="login_title">TikStar OPS</string>
+    <string name="login_subtitle">Đăng nhập bằng tài khoản quản trị hiện có</string>
+    <string name="login_username">Tên đăng nhập</string>
+    <string name="login_password">Mật khẩu</string>
+    <string name="login_btn">Đăng nhập</string>
+    <string name="login_error_required">Vui lòng nhập URL admin, tên đăng nhập và mật khẩu.</string>
+    <string name="login_error_prefix">Đăng nhập thất bại:</string>
+
+    <string name="portal_merchant_title">Cổng Merchant</string>
+    <string name="portal_influencer_title">Cổng Influencer</string>
+    <string name="console_user_info">%1$s | %2$s | tenant %3$s</string>
+    <string name="console_load_failed">Tải module thất bại</string>
+    <string name="console_no_modules">Không có module khả dụng. Hãy liên hệ quản trị viên để cấp quyền.</string>
+    <string name="console_open">Mở</string>
+    <string name="console_creator_module_disabled">Module Creator CRM đang bị tắt.</string>
+    <string name="console_create_task_result">%1$s: tạo %2$s, đã có %3$s, chặn 24h %4$s</string>
+    <string name="console_action_done">Thao tác thành công</string>
+    <string name="console_action_failed">Thao tác thất bại</string>
+    <string name="console_pending_tasks">Hàng đợi chờ xử lý</string>
+    <string name="console_device_status">Trạng thái thiết bị</string>
+    <string name="console_no_data">Không có dữ liệu</string>
+    <string name="console_session_expired">Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.</string>
+    <string name="console_quick_actions_title">Tác vụ nhanh Creator CRM</string>
+    <string name="console_metric_contacted">Đã liên hệ hôm nay</string>
+    <string name="console_metric_pending_reply">Chờ phản hồi</string>
+    <string name="console_metric_sampled">Đã gửi mẫu</string>
+    <string name="console_btn_refresh">Làm mới</string>
+    <string name="console_btn_add_zalo">Thêm Zalo</string>
+    <string name="console_btn_go_comment">Đi bình luận</string>
+    <string name="console_btn_send_dm">Gửi DM</string>
+    <string name="console_card_sub">%1$s · GPM %2$s</string>
+    <string name="console_no_nickname">Chưa có biệt danh</string>
+    <string name="console_status_pending">Chờ xử lý</string>
+    <string name="console_status_assigned">Đã giao</string>
+    <string name="console_status_prepared">Đã làm nóng</string>
+    <string name="console_status_done">Hoàn tất</string>
+    <string name="console_status_failed">Lỗi</string>
+    <string name="console_status_skipped">Bỏ qua</string>
+    <string name="console_status_canceled">Đã hủy</string>
+    <string name="console_default_comment">%1$s, video mới của bạn rất hay! Mình vừa nhắn tin để trao đổi gửi mẫu hợp tác.</string>
+    <string name="console_overlay_required">Vui lòng cấp quyền cửa sổ nổi trước.</string>
+    <string name="console_accessibility_required">Vui lòng bật dịch vụ trợ năng Reach.</string>
+    <string name="console_comment_ready">Đã sao chép nội dung. Bấm bong bóng để tự động bình luận.</string>
+    <string name="console_no_external_contact">Chưa có liên hệ ngoài nền tảng, đã chuyển sang DM TikTok.</string>
+    <string name="console_switched_dm_mode">Đã chuyển sang DM TikTok.</string>
+    <string name="auto_no_pending_task">Không có nhiệm vụ bình luận đang chờ</string>
+    <string name="auto_comment_ui_not_ready">Giao diện bình luận chưa sẵn sàng</string>
+    <string name="auto_comment_button_not_found">Không tìm thấy nút bình luận</string>
+    <string name="auto_comment_sent_success">Đã hoàn tất bình luận tự động và cập nhật trạng thái</string>
+    <string name="auto_comment_send_failed">Bình luận tự động thất bại: %1$s</string>
+
+    <string name="btn_open_execution_center">Trung tâm thực thi</string>
+    <string name="btn_logout">Đăng xuất</string>
+    <string name="btn_create_comment">Tạo nhiệm vụ bình luận làm nóng</string>
+    <string name="btn_create_dm">Tạo nhiệm vụ DM</string>
+    <string name="btn_view_pending">Xem hàng đợi chờ xử lý</string>
+    <string name="btn_view_devices">Xem trạng thái thiết bị</string>
+    <string name="common_ok">OK</string>
+
+    <string name="web_title_default">Trang module</string>
+    <string name="web_load_failed">Không thể mở trang module.</string>
+    <string name="web_open_external_failed">Không thể mở ứng dụng ngoài.</string>
+    <string name="accessibility_service_label">Trợ năng Reach</string>
+    <string name="accessibility_service_desc">Hỗ trợ bấm bình luận, dán nội dung và gửi cho nhiệm vụ outreach TikTok.</string>
+
+    <string name="agent_title">TikStar OPS Mobile Agent</string>
+    <string name="agent_subtitle">Tự động kéo nhiệm vụ, sao chép nội dung và mở ứng dụng mục tiêu. Gửi tin vẫn do người dùng xác nhận.</string>
+
+    <string name="label_admin_base">URL admin (tự thêm /admin.php)</string>
+    <string name="label_token">Token thiết bị</string>
+    <string name="label_device_code">Mã thiết bị</string>
+    <string name="label_poll_interval">Chu kỳ kéo (giây)</string>
+    <string name="label_task_types">Loại nhiệm vụ</string>
+
+    <string name="hint_admin_base">Ví dụ: https://your-domain.com/admin.php</string>
+    <string name="hint_token">mobile_devices.agent_token</string>
+    <string name="hint_device_code">mobile_devices.device_code</string>
+
+    <string name="task_comment_warmup">Làm nóng bình luận (comment_warmup)</string>
+    <string name="task_tiktok_dm">TikTok DM (tiktok_dm)</string>
+    <string name="task_zalo_im">Zalo IM (zalo_im)</string>
+    <string name="task_wa_im">WhatsApp IM (wa_im)</string>
+
+    <string name="btn_save_config">Lưu cấu hình</string>
+    <string name="btn_start">Bật Agent</string>
+    <string name="btn_stop">Dừng Agent</string>
+    <string name="btn_pull_once">Kéo một lần</string>
+    <string name="btn_open_target">Mở lại mục tiêu</string>
+    <string name="btn_mark_sent">Đánh dấu đã gửi</string>
+    <string name="btn_go_comment_auto">Đi bình luận (Tự động)</string>
+    <string name="btn_mark_skip">Đánh dấu bỏ qua</string>
+    <string name="btn_mark_fail">Đánh dấu thất bại</string>
+    <string name="btn_clear_log">Xóa log</string>
+
+    <string name="label_status_initial">Trạng thái: chưa chạy</string>
+    <string name="label_status_value">Trạng thái: %1$s</string>
+    <string name="task_none">Nhiệm vụ hiện tại: không có</string>
+
+    <string name="error_invalid_config">Vui lòng nhập URL admin, token và mã thiết bị.</string>
+    <string name="log_config_saved">Đã lưu cấu hình.</string>
+
+    <string name="menu_overview">Tổng quan</string>
+    <string name="menu_dashboard">Bảng điều khiển</string>
+    <string name="menu_group_search">Tìm nguồn hàng</string>
+    <string name="menu_style_search">Tìm mẫu</string>
+    <string name="menu_offline_orders">Đặt hàng offline</string>
+    <string name="menu_growth_hub">Trung tâm tăng trưởng</string>
+    <string name="menu_industry_trend">Xu hướng ngành</string>
+    <string name="menu_competitor_analysis">Phân tích đối thủ</string>
+    <string name="menu_ad_insight">Thông tin quảng cáo</string>
+    <string name="menu_data_import">Nhập dữ liệu</string>
+    <string name="menu_group_creator">Vận hành KOL</string>
+    <string name="menu_influencer_list">Danh bạ KOL</string>
+    <string name="menu_outreach_workspace">Không gian outreach</string>
+    <string name="menu_sample_management">Quản lý gửi mẫu</string>
+    <string name="menu_category">Cấu hình phân loại</string>
+    <string name="menu_message_templates">Mẫu tin nhắn</string>
+    <string name="menu_distribute">Liên kết KOL</string>
+    <string name="menu_material">Phân phối nội dung</string>
+    <string name="menu_video">Kho video</string>
+    <string name="menu_upload">Tải lên hàng loạt</string>
+    <string name="menu_product">Quản lý sản phẩm</string>
+    <string name="menu_terminal_section">Thiết bị đầu cuối</string>
+    <string name="menu_terminal">Thiết bị đầu cuối</string>
+    <string name="menu_platform">Nền tảng</string>
+    <string name="menu_device">Thiết bị</string>
+    <string name="menu_system">Cài đặt hệ thống</string>
+    <string name="menu_settings">Cài đặt</string>
+    <string name="menu_ops_center">Trung tâm vận hành</string>
+    <string name="menu_user">Người dùng</string>
+    <string name="menu_extension_manager">Quản lý module</string>
+</resources>

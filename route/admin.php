@@ -200,12 +200,14 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('mobile_task/listJson', 'app\controller\admin\MobileTask@listJson');
     Route::post('mobile_task/create_batch', 'app\controller\admin\MobileTask@createBatch');
     Route::post('mobile_task/retry', 'app\controller\admin\MobileTask@retry');
+    Route::post('mobile_task/update_status', 'app\controller\admin\MobileTask@updateStatus');
 
     Route::get('mobile_device/list', 'app\controller\admin\MobileDevice@listJson');
     Route::get('mobile_device/listJson', 'app\controller\admin\MobileDevice@listJson');
 
     Route::post('mobile_agent/pull', 'app\controller\admin\MobileAgent@pull');
     Route::post('mobile_agent/report', 'app\controller\admin\MobileAgent@report');
+    Route::get('mobile_console/bootstrap', 'app\controller\admin\MobileConsole@bootstrap');
 
     // Sample management
     Route::get('sample/list', 'app\controller\admin\Sample@listJson');

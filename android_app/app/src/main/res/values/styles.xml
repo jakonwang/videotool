@@ -1,8 +1,72 @@
 <resources>
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <item name="colorPrimary">#667eea</item>
-        <item name="colorPrimaryDark">#5568d3</item>
-        <item name="colorAccent">#764ba2</item>
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryDark">@color/brand_primary_dark</item>
+        <item name="colorAccent">@color/brand_accent</item>
+        <item name="android:statusBarColor">#F5F7FA</item>
+        <item name="android:navigationBarColor">#F5F7FA</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="AppPageTitle">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
+    <style name="AppPageSubtitle">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="AppLabelText">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="AppEditText">
+        <item name="android:background">@drawable/bg_input</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_muted</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+    </style>
+
+    <style name="AppButtonBase">
+        <item name="android:minHeight">44dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+    </style>
+
+    <style name="AppButtonPrimary" parent="AppButtonBase">
+        <item name="android:background">@drawable/bg_button_primary</item>
+        <item name="android:textColor">@color/text_inverse</item>
+    </style>
+
+    <style name="AppButtonSecondary" parent="AppButtonBase">
+        <item name="android:background">@drawable/bg_button_secondary</item>
+        <item name="android:textColor">@color/btn_secondary_text</item>
+    </style>
+
+    <style name="AppButtonNeutral" parent="AppButtonBase">
+        <item name="android:background">@drawable/bg_button_neutral</item>
+        <item name="android:textColor">@color/btn_neutral_text</item>
+    </style>
+
+    <style name="AppButtonDanger" parent="AppButtonBase">
+        <item name="android:background">@drawable/bg_button_danger</item>
+        <item name="android:textColor">@color/btn_danger_text</item>
+    </style>
+
+    <style name="AppButtonSuccess" parent="AppButtonBase">
+        <item name="android:background">@drawable/bg_button_success</item>
+        <item name="android:textColor">@color/btn_success_text</item>
     </style>
 </resources>
-

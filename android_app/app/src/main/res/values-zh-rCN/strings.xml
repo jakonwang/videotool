@@ -1,0 +1,139 @@
+<resources>
+    <string name="app_name">TikStar 移动执行器</string>
+
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">英文</string>
+    <string name="lang_vi">越南语</string>
+
+    <string name="login_title">TikStar OPS</string>
+    <string name="login_subtitle">使用后台现有账号登录</string>
+    <string name="login_username">用户名</string>
+    <string name="login_password">密码</string>
+    <string name="login_btn">登录</string>
+    <string name="login_error_required">请填写后台地址、用户名和密码。</string>
+    <string name="login_error_prefix">登录失败：</string>
+
+    <string name="portal_merchant_title">商家端</string>
+    <string name="portal_influencer_title">达人端</string>
+    <string name="console_user_info">%1$s | %2$s | 租户 %3$s</string>
+    <string name="console_load_failed">加载模块失败</string>
+    <string name="console_no_modules">当前没有可用模块，请联系管理员开通权限。</string>
+    <string name="console_open">打开</string>
+    <string name="console_creator_module_disabled">达人 CRM 模块未启用。</string>
+    <string name="console_create_task_result">%1$s：新建 %2$s，已存在 %3$s，24h 拦截 %4$s</string>
+    <string name="console_action_done">操作成功</string>
+    <string name="console_action_failed">操作失败</string>
+    <string name="console_pending_tasks">待处理任务</string>
+    <string name="console_device_status">设备状态</string>
+    <string name="console_no_data">暂无数据</string>
+    <string name="console_session_expired">登录已失效，请重新登录。</string>
+    <string name="console_quick_actions_title">达人 CRM 快捷操作</string>
+    <string name="console_metric_contacted">今日已联系</string>
+    <string name="console_metric_pending_reply">待回复</string>
+    <string name="console_metric_sampled">已寄样</string>
+    <string name="console_btn_refresh">刷新</string>
+    <string name="console_btn_add_zalo">加Zalo</string>
+    <string name="console_btn_go_comment">去评论</string>
+    <string name="console_btn_send_dm">发私信</string>
+    <string name="console_card_sub">%1$s · GPM %2$s</string>
+    <string name="console_no_nickname">未填写昵称</string>
+    <string name="console_status_pending">待处理</string>
+    <string name="console_status_assigned">已分配</string>
+    <string name="console_status_prepared">已预热</string>
+    <string name="console_status_done">已完成</string>
+    <string name="console_status_failed">失败</string>
+    <string name="console_status_skipped">跳过</string>
+    <string name="console_status_canceled">取消</string>
+    <string name="console_default_comment">%1$s，你最近的视频很棒！我刚给你发了私信，想沟通寄样合作。</string>
+    <string name="console_overlay_required">请先开启悬浮窗权限。</string>
+    <string name="console_accessibility_required">请先开启 Reach 无障碍服务。</string>
+    <string name="console_comment_ready">话术已复制，点击悬浮球可自动执行评论。</string>
+    <string name="console_no_external_contact">该达人未抓取到站外账号，已切换为 TikTok 站内私信模式。</string>
+    <string name="console_switched_dm_mode">已切换为 TikTok 站内私信模式。</string>
+    <string name="auto_no_pending_task">暂无待处理评论任务</string>
+    <string name="auto_comment_ui_not_ready">评论界面尚未就绪</string>
+    <string name="auto_comment_button_not_found">未找到评论按钮</string>
+    <string name="auto_comment_sent_success">已完成自动评论并回传</string>
+    <string name="auto_comment_send_failed">自动评论失败：%1$s</string>
+
+    <string name="btn_open_execution_center">执行中心</string>
+    <string name="btn_logout">退出登录</string>
+    <string name="btn_create_comment">创建预热评论任务</string>
+    <string name="btn_create_dm">创建私信任务</string>
+    <string name="btn_view_pending">查看待处理队列</string>
+    <string name="btn_view_devices">查看设备状态</string>
+    <string name="common_ok">确定</string>
+
+    <string name="web_title_default">模块页面</string>
+    <string name="web_load_failed">无法打开模块页面。</string>
+    <string name="web_open_external_failed">无法打开外部应用。</string>
+    <string name="accessibility_service_label">触达无障碍助手</string>
+    <string name="accessibility_service_desc">辅助点击评论、粘贴并发送，用于达人触达任务。</string>
+
+    <string name="agent_title">TikStar OPS 移动执行器</string>
+    <string name="agent_subtitle">自动拉取任务、复制话术并打开目标 App，发送动作仍由人工完成。</string>
+
+    <string name="label_admin_base">后台地址（自动补全 /admin.php）</string>
+    <string name="label_token">设备 Token</string>
+    <string name="label_device_code">设备编码</string>
+    <string name="label_poll_interval">轮询间隔（秒）</string>
+    <string name="label_task_types">任务类型</string>
+
+    <string name="hint_admin_base">示例：https://your-domain.com/admin.php</string>
+    <string name="hint_token">mobile_devices.agent_token</string>
+    <string name="hint_device_code">mobile_devices.device_code</string>
+
+    <string name="task_comment_warmup">评论预热（comment_warmup）</string>
+    <string name="task_tiktok_dm">TikTok 私信（tiktok_dm）</string>
+    <string name="task_zalo_im">Zalo 私信（zalo_im）</string>
+    <string name="task_wa_im">WhatsApp 私信（wa_im）</string>
+
+    <string name="btn_save_config">保存配置</string>
+    <string name="btn_start">启动 Agent</string>
+    <string name="btn_stop">停止 Agent</string>
+    <string name="btn_pull_once">拉取一次</string>
+    <string name="btn_open_target">重新打开目标</string>
+    <string name="btn_mark_sent">标记已发送</string>
+    <string name="btn_go_comment_auto">去评论（自动）</string>
+    <string name="btn_mark_skip">标记跳过</string>
+    <string name="btn_mark_fail">标记失败</string>
+    <string name="btn_clear_log">清空日志</string>
+
+    <string name="label_status_initial">状态：未启动</string>
+    <string name="label_status_value">状态：%1$s</string>
+    <string name="task_none">当前任务：无</string>
+
+    <string name="error_invalid_config">请填写后台地址、Token 和设备编码。</string>
+    <string name="log_config_saved">配置已保存。</string>
+
+    <string name="menu_overview">概览</string>
+    <string name="menu_dashboard">仪表盘</string>
+    <string name="menu_group_search">商机寻款</string>
+    <string name="menu_style_search">款式检索</string>
+    <string name="menu_offline_orders">线下预定</string>
+    <string name="menu_growth_hub">增长中台</string>
+    <string name="menu_industry_trend">行业趋势</string>
+    <string name="menu_competitor_analysis">竞品分析</string>
+    <string name="menu_ad_insight">广告情报</string>
+    <string name="menu_data_import">数据导入</string>
+    <string name="menu_group_creator">达人运营</string>
+    <string name="menu_influencer_list">达人名录</string>
+    <string name="menu_outreach_workspace">外联工作台</string>
+    <string name="menu_sample_management">寄样管理</string>
+    <string name="menu_category">分类配置</string>
+    <string name="menu_message_templates">话术模板</string>
+    <string name="menu_distribute">达人链路</string>
+    <string name="menu_material">内容分发</string>
+    <string name="menu_video">视频素材</string>
+    <string name="menu_upload">批量上传</string>
+    <string name="menu_product">商品管理</string>
+    <string name="menu_terminal_section">终端</string>
+    <string name="menu_terminal">终端</string>
+    <string name="menu_platform">平台管理</string>
+    <string name="menu_device">设备管理</string>
+    <string name="menu_system">系统设置</string>
+    <string name="menu_settings">系统设置</string>
+    <string name="menu_ops_center">运维中心</string>
+    <string name="menu_user">用户管理</string>
+    <string name="menu_extension_manager">模块管理</string>
+</resources>

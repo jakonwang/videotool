@@ -17,6 +17,11 @@ composer.lock
 *.swo
 *~
 
+# Android build artifacts
+android_app/.gradle/
+android_app/app/build/
+android_app/build/
+
 # 系统文件
 .DS_Store
 Thumbs.db

@@ -333,5 +333,130 @@
 5. 配额说明：
    - `mobile_devices.daily_used` 仅在任务终态（`done/failed/skipped/canceled`）计数，`prepared` 不计数。
 
+### 14.9 Android App Agent（本轮新增，2026-04-08）
+- 目录：`android_app/`
+- 目标：把“执行层”封装为手机 App，电脑后台仅负责创建任务。
+- 架构：
+  - `MainActivity`：配置页 + 任务操作页（启动/停止/拉取/已发送/跳过/失败）
+  - `MobileAgentService`：前台服务常驻轮询 `pull`，并回传 `report`
+  - `AgentApiClient`：统一 HTTP 协议层（`/mobile_agent/pull`、`/mobile_agent/report`）
+  - `MobileTaskExecutor`：自动复制文案 + 打开 TikTok/Zalo/WA，停在人工发送前
+  - `AgentPrefs`：本地持久化配置与当前任务
+- 默认执行边界：
+  - 自动：拉任务、复制内容、打开目标应用、回传 `*_prepared`
+  - 人工：最终点击发送，再在 App 中点“标记已发送”
+- 运行步骤（手机 App）：
+  1. 后台先配置 `mobile_devices`（`agent_token`、`device_code`）
+  2. 手机安装 APK，填写 `admin_base/token/device_code`
+  3. 点击“启动 Agent”
+  4. 后台创建移动任务后，手机自动拉取并打开目标渠道
+  5. 人工发送后在 App 点击“标记已发送”
+- 当前限制：
+  - 本地编译依赖 JDK；若未配置 `JAVA_HOME`，无法在开发机执行 `gradlew assembleDebug`
+
+## 15. 2026-04-08 Mobile Agent V1（多语言 + 分端登录 + 模块化执行）
+
+### 15.1 后端新增接口
+- 新增：`GET /admin.php/mobile_console/bootstrap?lang=zh|en|vi`
+- 控制器：`app/controller/admin/MobileConsole.php`
+- 返回结构：
+  - `user(id, username, role, tenant_id)`
+  - `portal`（`viewer -> influencer`，其余角色为 `merchant`）
+  - `menus`（来自 `ModuleManagerService::getEnabledMenus()`）
+  - `enabled_modules`（来自 `ModuleManagerService::modulesForCurrentRole(true)`）
+
+### 15.2 Android 端架构（V1）
+- 入口改为路由：
+  - `MainActivity` 仅做跳转：已登录 -> `ModuleConsoleActivity`，未登录 -> `LoginActivity`
+- 登录页：
+  - 复用后台登录：`POST /admin.php/auth/login`
+  - 会话持久化：`PersistentCookieJar` + `HttpClientProvider`
+- 分端首页：
+  - `ModuleConsoleActivity` 根据 `bootstrap` 的 `portal + menus` 动态渲染模块
+  - `super_admin/operator` 走商家端；`viewer` 走达人端
+- 模块执行：
+  - 通用动作：模块“打开后台页面”（`WebModuleActivity` + WebView）
+  - `creator_crm` 快捷动作：
+    - 创建评论预热任务：`POST /admin.php/mobile_task/create_batch (comment_warmup)`
+    - 创建私信任务：`POST /admin.php/mobile_task/create_batch (tiktok_dm)`
+    - 查看待处理：`GET /admin.php/mobile_task/listJson?task_status=0`
+    - 查看设备：`GET /admin.php/mobile_device/listJson`
+- 执行中心：
+  - 仍保留 `AgentControlActivity`，不改变“自动填充 + 人工发送”边界
+
+### 15.3 多语言与资源
+- Android 新增资源目录：
+  - `android_app/app/src/main/res/values-en/strings.xml`
+  - `android_app/app/src/main/res/values-zh-rCN/strings.xml`
+  - `android_app/app/src/main/res/values-vi/strings.xml`
+- 语言策略：
+  - 首次跟随系统语言（`zh/en/vi`）
+  - 支持手动切换并持久化（重启后生效）
+
+### 15.4 兼容性与修复
+- `SessionApiClient.logout()` 使用空 `FormBody`，避免 `RequestBody.create(..., null)` 兼容问题。
+- `MobileAgentService` 通知点击入口改为 `AgentControlActivity`（执行中心直达）。
+- `AndroidManifest.xml` 已注册：
+  - `.console.LoginActivity`
+  - `.console.ModuleConsoleActivity`
+  - `.console.WebModuleActivity`
+  - `.AgentControlActivity`
+
+### 15.5 本地验证记录（Windows）
+1. 编译：
+   - `cd android_app`
+   - `set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot`
+   - `gradlew.bat :app:assembleDebug`
+2. 设备安装：
+   - `adb install -r android_app\app\build\outputs\apk\debug\app-debug.apk`
+3. 启动验证：
+   - `adb shell am start -W -n com.videotool/.MainActivity`
+   - 已确认顶层 Activity 为：`com.videotool/.console.LoginActivity`
+
+### 15.6 2026-04-08 A/B/C 交互增强（移动端首页 + 悬浮触达 + 智能跳转）
+
+#### A. ModuleConsoleActivity 视觉重构
+- 首页统一为 `Modern SaaS` 轻量风格：
+  - 页面底色：`#F5F7FA`
+  - 顶部统计区：固定 `120dp`，三指标（今日已联系、待回复、已寄样）
+  - 任务条目：白色圆角卡片 + `elevation=2dp`
+- 卡片信息层级：
+  - 左侧：达人头像位（当前无可用头像时使用 Handle 首字母占位）
+  - 中间：`@handle` + `昵称/GPM`
+  - 右侧：状态 Badge（按任务状态映射不同底色）
+- 底部动作栏固定三键：
+  - `加Zalo`（绿色）
+  - `去评论`（蓝色）
+  - `发私信`（灰色）
+
+#### B. 悬浮窗一键触达（评论预热）
+- 点击 `去评论` 时：
+  1. 自动复制 `comment_warmup` 话术到剪贴板
+  2. 深链打开 TikTok：`snssdk1128://user/profile/{uid}`
+  3. 启动 `40x40dp` 半透明左侧悬浮球
+- 点击悬浮球后通过 `AccessibilityService` 自动执行：
+  - 点击评论入口 -> 填充/粘贴话术 -> 点击发送
+- 回传规则：
+  - 调用 `POST /admin.php/mobile_task/update_status`
+  - 发送成功后任务保持为“已预热”（`comment_prepared`）
+- 交互提示已三语化：`zh/en/vi`（无待处理任务、评论区未就绪、评论按钮未找到、成功/失败提示）
+
+#### C. Zalo / WhatsApp 智能跳转
+- 渠道优先级：
+  1. 若存在 `zalo_id`，优先走 `zalo://...`
+  2. 若仅手机号且达人 `region != VN`，走 `whatsapp://send?phone={no}`
+  3. 若无站外联系方式，自动回退 TikTok 站内私信并提示原因
+
+#### A/B/C 验证命令（Windows）
+1. 编译 APK：
+   - `cd android_app`
+   - `gradlew.bat :app:assembleDebug`
+2. 安装到设备：
+   - `adb install -r app\build\outputs\apk\debug\app-debug.apk`
+3. 启动并检查首页：
+   - `adb shell am start -W -n com.videotool/.MainActivity`
+4. 自动化链路检查：
+   - 在首页点击“去评论” -> TikTok 打开 -> 悬浮球出现 -> 点击悬浮球 -> 后台任务状态更新为已预热
+
 
 

@@ -1,139 +1,81 @@
-# TikStar OPS · 云境Pro Android 应用
+# TikStar OPS Android Mobile Agent
 
-这是 **TikStar OPS**（原「社媒素材库·云境Pro」）的 WebView 套壳应用，用于展示平台分类与素材列表，避免浏览器广告干扰并提供更沉浸的下载体验。
+`android_app` 是 TikStar OPS 的移动执行端，负责把后台创建的任务在 Android 手机上高效落地执行。
 
-## 功能特点
+## 1. V1 能力范围
+- 登录：复用后台登录接口 `POST /admin.php/auth/login`，不新增账号体系。
+- 分端：按后台角色自动分端。
+  - 商家端：`super_admin`、`operator`
+  - 达人端：`viewer`
+- 多语言：`zh/en/vi`（自动识别 + 手动切换 + 本地持久化）。
+- 模块首页：动态读取 `GET /admin.php/mobile_console/bootstrap` 返回的菜单渲染。
+- 执行边界：固定为 **自动填充 + 人工发送**。
 
-- 📱 平台分类列表展示
-- 🎬 点击平台跳转到视频页面
-- 🚫 无广告干扰（使用 WebView 而非浏览器）
-- 📥 内置 NativeDownloader，多线程断点续传与备用链自动重试
-- 🎨 简洁美观的界面
+## 2. 主要页面与模块
+- `MainActivity`：
+  - 启动路由（已登录 -> 模块首页；未登录 -> 登录页）。
+- `com.videotool.console.LoginActivity`：
+  - 登录页，支持语言切换。
+- `com.videotool.console.ModuleConsoleActivity`：
+  - 分端首页，按模块动态显示功能入口。
+  - Creator CRM 快捷操作：
+    - 创建评论预热任务（`comment_warmup`）
+    - 创建私信任务（`tiktok_dm`）
+    - 查看待处理任务
+    - 查看设备状态
+- `com.videotool.console.WebModuleActivity`：
+  - 内嵌 WebView 打开后台模块页面，复用会话 Cookie。
+- `com.videotool.AgentControlActivity`：
+  - 移动执行中心（保留原有 Agent 任务执行能力）。
 
-## 项目结构
+## 3. 网络接口（V1）
+- `GET /admin.php/mobile_console/bootstrap`
+- `POST /admin.php/auth/login`
+- `POST /admin.php/auth/logout`
+- `POST /admin.php/mobile_task/create_batch`
+- `GET /admin.php/mobile_task/listJson`
+- `GET /admin.php/mobile_device/listJson`
+- `POST /admin.php/mobile_agent/pull`
+- `POST /admin.php/mobile_agent/report`
 
-```
-android_app/
-├── app/
-│   ├── src/
-│   │   └── main/
-│   │       ├── java/com/videotool/
-│   │       │   └── MainActivity.java
-│   │       ├── res/
-│   │       │   ├── layout/
-│   │       │   │   └── activity_main.xml
-│   │       │   ├── values/
-│   │       │   │   └── strings.xml
-│   │       │   └── mipmap/
-│   │       │       └── ic_launcher.png
-│   │       └── AndroidManifest.xml
-│   └── build.gradle
-├── build.gradle
-├── settings.gradle
-└── README.md
-```
+## 4. 本地开发（Windows）
 
-## 配置说明
+### 4.1 先决条件
+- JDK 17（推荐 Temurin 17）
+- Android SDK + ADB
 
-### 1. 修改服务器地址
-
-在 `MainActivity.java` 中修改 `BASE_URL` 变量为你的服务器地址：
-
-```java
-private static final String BASE_URL = "https://your-domain.com";
-```
-
-### 2. 编译 APK
-
-#### 方法一：使用 Android Studio（推荐）
-
-1. 安装 Android Studio
-2. 打开项目文件夹 `android_app`
-3. 等待 Gradle 同步完成
-4. 点击 `Build` -> `Build Bundle(s) / APK(s)` -> `Build APK(s)`
-5. APK 文件将生成在 `app/build/outputs/apk/debug/app-debug.apk`
-
-#### 方法二：使用命令行
-
-```bash
-# 进入项目目录
+### 4.2 编译
+```powershell
 cd android_app
-
-# 编译 APK
-./gradlew assembleDebug
-
-# APK 文件位置
-# app/build/outputs/apk/debug/app-debug.apk
+$env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+.\gradlew.bat :app:assembleDebug
 ```
 
-### 3. 签名 APK（用于发布）
-
-```bash
-# 生成签名密钥（首次）
-keytool -genkey -v -keystore videotool.keystore -alias videotool -keyalg RSA -keysize 2048 -validity 10000
-
-# 签名 APK
-jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore videotool.keystore app-release-unsigned.apk videotool
-
-# 对齐 APK（可选，但推荐）
-zipalign -v 4 app-release-unsigned.apk videotool-release.apk
+### 4.3 安装与启动
+```powershell
+adb devices
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+adb shell am start -W -n com.videotool/.MainActivity
 ```
 
-## 安装说明
+## 5. Linux 部署说明
+- Android 客户端与 Linux 无直接编译耦合，仅依赖后台 HTTP 接口。
+- 后台部署在 Linux 时，确保：
+  - `/admin.php/auth/login`
+  - `/admin.php/mobile_console/bootstrap`
+  - `/admin.php/mobile_task/*`
+  - `/admin.php/mobile_device/*`
+  - `/admin.php/mobile_agent/*`
+  可用且带会话/权限策略一致。
 
-1. 在 Android 设备上启用"未知来源"安装
-2. 将 APK 文件传输到设备
-3. 点击安装
+## 6. 注意事项
+- 不做无人值守自动发送（合规与封控风险控制）。
+- `mobile_agent/pull|report` 走设备 token 鉴权，需先配置 `mobile_devices`。
+- 若 App 无法编译，优先检查 `JAVA_HOME` 与 `adb` 连通性。
 
-## 使用说明
-
-1. 打开应用，显示平台分类列表
-2. 点击某个平台，跳转到该平台的视频页面
-3. 在视频页面可以：
-   - 观看视频
-   - 下载视频
-   - 下载封面
-   - 复制标题
-
-## 技术栈
-
-- Android SDK
-- WebView
-- Java
-
-## 注意事项
-
-- 确保服务器支持 HTTPS（Android 9+ 默认要求）
-- 如需支持 HTTP，需要在 AndroidManifest.xml 中配置网络安全策略
-- 确保服务器已配置 CORS（如果需要）
-
-## 更新日志
-
-### v1.0.8
-- 与服务端缓存/后台缓存管理功能同步，默认 APK 版本号升级至 1.0.8，便于渠道区分
-- APP 下载链路沿用 v1.0.7 的断点续传、通知权限与本地缓存机制，并彻底移除系统 DownloadManager 依赖，100% 走 NativeDownloader，兼容性更高
-
-### v1.0.7
-- 新增临时缓存文件 + 断点续传 + 自动重试 3 次，彻底解决 `unexpected end of stream`
-- 下载过程全程通知栏进度，Android 13+ 会请求通知权限确保有反馈
-- 后端代理增加无限超时与 Content-Length 透传，兼容千牛云长链大文件
-
-### v1.0.6
-- 彻底弃用系统 DownloadManager，全量使用内置引擎下载，彻底解决系统下载空文件问题
-- 新增下拉通知栏进度条，实时显示下载进度与状态
-- 强化防盗链兼容，确保 CDN 资源 100% 可下载
-
-### v1.0.5
-- APP 下载统一附带合法 Referer 与 User-Agent，兼容启用了防盗链的七牛/千牛 CDN
-- DownloadManager 与 OkHttp 两路下载均补齐 Header，确保直链和代理都能成功
-
-### v1.0.4
-- CDN 直链统一交由系统 DownloadManager 处理，失败后自动回退到应用内下载并提示错误原因
-- 新增 DownloadManager 任务追踪与媒体库刷新，确保视频/图片在下载完成后立即显示在相册
-- 扩展 CDN 域名识别范围，兼容千牛/七牛多个加速域
-
-### v1.0.0
-- 初始版本
-- 支持平台分类展示
-- 支持视频播放和下载
-
+## 7. UI 风格（2026-04-08）
+- 登录页、模块首页、执行中心统一为卡片化样式。
+- 统一了视觉规范：渐变背景、圆角卡片、分级按钮、统一输入框样式。
+- 模块菜单动态渲染项改为卡片行，`Open` 操作按钮可读性更高。
+- 语言切换下拉框使用定制样式（`zh/en/vi`）。
