@@ -14,6 +14,7 @@ class AdminUser extends Model
 
     protected $schema = [
         'id'            => 'int',
+        'tenant_id'     => 'int',
         'username'      => 'string',
         'role'          => 'string',
         'password_hash' => 'string',
@@ -24,4 +25,3 @@ class AdminUser extends Model
         'updated_at'    => 'datetime',
     ];
 }
-

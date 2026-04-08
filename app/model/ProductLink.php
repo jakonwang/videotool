@@ -14,6 +14,7 @@ class ProductLink extends Model
 
     protected $schema = [
         'id'            => 'int',
+        'tenant_id'     => 'int',
         'product_id'    => 'int',
         'token'         => 'string',
         'label'         => 'string',

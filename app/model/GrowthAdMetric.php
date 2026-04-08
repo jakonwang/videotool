@@ -11,6 +11,7 @@ class GrowthAdMetric extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'creative_id' => 'int',
         'metric_date' => 'date',
         'impressions' => 'int',
@@ -19,9 +20,9 @@ class GrowthAdMetric extends Model
         'cpc' => 'float',
         'cpm' => 'float',
         'est_spend' => 'float',
+        'est_gmv' => 'float',
         'active_days' => 'int',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 }
-

@@ -46,12 +46,17 @@
     .style-detail-top-meta { flex: 1; min-width: 0; }
     .style-detail-ai-title { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 6px; }
     .style-detail-ai-content { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #1f2937; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; }
+    .style-profit-card { margin-top: 14px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+    .style-profit-card .el-form-item { margin-bottom: 10px; }
+    .style-profit-note { margin: 4px 0 10px; font-size: 12px; color: #64748b; line-height: 1.5; }
+    .style-profit-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
     @media (max-width: 768px) {
         .style-search-keyword { width: 100%; }
         .style-image-dropzone { width: 100%; }
         .style-card-pricing { grid-template-columns: 1fr; }
         .style-detail-top { flex-direction: column; }
         .style-detail-image-wrap { width: 100%; height: 240px; }
+        .style-profit-card .el-form-item { margin-right: 0 !important; }
     }
 </style>
 {/block}
@@ -147,6 +152,15 @@
       const detailRow = ref(null);
       const aiDialogVisible = ref(false);
       const aiDialogRow = ref(null);
+      const DEFAULT_PROFIT_TARGET_MARGIN = 20;
+      const profitPosterLoading = ref(false);
+      const profitSimForm = reactive({
+        logistics_cost_per_kg: 2.5,
+        commission_rate: 7,
+        return_rate: 5,
+        sell_price: null,
+      });
+      const profitRows = computed(() => computeProfitRows(detailRow.value, profitSimForm));
       let importPollTimer = null;
 
       function stopImportPolling() {
@@ -640,8 +654,80 @@
         return imageDisplayUrl(ref) !== '';
       }
 
+      function toFinite(v, fallback = 0) {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function normalizePercent(v, min, max) {
+        const n = toFinite(v, min);
+        if (n < min) return min;
+        if (n > max) return max;
+        return n;
+      }
+
+      function levelPriceRows(row) {
+        const out = [];
+        const parsed = parsePriceLevels((row && row.price_levels_json) || '');
+        ['level1', 'level2', 'level3'].forEach((key) => {
+          if (parsed[key] === undefined || parsed[key] === null || parsed[key] === '') return;
+          out.push({
+            key,
+            level: key.toUpperCase(),
+            wholesale_price: Math.max(0, toFinite(parsed[key], 0)),
+          });
+        });
+        if (out.length === 0) {
+          out.push({
+            key: 'level1',
+            level: 'LEVEL1',
+            wholesale_price: Math.max(0, toFinite(row && row.wholesale_price, 0)),
+          });
+        }
+        return out.slice(0, 3);
+      }
+
+      function computeProfitRows(row, form) {
+        if (!row) return [];
+        const logistics = Math.max(0, toFinite(form.logistics_cost_per_kg, 0));
+        const commission = normalizePercent(form.commission_rate, 0, 95) / 100;
+        const returnRate = normalizePercent(form.return_rate, 0, 90) / 100;
+        const targetMargin = DEFAULT_PROFIT_TARGET_MARGIN / 100;
+        const denominator = (1 - commission) * (1 - returnRate);
+        const suggestedDenominator = (1 - targetMargin) * denominator;
+        const sellPriceRaw = toFinite(form.sell_price, 0);
+        const hasSellOverride = sellPriceRaw > 0;
+        return levelPriceRows(row).map((it) => {
+          const wholesale = Math.max(0, toFinite(it.wholesale_price, 0));
+          const totalCost = wholesale + logistics;
+          const suggestedSell = suggestedDenominator > 0 ? (totalCost / suggestedDenominator) : totalCost;
+          const usedSell = hasSellOverride ? sellPriceRaw : suggestedSell;
+          const netRevenue = usedSell * denominator;
+          const grossProfit = netRevenue - totalCost;
+          const grossMargin = netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
+          return {
+            key: it.key,
+            level: it.level,
+            wholesale_price: wholesale,
+            total_cost: totalCost,
+            suggested_sell_price: suggestedSell,
+            used_sell_price: usedSell,
+            gross_profit: grossProfit,
+            gross_margin: grossMargin,
+          };
+        });
+      }
+
+      function resetProfitSim() {
+        profitSimForm.logistics_cost_per_kg = 2.5;
+        profitSimForm.commission_rate = 7;
+        profitSimForm.return_rate = 5;
+        profitSimForm.sell_price = null;
+      }
+
       function openDetail(row) {
         detailRow.value = row || null;
+        resetProfitSim();
         detailVisible.value = true;
       }
 
@@ -863,6 +949,129 @@
         ctx.drawImage(img, dx, dy, dw, dh);
       }
 
+      function formatPercent(v) {
+        const n = Number(v || 0);
+        if (!Number.isFinite(n)) return '0.00%';
+        return n.toFixed(2) + '%';
+      }
+
+      async function generateProfitPoster() {
+        if (!detailRow.value) {
+          ElMessage.warning(tt('common.noData'));
+          return;
+        }
+        if (!profitRows.value.length) {
+          ElMessage.warning(tt('common.noData'));
+          return;
+        }
+        profitPosterLoading.value = true;
+        try {
+          const row = detailRow.value;
+          const rows = profitRows.value;
+          const canvas = document.createElement('canvas');
+          canvas.width = 1080;
+          canvas.height = 1680;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error(tt('page.styleSearch.fail'));
+
+          const bg = ctx.createLinearGradient(0, 0, 1080, 1680);
+          bg.addColorStop(0, '#f8fafc');
+          bg.addColorStop(1, '#e2e8f0');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, 1080, 1680);
+
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 52px sans-serif';
+          ctx.fillText(tt('page.styleSearch.profitPosterTitle'), 60, 90);
+
+          ctx.fillStyle = '#334155';
+          ctx.font = '28px sans-serif';
+          ctx.fillText(String(row.product_code || '-'), 60, 138);
+          ctx.fillText(String(row.hot_type || ''), 60, 176);
+
+          let img = null;
+          const imageUrl = imageDisplayUrl(row.image_ref || '');
+          if (imageUrl) {
+            try {
+              img = await loadImage(imageUrl);
+            } catch (_) {
+              img = null;
+            }
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(60, 220, 420, 420);
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(60, 220, 420, 420);
+          if (img) {
+            drawContain(ctx, img, 70, 230, 400, 400);
+          } else {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '24px sans-serif';
+            ctx.fillText(tt('page.styleSearch.imgLoadFail'), 190, 440);
+          }
+
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 30px sans-serif';
+          ctx.fillText(tt('page.styleSearch.profitPosterAssumption'), 520, 260);
+          ctx.fillStyle = '#334155';
+          ctx.font = '24px sans-serif';
+          ctx.fillText(tt('page.styleSearch.profitLogisticsPerKg') + ': ' + formatCurrency(profitSimForm.logistics_cost_per_kg), 520, 318);
+          ctx.fillText(tt('page.styleSearch.profitCommissionRate') + ': ' + formatPercent(profitSimForm.commission_rate), 520, 356);
+          ctx.fillText(tt('page.styleSearch.profitReturnRate') + ': ' + formatPercent(profitSimForm.return_rate), 520, 394);
+          ctx.fillText(tt('page.styleSearch.profitTargetMargin', { rate: DEFAULT_PROFIT_TARGET_MARGIN }), 520, 432);
+          if (Number(profitSimForm.sell_price || 0) > 0) {
+            ctx.fillText(tt('page.styleSearch.profitSellPrice') + ': ' + formatCurrency(profitSimForm.sell_price), 520, 470);
+          }
+
+          const tableX = 60;
+          const tableY = 700;
+          const tableW = 960;
+          const rowH = 86;
+          const headerH = 64;
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(tableX, tableY, tableW, headerH);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 24px sans-serif';
+          ctx.fillText(tt('page.styleSearch.profitLevel'), tableX + 18, tableY + 40);
+          ctx.fillText(tt('page.styleSearch.profitWholesale'), tableX + 180, tableY + 40);
+          ctx.fillText(tt('page.styleSearch.profitSuggestRetail'), tableX + 390, tableY + 40);
+          ctx.fillText(tt('page.styleSearch.profitGrossMargin'), tableX + 730, tableY + 40);
+
+          rows.forEach((r, idx) => {
+            const y = tableY + headerH + idx * rowH;
+            ctx.fillStyle = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            ctx.fillRect(tableX, y, tableW, rowH);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeRect(tableX, y, tableW, rowH);
+            ctx.fillStyle = '#0f172a';
+            ctx.font = '24px sans-serif';
+            ctx.fillText(String(r.level || '-'), tableX + 18, y + 53);
+            ctx.fillText(formatCurrency(r.wholesale_price), tableX + 180, y + 53);
+            ctx.fillText(formatCurrency(r.suggested_sell_price), tableX + 390, y + 53);
+            ctx.fillText(formatPercent(r.gross_margin), tableX + 760, y + 53);
+          });
+
+          ctx.fillStyle = '#334155';
+          ctx.font = '22px sans-serif';
+          ctx.fillText(tt('page.styleSearch.profitPosterHint'), 60, 1560);
+
+          const url = canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          const code = String(row.product_code || 'style');
+          a.href = url;
+          a.download = code + '_profit_quote.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          ElMessage.success(tt('page.styleSearch.profitPosterReady'));
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.styleSearch.fail'));
+        } finally {
+          profitPosterLoading.value = false;
+        }
+      }
+
       async function buildSharePoster() {
         if (!shareSourceRow.value) {
           ElMessage.warning(tt('common.noData'));
@@ -967,17 +1176,17 @@
         selectedRows, allCurrentSelected, batchDeleting, isRowSelected, toggleRowSelected, toggleSelectAllCurrent,
         imageSearchInputRef, imageSearching, imageDragOver,
         visionDescribeOnImport, visionDescCount, volcArkEnabled, visionAnyProviderReady,
-        detailVisible, detailRow, aiDialogVisible, aiDialogRow,
+        detailVisible, detailRow, aiDialogVisible, aiDialogRow, profitSimForm, profitRows, profitPosterLoading,
         editVisible, editSaving, editImageInputKey, editForm,
         tokenDialogVisible, tokenLoading, tokenForm,
         shareDialogVisible, shareLoading, shareForm, shareSourceRow, sharePosterDataUrl,
         fetchList, triggerSearch, resetFilters, toggleAdvanced,
         doImport, doDelete, doBatchDelete, openEdit, saveEdit, openH5, openCatalogH5, copyCatalogLink, lang, tt,
         triggerImageSearchInput, onImageDragOver, onImageDragLeave, onImageDrop, onImageSearchInputChange,
-        openDetail, openAiDialog, aiText, copyAiToZalo,
+        openDetail, openAiDialog, aiText, copyAiToZalo, generateProfitPoster,
         openTokenDialog, generateTokenLink, copyTokenLink,
         openSharePoster, buildSharePoster, downloadSharePoster,
-        imageDisplayUrl, isImagePreviewable, formatCurrency, formatQty,
+        imageDisplayUrl, isImagePreviewable, formatCurrency, formatQty, formatPercent,
       };
     },
     template: `
@@ -1163,9 +1372,49 @@
               <div class="style-detail-ai-title">{{ tt('page.styleSearch.aiSellingPoints') }}</div>
               <div class="style-detail-ai-content">{{ aiText(detailRow) || tt('page.styleSearch.aiEmpty') }}</div>
             </div>
+            <div class="style-profit-card">
+              <div class="style-detail-ai-title">{{ tt('page.styleSearch.profitSimulatorTitle') }}</div>
+              <el-form :inline="true" label-position="top" @submit.prevent>
+                <el-form-item :label="tt('page.styleSearch.profitLogisticsPerKg')">
+                  <el-input-number v-model="profitSimForm.logistics_cost_per_kg" :min="0" :step="0.1" :precision="2" style="width:180px;" />
+                </el-form-item>
+                <el-form-item :label="tt('page.styleSearch.profitCommissionRate')">
+                  <el-input-number v-model="profitSimForm.commission_rate" :min="0" :max="95" :step="0.5" :precision="2" style="width:160px;" />
+                </el-form-item>
+                <el-form-item :label="tt('page.styleSearch.profitReturnRate')">
+                  <el-input-number v-model="profitSimForm.return_rate" :min="0" :max="90" :step="0.5" :precision="2" style="width:160px;" />
+                </el-form-item>
+                <el-form-item :label="tt('page.styleSearch.profitSellPrice')">
+                  <el-input-number v-model="profitSimForm.sell_price" :min="0" :step="0.1" :precision="2" clearable style="width:180px;" />
+                </el-form-item>
+              </el-form>
+              <div class="style-profit-note">{{ tt('page.styleSearch.profitSellPriceHint') }}</div>
+              <el-table :data="profitRows" border size="small" table-layout="fixed">
+                <el-table-column prop="level" :label="tt('page.styleSearch.profitLevel')" width="110" />
+                <el-table-column :label="tt('page.styleSearch.profitWholesale')" width="130">
+                  <template #default="{ row }">{{ formatCurrency(row.wholesale_price) }}</template>
+                </el-table-column>
+                <el-table-column :label="tt('page.styleSearch.profitSuggestRetail')" width="170">
+                  <template #default="{ row }">{{ formatCurrency(row.suggested_sell_price) }}</template>
+                </el-table-column>
+                <el-table-column :label="tt('page.styleSearch.profitUsedRetail')" width="150">
+                  <template #default="{ row }">{{ formatCurrency(row.used_sell_price) }}</template>
+                </el-table-column>
+                <el-table-column :label="tt('page.styleSearch.profitGrossProfit')" width="130">
+                  <template #default="{ row }">{{ formatCurrency(row.gross_profit) }}</template>
+                </el-table-column>
+                <el-table-column :label="tt('page.styleSearch.profitGrossMargin')" min-width="120">
+                  <template #default="{ row }">{{ formatPercent(row.gross_margin) }}</template>
+                </el-table-column>
+              </el-table>
+              <div class="style-profit-actions">
+                <el-button type="success" :loading="profitPosterLoading" @click="generateProfitPoster">{{ tt('page.styleSearch.buildProfitPoster') }}</el-button>
+              </div>
+            </div>
           </div>
           <template #footer>
             <el-button @click="detailVisible = false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="success" :loading="profitPosterLoading" @click="generateProfitPoster">{{ tt('page.styleSearch.buildProfitPoster') }}</el-button>
             <el-button type="primary" @click="copyAiToZalo(detailRow)">{{ tt('page.styleSearch.copyToZalo') }}</el-button>
           </template>
         </el-dialog>

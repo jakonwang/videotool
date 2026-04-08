@@ -14,6 +14,7 @@ class OfflineOrder extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'order_no' => 'string',
         'customer_info' => 'string',
         'items_json' => 'string',
@@ -24,4 +25,3 @@ class OfflineOrder extends Model
         'updated_at' => 'datetime',
     ];
 }
-

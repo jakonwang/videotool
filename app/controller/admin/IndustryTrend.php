@@ -41,6 +41,7 @@ class IndustryTrend extends BaseController
         $dateTo = trim((string) $this->request->param('date_to', ''));
 
         $query = GrowthIndustryMetricModel::order('metric_date', 'desc')->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'growth_industry_metrics');
         if ($country !== '') {
             $query->where('country_code', strtoupper($country));
         }
@@ -91,7 +92,10 @@ class IndustryTrend extends BaseController
         $dateTo = $this->normalizeDate((string) $this->request->param('date_to', ''));
 
         if ($dateFrom === '' || $dateTo === '') {
-            $latest = GrowthIndustryMetricModel::max('metric_date');
+            $latestQuery = GrowthIndustryMetricModel::fieldRaw('MAX(metric_date) as latest');
+            $latestQuery = $this->scopeTenant($latestQuery, 'growth_industry_metrics');
+            $latestRow = $latestQuery->find();
+            $latest = (string) ($latestRow->latest ?? '');
             if (is_string($latest) && $latest !== '') {
                 $dateTo = $this->normalizeDate($latest);
             } else {
@@ -196,6 +200,7 @@ class IndustryTrend extends BaseController
             fputcsv($out, ['metric_date', 'country_code', 'category_name', 'heat_score', 'content_count', 'engagement_rate', 'cpc', 'cpm', 'updated_at']);
 
             $query = GrowthIndustryMetricModel::order('metric_date', 'desc')->order('id', 'desc');
+            $query = $this->scopeTenant($query, 'growth_industry_metrics');
             if ($country !== '') {
                 $query->where('country_code', strtoupper($country));
             }
@@ -238,6 +243,7 @@ class IndustryTrend extends BaseController
     private function aggregateRange(string $from, string $to, string $country, string $category): array
     {
         $query = GrowthIndustryMetricModel::where('metric_date', '>=', $from)->where('metric_date', '<=', $to);
+        $query = $this->scopeTenant($query, 'growth_industry_metrics');
         if ($country !== '') {
             $query->where('country_code', strtoupper($country));
         }

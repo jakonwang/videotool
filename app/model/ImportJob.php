@@ -11,6 +11,7 @@ class ImportJob extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'source_id' => 'int',
         'domain' => 'string',
         'job_type' => 'string',
@@ -27,4 +28,3 @@ class ImportJob extends Model
         'updated_at' => 'datetime',
     ];
 }
-

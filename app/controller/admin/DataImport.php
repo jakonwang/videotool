@@ -30,7 +30,9 @@ class DataImport extends BaseController
 
     public function sourceListJson()
     {
-        $rows = DataSourceModel::order('id', 'desc')->select();
+        $rowsQuery = DataSourceModel::order('id', 'desc');
+        $rowsQuery = $this->scopeTenant($rowsQuery, 'data_sources');
+        $rows = $rowsQuery->select();
         $items = [];
         foreach ($rows as $row) {
             $config = DataImportDispatchService::parseConfig((string) ($row->config_json ?? ''));
@@ -87,7 +89,9 @@ class DataImport extends BaseController
         $configJson = $config !== [] ? json_encode($config, JSON_UNESCAPED_UNICODE) : null;
 
         if ($id > 0) {
-            $row = DataSourceModel::find($id);
+            $rowQuery = DataSourceModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'data_sources');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('not_found', 1, null, 'common.notFound');
             }
@@ -99,14 +103,15 @@ class DataImport extends BaseController
             $row->config_json = $configJson;
             $row->save();
         } else {
-            DataSourceModel::create([
+            $createPayload = $this->withTenantPayload([
                 'code' => mb_substr($code, 0, 64),
                 'name' => mb_substr($name, 0, 128),
                 'source_type' => $sourceType,
                 'adapter_key' => $adapterKey !== '' ? mb_substr($adapterKey, 0, 64) : null,
                 'status' => $status,
                 'config_json' => $configJson,
-            ]);
+            ], 'data_sources');
+            DataSourceModel::create($createPayload);
         }
 
         return $this->jsonOk([], 'saved');
@@ -127,7 +132,9 @@ class DataImport extends BaseController
         if ($id <= 0) {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
-        DataSourceModel::destroy($id);
+        $query = DataSourceModel::where('id', $id);
+        $query = $this->scopeTenant($query, 'data_sources');
+        $query->delete();
         return $this->jsonOk([], 'deleted');
     }
 
@@ -144,6 +151,7 @@ class DataImport extends BaseController
         $domain = trim((string) $this->request->param('domain', ''));
         $status = (string) $this->request->param('status', '');
         $query = ImportJobModel::order('id', 'desc');
+        $query = $this->scopeTenant($query, 'import_jobs');
         if ($domain !== '') {
             $query->where('domain', $domain);
         }
@@ -190,7 +198,9 @@ class DataImport extends BaseController
         if ($jobId <= 0) {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
-        $rows = ImportJobLogModel::where('job_id', $jobId)->order('id', 'desc')->limit(200)->select();
+        $rowsQuery = ImportJobLogModel::where('job_id', $jobId)->order('id', 'desc')->limit(200);
+        $rowsQuery = $this->scopeTenant($rowsQuery, 'import_job_logs');
+        $rows = $rowsQuery->select();
         $items = [];
         foreach ($rows as $row) {
             $items[] = [
@@ -215,7 +225,9 @@ class DataImport extends BaseController
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
 
-        $job = ImportJobModel::find($jobId);
+        $jobQuery = ImportJobModel::where('id', $jobId);
+        $jobQuery = $this->scopeTenant($jobQuery, 'import_jobs');
+        $job = $jobQuery->find();
         if (!$job) {
             return $this->jsonErr('not_found', 1, null, 'common.notFound');
         }

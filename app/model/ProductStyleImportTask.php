@@ -14,6 +14,7 @@ class ProductStyleImportTask extends Model
 
     protected $schema = [
         'id'                   => 'int',
+        'tenant_id'            => 'int',
         'status'               => 'string',
         'file_path'            => 'string',
         'file_ext'             => 'string',

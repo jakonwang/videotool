@@ -40,6 +40,7 @@ class OfflineOrder extends BaseController
         }
 
         $q = Db::name('offline_orders')->order('id', 'desc');
+        $q = $this->scopeTenant($q, 'offline_orders');
         if ($keyword !== '') {
             $q->where(static function ($where) use ($keyword): void {
                 $where->whereLike('order_no', '%' . $keyword . '%')
@@ -102,12 +103,16 @@ class OfflineOrder extends BaseController
             return $this->jsonErr('invalid_status');
         }
 
-        $exists = Db::name('offline_orders')->where('id', $id)->find();
+        $existsQuery = Db::name('offline_orders')->where('id', $id);
+        $existsQuery = $this->scopeTenant($existsQuery, 'offline_orders');
+        $exists = $existsQuery->find();
         if (!$exists) {
             return $this->jsonErr('not_found');
         }
 
-        Db::name('offline_orders')->where('id', $id)->update([
+        $updateQuery = Db::name('offline_orders')->where('id', $id);
+        $updateQuery = $this->scopeTenant($updateQuery, 'offline_orders');
+        $updateQuery->update([
             'status' => $status,
             'remark' => $remark,
             'updated_at' => date('Y-m-d H:i:s'),
@@ -122,6 +127,7 @@ class OfflineOrder extends BaseController
         $statusRaw = trim((string) $this->request->param('status', ''));
 
         $q = Db::name('offline_orders')->order('id', 'desc');
+        $q = $this->scopeTenant($q, 'offline_orders');
         if ($keyword !== '') {
             $q->where(static function ($where) use ($keyword): void {
                 $where->whereLike('order_no', '%' . $keyword . '%')

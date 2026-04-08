@@ -23,7 +23,18 @@ class Product extends BaseController
         if (preg_match('#^(.*?)/admin\.php#', $scriptName, $matches)) {
             $baseUrl .= $matches[1];
         }
+
         return $baseUrl;
+    }
+
+    private function activeProductCategoryList()
+    {
+        $query = CategoryModel::where('type', 'product')->where('status', 1)
+            ->order('sort_order', 'asc')
+            ->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'categories');
+
+        return $query->select();
     }
 
     public function index()
@@ -32,6 +43,7 @@ class Product extends BaseController
         $status = $this->request->param('status', '');
 
         $query = ProductModel::order('sort_order', 'asc')->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'products');
         if ($keyword !== '') {
             $query->whereLike('name', '%' . $keyword . '%');
         }
@@ -64,11 +76,15 @@ class Product extends BaseController
 
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
-        if ($pageSize <= 0) $pageSize = 10;
-        if ($pageSize > 100) $pageSize = 100;
+        if ($pageSize <= 0) {
+            $pageSize = 10;
+        }
+        if ($pageSize > 100) {
+            $pageSize = 100;
+        }
 
         $sortProp = (string) $this->request->param('sort_prop', 'sort_order');
-        $sortOrder = (string) $this->request->param('sort_order', 'asc'); // asc|desc
+        $sortOrder = (string) $this->request->param('sort_order', 'asc');
         $sortOrder = strtolower($sortOrder) === 'desc' ? 'desc' : 'asc';
 
         $allowedSort = ['id', 'sort_order', 'updated_at', 'created_at', 'status'];
@@ -77,6 +93,7 @@ class Product extends BaseController
         }
 
         $query = ProductModel::order($sortProp, $sortOrder)->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'products');
         if ($keyword !== '') {
             $query->whereLike('name', '%' . $keyword . '%');
         }
@@ -102,21 +119,22 @@ class Product extends BaseController
                 $productIds[] = $pid;
             }
         }
+
         $statsByProductId = [];
-        if (!empty($productIds)) {
-            $rows = Db::name('videos')
-                ->fieldRaw("
+        if ($productIds !== []) {
+            $statsQuery = Db::name('videos')
+                ->fieldRaw('
                     product_id,
                     COUNT(*) AS total_videos,
                     SUM(CASE WHEN is_downloaded = 1 THEN 1 ELSE 0 END) AS downloaded_videos,
                     SUM(CASE WHEN is_downloaded = 0 THEN 1 ELSE 0 END) AS undownloaded_videos
-                ")
+                ')
                 ->whereIn('product_id', $productIds)
-                ->group('product_id')
-                ->select()
-                ->toArray();
+                ->group('product_id');
+            $statsQuery = $this->scopeTenant($statsQuery, 'videos');
+            $rows = $statsQuery->select()->toArray();
             foreach ($rows as $r) {
-                $statsByProductId[(int) $r['product_id']] = [
+                $statsByProductId[(int) ($r['product_id'] ?? 0)] = [
                     'total_videos' => (int) ($r['total_videos'] ?? 0),
                     'downloaded_videos' => (int) ($r['downloaded_videos'] ?? 0),
                     'undownloaded_videos' => (int) ($r['undownloaded_videos'] ?? 0),
@@ -146,23 +164,26 @@ class Product extends BaseController
             ];
         }
 
+        $catNamesQuery = ProductModel::whereNotNull('category_name')
+            ->where('category_name', '<>', '')
+            ->distinct(true)
+            ->order('category_name', 'asc');
+        $catNamesQuery = $this->scopeTenant($catNamesQuery, 'products');
+
+        $catOptionsQuery = CategoryModel::where('type', 'product')
+            ->where('status', 1)
+            ->order('sort_order', 'asc')
+            ->order('id', 'desc')
+            ->field('id,name');
+        $catOptionsQuery = $this->scopeTenant($catOptionsQuery, 'categories');
+
         return json([
             'code' => 0,
             'msg' => 'ok',
             'data' => [
                 'items' => $items,
-                'categories' => ProductModel::whereNotNull('category_name')
-                    ->where('category_name', '<>', '')
-                    ->distinct(true)
-                    ->order('category_name', 'asc')
-                    ->column('category_name'),
-                'category_options' => CategoryModel::where('type', 'product')
-                    ->where('status', 1)
-                    ->order('sort_order', 'asc')
-                    ->order('id', 'desc')
-                    ->field('id,name')
-                    ->select()
-                    ->toArray(),
+                'categories' => $catNamesQuery->column('category_name'),
+                'category_options' => $catOptionsQuery->select()->toArray(),
                 'total' => (int) $list->total(),
                 'page' => (int) $list->currentPage(),
                 'page_size' => (int) $list->listRows(),
@@ -181,12 +202,15 @@ class Product extends BaseController
             $categoryId = (int) ($data['category_id'] ?? 0);
             $categoryName = trim((string) ($data['category_name'] ?? ''));
             if ($categoryId > 0) {
-                $cat = CategoryModel::where('id', $categoryId)->where('type', 'product')->find();
+                $catQuery = CategoryModel::where('id', $categoryId)->where('type', 'product');
+                $catQuery = $this->scopeTenant($catQuery, 'categories');
+                $cat = $catQuery->find();
                 if ($cat) {
                     $categoryName = (string) ($cat->name ?? '');
                 }
             }
-            ProductModel::create([
+
+            $payload = [
                 'name' => $name,
                 'category_name' => $categoryName !== '' ? $categoryName : null,
                 'category_id' => $categoryId > 0 ? $categoryId : null,
@@ -195,16 +219,15 @@ class Product extends BaseController
                 'tiktok_shop_url' => trim((string) ($data['tiktok_shop_url'] ?? '')) ?: null,
                 'status' => (int) ($data['status'] ?? 1),
                 'sort_order' => (int) ($data['sort_order'] ?? 0),
-            ]);
+            ];
+            ProductModel::create($this->withTenantPayload($payload, 'products'));
+
             return json(['code' => 0, 'msg' => '添加成功']);
         }
+
         return View::fetch('admin/product/form', [
             'info' => null,
-            'categories' => CategoryModel::where('type', 'product')
-                ->where('status', 1)
-                ->order('sort_order', 'asc')
-                ->order('id', 'desc')
-                ->select(),
+            'categories' => $this->activeProductCategoryList(),
         ]);
     }
 
@@ -217,15 +240,21 @@ class Product extends BaseController
             if ($name === '') {
                 return json(['code' => 1, 'msg' => '请填写商品名称']);
             }
+
             $categoryId = (int) ($data['category_id'] ?? 0);
             $categoryName = trim((string) ($data['category_name'] ?? ''));
             if ($categoryId > 0) {
-                $cat = CategoryModel::where('id', $categoryId)->where('type', 'product')->find();
+                $catQuery = CategoryModel::where('id', $categoryId)->where('type', 'product');
+                $catQuery = $this->scopeTenant($catQuery, 'categories');
+                $cat = $catQuery->find();
                 if ($cat) {
                     $categoryName = (string) ($cat->name ?? '');
                 }
             }
-            ProductModel::where('id', $id)->update([
+
+            $updateQuery = ProductModel::where('id', $id);
+            $updateQuery = $this->scopeTenant($updateQuery, 'products');
+            $updateQuery->update([
                 'name' => $name,
                 'category_name' => $categoryName !== '' ? $categoryName : null,
                 'category_id' => $categoryId > 0 ? $categoryId : null,
@@ -235,31 +264,35 @@ class Product extends BaseController
                 'status' => (int) ($data['status'] ?? 1),
                 'sort_order' => (int) ($data['sort_order'] ?? 0),
             ]);
+
             return json(['code' => 0, 'msg' => '修改成功']);
         }
-        $info = ProductModel::find($id);
+
+        $infoQuery = ProductModel::where('id', $id);
+        $infoQuery = $this->scopeTenant($infoQuery, 'products');
+        $info = $infoQuery->find();
         if (!$info) {
             return '商品不存在';
         }
+
         return View::fetch('admin/product/form', [
             'info' => $info,
-            'categories' => CategoryModel::where('type', 'product')
-                ->where('status', 1)
-                ->order('sort_order', 'asc')
-                ->order('id', 'desc')
-                ->select(),
+            'categories' => $this->activeProductCategoryList(),
         ]);
     }
 
     public function delete()
     {
-        $id = $this->request->param('id');
-        ProductModel::destroy($id);
+        $id = (int) $this->request->param('id');
+        $deleteQuery = ProductModel::where('id', $id);
+        $deleteQuery = $this->scopeTenant($deleteQuery, 'products');
+        $deleteQuery->delete();
+
         return json(['code' => 0, 'msg' => '删除成功']);
     }
 
     /**
-     * 上传商品缩略图 → public/uploads/product_thumbs/{Ymd}/
+     * 上传商品缩略图 -> public/uploads/product_thumbs/{Ymd}/
      */
     public function uploadThumb()
     {
@@ -293,3 +326,4 @@ class Product extends BaseController
         return json(['code' => 0, 'msg' => 'ok', 'data' => ['url' => $url]]);
     }
 }
+

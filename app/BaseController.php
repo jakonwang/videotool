@@ -3,9 +3,11 @@ declare (strict_types = 1);
 
 namespace app;
 
+use app\service\AdminAuthService;
 use app\service\ModuleManagerService;
 use think\App;
 use think\exception\ValidateException;
+use think\facade\Db;
 use think\facade\View;
 use think\Validate;
 
@@ -14,6 +16,11 @@ use think\Validate;
  */
 abstract class BaseController
 {
+    /**
+     * @var array<string, bool>
+     */
+    private static array $TENANT_COLUMN_CACHE = [];
+
     /**
      * @var array<string, string>
      */
@@ -136,6 +143,53 @@ abstract class BaseController
         }
 
         return '';
+    }
+
+    protected function currentTenantId(): int
+    {
+        return AdminAuthService::tenantId();
+    }
+
+    protected function tableHasTenantId(string $table): bool
+    {
+        $name = strtolower(trim($table));
+        if ($name === '') {
+            return false;
+        }
+        if (array_key_exists($name, self::$TENANT_COLUMN_CACHE)) {
+            return self::$TENANT_COLUMN_CACHE[$name];
+        }
+        try {
+            $fields = Db::name($name)->getFields();
+            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
+        } catch (\Throwable $e) {
+            $has = false;
+        }
+        self::$TENANT_COLUMN_CACHE[$name] = $has;
+
+        return $has;
+    }
+
+    protected function scopeTenant($query, string $table)
+    {
+        if ($this->tableHasTenantId($table)) {
+            $query->where('tenant_id', $this->currentTenantId());
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    protected function withTenantPayload(array $payload, string $table): array
+    {
+        if ($this->tableHasTenantId($table) && !array_key_exists('tenant_id', $payload)) {
+            $payload['tenant_id'] = $this->currentTenantId();
+        }
+
+        return $payload;
     }
 
     /**

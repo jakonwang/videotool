@@ -14,6 +14,7 @@ class Influencer extends Model
 
     protected $schema = [
         'id'             => 'int',
+        'tenant_id'      => 'int',
         'tiktok_id'      => 'string',
         'category_name'  => 'string',
         'category_id'    => 'int',
@@ -27,6 +28,10 @@ class Influencer extends Model
         'sample_status' => 'int',
         'tags_json' => 'string',
         'last_contacted_at' => 'datetime',
+        'last_commented_at' => 'datetime',
+        'quality_score' => 'float',
+        'quality_grade' => 'string',
+        'contact_confidence' => 'float',
         'created_at'     => 'datetime',
         'updated_at'     => 'datetime',
     ];

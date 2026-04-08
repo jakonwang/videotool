@@ -9,6 +9,7 @@ use think\facade\Session;
 class AdminAuthService
 {
     public const SESSION_UID = 'admin_user_id';
+    public const SESSION_TENANT_ID = 'admin_tenant_id';
     public const SESSION_UNAME = 'admin_username';
     public const SESSION_ROLE = 'admin_role';
 
@@ -20,6 +21,12 @@ class AdminAuthService
     public static function username(): string
     {
         return (string) Session::get(self::SESSION_UNAME, '');
+    }
+
+    public static function tenantId(): int
+    {
+        $tid = (int) Session::get(self::SESSION_TENANT_ID, 1);
+        return $tid > 0 ? $tid : 1;
     }
 
     public static function isLoggedIn(): bool
@@ -39,6 +46,7 @@ class AdminAuthService
     public static function logout(): void
     {
         Session::delete(self::SESSION_UID);
+        Session::delete(self::SESSION_TENANT_ID);
         Session::delete(self::SESSION_UNAME);
         Session::delete(self::SESSION_ROLE);
     }
@@ -68,6 +76,7 @@ class AdminAuthService
         }
 
         Session::set(self::SESSION_UID, (int) $user->id);
+        Session::set(self::SESSION_TENANT_ID, max(1, (int) ($user->tenant_id ?? 1)));
         Session::set(self::SESSION_UNAME, (string) $user->username);
         Session::set(self::SESSION_ROLE, (string) ($user->role ?: 'super_admin'));
 
@@ -80,10 +89,10 @@ class AdminAuthService
             'msg' => '登录成功',
             'user' => [
                 'id' => (int) $user->id,
+                'tenant_id' => max(1, (int) ($user->tenant_id ?? 1)),
                 'username' => (string) $user->username,
                 'role' => (string) ($user->role ?: 'super_admin'),
             ],
         ];
     }
 }
-

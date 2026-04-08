@@ -11,6 +11,7 @@ class InfluencerStatusLog extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'influencer_id' => 'int',
         'from_status' => 'int',
         'to_status' => 'int',
@@ -21,4 +22,3 @@ class InfluencerStatusLog extends Model
         'updated_at' => 'datetime',
     ];
 }
-

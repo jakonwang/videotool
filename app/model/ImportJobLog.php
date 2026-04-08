@@ -11,6 +11,7 @@ class ImportJobLog extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'job_id' => 'int',
         'level' => 'string',
         'message' => 'string',
@@ -19,4 +20,3 @@ class ImportJobLog extends Model
         'updated_at' => 'datetime',
     ];
 }
-

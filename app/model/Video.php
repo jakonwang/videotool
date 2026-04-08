@@ -11,29 +11,29 @@ use think\Model;
 class Video extends Model
 {
     protected $name = 'videos';
-    
-    // 设置字段信息
+
     protected $schema = [
-        'id'            => 'int',
-        'platform_id'   => 'int',
-        'device_id'     => 'int', // 可空：达人分发专用素材无需设备
-        'product_id'    => 'int',
-        'title'         => 'string',
-        'cover_url'     => 'string',
-        'video_url'     => 'string',
+        'id' => 'int',
+        'tenant_id' => 'int',
+        'platform_id' => 'int',
+        'device_id' => 'int',
+        'product_id' => 'int',
+        'title' => 'string',
+        'cover_url' => 'string',
+        'video_url' => 'string',
+        'video_md5' => 'string',
+        'ad_creative_code' => 'string',
         'is_downloaded' => 'int',
-        'sort_order'    => 'int',
-        'created_at'    => 'datetime',
-        'updated_at'    => 'datetime',
+        'sort_order' => 'int',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
-    
-    // 关联平台
+
     public function platform()
     {
         return $this->belongsTo(Platform::class, 'platform_id');
     }
-    
-    // 关联设备
+
     public function device()
     {
         return $this->belongsTo(Device::class, 'device_id');
@@ -54,11 +54,9 @@ class Video extends Model
             ->orderRaw('RAND()')
             ->find();
     }
-    
+
     /**
-     * 获取未下载的视频
-     * @param int $deviceId 设备ID
-     * @return Video|null
+     * 获取设备未下载视频
      */
     public static function getUndownloaded(int $deviceId)
     {
@@ -69,4 +67,3 @@ class Video extends Model
             ->find();
     }
 }
-

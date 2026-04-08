@@ -43,6 +43,7 @@ class MessageTemplate extends BaseController
         }
 
         $query = MessageTemplateModel::order('sort_order', 'asc')->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'message_templates');
         $onlyEnabled = (string) $this->request->param('enabled', '');
         $lang = trim((string) $this->request->param('lang', ''));
         if ($onlyEnabled === '1') {
@@ -102,7 +103,9 @@ class MessageTemplate extends BaseController
         $status = $status === 0 ? 0 : 1;
 
         if ($id > 0) {
-            $row = MessageTemplateModel::find($id);
+            $rowQuery = MessageTemplateModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'message_templates');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('记录不存在');
             }
@@ -114,14 +117,15 @@ class MessageTemplate extends BaseController
             $row->status = $status;
             $row->save();
         } else {
-            $new = MessageTemplateModel::create([
+            $createPayload = $this->withTenantPayload([
                 'name' => mb_substr($name, 0, 128),
                 'template_key' => $templateKey !== '' ? mb_substr($templateKey, 0, 64) : '',
                 'lang' => $lang,
                 'body' => $body,
                 'sort_order' => $sortOrder,
                 'status' => $status,
-            ]);
+            ], 'message_templates');
+            $new = MessageTemplateModel::create($createPayload);
             if ((string) ($new->template_key ?? '') === '') {
                 $new->template_key = 'tpl_' . (int) $new->id;
                 $new->save();
@@ -141,7 +145,9 @@ class MessageTemplate extends BaseController
         if ($id <= 0) {
             return $this->jsonErr('无效 id');
         }
-        MessageTemplateModel::destroy($id);
+        $deleteQuery = MessageTemplateModel::where('id', $id);
+        $deleteQuery = $this->scopeTenant($deleteQuery, 'message_templates');
+        $deleteQuery->delete();
 
         return $this->jsonOk([], '已删除');
     }
@@ -161,11 +167,15 @@ class MessageTemplate extends BaseController
         if ($templateId <= 0 || $influencerId <= 0) {
             return $this->jsonErr('缺少 template_id 或 influencer_id');
         }
-        $tpl = MessageTemplateModel::find($templateId);
+        $tplQuery = MessageTemplateModel::where('id', $templateId);
+        $tplQuery = $this->scopeTenant($tplQuery, 'message_templates');
+        $tpl = $tplQuery->find();
         if (!$tpl || (int) $tpl->status !== 1) {
             return $this->jsonErr('模板不存在或未启用');
         }
-        $inf = InfluencerModel::find($influencerId);
+        $infQuery = InfluencerModel::where('id', $influencerId);
+        $infQuery = $this->scopeTenant($infQuery, 'influencers');
+        $inf = $infQuery->find();
         if (!$inf) {
             return $this->jsonErr('达人不存在');
         }
@@ -176,12 +186,13 @@ class MessageTemplate extends BaseController
             'lang' => (string) ($tpl->lang ?? 'en'),
             'body' => (string) ($tpl->body ?? ''),
             'status' => (int) ($tpl->status ?? 1),
-        ], (string) ($inf->region ?? ''));
+        ], (string) ($inf->region ?? ''), $this->currentTenantId());
         $baseUrl = MessageOutreachService::adminBaseUrl();
         $vars = MessageOutreachService::buildRenderVars(
             $influencerId,
             $productId > 0 ? $productId : null,
-            $baseUrl
+            $baseUrl,
+            $this->currentTenantId()
         );
         if ($vars === []) {
             return $this->jsonErr('达人不存在');
@@ -192,15 +203,19 @@ class MessageTemplate extends BaseController
 
         // 渲染即视作一次联系动作，更新最后联系时间并记录历史
         $now = date('Y-m-d H:i:s');
-        InfluencerModel::where('id', $influencerId)->update(['last_contacted_at' => $now]);
+        $touchQuery = InfluencerModel::where('id', $influencerId);
+        $touchQuery = $this->scopeTenant($touchQuery, 'influencers');
+        $touchQuery->update(['last_contacted_at' => $now]);
         $productName = '';
         if ($productId > 0) {
-            $p = Db::name('products')->where('id', $productId)->find();
+            $productQuery = Db::name('products')->where('id', $productId);
+            $productQuery = $this->scopeTenant($productQuery, 'products');
+            $p = $productQuery->find();
             if (is_array($p)) {
                 $productName = (string) ($p['name'] ?? '');
             }
         }
-        OutreachLogModel::create([
+        $logPayload = $this->withTenantPayload([
             'influencer_id' => $influencerId,
             'template_id' => (int) ($pickedTpl['id'] ?? 0),
             'template_name' => (string) ($pickedTpl['name'] ?? ''),
@@ -209,7 +224,8 @@ class MessageTemplate extends BaseController
             'product_name' => $productName !== '' ? $productName : null,
             'channel' => 'render',
             'rendered_body' => $text,
-        ]);
+        ], 'outreach_logs');
+        OutreachLogModel::create($logPayload);
 
         return $this->jsonOk([
             'text' => $text,

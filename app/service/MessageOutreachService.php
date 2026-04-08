@@ -12,9 +12,50 @@ class MessageOutreachService
     private const LANG_VI = 'vi';
 
     /**
+     * @var array<string, bool>
+     */
+    private static array $tenantColumnCache = [];
+
+    /**
      * @var list<string>
      */
-    private static array $emojiPool = ['😊', '😁', '🤝', '✨', '🙏', '🙌', '👍', '💖', '🌟', '🔥'];
+    private static array $emojiPool = ['😊', '🤝', '✨', '💬', '🙌', '👏', '👍', '🔥', '🌟', '💡'];
+
+    private static function effectiveTenantId(?int $tenantId = null): int
+    {
+        $tid = $tenantId !== null ? (int) $tenantId : AdminAuthService::tenantId();
+
+        return $tid > 0 ? $tid : 1;
+    }
+
+    private static function tableHasTenantId(string $table): bool
+    {
+        $name = strtolower(trim($table));
+        if ($name === '') {
+            return false;
+        }
+        if (array_key_exists($name, self::$tenantColumnCache)) {
+            return self::$tenantColumnCache[$name];
+        }
+        try {
+            $fields = Db::name($name)->getFields();
+            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
+        } catch (\Throwable $e) {
+            $has = false;
+        }
+        self::$tenantColumnCache[$name] = $has;
+
+        return $has;
+    }
+
+    private static function scopeTenant($query, string $table, ?int $tenantId = null)
+    {
+        if (self::tableHasTenantId($table)) {
+            $query->where('tenant_id', self::effectiveTenantId($tenantId));
+        }
+
+        return $query;
+    }
 
     public static function adminBaseUrl(): string
     {
@@ -29,20 +70,22 @@ class MessageOutreachService
         return $baseUrl;
     }
 
-    public static function resolveDistributeLink(int $influencerId, int $productId, string $baseUrl): string
+    public static function resolveDistributeLink(int $influencerId, int $productId, string $baseUrl, ?int $tenantId = null): string
     {
-        $row = Db::name('product_links')
+        $rowQuery = Db::name('product_links')
             ->where('product_id', $productId)
             ->where('influencer_id', $influencerId)
             ->where('status', 1)
-            ->order('id', 'desc')
-            ->find();
+            ->order('id', 'desc');
+        $rowQuery = self::scopeTenant($rowQuery, 'product_links', $tenantId);
+        $row = $rowQuery->find();
         if (!$row || empty($row['token'])) {
-            $row = Db::name('product_links')
+            $fallbackQuery = Db::name('product_links')
                 ->where('product_id', $productId)
                 ->where('status', 1)
-                ->order('id', 'desc')
-                ->find();
+                ->order('id', 'desc');
+            $fallbackQuery = self::scopeTenant($fallbackQuery, 'product_links', $tenantId);
+            $row = $fallbackQuery->find();
         }
         if (!$row || empty($row['token'])) {
             return '';
@@ -54,9 +97,11 @@ class MessageOutreachService
     /**
      * @return array<string, string>
      */
-    public static function buildRenderVars(int $influencerId, ?int $productId, string $baseUrl): array
+    public static function buildRenderVars(int $influencerId, ?int $productId, string $baseUrl, ?int $tenantId = null): array
     {
-        $inf = Db::name('influencers')->where('id', $influencerId)->find();
+        $infQuery = Db::name('influencers')->where('id', $influencerId);
+        $infQuery = self::scopeTenant($infQuery, 'influencers', $tenantId);
+        $inf = $infQuery->find();
         if (!$inf) {
             return [];
         }
@@ -77,13 +122,15 @@ class MessageOutreachService
         ];
 
         if ($productId !== null && $productId > 0) {
-            $p = Db::name('products')->where('id', $productId)->find();
+            $pQuery = Db::name('products')->where('id', $productId);
+            $pQuery = self::scopeTenant($pQuery, 'products', $tenantId);
+            $p = $pQuery->find();
             if ($p) {
                 $vars['product_name'] = (string) ($p['name'] ?? '');
                 $vars['goods_url'] = (string) ($p['goods_url'] ?? '');
                 $vars['tiktok_shop_url'] = (string) ($p['tiktok_shop_url'] ?? '');
             }
-            $vars['distribute_link'] = self::resolveDistributeLink($influencerId, $productId, $baseUrl);
+            $vars['distribute_link'] = self::resolveDistributeLink($influencerId, $productId, $baseUrl, $tenantId);
         }
 
         return $vars;
@@ -160,7 +207,7 @@ class MessageOutreachService
      * @param array<string, mixed> $baseTemplate
      * @return array<string, mixed>
      */
-    public static function pickTemplateVariantByRegion(array $baseTemplate, string $region): array
+    public static function pickTemplateVariantByRegion(array $baseTemplate, string $region, ?int $tenantId = null): array
     {
         $baseLang = self::normalizeTemplateLang((string) ($baseTemplate['lang'] ?? self::LANG_EN));
         $langs = self::templateLangPriority($region, $baseLang);
@@ -168,12 +215,13 @@ class MessageOutreachService
 
         if ($templateKey !== '') {
             foreach ($langs as $lang) {
-                $row = Db::name('message_templates')
+                $rowQuery = Db::name('message_templates')
                     ->where('template_key', $templateKey)
                     ->where('lang', $lang)
                     ->where('status', 1)
-                    ->order('id', 'desc')
-                    ->find();
+                    ->order('id', 'desc');
+                $rowQuery = self::scopeTenant($rowQuery, 'message_templates', $tenantId);
+                $row = $rowQuery->find();
                 if (is_array($row)) {
                     return $row;
                 }
@@ -183,12 +231,13 @@ class MessageOutreachService
         $name = trim((string) ($baseTemplate['name'] ?? ''));
         if ($name !== '') {
             foreach ($langs as $lang) {
-                $row = Db::name('message_templates')
+                $rowQuery = Db::name('message_templates')
                     ->where('name', $name)
                     ->where('lang', $lang)
                     ->where('status', 1)
-                    ->order('id', 'desc')
-                    ->find();
+                    ->order('id', 'desc');
+                $rowQuery = self::scopeTenant($rowQuery, 'message_templates', $tenantId);
+                $row = $rowQuery->find();
                 if (is_array($row)) {
                     return $row;
                 }
@@ -250,3 +299,4 @@ class MessageOutreachService
         return $unique;
     }
 }
+

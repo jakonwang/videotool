@@ -6,9 +6,44 @@ namespace app\service;
 use app\model\DataSource as DataSourceModel;
 use app\model\ImportJob as ImportJobModel;
 use app\service\data_import\SourceAdapterRegistry;
+use think\facade\Db;
 
 class DataImportDispatchService
 {
+    /**
+     * @var array<string, bool>
+     */
+    private static array $tenantColumnCache = [];
+
+    private static function tableHasTenantId(string $table): bool
+    {
+        $name = strtolower(trim($table));
+        if ($name === '') {
+            return false;
+        }
+        if (array_key_exists($name, self::$tenantColumnCache)) {
+            return self::$tenantColumnCache[$name];
+        }
+        try {
+            $fields = Db::name($name)->getFields();
+            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
+        } catch (\Throwable $e) {
+            $has = false;
+        }
+        self::$tenantColumnCache[$name] = $has;
+
+        return $has;
+    }
+
+    private static function applyTenantFilter($query, string $table)
+    {
+        if (self::tableHasTenantId($table)) {
+            $query->where('tenant_id', AdminAuthService::tenantId());
+        }
+
+        return $query;
+    }
+
     /**
      * @return list<array<string, string>>
      */
@@ -22,7 +57,9 @@ class DataImportDispatchService
      */
     public static function runSource(int $sourceId, string $domainOverride = ''): array
     {
-        $source = DataSourceModel::find($sourceId);
+        $sourceQuery = DataSourceModel::where('id', $sourceId);
+        $sourceQuery = self::applyTenantFilter($sourceQuery, 'data_sources');
+        $source = $sourceQuery->find();
         if (!$source) {
             throw new \RuntimeException('source_not_found');
         }
@@ -62,7 +99,9 @@ class DataImportDispatchService
             $rows = $adapter->fetchRows($config, $domain);
             DataImportService::addJobLog($jobId, 'info', 'adapter_rows_fetched', ['count' => count($rows)]);
 
-            ImportJobModel::where('id', $jobId)->update([
+            $jobUpdateQuery = ImportJobModel::where('id', $jobId);
+            $jobUpdateQuery = self::applyTenantFilter($jobUpdateQuery, 'import_jobs');
+            $jobUpdateQuery->update([
                 'payload_json' => json_encode([
                     'source_id' => (int) $source->id,
                     'source_code' => (string) ($source->code ?? ''),
@@ -132,4 +171,3 @@ class DataImportDispatchService
         return $copy;
     }
 }
-

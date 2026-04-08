@@ -39,6 +39,7 @@ class AdInsight extends BaseController
         $keyword = trim((string) $this->request->param('keyword', ''));
         $platform = trim((string) $this->request->param('platform', ''));
         $query = GrowthAdCreativeModel::order('id', 'desc');
+        $query = $this->scopeTenant($query, 'growth_ad_creatives');
         if ($keyword !== '') {
             $query->where(function ($sub) use ($keyword) {
                 $sub->whereLike('creative_code', '%' . $keyword . '%')
@@ -55,9 +56,9 @@ class AdInsight extends BaseController
         ]);
         $items = [];
         foreach ($list as $row) {
-            $latestMetric = GrowthAdMetricModel::where('creative_id', (int) $row->id)
-                ->order('metric_date', 'desc')
-                ->find();
+            $metricQuery = GrowthAdMetricModel::where('creative_id', (int) $row->id)
+                ->order('metric_date', 'desc');
+            $latestMetric = $this->scopeTenant($metricQuery, 'growth_ad_metrics')->find();
             $items[] = [
                 'id' => (int) $row->id,
                 'creative_code' => (string) ($row->creative_code ?? ''),
@@ -76,6 +77,7 @@ class AdInsight extends BaseController
                 'cpc' => (float) ($latestMetric->cpc ?? 0),
                 'cpm' => (float) ($latestMetric->cpm ?? 0),
                 'est_spend' => (float) ($latestMetric->est_spend ?? 0),
+                'est_gmv' => (float) ($latestMetric->est_gmv ?? 0),
                 'active_days' => (int) ($latestMetric->active_days ?? 0),
                 'updated_at' => (string) ($row->updated_at ?? ''),
             ];
@@ -144,9 +146,10 @@ class AdInsight extends BaseController
                 return $this->jsonErr('export_failed', 1, null, 'common.operationFailed');
             }
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['id', 'creative_code', 'title', 'platform', 'region', 'category_name', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'est_spend', 'active_days', 'updated_at']);
+            fputcsv($out, ['id', 'creative_code', 'title', 'platform', 'region', 'category_name', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'est_spend', 'est_gmv', 'active_days', 'updated_at']);
 
             $query = GrowthAdCreativeModel::order('id', 'desc');
+            $query = $this->scopeTenant($query, 'growth_ad_creatives');
             if ($keyword !== '') {
                 $query->where(function ($sub) use ($keyword) {
                     $sub->whereLike('creative_code', '%' . $keyword . '%')
@@ -159,9 +162,9 @@ class AdInsight extends BaseController
             $rows = $query->select();
             foreach ($rows as $row) {
                 $r = is_array($row) ? $row : $row->toArray();
-                $latestMetric = GrowthAdMetricModel::where('creative_id', (int) ($r['id'] ?? 0))
-                    ->order('metric_date', 'desc')
-                    ->find();
+                $metricQuery = GrowthAdMetricModel::where('creative_id', (int) ($r['id'] ?? 0))
+                    ->order('metric_date', 'desc');
+                $latestMetric = $this->scopeTenant($metricQuery, 'growth_ad_metrics')->find();
                 fputcsv($out, [
                     (int) ($r['id'] ?? 0),
                     (string) ($r['creative_code'] ?? ''),
@@ -175,6 +178,7 @@ class AdInsight extends BaseController
                     (float) ($latestMetric->cpc ?? 0),
                     (float) ($latestMetric->cpm ?? 0),
                     (float) ($latestMetric->est_spend ?? 0),
+                    (float) ($latestMetric->est_gmv ?? 0),
                     (int) ($latestMetric->active_days ?? 0),
                     (string) ($r['updated_at'] ?? ''),
                 ]);

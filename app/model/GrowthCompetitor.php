@@ -11,6 +11,7 @@ class GrowthCompetitor extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'name' => 'string',
         'platform' => 'string',
         'region' => 'string',
@@ -21,4 +22,3 @@ class GrowthCompetitor extends Model
         'updated_at' => 'datetime',
     ];
 }
-

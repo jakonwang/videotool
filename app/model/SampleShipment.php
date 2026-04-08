@@ -11,6 +11,7 @@ class SampleShipment extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'influencer_id' => 'int',
         'tracking_no' => 'string',
         'courier' => 'string',
@@ -23,4 +24,3 @@ class SampleShipment extends Model
         'updated_at' => 'datetime',
     ];
 }
-

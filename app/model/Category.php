@@ -14,6 +14,7 @@ class Category extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'name' => 'string',
         'type' => 'string',
         'sort_order' => 'int',

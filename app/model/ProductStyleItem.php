@@ -14,6 +14,7 @@ class ProductStyleItem extends Model
 
     protected $schema = [
         'id'           => 'int',
+        'tenant_id'    => 'int',
         'product_code' => 'string',
         'image_ref'    => 'string',
         'image_path'   => 'string',

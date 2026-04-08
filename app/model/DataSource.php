@@ -11,6 +11,7 @@ class DataSource extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'code' => 'string',
         'name' => 'string',
         'source_type' => 'string',
@@ -21,4 +22,3 @@ class DataSource extends Model
         'updated_at' => 'datetime',
     ];
 }
-

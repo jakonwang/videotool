@@ -10,6 +10,7 @@ use app\model\GrowthCompetitorMetric as GrowthCompetitorMetricModel;
 use app\model\GrowthIndustryMetric as GrowthIndustryMetricModel;
 use app\model\ImportJob as ImportJobModel;
 use app\model\ImportJobLog as ImportJobLogModel;
+use think\facade\Db;
 
 class DataImportService
 {
@@ -20,11 +21,64 @@ class DataImportService
     public const JOB_PARTIAL = 4;
 
     /**
+     * @var array<string, bool>
+     */
+    private static array $tenantColumnCache = [];
+
+    private static function currentTenantId(): int
+    {
+        $tid = AdminAuthService::tenantId();
+        return $tid > 0 ? $tid : 1;
+    }
+
+    private static function tableHasTenantId(string $table): bool
+    {
+        $name = strtolower(trim($table));
+        if ($name === '') {
+            return false;
+        }
+        if (array_key_exists($name, self::$tenantColumnCache)) {
+            return self::$tenantColumnCache[$name];
+        }
+        try {
+            $fields = Db::name($name)->getFields();
+            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
+        } catch (\Throwable $e) {
+            $has = false;
+        }
+        self::$tenantColumnCache[$name] = $has;
+
+        return $has;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private static function withTenantPayload(string $table, array $payload): array
+    {
+        if (self::tableHasTenantId($table) && !array_key_exists('tenant_id', $payload)) {
+            $payload['tenant_id'] = self::currentTenantId();
+        }
+
+        return $payload;
+    }
+
+    private static function applyTenantFilter($query, string $table)
+    {
+        if (self::tableHasTenantId($table)) {
+            $query->where('tenant_id', self::currentTenantId());
+        }
+
+        return $query;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     public static function createJob(string $domain, string $jobType, string $fileName = '', ?int $sourceId = null, array $payload = []): int
     {
-        $row = ImportJobModel::create([
+        $jobPayload = [
             'source_id' => $sourceId,
             'domain' => mb_substr(trim($domain) !== '' ? trim($domain) : 'generic', 0, 32),
             'job_type' => mb_substr(trim($jobType) !== '' ? trim($jobType) : 'csv', 0, 32),
@@ -32,7 +86,9 @@ class DataImportService
             'status' => self::JOB_RUNNING,
             'started_at' => date('Y-m-d H:i:s'),
             'payload_json' => $payload !== [] ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
-        ]);
+        ];
+        $jobPayload = self::withTenantPayload('import_jobs', $jobPayload);
+        $row = ImportJobModel::create($jobPayload);
 
         return (int) $row->id;
     }
@@ -45,12 +101,14 @@ class DataImportService
         if ($jobId <= 0) {
             return;
         }
-        ImportJobLogModel::create([
+        $logPayload = [
             'job_id' => $jobId,
             'level' => mb_substr(trim($level) !== '' ? trim($level) : 'info', 0, 16),
             'message' => mb_substr($message, 0, 255),
             'context_json' => $context !== [] ? json_encode($context, JSON_UNESCAPED_UNICODE) : null,
-        ]);
+        ];
+        $logPayload = self::withTenantPayload('import_job_logs', $logPayload);
+        ImportJobLogModel::create($logPayload);
     }
 
     public static function finishJob(int $jobId, int $status, int $total, int $success, int $failed, string $errorMessage = ''): void
@@ -58,7 +116,9 @@ class DataImportService
         if ($jobId <= 0) {
             return;
         }
-        ImportJobModel::where('id', $jobId)->update([
+        $query = ImportJobModel::where('id', $jobId);
+        $query = self::applyTenantFilter($query, 'import_jobs');
+        $query->update([
             'status' => $status,
             'total_rows' => max(0, $total),
             'success_rows' => max(0, $success),
@@ -252,10 +312,11 @@ class DataImportService
                 'cpc' => (float) ($r['cpc'] ?? 0),
                 'cpm' => (float) ($r['cpm'] ?? 0),
             ];
+            $payload = self::withTenantPayload('growth_industry_metrics', $payload);
             $exists = GrowthIndustryMetricModel::where('metric_date', $payload['metric_date'])
                 ->where('country_code', $payload['country_code'])
-                ->where('category_name', $payload['category_name'])
-                ->find();
+                ->where('category_name', $payload['category_name']);
+            $exists = self::applyTenantFilter($exists, 'growth_industry_metrics')->find();
             if ($exists) {
                 $exists->save($payload);
             } else {
@@ -287,15 +348,18 @@ class DataImportService
                 }
                 continue;
             }
-            $competitor = GrowthCompetitorModel::where('name', $name)->where('platform', $platform)->find();
+            $competitor = GrowthCompetitorModel::where('name', $name)->where('platform', $platform);
+            $competitor = self::applyTenantFilter($competitor, 'growth_competitors')->find();
             if (!$competitor) {
-                $competitor = GrowthCompetitorModel::create([
+                $competitorPayload = [
                     'name' => mb_substr($name, 0, 128),
                     'platform' => mb_substr($platform !== '' ? $platform : 'tiktok', 0, 32),
                     'region' => trim((string) ($r['region'] ?? '')) ?: null,
                     'category_name' => trim((string) ($r['category_name'] ?? ($r['category'] ?? ''))) ?: null,
                     'status' => 1,
-                ]);
+                ];
+                $competitorPayload = self::withTenantPayload('growth_competitors', $competitorPayload);
+                $competitor = GrowthCompetitorModel::create($competitorPayload);
             }
             $payload = [
                 'competitor_id' => (int) $competitor->id,
@@ -305,9 +369,10 @@ class DataImportService
                 'content_count' => max(0, (int) ($r['content_count'] ?? 0)),
                 'conversion_proxy' => (float) ($r['conversion_proxy'] ?? 0),
             ];
+            $payload = self::withTenantPayload('growth_competitor_metrics', $payload);
             $exists = GrowthCompetitorMetricModel::where('competitor_id', $payload['competitor_id'])
-                ->where('metric_date', $payload['metric_date'])
-                ->find();
+                ->where('metric_date', $payload['metric_date']);
+            $exists = self::applyTenantFilter($exists, 'growth_competitor_metrics')->find();
             if ($exists) {
                 $exists->save($payload);
             } else {
@@ -338,9 +403,10 @@ class DataImportService
                 }
                 continue;
             }
-            $creative = GrowthAdCreativeModel::where('creative_code', $creativeCode)->find();
+            $creative = GrowthAdCreativeModel::where('creative_code', $creativeCode);
+            $creative = self::applyTenantFilter($creative, 'growth_ad_creatives')->find();
             if (!$creative) {
-                $creative = GrowthAdCreativeModel::create([
+                $creativePayload = [
                     'creative_code' => mb_substr($creativeCode, 0, 64),
                     'title' => mb_substr((string) ($r['title'] ?? ''), 0, 255),
                     'platform' => mb_substr(trim((string) ($r['platform'] ?? 'tiktok')), 0, 32),
@@ -350,7 +416,9 @@ class DataImportService
                     'first_seen_at' => self::sanitizeDate((string) ($r['first_seen_at'] ?? '')) ?: null,
                     'last_seen_at' => self::sanitizeDate((string) ($r['last_seen_at'] ?? '')) ?: null,
                     'status' => 1,
-                ]);
+                ];
+                $creativePayload = self::withTenantPayload('growth_ad_creatives', $creativePayload);
+                $creative = GrowthAdCreativeModel::create($creativePayload);
             } else {
                 $creative->title = trim((string) ($r['title'] ?? '')) !== '' ? mb_substr((string) ($r['title'] ?? ''), 0, 255) : (string) $creative->title;
                 $creative->platform = trim((string) ($r['platform'] ?? '')) !== '' ? mb_substr((string) ($r['platform'] ?? ''), 0, 32) : (string) $creative->platform;
@@ -370,11 +438,13 @@ class DataImportService
                 'cpc' => (float) ($r['cpc'] ?? 0),
                 'cpm' => (float) ($r['cpm'] ?? 0),
                 'est_spend' => (float) ($r['est_spend'] ?? ($r['spend'] ?? 0)),
+                'est_gmv' => (float) ($r['est_gmv'] ?? ($r['gmv'] ?? 0)),
                 'active_days' => max(0, (int) ($r['active_days'] ?? 0)),
             ];
+            $payload = self::withTenantPayload('growth_ad_metrics', $payload);
             $exists = GrowthAdMetricModel::where('creative_id', $payload['creative_id'])
-                ->where('metric_date', $payload['metric_date'])
-                ->find();
+                ->where('metric_date', $payload['metric_date']);
+            $exists = self::applyTenantFilter($exists, 'growth_ad_metrics')->find();
             if ($exists) {
                 $exists->save($payload);
             } else {

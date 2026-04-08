@@ -7,6 +7,7 @@ use app\BaseController;
 use app\model\Category as CategoryModel;
 use app\model\Influencer as InfluencerModel;
 use app\model\OutreachLog as OutreachLogModel;
+use app\service\AdminAuditService;
 use app\service\InfluencerImportTaskRunner;
 use app\service\InfluencerService;
 use app\service\InfluencerStatusFlowService;
@@ -72,6 +73,7 @@ class Influencer extends BaseController
                 ->order('last_contacted_at', 'desc')
                 ->order('id', 'desc');
         }
+        $query = $this->scopeTenant($query, 'influencers');
         if ($keyword !== '') {
             $query->where(function ($sub) use ($keyword) {
                 $sub->whereLike('tiktok_id', '%' . $keyword . '%')
@@ -132,15 +134,19 @@ class Influencer extends BaseController
             ];
         }
 
+        $categoryQuery = CategoryModel::where('type', 'influencer')
+            ->where('status', 1);
+        $categoryQuery = $this->scopeTenant($categoryQuery, 'categories');
+        $categories = $categoryQuery
+            ->order('sort_order', 'asc')
+            ->order('id', 'desc')
+            ->field('id,name')
+            ->select()
+            ->toArray();
+
         return $this->jsonOk([
             'items' => $items,
-            'categories' => CategoryModel::where('type', 'influencer')
-                ->where('status', 1)
-                ->order('sort_order', 'asc')
-                ->order('id', 'desc')
-                ->field('id,name')
-                ->select()
-                ->toArray(),
+            'categories' => $categories,
             'tag_options' => $this->collectTagOptions(),
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
@@ -284,15 +290,23 @@ class Influencer extends BaseController
             }
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['id', 'tiktok_id', 'category_name', 'nickname', 'avatar_url', 'follower_count', 'contact', 'region', 'status', 'created_at', 'updated_at']);
+            AdminAuditService::log(
+                $this->request,
+                'influencer.export_contacts',
+                'influencers',
+                0,
+                ['includes' => ['contact', 'whatsapp', 'zalo']]
+            );
 
             $batch = 2000;
             $lastId = 0;
             while (true) {
-                $rows = Db::name('influencers')
+                $rowsQuery = Db::name('influencers')
                     ->where('id', '>', $lastId)
                     ->order('id', 'asc')
-                    ->limit($batch)
-                    ->select();
+                    ->limit($batch);
+                $rowsQuery = $this->scopeTenant($rowsQuery, 'influencers');
+                $rows = $rowsQuery->select();
                 if ($rows === null || count($rows) === 0) {
                     break;
                 }
@@ -341,7 +355,9 @@ class Influencer extends BaseController
             if ($id <= 0) {
                 return $this->jsonErr('无效 id');
             }
-            $row = InfluencerModel::find($id);
+            $rowQuery = InfluencerModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'influencers');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('记录不存在');
             }
@@ -447,11 +463,15 @@ class Influencer extends BaseController
             if ($id <= 0) {
                 return $this->jsonErr('无效 id');
             }
-            $row = InfluencerModel::find($id);
+            $rowQuery = InfluencerModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'influencers');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('记录不存在');
             }
-            Db::name('product_links')->where('influencer_id', $id)->update(['influencer_id' => null]);
+            $linksQuery = Db::name('product_links')->where('influencer_id', $id);
+            $linksQuery = $this->scopeTenant($linksQuery, 'product_links');
+            $linksQuery->update(['influencer_id' => null]);
             $row->delete();
 
             return $this->jsonOk([], '已删除');
@@ -506,7 +526,9 @@ class Influencer extends BaseController
         if ($trackingNo === '') {
             return $this->jsonErr('请填写快递单号');
         }
-        $row = InfluencerModel::find($id);
+        $rowQuery = InfluencerModel::where('id', $id);
+        $rowQuery = $this->scopeTenant($rowQuery, 'influencers');
+        $row = $rowQuery->find();
         if (!$row) {
             return $this->jsonErr('记录不存在');
         }
@@ -604,7 +626,7 @@ class Influencer extends BaseController
             $channel = 'action_' . preg_replace('/[^a-z0-9_]+/i', '_', strtolower($action));
             $channel = mb_substr($channel, 0, 32);
         }
-        OutreachLogModel::create([
+        $logPayload = $this->withTenantPayload([
             'influencer_id' => $influencerId,
             'template_id' => (int) ($tpl['id'] ?? 0),
             'template_name' => (string) ($tpl['name'] ?? ''),
@@ -613,8 +635,11 @@ class Influencer extends BaseController
             'product_name' => $productName !== '' ? $productName : null,
             'channel' => $channel,
             'rendered_body' => $renderedBody,
-        ]);
-        InfluencerModel::where('id', $influencerId)->update(['last_contacted_at' => date('Y-m-d H:i:s')]);
+        ], 'outreach_logs');
+        OutreachLogModel::create($logPayload);
+        $touchQuery = InfluencerModel::where('id', $influencerId);
+        $touchQuery = $this->scopeTenant($touchQuery, 'influencers');
+        $touchQuery->update(['last_contacted_at' => date('Y-m-d H:i:s')]);
         if (str_contains($channel, 'copy') || str_contains($channel, 'jump')) {
             InfluencerStatusFlowService::transition(
                 $influencerId,
@@ -635,7 +660,9 @@ class Influencer extends BaseController
         if ($id <= 0) {
             return $this->jsonErr('无效 influencer_id');
         }
-        $rows = OutreachLogModel::where('influencer_id', $id)
+        $rowsQuery = OutreachLogModel::where('influencer_id', $id);
+        $rowsQuery = $this->scopeTenant($rowsQuery, 'outreach_logs');
+        $rows = $rowsQuery
             ->order('id', 'desc')
             ->limit(100)
             ->select();
@@ -734,14 +761,14 @@ class Influencer extends BaseController
      */
     private function collectTagOptions(): array
     {
-        $rows = Db::name('influencers')
+        $rowsQuery = Db::name('influencers')
             ->whereNotNull('tags_json')
             ->where('tags_json', '<>', '')
             ->field('tags_json')
             ->order('id', 'desc')
-            ->limit(500)
-            ->select()
-            ->toArray();
+            ->limit(500);
+        $rowsQuery = $this->scopeTenant($rowsQuery, 'influencers');
+        $rows = $rowsQuery->select()->toArray();
         $all = [];
         foreach ($rows as $row) {
             $raw = (string) ($row['tags_json'] ?? '');

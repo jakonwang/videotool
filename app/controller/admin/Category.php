@@ -42,6 +42,7 @@ class Category extends BaseController
         }
 
         $query = CategoryModel::order('sort_order', 'asc')->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'categories');
         if (in_array($type, ['product', 'influencer'], true)) {
             $query->where('type', $type);
         }
@@ -84,11 +85,11 @@ class Category extends BaseController
         if (!in_array($type, ['product', 'influencer'], true)) {
             return $this->jsonErr('无效 type');
         }
-        $rows = CategoryModel::where('type', $type)
+        $rowsQuery = CategoryModel::where('type', $type)
             ->where('status', 1)
             ->order('sort_order', 'asc')
-            ->order('id', 'desc')
-            ->select();
+            ->order('id', 'desc');
+        $rows = $this->scopeTenant($rowsQuery, 'categories')->select();
         $items = [];
         foreach ($rows as $row) {
             $items[] = [
@@ -120,6 +121,7 @@ class Category extends BaseController
         }
         $name = mb_substr($name, 0, 64);
         $existsQuery = CategoryModel::where('type', $type)->where('name', $name);
+        $existsQuery = $this->scopeTenant($existsQuery, 'categories');
         if ($id > 0) {
             $existsQuery->where('id', '<>', $id);
         }
@@ -128,7 +130,9 @@ class Category extends BaseController
         }
 
         if ($id > 0) {
-            $row = CategoryModel::find($id);
+            $rowQuery = CategoryModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'categories');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('记录不存在');
             }
@@ -138,12 +142,13 @@ class Category extends BaseController
             $row->status = $status;
             $row->save();
         } else {
-            CategoryModel::create([
+            $createPayload = $this->withTenantPayload([
                 'name' => $name,
                 'type' => $type,
                 'sort_order' => $sortOrder,
                 'status' => $status,
-            ]);
+            ], 'categories');
+            CategoryModel::create($createPayload);
         }
 
         return $this->jsonOk([], '已保存');
@@ -159,7 +164,9 @@ class Category extends BaseController
         if ($id <= 0) {
             return $this->jsonErr('无效 id');
         }
-        CategoryModel::destroy($id);
+        $deleteQuery = CategoryModel::where('id', $id);
+        $deleteQuery = $this->scopeTenant($deleteQuery, 'categories');
+        $deleteQuery->delete();
 
         return $this->jsonOk([], '已删除');
     }

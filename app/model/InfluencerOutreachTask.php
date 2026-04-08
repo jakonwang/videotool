@@ -11,6 +11,7 @@ class InfluencerOutreachTask extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'influencer_id' => 'int',
         'template_id' => 'int',
         'product_id' => 'int',
@@ -25,4 +26,3 @@ class InfluencerOutreachTask extends Model
         'updated_at' => 'datetime',
     ];
 }
-

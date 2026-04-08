@@ -43,6 +43,12 @@ class Sample extends BaseController
             ->leftJoin('influencers i', 'i.id = s.influencer_id')
             ->field('s.*,i.tiktok_id,i.nickname,i.status as influencer_status')
             ->order('s.id', 'desc');
+        if ($this->tableHasTenantId('sample_shipments')) {
+            $query->where('s.tenant_id', $this->currentTenantId());
+        }
+        if ($this->tableHasTenantId('influencers')) {
+            $query->where('i.tenant_id', $this->currentTenantId());
+        }
         if ($shipmentStatus !== '' && $shipmentStatus !== null) {
             $query->where('s.shipment_status', (int) $shipmentStatus);
         }
@@ -115,17 +121,20 @@ class Sample extends BaseController
         }
 
         if ($id > 0) {
-            $row = SampleShipmentModel::find($id);
+            $rowQuery = SampleShipmentModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'sample_shipments');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('not_found', 1, null, 'common.notFound');
             }
         } else {
-            $row = SampleShipmentModel::create([
+            $createPayload = $this->withTenantPayload([
                 'influencer_id' => $influencerId,
                 'tracking_no' => mb_substr($trackingNo, 0, 64),
                 'shipment_status' => max(1, $shipmentStatus),
                 'shipped_at' => date('Y-m-d H:i:s'),
-            ]);
+            ], 'sample_shipments');
+            $row = SampleShipmentModel::create($createPayload);
         }
 
         $row->tracking_no = $trackingNo !== '' ? mb_substr($trackingNo, 0, 64) : (string) ($row->tracking_no ?? '');
@@ -141,7 +150,9 @@ class Sample extends BaseController
         }
         $row->save();
 
-        $inf = InfluencerModel::find((int) $row->influencer_id);
+        $infQuery = InfluencerModel::where('id', (int) $row->influencer_id);
+        $infQuery = $this->scopeTenant($infQuery, 'influencers');
+        $inf = $infQuery->find();
         if ($inf) {
             if ($shipmentStatus >= 1 && (int) ($inf->status ?? 0) < 4 && (int) ($inf->status ?? 0) !== 6) {
                 InfluencerStatusFlowService::transition(
@@ -179,19 +190,26 @@ class Sample extends BaseController
         if ($influencerId <= 0 || $trackingNo === '') {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
+        $infQuery = InfluencerModel::where('id', $influencerId);
+        $infQuery = $this->scopeTenant($infQuery, 'influencers');
+        if (!$infQuery->find()) {
+            return $this->jsonErr('not_found', 1, null, 'common.notFound');
+        }
         $exists = SampleShipmentModel::where('influencer_id', $influencerId)
             ->where('tracking_no', $trackingNo)
-            ->find();
+            ;
+        $exists = $this->scopeTenant($exists, 'sample_shipments')->find();
         if ($exists) {
             return $this->jsonErr('duplicate_tracking', 1, null, 'page.sample.duplicateTracking');
         }
-        SampleShipmentModel::create([
+        $createPayload = $this->withTenantPayload([
             'influencer_id' => $influencerId,
             'tracking_no' => mb_substr($trackingNo, 0, 64),
             'courier' => trim((string) ($payload['courier'] ?? '')) ?: null,
             'shipment_status' => 1,
             'shipped_at' => date('Y-m-d H:i:s'),
-        ]);
+        ], 'sample_shipments');
+        SampleShipmentModel::create($createPayload);
         $flow = InfluencerStatusFlowService::transition(
             $influencerId,
             4,
@@ -216,7 +234,9 @@ class Sample extends BaseController
         if ($id <= 0) {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
-        $row = SampleShipmentModel::find($id);
+        $rowQuery = SampleShipmentModel::where('id', $id);
+        $rowQuery = $this->scopeTenant($rowQuery, 'sample_shipments');
+        $row = $rowQuery->find();
         if (!$row) {
             return $this->jsonErr('not_found', 1, null, 'common.notFound');
         }

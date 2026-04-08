@@ -24,6 +24,7 @@ class Distribute extends BaseController
         if (preg_match('#^(.*?)/admin\.php#', $scriptName, $matches)) {
             $baseUrl .= $matches[1];
         }
+
         return $baseUrl;
     }
 
@@ -35,13 +36,23 @@ class Distribute extends BaseController
                 return $token;
             }
         }
+
         return bin2hex(random_bytes(16));
+    }
+
+    private function activeProducts()
+    {
+        $query = ProductModel::where('status', 1)->order('sort_order', 'asc')->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'products');
+
+        return $query->select();
     }
 
     public function index()
     {
         $productId = (int) $this->request->param('product_id', 0);
         $query = ProductLinkModel::with(['product', 'influencer'])->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'product_links');
         if ($productId > 0) {
             $query->where('product_id', $productId);
         }
@@ -49,11 +60,10 @@ class Distribute extends BaseController
             'list_rows' => 15,
             'query' => $this->request->param(),
         ]);
-        $products = ProductModel::where('status', 1)->order('sort_order', 'asc')->order('id', 'desc')->select();
 
         return View::fetch('admin/distribute/index', [
             'list' => $list,
-            'products' => $products,
+            'products' => $this->activeProducts(),
             'product_id' => $productId,
             'base_url' => $this->buildBaseUrl(),
         ]);
@@ -69,10 +79,15 @@ class Distribute extends BaseController
 
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
-        if ($pageSize <= 0) $pageSize = 10;
-        if ($pageSize > 100) $pageSize = 100;
+        if ($pageSize <= 0) {
+            $pageSize = 10;
+        }
+        if ($pageSize > 100) {
+            $pageSize = 100;
+        }
 
         $query = ProductLinkModel::with(['product', 'influencer'])->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'product_links');
         if ($productId > 0) {
             $query->where('product_id', $productId);
         }
@@ -89,7 +104,7 @@ class Distribute extends BaseController
             $token = (string) ($row->token ?? '');
             $inf = $row->influencer ?? null;
             $items[] = [
-                'id' => (int) $row->id,
+                'id' => (int) ($row->id ?? 0),
                 'product' => $row->product ? [
                     'id' => (int) ($row->product_id ?? 0),
                     'name' => (string) ($row->product->name ?? ''),
@@ -126,53 +141,71 @@ class Distribute extends BaseController
             $label = trim((string) $this->request->post('label', ''));
             $influencerTiktok = trim((string) $this->request->post('influencer_tiktok', ''));
             $influencerId = null;
+
             if ($influencerTiktok !== '') {
                 $h = InfluencerService::normalizeTiktokId($influencerTiktok);
                 if ($h === null) {
                     return json(['code' => 1, 'msg' => '达人 TikTok 用户名格式无效（需为 @handle，字母数字点下划线）']);
                 }
-                $inf = InfluencerModel::where('tiktok_id', $h)->find();
+                $infQuery = InfluencerModel::where('tiktok_id', $h);
+                $infQuery = $this->scopeTenant($infQuery, 'influencers');
+                $inf = $infQuery->find();
                 if (!$inf) {
                     return json(['code' => 1, 'msg' => '未找到该达人，请先在「达人」中导入']);
                 }
-                $influencerId = (int) $inf->id;
+                $influencerId = (int) ($inf->id ?? 0);
             }
+
             if ($productId <= 0) {
                 return json(['code' => 1, 'msg' => '请选择商品']);
             }
-            $product = ProductModel::where('id', $productId)->where('status', 1)->find();
+            $productQuery = ProductModel::where('id', $productId)->where('status', 1);
+            $productQuery = $this->scopeTenant($productQuery, 'products');
+            $product = $productQuery->find();
             if (!$product) {
                 return json(['code' => 1, 'msg' => '商品不存在或未启用']);
             }
-            ProductLinkModel::create([
+
+            $payload = [
                 'product_id' => $productId,
                 'token' => $this->generateToken(),
                 'label' => $label !== '' ? $label : null,
                 'influencer_id' => $influencerId,
                 'status' => 1,
-            ]);
+            ];
+            ProductLinkModel::create($this->withTenantPayload($payload, 'product_links'));
+
             return json(['code' => 0, 'msg' => '生成成功']);
         }
-        $products = ProductModel::where('status', 1)->order('sort_order', 'asc')->order('id', 'desc')->select();
-        return View::fetch('admin/distribute/form', ['products' => $products]);
+
+        return View::fetch('admin/distribute/form', [
+            'products' => $this->activeProducts(),
+        ]);
     }
 
     public function delete()
     {
-        $id = $this->request->param('id');
-        ProductLinkModel::destroy($id);
+        $id = (int) $this->request->param('id');
+        $query = ProductLinkModel::where('id', $id);
+        $query = $this->scopeTenant($query, 'product_links');
+        $query->delete();
+
         return json(['code' => 0, 'msg' => '已删除']);
     }
 
     public function toggle()
     {
         $id = (int) $this->request->param('id', 0);
-        $row = ProductLinkModel::find($id);
+        $query = ProductLinkModel::where('id', $id);
+        $query = $this->scopeTenant($query, 'product_links');
+        $row = $query->find();
         if (!$row) {
             return json(['code' => 1, 'msg' => '记录不存在']);
         }
-        $row->status = (int) $row->status === 1 ? 0 : 1;
+        $row->status = (int) ($row->status ?? 0) === 1 ? 0 : 1;
         $row->save();
+
         return json(['code' => 0, 'msg' => '已更新']);
     }
 }
+

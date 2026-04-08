@@ -11,6 +11,7 @@ class GrowthCompetitorMetric extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'competitor_id' => 'int',
         'metric_date' => 'date',
         'followers' => 'int',
@@ -21,4 +22,3 @@ class GrowthCompetitorMetric extends Model
         'updated_at' => 'datetime',
     ];
 }
-

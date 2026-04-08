@@ -4,12 +4,14 @@ declare (strict_types = 1);
 namespace app\controller\admin;
 
 use app\BaseController;
+use app\service\VolcArkVisionService;
 use app\model\Video as VideoModel;
 use app\model\Device as DeviceModel;
 use app\model\Platform as PlatformModel;
 use app\model\Product as ProductModel;
 use app\service\QiniuService;
 use think\facade\Filesystem;
+use think\facade\Db;
 use think\facade\View;
 
 /**
@@ -17,6 +19,169 @@ use think\facade\View;
  */
 class Video extends BaseController
 {
+    /**
+     * @var array<string, bool>|null
+     */
+    private static ?array $videoColumnsCache = null;
+
+    /**
+     * @return array<string, bool>
+     */
+    private function videoColumns(): array
+    {
+        if (is_array(self::$videoColumnsCache)) {
+            return self::$videoColumnsCache;
+        }
+        $out = [];
+        try {
+            $rows = Db::query('SHOW COLUMNS FROM `videos`');
+            foreach ($rows as $row) {
+                $name = strtolower((string) ($row['Field'] ?? ''));
+                if ($name !== '') {
+                    $out[$name] = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+        self::$videoColumnsCache = $out;
+
+        return $out;
+    }
+
+    private function videoHasColumn(string $name): bool
+    {
+        $name = strtolower(trim($name));
+        if ($name === '') {
+            return false;
+        }
+        $cols = $this->videoColumns();
+
+        return isset($cols[$name]);
+    }
+
+    private function findDuplicateVideoMd5(string $md5, int $excludeId = 0): ?array
+    {
+        $md5 = strtolower(trim($md5));
+        if ($md5 === '' || !$this->videoHasColumn('video_md5')) {
+            return null;
+        }
+        $query = Db::name('videos')->where('video_md5', $md5);
+        $query = $this->scopeTenant($query, 'videos');
+        if ($excludeId > 0) {
+            $query->where('id', '<>', $excludeId);
+        }
+
+        return $query->field('id,title,video_url')->order('id', 'desc')->find();
+    }
+
+    private function influencerUsageMap(array $productIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $productIds), static fn($v) => $v > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $query = Db::name('product_links')
+            ->whereIn('product_id', $ids)
+            ->whereNotNull('influencer_id')
+            ->where('influencer_id', '>', 0)
+            ->fieldRaw('product_id, COUNT(DISTINCT influencer_id) AS c')
+            ->group('product_id');
+        $query = $this->scopeTenant($query, 'product_links');
+        $rows = $query->select()->toArray();
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) ($row['product_id'] ?? 0)] = (int) ($row['c'] ?? 0);
+        }
+
+        return $map;
+    }
+
+    private function gmvMapByCreativeCodes(array $creativeCodes): array
+    {
+        $codes = [];
+        foreach ($creativeCodes as $code) {
+            $v = trim((string) $code);
+            if ($v !== '') {
+                $codes[] = $v;
+            }
+        }
+        $codes = array_values(array_unique($codes));
+        if ($codes === []) {
+            return [];
+        }
+
+        $creativeQuery = Db::name('growth_ad_creatives')
+            ->whereIn('creative_code', $codes)
+            ->field('id,creative_code');
+        $creativeQuery = $this->scopeTenant($creativeQuery, 'growth_ad_creatives');
+        $creativeRows = $creativeQuery->select()->toArray();
+        if ($creativeRows === []) {
+            return [];
+        }
+
+        $creativeMap = [];
+        $creativeIds = [];
+        foreach ($creativeRows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $code = trim((string) ($row['creative_code'] ?? ''));
+            if ($id > 0 && $code !== '') {
+                $creativeMap[$id] = $code;
+                $creativeIds[] = $id;
+            }
+        }
+        if ($creativeIds === []) {
+            return [];
+        }
+
+        $metricRows = [];
+        try {
+            $metricQuery = Db::name('growth_ad_metrics')
+                ->whereIn('creative_id', $creativeIds)
+                ->fieldRaw('creative_id, COALESCE(SUM(est_gmv),0) AS gmv')
+                ->group('creative_id');
+            $metricQuery = $this->scopeTenant($metricQuery, 'growth_ad_metrics');
+            $metricRows = $metricQuery->select()->toArray();
+        } catch (\Throwable $e) {
+            $metricQuery = Db::name('growth_ad_metrics')
+                ->whereIn('creative_id', $creativeIds)
+                ->fieldRaw('creative_id, COALESCE(SUM(est_spend),0) AS gmv')
+                ->group('creative_id');
+            $metricQuery = $this->scopeTenant($metricQuery, 'growth_ad_metrics');
+            $metricRows = $metricQuery->select()->toArray();
+        }
+        $byCreativeId = [];
+        foreach ($metricRows as $row) {
+            $byCreativeId[(int) ($row['creative_id'] ?? 0)] = (float) ($row['gmv'] ?? 0);
+        }
+
+        $out = [];
+        foreach ($creativeMap as $creativeId => $code) {
+            $out[$code] = round((float) ($byCreativeId[$creativeId] ?? 0), 2);
+        }
+
+        return $out;
+    }
+
+    private function fallbackMixSuggestion(array $video): string
+    {
+        $title = trim((string) ($video['title'] ?? ''));
+        $used = (int) ($video['used_by_influencers'] ?? 0);
+        $gmv = (float) ($video['total_gmv'] ?? 0);
+        $lead = '建议前 3 秒改为“产品特写+价格钩子”，并保留原视频核心卖点。';
+        $middle = '5-8 秒保留原解说节奏，补 1 个对比镜头（上身/近景切换）。';
+        $tail = '结尾增加 2 秒强 CTA（私信关键词 + 限时库存提示）。';
+        if ($used >= 5 || $gmv >= 1000) {
+            $middle = '5-8 秒保留高表现段落，增加字幕强调利益点（包邮/起批量/到货时效）。';
+            $tail = '结尾增加社会证明（出单截图/达人反馈）与 CTA，建议 A/B 两版封面。';
+        }
+        if ($title !== '') {
+            return '「' . mb_substr($title, 0, 30) . '」' . $lead . $middle . $tail;
+        }
+
+        return $lead . $middle . $tail;
+    }
+
     /**
      * 视频列表（JSON）
      * 仅输出形式不同：复用 index() 的筛选与排序规则，供前端 Vue/ElementPlus 使用
@@ -44,6 +209,7 @@ class Video extends BaseController
         }
 
         $query = VideoModel::with(['platform', 'device', 'product'])->order($sortProp, $sortOrder);
+        $query = $this->scopeTenant($query, 'videos');
 
         $platformIds = array_values(array_filter(array_map('intval', $platformIds)));
         $deviceIds = array_values(array_filter(array_map('intval', $deviceIds)));
@@ -77,13 +243,23 @@ class Video extends BaseController
             'query' => $this->request->param()
         ]);
 
-        $items = [];
+        $listRows = [];
         foreach ($list as $v) {
+            $listRows[] = $v;
+        }
+        $usageMap = $this->influencerUsageMap(array_map(static fn($v) => (int) ($v->product_id ?? 0), $listRows));
+        $creativeCodeMap = $this->gmvMapByCreativeCodes(array_map(static fn($v) => (string) ($v->ad_creative_code ?? ''), $listRows));
+
+        $items = [];
+        foreach ($listRows as $v) {
+            $creativeCode = $this->videoHasColumn('ad_creative_code') ? trim((string) ($v->ad_creative_code ?? '')) : '';
+            $productId = (int) ($v->product_id ?? 0);
             $items[] = [
                 'id' => (int) $v->id,
                 'title' => (string) ($v->title ?? ''),
                 'video_url' => (string) ($v->video_url ?? ''),
                 'cover_url' => (string) ($v->cover_url ?? ''),
+                'ad_creative_code' => $creativeCode,
                 'created_at' => (string) ($v->created_at ?? ''),
                 'is_downloaded' => (int) ($v->is_downloaded ?? 0),
                 'platform' => [
@@ -98,6 +274,8 @@ class Video extends BaseController
                     'id' => (int) ($v->product_id ?? 0),
                     'name' => (string) ($v->product->name ?? ''),
                 ] : null,
+                'used_by_influencers' => (int) ($usageMap[$productId] ?? 0),
+                'total_gmv' => (float) ($creativeCodeMap[$creativeCode] ?? 0),
             ];
         }
 
@@ -123,6 +301,7 @@ class Video extends BaseController
         $keyword = trim((string)$this->request->param('keyword', ''));
         
         $query = VideoModel::with(['platform', 'device', 'product'])->order('id', 'desc');
+        $query = $this->scopeTenant($query, 'videos');
         if ($platformId) $query->where('platform_id', '=', $platformId);
         if ($deviceId) $query->where('device_id', '=', $deviceId);
         if ($productId > 0) {
@@ -143,7 +322,9 @@ class Video extends BaseController
             
         $platforms = PlatformModel::select();
         $devices = DeviceModel::select();
-        $products = ProductModel::order('sort_order', 'asc')->order('id', 'desc')->select();
+        $productsQuery = ProductModel::order('sort_order', 'asc')->order('id', 'desc');
+        $productsQuery = $this->scopeTenant($productsQuery, 'products');
+        $products = $productsQuery->select();
 
         return View::fetch('admin/video/index', [
             'list' => $list,
@@ -248,6 +429,7 @@ class Video extends BaseController
             
             // 获取标题数组（只获取一次）
             $titles = $this->request->post('titles', []);
+            $adCreativeCodes = $this->request->post('ad_creative_codes', []);
             
             foreach ($files as $key => $file) {
                 try {
@@ -263,6 +445,16 @@ class Video extends BaseController
                     $file->move($videoDateDir, $videoFileName);
                     $videoLocalPath = $videoDateDir . $videoFileName;
                     $videoLocalUrl = '/uploads/videos/' . $dateStr . '/' . $videoFileName;
+                    $videoMd5 = '';
+                    if ($this->videoHasColumn('video_md5') && is_file($videoLocalPath)) {
+                        $videoMd5 = strtolower((string) md5_file($videoLocalPath));
+                        $dup = $this->findDuplicateVideoMd5($videoMd5);
+                        if ($dup) {
+                            @unlink($videoLocalPath);
+                            $errors[] = "鏂囦欢 " . ($key + 1) . ': 素材已存在，请进行混剪去重';
+                            continue;
+                        }
+                    }
                     
                     // 先使用本地URL，七牛云上传改为后台异步处理（避免阻塞）
                     $videoUrl = $videoLocalUrl;
@@ -290,14 +482,23 @@ class Video extends BaseController
                     $devResolved = $productId > 0
                         ? (!empty($deviceId) ? (int) $deviceId : null)
                         : (int) $deviceId;
-                    $videoModel = VideoModel::create([
+                    $createPayload = [
                         'platform_id' => $platformId,
                         'device_id' => $devResolved,
                         'product_id' => $productId > 0 ? $productId : null,
                         'title' => $title,
                         'cover_url' => $coverUrl,
-                        'video_url' => $videoUrl
-                    ]);
+                        'video_url' => $videoUrl,
+                    ];
+                    if ($this->videoHasColumn('video_md5')) {
+                        $createPayload['video_md5'] = $videoMd5 !== '' ? $videoMd5 : null;
+                    }
+                    if ($this->videoHasColumn('ad_creative_code')) {
+                        $creativeCode = trim((string) (is_array($adCreativeCodes) ? ($adCreativeCodes[$key] ?? '') : ''));
+                        $createPayload['ad_creative_code'] = $creativeCode !== '' ? mb_substr($creativeCode, 0, 64) : null;
+                    }
+                    $createPayload = $this->withTenantPayload($createPayload, 'videos');
+                    $videoModel = VideoModel::create($createPayload);
                     
                     // 后台异步上传到七牛云（不阻塞主流程）
                     if ($qiniuEnabled && $videoModel) {
@@ -324,7 +525,9 @@ class Video extends BaseController
         
         $platforms = PlatformModel::select();
         $devices = DeviceModel::select();
-        $products = ProductModel::order('sort_order', 'asc')->order('id', 'desc')->select();
+        $productsQuery = ProductModel::order('sort_order', 'asc')->order('id', 'desc');
+        $productsQuery = $this->scopeTenant($productsQuery, 'products');
+        $products = $productsQuery->select();
 
         return View::fetch('admin/video/batch_upload', [
             'platforms' => $platforms,
@@ -488,7 +691,9 @@ class Video extends BaseController
                     'title' => trim($data['title'])
                 ];
                 
-                VideoModel::whereIn('id', $ids)->update($updateData);
+                $updateQuery = VideoModel::whereIn('id', $ids);
+                $updateQuery = $this->scopeTenant($updateQuery, 'videos');
+                $updateQuery->update($updateData);
                 
                 return json(['code' => 0, 'msg' => '批量更新成功，共更新 ' . count($ids) . ' 条记录']);
             } catch (\Exception $e) {
@@ -508,7 +713,9 @@ class Video extends BaseController
                 return '请选择要编辑的视频';
             }
             
-            $list = VideoModel::whereIn('id', $ids)->with(['platform', 'device'])->select();
+            $listQuery = VideoModel::whereIn('id', $ids)->with(['platform', 'device']);
+            $listQuery = $this->scopeTenant($listQuery, 'videos');
+            $list = $listQuery->select();
             
             if ($list->isEmpty()) {
                 return '未找到要编辑的视频';
@@ -540,7 +747,9 @@ class Video extends BaseController
         if ($this->request->isPost()) {
             try {
                 // 获取原有视频信息
-                $video = VideoModel::find($id);
+                $videoQuery = VideoModel::where('id', $id);
+                $videoQuery = $this->scopeTenant($videoQuery, 'videos');
+                $video = $videoQuery->find();
                 if (!$video) {
                     return json(['code' => 1, 'msg' => '视频不存在']);
                 }
@@ -642,6 +851,15 @@ class Video extends BaseController
                         $videoFile->move($videoDateDir, $videoFileName);
                         $videoLocalPath = $videoDateDir . $videoFileName;
                         $videoLocalUrl = '/uploads/videos/' . date('Ymd') . '/' . $videoFileName;
+                        if ($this->videoHasColumn('video_md5') && is_file($videoLocalPath)) {
+                            $videoMd5 = strtolower((string) md5_file($videoLocalPath));
+                            $dup = $this->findDuplicateVideoMd5($videoMd5, (int) $id);
+                            if ($dup) {
+                                @unlink($videoLocalPath);
+                                return json(['code' => 1, 'msg' => '素材已存在，请进行混剪去重']);
+                            }
+                            $data['video_md5'] = $videoMd5;
+                        }
                         
                         // 上传到七牛云（如果启用）
                         $data['video_url'] = $videoLocalUrl; // 默认使用本地URL
@@ -697,6 +915,10 @@ class Video extends BaseController
                 if (isset($data['title'])) {
                     $data['title'] = trim($data['title']);
                 }
+                if ($this->videoHasColumn('ad_creative_code') && array_key_exists('ad_creative_code', $data)) {
+                    $cc = trim((string) ($data['ad_creative_code'] ?? ''));
+                    $data['ad_creative_code'] = $cc !== '' ? mb_substr($cc, 0, 64) : null;
+                }
                 
                 // 确保 platform_id；device_id 在绑定商品时可空
                 $data['platform_id'] = (int) $data['platform_id'];
@@ -709,7 +931,9 @@ class Video extends BaseController
                 }
 
                 // 更新数据
-                $result = VideoModel::where('id', $id)->update($data);
+                $updateQuery = VideoModel::where('id', $id);
+                $updateQuery = $this->scopeTenant($updateQuery, 'videos');
+                $result = $updateQuery->update($data);
                 
                 if ($result === false) {
                     return json(['code' => 1, 'msg' => '更新失败，请重试']);
@@ -726,14 +950,18 @@ class Video extends BaseController
         
         // GET请求，显示编辑页面
         try {
-            $info = VideoModel::with(['platform', 'device', 'product'])->find($id);
+            $infoQuery = VideoModel::with(['platform', 'device', 'product'])->where('id', $id);
+            $infoQuery = $this->scopeTenant($infoQuery, 'videos');
+            $info = $infoQuery->find();
             if (!$info) {
                 return '视频不存在';
             }
             
             $platforms = PlatformModel::select();
             $devices = DeviceModel::where('platform_id', $info->platform_id)->select();
-            $products = ProductModel::order('sort_order', 'asc')->order('id', 'desc')->select();
+            $productsQuery = ProductModel::order('sort_order', 'asc')->order('id', 'desc');
+            $productsQuery = $this->scopeTenant($productsQuery, 'products');
+            $products = $productsQuery->select();
 
             return View::fetch('admin/video/form', [
                 'info' => $info,
@@ -748,10 +976,72 @@ class Video extends BaseController
     }
     
     // 删除
+    public function mixSuggestion()
+    {
+        if (!$this->request->isPost()) {
+            return json(['code' => 1, 'msg' => 'only_post']);
+        }
+        $payload = $this->request->post();
+        $raw = (string) $this->request->getContent();
+        if ($raw !== '' && ($raw[0] === '{' || $raw[0] === '[')) {
+            $j = json_decode($raw, true);
+            if (is_array($j)) {
+                $payload = $j;
+            }
+        }
+        $videoId = (int) ($payload['video_id'] ?? 0);
+        if ($videoId <= 0) {
+            return json(['code' => 1, 'msg' => 'invalid_video_id']);
+        }
+
+        $videoQuery = VideoModel::where('id', $videoId);
+        $videoQuery = $this->scopeTenant($videoQuery, 'videos');
+        $video = $videoQuery->find();
+        if (!$video) {
+            return json(['code' => 1, 'msg' => 'not_found']);
+        }
+
+        $arr = $video->toArray();
+        $productId = (int) ($arr['product_id'] ?? 0);
+        $creativeCode = trim((string) ($arr['ad_creative_code'] ?? ''));
+        $usageMap = $this->influencerUsageMap([$productId]);
+        $gmvMap = $this->gmvMapByCreativeCodes([$creativeCode]);
+        $context = [
+            'video_id' => (int) ($arr['id'] ?? 0),
+            'title' => (string) ($arr['title'] ?? ''),
+            'video_url' => (string) ($arr['video_url'] ?? ''),
+            'platform' => (string) ($arr['platform_id'] ?? 'tiktok'),
+            'ad_creative_code' => $creativeCode,
+            'used_by_influencers' => (int) ($usageMap[$productId] ?? 0),
+            'total_gmv' => (float) ($gmvMap[$creativeCode] ?? 0),
+        ];
+
+        $suggestion = VolcArkVisionService::generateVideoRemixSuggestion($context);
+        $source = 'doubao';
+        if (!is_string($suggestion) || trim($suggestion) === '') {
+            $suggestion = $this->fallbackMixSuggestion($context);
+            $source = 'fallback';
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => 'ok',
+            'data' => [
+                'video_id' => $videoId,
+                'source' => $source,
+                'suggestion' => $suggestion,
+                'used_by_influencers' => (int) $context['used_by_influencers'],
+                'total_gmv' => (float) $context['total_gmv'],
+            ],
+        ]);
+    }
+
     public function delete()
     {
         $id = $this->request->param('id');
-        VideoModel::destroy($id);
+        $deleteQuery = VideoModel::where('id', (int) $id);
+        $deleteQuery = $this->scopeTenant($deleteQuery, 'videos');
+        $deleteQuery->delete();
         return json(['code' => 0, 'msg' => '删除成功']);
     }
     
@@ -762,7 +1052,12 @@ class Video extends BaseController
         if (is_string($ids)) {
             $ids = explode(',', $ids);
         }
-        VideoModel::whereIn('id', $ids)->delete();
+        $ids = array_values(array_filter(array_map('intval', (array) $ids), static fn($v) => $v > 0));
+        if ($ids !== []) {
+            $deleteQuery = VideoModel::whereIn('id', $ids);
+            $deleteQuery = $this->scopeTenant($deleteQuery, 'videos');
+            $deleteQuery->delete();
+        }
         return json(['code' => 0, 'msg' => '批量删除成功']);
     }
     
@@ -781,6 +1076,7 @@ class Video extends BaseController
             $deviceId = $this->request->post('device_id');
             $productId = (int) $this->request->post('product_id', 0);
             $title = $this->request->post('title', '');
+            $adCreativeCode = trim((string) $this->request->post('ad_creative_code', ''));
             $coverFile = $this->request->file('cover');
             
             if (!$chunk || !$fileId || !$platformId) {
@@ -895,6 +1191,18 @@ class Video extends BaseController
             
             rename($finalPath, $targetPath);
             $videoLocalUrl = '/uploads/videos/' . str_replace(DIRECTORY_SEPARATOR, '/', $targetFileName);
+            $videoMd5 = '';
+            if ($this->videoHasColumn('video_md5') && is_file($targetPath)) {
+                $videoMd5 = strtolower((string) md5_file($targetPath));
+                $dup = $this->findDuplicateVideoMd5($videoMd5);
+                if ($dup) {
+                    @unlink($targetPath);
+                    if (is_dir($tempDir)) {
+                        @rmdir($tempDir);
+                    }
+                    return json(['code' => 1, 'msg' => '素材已存在，请进行混剪去重']);
+                }
+            }
             
             // 先使用本地URL，七牛云上传改为异步（避免阻塞最后一个分片）
             $videoUrl = $videoLocalUrl;
@@ -958,14 +1266,22 @@ class Video extends BaseController
                     $devResolved = $productId > 0
                         ? (!empty($deviceId) ? (int) $deviceId : null)
                         : (int) $deviceId;
-                    $videoModel = VideoModel::create([
-                        'platform_id' => (int)$platformId,
+                    $createPayload = [
+                        'platform_id' => (int) $platformId,
                         'device_id' => $devResolved,
                         'product_id' => $productId > 0 ? $productId : null,
                         'title' => $title ?: $fileName,
                         'cover_url' => $coverUrl ?: $videoUrl,
-                        'video_url' => $videoUrl
-                    ]);
+                        'video_url' => $videoUrl,
+                    ];
+                    if ($this->videoHasColumn('video_md5')) {
+                        $createPayload['video_md5'] = $videoMd5 !== '' ? $videoMd5 : null;
+                    }
+                    if ($this->videoHasColumn('ad_creative_code')) {
+                        $createPayload['ad_creative_code'] = $adCreativeCode !== '' ? mb_substr($adCreativeCode, 0, 64) : null;
+                    }
+                    $createPayload = $this->withTenantPayload($createPayload, 'videos');
+                    $videoModel = VideoModel::create($createPayload);
                     
                     // 异步上传到七牛云（不阻塞主流程）
                     if ($videoModel) {
@@ -1008,4 +1324,3 @@ class Video extends BaseController
         }
     }
 }
-

@@ -404,6 +404,64 @@ TXT;
         }
     }
 
+    /**
+     * Build remix/editing suggestions for short videos using Doubao text reasoning.
+     *
+     * @param array<string, mixed> $context
+     */
+    public static function generateVideoRemixSuggestion(array $context): ?string
+    {
+        $cfg = VolcArkVisionConfig::get();
+        if (!$cfg['enabled']) {
+            return null;
+        }
+
+        $title = trim((string) ($context['title'] ?? ''));
+        $videoUrl = trim((string) ($context['video_url'] ?? ''));
+        $usedByInfluencers = (int) ($context['used_by_influencers'] ?? 0);
+        $totalGmv = (float) ($context['total_gmv'] ?? 0);
+        $platform = trim((string) ($context['platform'] ?? 'tiktok'));
+        $creativeCode = trim((string) ($context['ad_creative_code'] ?? ''));
+
+        $input = [
+            'title' => $title,
+            'platform' => $platform,
+            'creative_code' => $creativeCode,
+            'used_by_influencers' => $usedByInfluencers,
+            'total_gmv' => $totalGmv,
+            'video_url' => $videoUrl,
+        ];
+
+        $body = [
+            'model' => self::chatModel($cfg),
+            'max_tokens' => min(400, max(180, (int) ($cfg['describe_max_tokens'] ?? 220))),
+            'temperature' => 0.35,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => '你是 TikTok 广告素材优化专家。请输出 3-5 条可执行的混剪建议，每条包含具体秒段和动作，中文输出。',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => '请根据以下素材上下文给出混剪建议（包含前3秒钩子、主体节奏、结尾CTA）。上下文: '
+                        . json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ],
+            ],
+        ];
+
+        $raw = self::chatCompletionRaw($cfg, $body, 'video_remix_suggestion');
+        $text = self::parseChatCompletionText($raw);
+        if ($text === null) {
+            return null;
+        }
+        $text = trim((string) preg_replace('/\s+/u', ' ', $text));
+        if ($text === '') {
+            return null;
+        }
+
+        return mb_substr($text, 0, 1200);
+    }
+
     private static function pingFailureHint(int $http, ?string $arkErr): string
     {
         if ($http === 401 || $http === 403) {

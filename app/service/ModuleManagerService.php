@@ -805,6 +805,7 @@ class ModuleManagerService
     public static function modulesForCurrentRole(bool $includeDisabled = true): array
     {
         $role = AdminAuthService::role();
+        $tenantId = AdminAuthService::tenantId();
         $rows = self::permissionMatrix();
         $out = [];
         foreach ($rows as $row) {
@@ -815,6 +816,13 @@ class ModuleManagerService
             $minRole = self::normalizeRole((string) ($row['min_role'] ?? self::ROLE_OPERATOR), self::ROLE_OPERATOR);
             if (!self::canViewByRole($name, $role, $minRole)) {
                 continue;
+            }
+            if (!TenantModuleService::moduleAllowed($name, $tenantId)) {
+                if (!$includeDisabled) {
+                    continue;
+                }
+                $row['is_enabled'] = 0;
+                $row['tenant_disabled'] = 1;
             }
             if (!$includeDisabled && (int) ($row['is_enabled'] ?? 0) !== 1) {
                 continue;
@@ -834,7 +842,7 @@ class ModuleManagerService
         foreach ($rows as $row) {
             $map[(string) $row['name']] = (int) ($row['is_enabled'] ?? 0);
         }
-        return $map;
+        return TenantModuleService::filterEnabledMap($map, AdminAuthService::tenantId());
     }
 
     private static function tableExists(string $table): bool

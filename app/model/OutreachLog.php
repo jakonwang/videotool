@@ -14,6 +14,7 @@ class OutreachLog extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'influencer_id' => 'int',
         'template_id' => 'int',
         'template_name' => 'string',

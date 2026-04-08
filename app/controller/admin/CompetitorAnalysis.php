@@ -41,6 +41,7 @@ class CompetitorAnalysis extends BaseController
         $query = GrowthCompetitorModel::alias('c')
             ->field('c.*')
             ->order('c.id', 'desc');
+        $query = $this->scopeTenant($query, 'growth_competitors');
         if ($keyword !== '') {
             $query->whereLike('c.name', '%' . $keyword . '%');
         }
@@ -55,9 +56,9 @@ class CompetitorAnalysis extends BaseController
 
         $items = [];
         foreach ($list as $row) {
-            $latestMetric = GrowthCompetitorMetricModel::where('competitor_id', (int) $row->id)
-                ->order('metric_date', 'desc')
-                ->find();
+            $metricQuery = GrowthCompetitorMetricModel::where('competitor_id', (int) $row->id)
+                ->order('metric_date', 'desc');
+            $latestMetric = $this->scopeTenant($metricQuery, 'growth_competitor_metrics')->find();
             $items[] = [
                 'id' => (int) $row->id,
                 'name' => (string) ($row->name ?? ''),
@@ -100,7 +101,9 @@ class CompetitorAnalysis extends BaseController
         $status = (int) ($payload['status'] ?? 1) === 0 ? 0 : 1;
 
         if ($id > 0) {
-            $row = GrowthCompetitorModel::find($id);
+            $rowQuery = GrowthCompetitorModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'growth_competitors');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('not_found', 1, null, 'common.notFound');
             }
@@ -112,14 +115,15 @@ class CompetitorAnalysis extends BaseController
             $row->status = $status;
             $row->save();
         } else {
-            GrowthCompetitorModel::create([
+            $createPayload = $this->withTenantPayload([
                 'name' => mb_substr($name, 0, 128),
                 'platform' => mb_substr($platform, 0, 32),
                 'region' => $region !== '' ? mb_substr($region, 0, 16) : null,
                 'category_name' => $category !== '' ? mb_substr($category, 0, 64) : null,
                 'notes' => $notes !== '' ? mb_substr($notes, 0, 255) : null,
                 'status' => $status,
-            ]);
+            ], 'growth_competitors');
+            GrowthCompetitorModel::create($createPayload);
         }
         return $this->jsonOk([], 'saved');
     }
@@ -185,6 +189,7 @@ class CompetitorAnalysis extends BaseController
             $query = GrowthCompetitorModel::alias('c')
                 ->field('c.*')
                 ->order('c.id', 'desc');
+            $query = $this->scopeTenant($query, 'growth_competitors');
             if ($keyword !== '') {
                 $query->whereLike('c.name', '%' . $keyword . '%');
             }
@@ -194,9 +199,9 @@ class CompetitorAnalysis extends BaseController
             $rows = $query->select();
             foreach ($rows as $row) {
                 $r = is_array($row) ? $row : $row->toArray();
-                $latestMetric = GrowthCompetitorMetricModel::where('competitor_id', (int) ($r['id'] ?? 0))
-                    ->order('metric_date', 'desc')
-                    ->find();
+                $metricQuery = GrowthCompetitorMetricModel::where('competitor_id', (int) ($r['id'] ?? 0))
+                    ->order('metric_date', 'desc');
+                $latestMetric = $this->scopeTenant($metricQuery, 'growth_competitor_metrics')->find();
                 fputcsv($out, [
                     (int) ($r['id'] ?? 0),
                     (string) ($r['name'] ?? ''),

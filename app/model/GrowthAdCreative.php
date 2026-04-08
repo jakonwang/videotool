@@ -11,6 +11,7 @@ class GrowthAdCreative extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'creative_code' => 'string',
         'title' => 'string',
         'platform' => 'string',
@@ -24,4 +25,3 @@ class GrowthAdCreative extends Model
         'updated_at' => 'datetime',
     ];
 }
-

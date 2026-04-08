@@ -317,6 +317,32 @@
         }
       }
 
+      function formatMoney(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return '$0.00';
+        return '$' + n.toFixed(2);
+      }
+
+      async function askMixSuggestion(row) {
+        if (!row || !row.id) return;
+        try {
+          const resp = await fetch('/admin.php/video/mixSuggestion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ video_id: row.id }),
+          });
+          const json = await resp.json();
+          if (!json || json.code !== 0 || !json.data || !json.data.suggestion) {
+            throw new Error((json && json.msg) || tt('page.video.mixSuggestFailed'));
+          }
+          await copyText(json.data.suggestion);
+          ElMessage.success(tt('page.video.mixSuggestCopied'));
+        } catch (e) {
+          ElMessage.error((e && e.message) ? e.message : tt('page.video.mixSuggestFailed'));
+        }
+      }
+
       function openUpload() {
         // cache-bust，避免弹窗内页面缓存旧状态
         uploadIframeSrc.value = '/admin.php/video/batchUpload?_t=' + Date.now();
@@ -388,7 +414,7 @@
         PLATFORM_OPTIONS, DEVICE_OPTIONS, PRODUCT_OPTIONS,
         uploadVisible, uploadIframeSrc, uploadFrame, onUploadIframeLoad, onUploadDialogClose,
         tableRef, fetchList, onSortChange, onSearch, onReset, onSelectionChange, invertSelection,
-        goEdit, doDelete, doBatchDelete, copyText, openUpload, tt,
+        goEdit, doDelete, doBatchDelete, copyText, askMixSuggestion, formatMoney, openUpload, tt,
       };
     },
     template: `
@@ -488,13 +514,26 @@
               </template>
             </el-table-column>
 
-            <el-table-column :label="lang==='en'?'Actions':'操作'" width="100" fixed="right">
+            <el-table-column :label="tt('page.video.colUsedBy')" width="120" align="center">
+              <template #default="scope">{{ Number(scope.row.used_by_influencers || 0) }}</template>
+            </el-table-column>
+
+            <el-table-column :label="tt('page.video.colTotalGmv')" width="140" align="center">
+              <template #default="scope">{{ formatMoney(scope.row.total_gmv || 0) }}</template>
+            </el-table-column>
+
+            <el-table-column :label="tt('page.video.colCreativeCode')" min-width="140">
+              <template #default="scope">{{ scope.row.ad_creative_code || '—' }}</template>
+            </el-table-column>
+
+            <el-table-column :label="lang==='en'?'Actions':'操作'" width="140" fixed="right">
               <template #default="scope">
                 <el-dropdown trigger="click">
                   <el-button type="primary" link class="action-link">{{ lang==='en'?'Actions':'操作' }}</el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item @click="copyText(scope.row.video_url)">{{ lang==='en'?'Copy URL':'复制链接' }}</el-dropdown-item>
+                      <el-dropdown-item @click="askMixSuggestion(scope.row)">{{ tt('page.video.mixSuggest') }}</el-dropdown-item>
                       <el-dropdown-item @click="goEdit(scope.row)">{{ tt('common.edit') }}</el-dropdown-item>
                       <el-dropdown-item divided @click="doDelete(scope.row)">{{ tt('common.delete') }}</el-dropdown-item>
                     </el-dropdown-menu>

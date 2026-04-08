@@ -11,6 +11,7 @@ class GrowthIndustryMetric extends Model
 
     protected $schema = [
         'id' => 'int',
+        'tenant_id' => 'int',
         'metric_date' => 'date',
         'country_code' => 'string',
         'category_name' => 'string',
@@ -23,4 +24,3 @@ class GrowthIndustryMetric extends Model
         'updated_at' => 'datetime',
     ];
 }
-

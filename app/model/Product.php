@@ -14,6 +14,7 @@ class Product extends Model
 
     protected $schema = [
         'id'          => 'int',
+        'tenant_id'   => 'int',
         'name'        => 'string',
         'category_name' => 'string',
         'category_id' => 'int',

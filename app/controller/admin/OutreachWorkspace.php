@@ -58,6 +58,12 @@ class OutreachWorkspace extends BaseController
             ->field('t.*,i.tiktok_id,i.nickname,i.region,i.contact_info,mt.name as template_name,p.name as product_name')
             ->order('t.priority', 'desc')
             ->order('t.id', 'asc');
+        if ($this->tableHasTenantId('influencer_outreach_tasks')) {
+            $query->where('t.tenant_id', $this->currentTenantId());
+        }
+        if ($this->tableHasTenantId('influencers')) {
+            $query->where('i.tenant_id', $this->currentTenantId());
+        }
         if ($status !== '' && $status !== null) {
             $query->where('t.task_status', (int) $status);
         }
@@ -120,6 +126,7 @@ class OutreachWorkspace extends BaseController
         $region = trim((string) ($payload['region'] ?? ''));
         $influencerStatus = $payload['influencer_status'] ?? '';
         $query = InfluencerModel::order('id', 'asc');
+        $query = $this->scopeTenant($query, 'influencers');
         if ($categoryId > 0) {
             $query->where('category_id', $categoryId);
         }
@@ -151,9 +158,10 @@ class OutreachWorkspace extends BaseController
         }
 
         $openMap = [];
-        $openRows = InfluencerOutreachTaskModel::whereIn('influencer_id', $ids)
+        $openRowsQuery = InfluencerOutreachTaskModel::whereIn('influencer_id', $ids)
             ->whereIn('task_status', [self::TASK_PENDING, self::TASK_COPIED, self::TASK_JUMPED])
-            ->field('influencer_id')
+            ->field('influencer_id');
+        $openRows = $this->scopeTenant($openRowsQuery, 'influencer_outreach_tasks')
             ->select()
             ->toArray();
         foreach ($openRows as $r) {
@@ -174,7 +182,7 @@ class OutreachWorkspace extends BaseController
                 $skipped++;
                 continue;
             }
-            InfluencerOutreachTaskModel::create([
+            $taskPayload = $this->withTenantPayload([
                 'influencer_id' => $id,
                 'template_id' => $templateId > 0 ? $templateId : null,
                 'product_id' => $productId > 0 ? $productId : null,
@@ -182,7 +190,8 @@ class OutreachWorkspace extends BaseController
                 'priority' => $priority,
                 'assigned_to' => AdminAuthService::userId() > 0 ? AdminAuthService::userId() : null,
                 'source_filter_json' => $filterJson,
-            ]);
+            ], 'influencer_outreach_tasks');
+            InfluencerOutreachTaskModel::create($taskPayload);
             $created++;
         }
 
@@ -203,11 +212,15 @@ class OutreachWorkspace extends BaseController
         if ($taskId <= 0 || $action === '') {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
-        $task = InfluencerOutreachTaskModel::find($taskId);
+        $taskQuery = InfluencerOutreachTaskModel::where('id', $taskId);
+        $taskQuery = $this->scopeTenant($taskQuery, 'influencer_outreach_tasks');
+        $task = $taskQuery->find();
         if (!$task) {
             return $this->jsonErr('not_found', 1, null, 'common.notFound');
         }
-        $inf = InfluencerModel::find((int) ($task->influencer_id ?? 0));
+        $infQuery = InfluencerModel::where('id', (int) ($task->influencer_id ?? 0));
+        $infQuery = $this->scopeTenant($infQuery, 'influencers');
+        $inf = $infQuery->find();
         if (!$inf) {
             return $this->jsonErr('influencer_not_found', 1, null, 'page.influencer.notFound');
         }
@@ -260,16 +273,20 @@ class OutreachWorkspace extends BaseController
 
                 $tpl = null;
                 if ((int) ($task->template_id ?? 0) > 0) {
-                    $tpl = MessageTemplateModel::find((int) $task->template_id);
+                    $tplQuery = MessageTemplateModel::where('id', (int) $task->template_id);
+                    $tplQuery = $this->scopeTenant($tplQuery, 'message_templates');
+                    $tpl = $tplQuery->find();
                 }
                 $productName = '';
                 if ((int) ($task->product_id ?? 0) > 0) {
-                    $p = Db::name('products')->where('id', (int) $task->product_id)->find();
+                    $productQuery = Db::name('products')->where('id', (int) $task->product_id);
+                    $productQuery = $this->scopeTenant($productQuery, 'products');
+                    $p = $productQuery->find();
                     if ($p) {
                         $productName = (string) ($p['name'] ?? '');
                     }
                 }
-                OutreachLogModel::create([
+                $logPayload = $this->withTenantPayload([
                     'influencer_id' => (int) $inf->id,
                     'template_id' => (int) ($task->template_id ?? 0),
                     'template_name' => (string) ($tpl->name ?? ''),
@@ -278,8 +295,11 @@ class OutreachWorkspace extends BaseController
                     'product_name' => $productName !== '' ? $productName : null,
                     'channel' => $channel,
                     'rendered_body' => $renderedBody !== '' ? $renderedBody : null,
-                ]);
-                InfluencerModel::where('id', (int) $inf->id)->update(['last_contacted_at' => date('Y-m-d H:i:s')]);
+                ], 'outreach_logs');
+                OutreachLogModel::create($logPayload);
+                $touchQuery = InfluencerModel::where('id', (int) $inf->id);
+                $touchQuery = $this->scopeTenant($touchQuery, 'influencers');
+                $touchQuery->update(['last_contacted_at' => date('Y-m-d H:i:s')]);
 
                 if ($statusTarget !== null) {
                     $current = (int) ($inf->status ?? 0);
@@ -320,6 +340,12 @@ class OutreachWorkspace extends BaseController
             ->whereIn('t.task_status', [self::TASK_PENDING, self::TASK_COPIED, self::TASK_JUMPED])
             ->order('t.priority', 'desc')
             ->order('t.id', 'asc');
+        if ($this->tableHasTenantId('influencer_outreach_tasks')) {
+            $query->where('t.tenant_id', $this->currentTenantId());
+        }
+        if ($this->tableHasTenantId('influencers')) {
+            $query->where('i.tenant_id', $this->currentTenantId());
+        }
         if ($uid > 0) {
             $query->where(function ($sub) use ($uid) {
                 $sub->whereNull('t.assigned_to')->whereOr('t.assigned_to', $uid);

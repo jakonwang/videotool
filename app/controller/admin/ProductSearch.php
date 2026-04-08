@@ -5,6 +5,7 @@ namespace app\controller\admin;
 
 use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
+use app\service\AdminAuditService;
 use app\service\AdminAuthService;
 use app\service\CatalogTokenService;
 use app\service\VolcArkVisionConfig;
@@ -102,7 +103,7 @@ class ProductSearch extends BaseController
             $pageSize = 100;
         }
 
-        $q = ItemModel::order('id', 'desc');
+        $q = $this->scopeTenant(ItemModel::order('id', 'desc'), 'product_style_items');
         if ($keyword !== '') {
             $q->where(static function ($query) use ($keyword, $hasAiDescription): void {
                 $query->whereLike('product_code', '%' . $keyword . '%')
@@ -161,7 +162,9 @@ class ProductSearch extends BaseController
 
         $categoryOptions = [];
         try {
-            $categoryRows = ItemModel::whereRaw("TRIM(IFNULL(hot_type,'')) <> ''")
+            $categoryQuery = ItemModel::whereRaw("TRIM(IFNULL(hot_type,'')) <> ''");
+            $categoryQuery = $this->scopeTenant($categoryQuery, 'product_style_items');
+            $categoryRows = $categoryQuery
                 ->group('hot_type')
                 ->order('hot_type', 'asc')
                 ->column('hot_type');
@@ -192,10 +195,11 @@ class ProductSearch extends BaseController
         $visionDescCount = 0;
         if ($hasAiDescription) {
             try {
-                $visionDescCount = (int) Db::name('product_style_items')
+                $visionQuery = Db::name('product_style_items')
                     ->where('status', 1)
-                    ->whereRaw('ai_description IS NOT NULL AND TRIM(ai_description) <> \'\'')
-                    ->count();
+                    ->whereRaw('ai_description IS NOT NULL AND TRIM(ai_description) <> \'\'');
+                $visionQuery = $this->scopeTenant($visionQuery, 'product_style_items');
+                $visionDescCount = (int) $visionQuery->count();
             } catch (\Throwable $e) {
                 $visionDescCount = 0;
             }
@@ -373,7 +377,9 @@ class ProductSearch extends BaseController
     public function delete()
     {
         $id = (int) $this->request->param('id', 0);
-        ItemModel::destroy($id);
+        $query = ItemModel::where('id', $id);
+        $query = $this->scopeTenant($query, 'product_style_items');
+        $query->delete();
 
         return $this->jsonOk([], '已删除');
     }
@@ -395,7 +401,9 @@ class ProductSearch extends BaseController
             if (count($ids) > $max) {
                 return $this->jsonErr('单次最多删除 ' . $max . ' 条');
             }
-            ItemModel::whereIn('id', $ids)->delete();
+            $deleteQuery = ItemModel::whereIn('id', $ids);
+            $deleteQuery = $this->scopeTenant($deleteQuery, 'product_style_items');
+            $deleteQuery->delete();
 
             return $this->jsonOk(['deleted' => count($ids)], '已批量删除');
         } catch (\Throwable $e) {
@@ -445,10 +453,13 @@ class ProductSearch extends BaseController
             if ($id <= 0) {
                 return $this->jsonErr('无效 ID');
             }
-            $row = ItemModel::find($id);
+            $rowQuery = ItemModel::where('id', $id);
+            $rowQuery = $this->scopeTenant($rowQuery, 'product_style_items');
+            $row = $rowQuery->find();
             if (!$row) {
                 return $this->jsonErr('记录不存在');
             }
+            $oldWholesalePrice = round((float) ($row->wholesale_price ?? 0), 2);
             $productCode = trim((string) $this->request->param('product_code', ''));
             if ($productCode === '') {
                 return $this->jsonErr('产品编号不能为空');
@@ -564,6 +575,22 @@ class ProductSearch extends BaseController
             if ($hasAiDescription && isset($update['ai_description']) && (string) $update['ai_description'] !== '') {
                 ProductStyleIndexRowService::syncProductAiDescription($productCode, (string) $update['ai_description']);
             }
+            if (array_key_exists('wholesale_price', $update)) {
+                $newWholesalePrice = round((float) ($update['wholesale_price'] ?? 0), 2);
+                if (abs($newWholesalePrice - $oldWholesalePrice) >= 0.0001) {
+                    AdminAuditService::log(
+                        $this->request,
+                        'product_style.update_wholesale_price',
+                        'product_style_items',
+                        (int) $row->id,
+                        [
+                            'product_code' => (string) $productCode,
+                            'old_wholesale_price' => $oldWholesalePrice,
+                            'new_wholesale_price' => $newWholesalePrice,
+                        ]
+                    );
+                }
+            }
 
             return $this->jsonOk([], '已保存');
         } catch (\Throwable $e) {
@@ -666,12 +693,13 @@ class ProductSearch extends BaseController
             $batch = 2000;
             $lastId = 0;
             while (true) {
-                $rows = Db::name('product_style_items')
+                $rowsQuery = Db::name('product_style_items')
                     ->field($field)
                     ->where('id', '>', $lastId)
                     ->order('id', 'asc')
-                    ->limit($batch)
-                    ->select();
+                    ->limit($batch);
+                $rowsQuery = $this->scopeTenant($rowsQuery, 'product_style_items');
+                $rows = $rowsQuery->select();
                 if ($rows === null || count($rows) === 0) {
                     break;
                 }
