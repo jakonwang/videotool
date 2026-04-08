@@ -12,11 +12,49 @@ use think\facade\Db;
 class InfluencerService
 {
     /**
+     * 将可能的 GBK/GB18030 输入统一转为 UTF-8，并做基础清洗。
+     */
+    public static function normalizeInputText(?string $raw, int $maxLen = 0): string
+    {
+        if ($raw === null) {
+            return '';
+        }
+        $s = (string) $raw;
+        if ($s === '') {
+            return '';
+        }
+        // 移除 UTF-8 BOM
+        $s = (string) preg_replace('/^\xEF\xBB\xBF/', '', $s);
+
+        if (!mb_check_encoding($s, 'UTF-8')) {
+            $detected = mb_detect_encoding($s, ['GB18030', 'GBK', 'BIG5', 'UTF-8', 'Windows-1252', 'ISO-8859-1'], true);
+            if (is_string($detected) && strtoupper($detected) !== 'UTF-8') {
+                $conv = @mb_convert_encoding($s, 'UTF-8', $detected);
+                if (is_string($conv) && $conv !== '') {
+                    $s = $conv;
+                }
+            } else {
+                $conv = @iconv('GB18030', 'UTF-8//IGNORE', $s);
+                if (is_string($conv) && $conv !== '') {
+                    $s = $conv;
+                }
+            }
+        }
+
+        $s = trim($s);
+        if ($maxLen > 0) {
+            $s = mb_substr($s, 0, $maxLen);
+        }
+
+        return $s;
+    }
+
+    /**
      * 将用户输入规范为库内唯一键：小写、前导 @
      */
     public static function normalizeTiktokId(string $raw): ?string
     {
-        $s = trim($raw);
+        $s = self::normalizeInputText($raw);
         if ($s === '') {
             return null;
         }
@@ -42,7 +80,7 @@ class InfluencerService
     {
         $norm = [];
         foreach ($row as $i => $cell) {
-            $norm[$i] = self::normHeaderCell((string) $cell);
+            $norm[$i] = self::normHeaderCell(self::normalizeInputText((string) $cell));
         }
 
         $tikTokIdx = null;
@@ -110,7 +148,7 @@ class InfluencerService
 
     private static function normHeaderCell(string $s): string
     {
-        $s = mb_strtolower(trim($s), 'UTF-8');
+        $s = mb_strtolower(self::normalizeInputText($s), 'UTF-8');
 
         return preg_replace('/\s+/u', '', $s) ?? $s;
     }
@@ -120,7 +158,7 @@ class InfluencerService
      */
     public static function parseFollowerCount(string $raw): int
     {
-        $s = trim($raw);
+        $s = self::normalizeInputText($raw);
         if ($s === '') {
             return 0;
         }
@@ -137,7 +175,7 @@ class InfluencerService
      */
     public static function parseStatus(string $raw): ?int
     {
-        $s = trim($raw);
+        $s = self::normalizeInputText($raw);
         if ($s === '') {
             return null;
         }
@@ -175,7 +213,7 @@ class InfluencerService
      */
     public static function normalizeWhatsappNumber(string $raw): string
     {
-        $s = preg_replace('/\D+/', '', $raw) ?? '';
+        $s = preg_replace('/\D+/', '', self::normalizeInputText($raw)) ?? '';
         if ($s === '') {
             return '';
         }
@@ -197,7 +235,7 @@ class InfluencerService
      */
     public static function normalizeZaloToken(string $raw): string
     {
-        $t = trim($raw);
+        $t = self::normalizeInputText($raw);
         if ($t === '') {
             return '';
         }
@@ -237,7 +275,7 @@ class InfluencerService
             }
         }
         if (isset($map['contact'], $row[$map['contact']])) {
-            $raw = trim((string) $row[$map['contact']]);
+            $raw = self::normalizeInputText((string) $row[$map['contact']]);
             if ($raw !== '') {
                 if ($raw[0] === '{' || $raw[0] === '[') {
                     $j = json_decode($raw, true);
@@ -246,7 +284,7 @@ class InfluencerService
                             if (!isset($j[$k]) || $j[$k] === '' || $j[$k] === null) {
                                 continue;
                             }
-                            $v = trim((string) $j[$k]);
+                            $v = self::normalizeInputText((string) $j[$k]);
                             if ($v === '') {
                                 continue;
                             }
@@ -469,16 +507,16 @@ class InfluencerService
         $nick = '';
         $category = null;
         if (isset($map['category']) && $map['category'] !== null && isset($row[$map['category']])) {
-            $c = trim((string) $row[$map['category']]);
-            $category = $c !== '' ? mb_substr($c, 0, 64) : null;
+            $c = self::normalizeInputText((string) $row[$map['category']], 64);
+            $category = $c !== '' ? $c : null;
         }
         if (isset($map['nickname']) && $map['nickname'] !== null && isset($row[$map['nickname']])) {
-            $nick = trim((string) $row[$map['nickname']]);
+            $nick = self::normalizeInputText((string) $row[$map['nickname']], 120);
         }
         $avatar = null;
         if (isset($map['avatar']) && $map['avatar'] !== null && isset($row[$map['avatar']])) {
-            $a = trim((string) $row[$map['avatar']]);
-            $avatar = $a !== '' ? mb_substr($a, 0, 1024) : null;
+            $a = self::normalizeInputText((string) $row[$map['avatar']], 1024);
+            $avatar = $a !== '' ? $a : null;
         }
         $followers = 0;
         if (isset($map['followers']) && $map['followers'] !== null && isset($row[$map['followers']])) {
@@ -487,8 +525,8 @@ class InfluencerService
         $contactParts = self::contactPartsFromImportRow($map, $row);
         $region = null;
         if (isset($map['region']) && $map['region'] !== null && isset($row[$map['region']])) {
-            $r = trim((string) $row[$map['region']]);
-            $region = $r !== '' ? mb_substr($r, 0, 64) : null;
+            $r = self::normalizeInputText((string) $row[$map['region']], 64);
+            $region = $r !== '' ? $r : null;
         }
         $status = 0;
         if (isset($map['status']) && $map['status'] !== null && isset($row[$map['status']])) {

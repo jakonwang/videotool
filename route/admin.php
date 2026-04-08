@@ -204,6 +204,10 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     Route::get('mobile_device/list', 'app\controller\admin\MobileDevice@listJson');
     Route::get('mobile_device/listJson', 'app\controller\admin\MobileDevice@listJson');
+    Route::post('mobile_device/save', 'app\controller\admin\MobileDevice@save');
+    Route::post('mobile_device/delete', 'app\controller\admin\MobileDevice@delete');
+    Route::post('mobile_device/regenerateToken', 'app\controller\admin\MobileDevice@regenerateToken');
+    Route::get('mobile_device', 'app\controller\admin\MobileDevice@index');
 
     Route::post('mobile_agent/pull', 'app\controller\admin\MobileAgent@pull');
     Route::post('mobile_agent/report', 'app\controller\admin\MobileAgent@report');

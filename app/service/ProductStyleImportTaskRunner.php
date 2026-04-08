@@ -263,6 +263,7 @@ class ProductStyleImportTaskRunner
             self::unlinkDrawingMap((int) $task->id);
             $task->status = 'failed';
             $task->error_message = $e->getMessage();
+            $task->failed_count = (int) $task->failed_count + 1;
             $task->save();
             self::appendLog($task, '异常：' . mb_substr($e->getMessage(), 0, 200));
 
@@ -359,9 +360,7 @@ class ProductStyleImportTaskRunner
                 $row = self::stripBomRow($row);
             }
 
-            $row = \array_map(static function ($c) {
-                return \trim((string) $c);
-            }, $row);
+            $row = self::normalizeCsvRowCells($row);
             if ($row === [null] || (\count($row) === 1 && $row[0] === '')) {
                 $task->line_idx = $lineIdx + 1;
                 $task->save();
@@ -845,9 +844,7 @@ class ProductStyleImportTaskRunner
             return;
         }
         $first = self::stripBomRow($first);
-        $first = \array_map(static function ($c) {
-            return \trim((string) $c);
-        }, $first);
+        $first = self::normalizeCsvRowCells($first);
 
         $detected = self::detectHeaderRow($first);
         if ($detected !== null) {
@@ -909,9 +906,7 @@ class ProductStyleImportTaskRunner
             if ($line === $startLine && $startLine === 0) {
                 $row = self::stripBomRow($row);
             }
-            $row = \array_map(static function ($c) {
-                return \trim((string) $c);
-            }, $row);
+            $row = self::normalizeCsvRowCells($row);
             if ($row === [null] || (\count($row) === 1 && $row[0] === '')) {
                 $line++;
 
@@ -969,6 +964,44 @@ class ProductStyleImportTaskRunner
         }
 
         return $row;
+    }
+
+    /**
+     * @param array<int, mixed> $row
+     * @return list<string>
+     */
+    private static function normalizeCsvRowCells(array $row): array
+    {
+        $out = [];
+        foreach ($row as $cell) {
+            $out[] = self::normalizeCsvCell((string) $cell);
+        }
+
+        return $out;
+    }
+
+    private static function normalizeCsvCell(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        $value = (string) \preg_replace('/^\xEF\xBB\xBF/', '', $value);
+        if (!\mb_check_encoding($value, 'UTF-8')) {
+            $detected = \mb_detect_encoding($value, ['GB18030', 'GBK', 'BIG5', 'UTF-8', 'Windows-1252', 'ISO-8859-1'], true);
+            if (\is_string($detected) && \strtoupper($detected) !== 'UTF-8') {
+                $converted = @\mb_convert_encoding($value, 'UTF-8', $detected);
+                if (\is_string($converted) && $converted !== '') {
+                    $value = $converted;
+                }
+            } else {
+                $converted = @\iconv('GB18030', 'UTF-8//IGNORE', $value);
+                if (\is_string($converted) && $converted !== '') {
+                    $value = $converted;
+                }
+            }
+        }
+
+        return \trim($value);
     }
 
     private static function appendLog(ProductStyleImportTask $task, string $message): void

@@ -1,0 +1,438 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.mobileDevice.title') : 'Mobile Devices' }}{/literal}{/block}
+{block name="page_title"}<span data-i18n="page.mobileDevice.title">Mobile Devices</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.mobileDevice.breadcrumb">Creator Ops / Mobile Devices</span>{/block}
+
+{block name="style"}
+<style>
+  .mobile-device-wrap { padding: 16px; }
+  .mobile-device-card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 2px 10px rgba(0, 0, 0, .04); }
+  .mobile-device-head { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .mobile-device-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .mobile-device-token { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+  .mobile-device-empty { padding: 26px 0; color: #9ca3af; text-align: center; }
+</style>
+{/block}
+
+{block name="content"}
+<div id="mobileDeviceApp" class="mobile-device-wrap"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, reactive, ref, computed, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+  const headers = {
+    'Accept': 'application/json, text/javascript, */*;q=0.01',
+    'X-Requested-With': 'XMLHttpRequest'
+  };
+
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch (_) { return null; }
+  }
+
+  function resolveApiMessage(json, fallbackKey) {
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    if (json && json.msg) return String(json.msg);
+    return tt(fallbackKey || 'common.operationFailed');
+  }
+
+  async function copyTextSafe(text) {
+    const value = String(text || '');
+    if (!value) throw new Error(tt('common.copyFail'));
+    if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const input = document.createElement('textarea');
+    input.value = value;
+    input.setAttribute('readonly', 'readonly');
+    input.style.position = 'fixed';
+    input.style.top = '-9999px';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.focus();
+    input.select();
+    const ok = document.execCommand && document.execCommand('copy');
+    document.body.removeChild(input);
+    if (!ok) throw new Error(tt('common.copyFail'));
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const saving = ref(false);
+      const rows = ref([]);
+
+      const query = reactive({
+        keyword: '',
+        status: ''
+      });
+
+      const dialogVisible = ref(false);
+      const dialogMode = ref('create');
+      const formRef = ref(null);
+      const form = reactive({
+        id: 0,
+        device_code: '',
+        device_name: '',
+        device_serial: '',
+        platform: 'android',
+        agent_token: '',
+        daily_quota: 120,
+        status: 1,
+        remark: '',
+        capability_json: ''
+      });
+
+      const platformOptions = computed(() => [
+        { value: 'android', label: tt('page.mobileDevice.platformAndroid') },
+        { value: 'ios', label: tt('page.mobileDevice.platformIos') }
+      ]);
+
+      const statusOptions = computed(() => [
+        { value: '', label: tt('page.mobileDevice.statusAll') },
+        { value: '1', label: tt('common.statusEnabled') },
+        { value: '0', label: tt('common.statusDisabled') }
+      ]);
+
+      const dialogTitle = computed(() => dialogMode.value === 'edit' ? tt('page.mobileDevice.edit') : tt('page.mobileDevice.add'));
+
+      const formRules = {
+        device_code: [{ required: true, message: tt('common.required'), trigger: 'blur' }],
+        device_name: [{ required: true, message: tt('common.required'), trigger: 'blur' }]
+      };
+
+      function resetForm() {
+        form.id = 0;
+        form.device_code = '';
+        form.device_name = '';
+        form.device_serial = '';
+        form.platform = 'android';
+        form.agent_token = '';
+        form.daily_quota = 120;
+        form.status = 1;
+        form.remark = '';
+        form.capability_json = '';
+      }
+
+      function openCreate() {
+        dialogMode.value = 'create';
+        resetForm();
+        dialogVisible.value = true;
+      }
+
+      function openEdit(row) {
+        dialogMode.value = 'edit';
+        form.id = Number(row.id || 0);
+        form.device_code = String(row.device_code || '');
+        form.device_name = String(row.device_name || '');
+        form.device_serial = String(row.device_serial || '');
+        form.platform = String(row.platform || 'android');
+        form.agent_token = String(row.agent_token || '');
+        form.daily_quota = Number(row.daily_quota || 120);
+        form.status = Number(row.status || 0) === 1 ? 1 : 0;
+        form.remark = String(row.remark || '');
+        form.capability_json = String(row.capability_json || '');
+        dialogVisible.value = true;
+      }
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams();
+          if (query.keyword) p.set('keyword', String(query.keyword));
+          if (query.status !== '') p.set('status', String(query.status));
+          const res = await fetch('/admin.php/mobile_device/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          rows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      async function submit() {
+        if (!formRef.value) return;
+        try {
+          await formRef.value.validate();
+        } catch (_) {
+          return;
+        }
+        saving.value = true;
+        try {
+          const res = await fetch('/admin.php/mobile_device/save', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              id: Number(form.id || 0),
+              device_code: String(form.device_code || '').trim(),
+              device_name: String(form.device_name || '').trim(),
+              device_serial: String(form.device_serial || '').trim(),
+              platform: String(form.platform || 'android'),
+              agent_token: String(form.agent_token || '').trim(),
+              daily_quota: Number(form.daily_quota || 0),
+              status: Number(form.status || 0) === 1 ? 1 : 0,
+              remark: String(form.remark || '').trim(),
+              capability_json: String(form.capability_json || '').trim()
+            })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.saved'));
+          dialogVisible.value = false;
+          await fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          saving.value = false;
+        }
+      }
+
+      async function remove(row) {
+        await ElMessageBox.confirm(tt('page.mobileDevice.deleteConfirm', { code: row.device_code || '-' }), tt('common.delete'), {
+          type: 'warning',
+          confirmButtonText: tt('common.delete'),
+          cancelButtonText: tt('common.cancel')
+        });
+        const res = await fetch('/admin.php/mobile_device/delete', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({ id: Number(row.id || 0) })
+        });
+        const json = parseJson(await res.text());
+        if (!json || json.code !== 0) {
+          throw new Error(resolveApiMessage(json, 'common.deleteFailed'));
+        }
+        ElMessage.success(tt('common.deleted'));
+        await fetchList();
+      }
+
+      async function onDelete(row) {
+        try {
+          await remove(row);
+        } catch (e) {
+          const msg = String((e && e.message) ? e.message : e || '');
+          if (msg === 'cancel' || msg === 'close') {
+            return;
+          }
+          ElMessage.error((e && e.message) ? e.message : tt('common.deleteFailed'));
+        }
+      }
+
+      async function regenToken(row) {
+        const res = await fetch('/admin.php/mobile_device/regenerateToken', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({ id: Number(row.id || 0) })
+        });
+        const json = parseJson(await res.text());
+        if (!json || json.code !== 0) {
+          throw new Error(resolveApiMessage(json, 'common.operationFailed'));
+        }
+        const token = json.data ? String(json.data.agent_token || '') : '';
+        if (token) {
+          await copyTextSafe(token);
+          ElMessage.success(tt('common.copyDone'));
+        } else {
+          ElMessage.success(tt('common.updated'));
+        }
+        await fetchList();
+      }
+
+      async function onRegen(row) {
+        try {
+          await regenToken(row);
+        } catch (e) {
+          ElMessage.error((e && e.message) ? e.message : tt('common.operationFailed'));
+        }
+      }
+
+      async function doCopyToken(token) {
+        try {
+          await copyTextSafe(token);
+          ElMessage.success(tt('common.copyDone'));
+        } catch (e) {
+          ElMessage.error((e && e.message) ? e.message : tt('common.copyFail'));
+        }
+      }
+
+      function tokenPreview(token) {
+        const value = String(token || '');
+        if (value.length <= 16) return value || '-';
+        return value.slice(0, 6) + '...' + value.slice(-6);
+      }
+
+      onMounted(fetchList);
+
+      return {
+        loading,
+        saving,
+        rows,
+        query,
+        dialogVisible,
+        dialogTitle,
+        form,
+        formRef,
+        formRules,
+        statusOptions,
+        platformOptions,
+        tt,
+        fetchList,
+        openCreate,
+        openEdit,
+        submit,
+        remove,
+        onDelete,
+        regenToken,
+        onRegen,
+        tokenPreview,
+        doCopyToken,
+        copyTextSafe
+      };
+    },
+    template: `
+      <div class="mobile-device-card">
+        <div class="mobile-device-head">
+          <div style="font-size:18px;font-weight:600;color:#111827;">{{ tt('page.mobileDevice.title') }}</div>
+          <el-button type="primary" @click="openCreate">{{ tt('page.mobileDevice.add') }}</el-button>
+        </div>
+
+        <div class="mobile-device-filters">
+          <el-input
+            v-model="query.keyword"
+            clearable
+            style="width:280px"
+            :placeholder="tt('page.mobileDevice.keywordPh')"
+            @keyup.enter="fetchList"
+          />
+          <el-select v-model="query.status" style="width:150px" @change="fetchList">
+            <el-option v-for="op in statusOptions" :key="String(op.value)" :label="op.label" :value="op.value" />
+          </el-select>
+          <el-button type="primary" @click="fetchList">{{ tt('common.filter') }}</el-button>
+          <el-button @click="query.keyword='';query.status='';fetchList()">{{ tt('common.reset') }}</el-button>
+        </div>
+
+        <el-table :data="rows" v-loading="loading" stripe>
+          <el-table-column prop="device_code" :label="tt('page.mobileDevice.colCode')" width="160" />
+          <el-table-column prop="device_name" :label="tt('page.mobileDevice.colName')" min-width="160" />
+          <el-table-column :label="tt('page.mobileDevice.colPlatform')" width="120">
+            <template #default="{ row }">
+              {{ row.platform === 'ios' ? tt('page.mobileDevice.platformIos') : tt('page.mobileDevice.platformAndroid') }}
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.mobileDevice.colToken')" min-width="230">
+            <template #default="{ row }">
+              <span class="mobile-device-token" :title="row.agent_token || ''">{{ tokenPreview(row.agent_token) }}</span>
+              <el-button link type="primary" @click="doCopyToken(row.agent_token)">{{ tt('common.copy') }}</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.mobileDevice.colStatus')" width="120">
+            <template #default="{ row }">
+              <el-tag :type="Number(row.status||0)===1 ? 'success' : 'info'">
+                {{ Number(row.status||0)===1 ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.mobileDevice.colOnline')" width="120">
+            <template #default="{ row }">
+              <el-tag :type="Number(row.is_online||0)===1 ? 'success' : 'info'">
+                {{ Number(row.is_online||0)===1 ? tt('page.mobileDevice.online') : tt('page.mobileDevice.offline') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="daily_quota" :label="tt('page.mobileDevice.colQuota')" width="110" />
+          <el-table-column prop="heartbeat_at" :label="tt('page.mobileDevice.colHeartbeat')" min-width="170" />
+          <el-table-column prop="updated_at" :label="tt('page.mobileDevice.colUpdated')" min-width="170" />
+          <el-table-column :label="tt('page.mobileDevice.colActions')" width="270" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button link type="warning" @click="onRegen(row)">{{ tt('page.mobileDevice.regenToken') }}</el-button>
+              <el-button link type="danger" @click="onDelete(row)">{{ tt('common.delete') }}</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="mobile-device-empty">{{ tt('common.noData') }}</div>
+          </template>
+        </el-table>
+      </div>
+
+      <el-dialog v-model="dialogVisible" :title="dialogTitle" width="680px" :close-on-click-modal="false">
+        <el-form ref="formRef" :model="form" :rules="formRules" label-width="130px">
+          <el-row :gutter="14">
+            <el-col :span="12">
+              <el-form-item prop="device_code" :label="tt('page.mobileDevice.fieldCode')">
+                <el-input v-model="form.device_code" maxlength="64" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item prop="device_name" :label="tt('page.mobileDevice.fieldName')">
+                <el-input v-model="form.device_name" maxlength="128" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="14">
+            <el-col :span="12">
+              <el-form-item :label="tt('page.mobileDevice.fieldPlatform')">
+                <el-select v-model="form.platform" style="width:100%">
+                  <el-option v-for="op in platformOptions" :key="op.value" :label="op.label" :value="op.value" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item :label="tt('page.mobileDevice.fieldQuota')">
+                <el-input-number v-model="form.daily_quota" :min="0" :max="200000" style="width:100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="14">
+            <el-col :span="12">
+              <el-form-item :label="tt('page.mobileDevice.fieldSerial')">
+                <el-input v-model="form.device_serial" maxlength="128" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item :label="tt('page.mobileDevice.fieldStatus')">
+                <el-switch v-model="form.status" :active-value="1" :inactive-value="0" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item :label="tt('page.mobileDevice.fieldToken')">
+            <el-input v-model="form.agent_token" maxlength="128" :placeholder="tt('page.mobileDevice.tokenPlaceholder')" />
+          </el-form-item>
+          <el-form-item :label="tt('page.mobileDevice.fieldCapability')">
+            <el-input v-model="form.capability_json" type="textarea" :rows="2" :placeholder="tt('page.mobileDevice.capabilityPlaceholder')" />
+          </el-form-item>
+          <el-form-item :label="tt('page.mobileDevice.fieldRemark')">
+            <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible=false">{{ tt('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="saving" @click="submit">{{ tt('common.save') }}</el-button>
+        </template>
+      </el-dialog>
+    `
+  }).use(ElementPlus).mount('#mobileDeviceApp');
+})();
+{/literal}
+</script>
+{/block}

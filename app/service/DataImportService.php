@@ -240,6 +240,7 @@ class DataImportService
             if (!is_array($line)) {
                 continue;
             }
+            $line = self::normalizeCsvLine($line);
             $lineNo++;
             if ($lineNo === 1) {
                 $headers = self::normalizeHeaders($line);
@@ -263,6 +264,44 @@ class DataImportService
         }
 
         return ['headers' => $headers, 'rows' => $rows];
+    }
+
+    /**
+     * @param array<int, mixed> $line
+     * @return list<string>
+     */
+    private static function normalizeCsvLine(array $line): array
+    {
+        $out = [];
+        foreach ($line as $cell) {
+            $out[] = self::normalizeCsvCell((string) $cell);
+        }
+
+        return $out;
+    }
+
+    private static function normalizeCsvCell(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        $value = (string) preg_replace('/^\xEF\xBB\xBF/', '', $value);
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            $detected = mb_detect_encoding($value, ['GB18030', 'GBK', 'BIG5', 'UTF-8', 'Windows-1252', 'ISO-8859-1'], true);
+            if (is_string($detected) && strtoupper($detected) !== 'UTF-8') {
+                $converted = @mb_convert_encoding($value, 'UTF-8', $detected);
+                if (is_string($converted) && $converted !== '') {
+                    $value = $converted;
+                }
+            } else {
+                $converted = @iconv('GB18030', 'UTF-8//IGNORE', $value);
+                if (is_string($converted) && $converted !== '') {
+                    $value = $converted;
+                }
+            }
+        }
+
+        return trim($value);
     }
 
     /**

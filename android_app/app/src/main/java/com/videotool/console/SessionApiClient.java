@@ -53,7 +53,8 @@ public class SessionApiClient
         }
         RequestBody body = new FormBody.Builder()
                 .add("username", username == null ? "" : username.trim())
-                .add("password", password == null ? "" : password.trim())
+                // 密码按用户输入原样提交，避免尾部空格类口令被误改
+                .add("password", password == null ? "" : password)
                 .add("redirect", "/admin.php")
                 .build();
         Request req = new Request.Builder()

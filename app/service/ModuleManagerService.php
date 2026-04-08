@@ -935,6 +935,7 @@ class ModuleManagerService
             'template_total' => self::safeCount('message_templates', ['status' => 1]),
             'outreach_pending' => self::safeCount('influencer_outreach_tasks', ['task_status' => 0]),
             'sample_pending' => self::safeCount('sample_shipments', ['shipment_status' => 0]) + self::safeCount('sample_shipments', ['shipment_status' => 1]),
+            'mobile_device_total' => self::safeCount('mobile_devices', ['status' => 1]),
             'industry_total' => self::safeCount('growth_industry_metrics'),
             'competitor_total' => self::safeCount('growth_competitors'),
             'ad_total' => self::safeCount('growth_ad_creatives'),
@@ -1132,6 +1133,16 @@ class ModuleManagerService
                     'text_i18n' => 'admin.menu.outreachWorkspace',
                     'active' => self::controllerIs($currentController, 'outreachworkspace', 'outreach_workspace'),
                     'badge' => ($badges['outreach_pending'] ?? 0) > 0 ? (string) $badges['outreach_pending'] : '',
+                ];
+            }
+            if ($creatorEnabled) {
+                $creatorChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/mobile_device',
+                    'icon' => 'smartphone',
+                    'text_i18n' => 'admin.menu.mobileDevice',
+                    'active' => self::controllerIs($currentController, 'mobiledevice', 'mobile_device'),
+                    'badge' => ($badges['mobile_device_total'] ?? 0) > 0 ? (string) $badges['mobile_device_total'] : '',
                 ];
             }
             if ($creatorSampleEnabled) {

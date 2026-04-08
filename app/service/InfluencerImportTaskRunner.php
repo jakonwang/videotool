@@ -144,6 +144,7 @@ class InfluencerImportTaskRunner
             Log::error('InfluencerImportTaskRunner tick: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             $task->status = 'failed';
             $task->error_message = $e->getMessage();
+            $task->failed_count = (int) $task->failed_count + 1;
             $task->save();
             $loc = $e->getFile() . ':' . $e->getLine();
             self::appendLog($task, '异常：' . mb_substr($e->getMessage(), 0, 200) . ' @ ' . $loc);
@@ -319,9 +320,7 @@ class InfluencerImportTaskRunner
                 $row = self::stripBomRow($row);
             }
 
-            $row = array_map(static function ($c) {
-                return trim((string) $c);
-            }, $row);
+            $row = self::normalizeCsvRowCells($row);
             if ($row === [null] || (count($row) === 1 && $row[0] === '')) {
                 $task->line_idx = $lineIdx + 1;
                 $task->save();
@@ -385,9 +384,7 @@ class InfluencerImportTaskRunner
             return;
         }
         $first = self::stripBomRow($first);
-        $first = array_map(static function ($c) {
-            return trim((string) $c);
-        }, $first);
+        $first = self::normalizeCsvRowCells($first);
 
         $detected = InfluencerService::mapHeader($first);
         if ($detected !== null) {
@@ -458,9 +455,7 @@ class InfluencerImportTaskRunner
             if ($line === $startLine && $startLine === 0) {
                 $row = self::stripBomRow($row);
             }
-            $row = array_map(static function ($c) {
-                return trim((string) $c);
-            }, $row);
+            $row = self::normalizeCsvRowCells($row);
             if ($row === [null] || (count($row) === 1 && $row[0] === '')) {
                 $line++;
 
@@ -514,6 +509,20 @@ class InfluencerImportTaskRunner
         }
 
         return $row;
+    }
+
+    /**
+     * @param list<string|null>|array<int, mixed> $row
+     * @return list<string>
+     */
+    private static function normalizeCsvRowCells(array $row): array
+    {
+        $out = [];
+        foreach ($row as $cell) {
+            $out[] = InfluencerService::normalizeInputText((string) $cell);
+        }
+
+        return $out;
     }
 
     private static function appendLog(InfluencerImportTask $task, string $message): void

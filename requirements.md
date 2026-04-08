@@ -460,3 +460,20 @@
 
 
 
+
+## 16. 2026-04-08 移动设备后台可视化管理（新增）
+
+- 新增页面：`/admin.php/mobile_device`
+  - 菜单位置：`达人运营 -> 移动设备`
+  - 数据来源：`mobile_devices`
+  - 支持筛选：设备编码/名称/序列号、状态
+  - 支持操作：新增、编辑、删除、重置 Token、复制 Token
+- 新增接口：
+  - `POST /admin.php/mobile_device/save`
+  - `POST /admin.php/mobile_device/delete`
+  - `POST /admin.php/mobile_device/regenerateToken`
+- 保留接口：
+  - `GET /admin.php/mobile_device/listJson`
+- 说明：
+  - `agent_token` 与 `device_code` 用于 `mobile_agent/pull|report` 设备级鉴权
+  - 重置 Token 后建议同步更新手机端 Agent 配置
