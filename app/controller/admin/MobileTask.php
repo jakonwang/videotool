@@ -56,6 +56,11 @@ class MobileTask extends BaseController
             'd.device_name',
             'd.device_code',
         ];
+        if ($this->columnExists('influencers', 'category_name')) {
+            $fields[] = 'i.category_name';
+        } else {
+            $fields[] = "'' as category_name";
+        }
         if ($this->columnExists('influencers', 'avatar_url')) {
             $fields[] = 'i.avatar_url';
         } else {
@@ -495,6 +500,7 @@ class MobileTask extends BaseController
             'completed_at' => (string) ($row['completed_at'] ?? ''),
             'tiktok_id' => (string) ($row['tiktok_id'] ?? ''),
             'nickname' => (string) ($row['nickname'] ?? ''),
+            'category_name' => (string) ($row['category_name'] ?? ''),
             'avatar_url' => (string) ($row['avatar_url'] ?? ''),
             'region' => (string) ($row['region'] ?? ''),
             'influencer_status' => (int) ($row['influencer_status'] ?? 0),
@@ -517,12 +523,24 @@ class MobileTask extends BaseController
         $todayStart = date('Y-m-d 00:00:00');
         $todayEnd = date('Y-m-d 23:59:59');
 
+        $todayTaskQuery = Db::name('mobile_action_tasks')->whereBetween('created_at', [$todayStart, $todayEnd]);
+        if ($this->tableHasTenantId('mobile_action_tasks')) {
+            $todayTaskQuery->where('tenant_id', $tenantId);
+        }
+        $todayTotalTasks = (int) $todayTaskQuery->count();
+
         $contactedQuery = Db::name('influencers')
             ->whereBetween('last_contacted_at', [$todayStart, $todayEnd]);
         if ($this->tableHasTenantId('influencers')) {
             $contactedQuery->where('tenant_id', $tenantId);
         }
         $contactedToday = (int) $contactedQuery->count();
+
+        $repliedQuery = Db::name('influencers')->where('status', 2);
+        if ($this->tableHasTenantId('influencers')) {
+            $repliedQuery->where('tenant_id', $tenantId);
+        }
+        $repliedCount = (int) $repliedQuery->count();
 
         $pendingReplyQuery = Db::name('influencers')->where('status', 1);
         if ($this->tableHasTenantId('influencers')) {
@@ -537,7 +555,10 @@ class MobileTask extends BaseController
         $sampleShipped = (int) $sampledQuery->count();
 
         return [
+            'today_total_tasks' => $todayTotalTasks,
             'today_contacted' => $contactedToday,
+            'reached_count' => $contactedToday,
+            'replied_count' => $repliedCount,
             'pending_reply' => $pendingReply,
             'sample_shipped' => $sampleShipped,
         ];

@@ -10,8 +10,8 @@ android {
         applicationId "com.videotool"
         minSdk 21
         targetSdk 33
-        versionCode 21
-        versionName "2.1.0"
+        versionCode 22
+        versionName "2.2.0"
     }
 
     buildTypes {
@@ -29,7 +29,9 @@ android {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'com.google.android.material:material:1.9.0'
+    implementation 'de.hdodenhof:circleimageview:3.1.0'
     implementation 'com.squareup.okhttp3:okhttp:4.11.0'
 }
 

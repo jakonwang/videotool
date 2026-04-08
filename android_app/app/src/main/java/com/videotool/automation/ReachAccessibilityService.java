@@ -194,7 +194,7 @@ public class ReachAccessibilityService extends AccessibilityService
     {
         actionRunning = false;
         if (success) {
-            toast(getString(R.string.auto_comment_sent_success));
+            toast(getString(R.string.auto_comment_synced));
         } else if (!TextUtils.isEmpty(reason)) {
             toast(getString(R.string.auto_comment_send_failed, reason));
         }

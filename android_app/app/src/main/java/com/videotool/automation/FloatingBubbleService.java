@@ -10,14 +10,17 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.TextView;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
+
+import com.videotool.R;
 
 public class FloatingBubbleService extends Service
 {
     private WindowManager windowManager;
-    private TextView bubbleView;
+    private View bubbleView;
     private WindowManager.LayoutParams layoutParams;
     private float touchStartX;
     private float touchStartY;
@@ -48,15 +51,19 @@ public class FloatingBubbleService extends Service
             return;
         }
 
-        bubbleView = new TextView(this);
-        bubbleView.setText("●");
-        bubbleView.setTextSize(18f);
-        bubbleView.setGravity(Gravity.CENTER);
-        bubbleView.setTextColor(0xCCFFFFFF);
+        FrameLayout bubble = new FrameLayout(this);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0x883D63E6);
-        bubbleView.setBackground(bg);
+        bg.setColor(0x993D63E6);
+        bubble.setBackground(bg);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.mipmap.ic_launcher_round);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(24), dp(24));
+        iconLp.gravity = Gravity.CENTER;
+        bubble.addView(icon, iconLp);
+        bubbleView = bubble;
 
         int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY

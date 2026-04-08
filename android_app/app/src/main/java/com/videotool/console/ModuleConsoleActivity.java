@@ -1,5 +1,6 @@
 package com.videotool.console;
 
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
@@ -12,6 +13,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -31,11 +33,17 @@ import com.videotool.automation.CommentAutomationBridge;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+
+import de.hdodenhof.circleimageview.CircleImageView;
 
 public class ModuleConsoleActivity extends AppCompatActivity
 {
     private static final String[] LANG_CODES = new String[]{"zh", "en", "vi"};
+    private static final String[] TASK_TYPE_VALUES = new String[]{"", "comment_warmup", "tiktok_dm", "zalo_im", "wa_im"};
+    private static final String[] TASK_STATUS_VALUES = new String[]{"", "0", "1", "2", "3", "4", "5", "6"};
 
     private AppPrefs prefs;
     private SessionApiClient apiClient;
@@ -47,11 +55,15 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private TextView textMetricSampled;
     private TextView textEmptyHint;
     private Spinner spinnerLanguage;
+    private Spinner spinnerTaskType;
+    private Spinner spinnerTaskStatus;
     private LinearLayout taskCardContainer;
+    private LinearLayout moduleBoardContainer;
 
     private boolean languageInitialized = false;
     private boolean creatorModuleEnabled = false;
     private String currentPortal = "merchant";
+    private JSONArray rawTaskItems = new JSONArray();
 
     @Override
     protected void attachBaseContext(android.content.Context newBase)
@@ -78,6 +90,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
         bindViews();
         bindLanguageSwitch();
+        bindTaskFilters();
         bindButtons();
         renderUserHeader();
         loadBootstrap();
@@ -102,7 +115,54 @@ public class ModuleConsoleActivity extends AppCompatActivity
         textMetricSampled = findViewById(R.id.text_metric_sampled);
         textEmptyHint = findViewById(R.id.text_empty_hint);
         spinnerLanguage = findViewById(R.id.spinner_language_console);
+        spinnerTaskType = findViewById(R.id.spinner_task_type);
+        spinnerTaskStatus = findViewById(R.id.spinner_task_status);
         taskCardContainer = findViewById(R.id.task_card_container);
+        moduleBoardContainer = findViewById(R.id.module_board_container);
+    }
+
+    private void bindTaskFilters()
+    {
+        String[] typeLabels = new String[]{
+                getString(R.string.console_filter_type_all),
+                getString(R.string.console_filter_type_comment),
+                getString(R.string.console_filter_type_dm),
+                getString(R.string.console_filter_type_zalo),
+                getString(R.string.console_filter_type_wa)
+        };
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_selected, typeLabels);
+        typeAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerTaskType.setAdapter(typeAdapter);
+
+        String[] statusLabels = new String[]{
+                getString(R.string.console_filter_status_all),
+                getString(R.string.console_status_pending),
+                getString(R.string.console_status_assigned),
+                getString(R.string.console_status_prepared),
+                getString(R.string.console_status_done),
+                getString(R.string.console_status_failed),
+                getString(R.string.console_status_skipped),
+                getString(R.string.console_status_canceled)
+        };
+        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_selected, statusLabels);
+        statusAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerTaskStatus.setAdapter(statusAdapter);
+
+        AdapterView.OnItemSelectedListener listener = new AdapterView.OnItemSelectedListener()
+        {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id)
+            {
+                applyTaskFilters();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent)
+            {
+            }
+        };
+        spinnerTaskType.setOnItemSelectedListener(listener);
+        spinnerTaskStatus.setOnItemSelectedListener(listener);
     }
 
     private void bindLanguageSwitch()
@@ -163,10 +223,16 @@ public class ModuleConsoleActivity extends AppCompatActivity
         Button btnLogout = findViewById(R.id.btn_logout);
         Button btnExecutionCenter = findViewById(R.id.btn_open_execution_center);
         Button btnRefresh = findViewById(R.id.btn_refresh_tasks);
+        Button btnCreateCommentTask = findViewById(R.id.btn_create_comment_task);
+        Button btnCreateDmTask = findViewById(R.id.btn_create_dm_task);
+        Button btnResetFilters = findViewById(R.id.btn_reset_task_filters);
 
         btnLogout.setOnClickListener(v -> doLogout());
         btnExecutionCenter.setOnClickListener(v -> startActivity(new Intent(this, AgentControlActivity.class)));
         btnRefresh.setOnClickListener(v -> loadTaskDashboard());
+        btnCreateCommentTask.setOnClickListener(v -> createTaskBatch("comment_warmup"));
+        btnCreateDmTask.setOnClickListener(v -> createTaskBatch("tiktok_dm"));
+        btnResetFilters.setOnClickListener(v -> resetTaskFilters());
     }
 
     private void renderUserHeader()
@@ -229,6 +295,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         String portal = data.optString("portal", prefs.getPortal());
         currentPortal = TextUtils.isEmpty(portal) ? prefs.getPortal() : portal;
         renderUserHeader();
+        renderModuleBoard(data.optJSONArray("menus"));
 
         creatorModuleEnabled = hasEnabledModule(data.optJSONArray("enabled_modules"), "creator_crm");
         if (!creatorModuleEnabled) {
@@ -289,20 +356,23 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private void applyTaskData(JSONObject data)
     {
         JSONObject summary = data.optJSONObject("summary");
-        int contacted = summary == null ? 0 : summary.optInt("today_contacted", 0);
-        int waiting = summary == null ? 0 : summary.optInt("pending_reply", 0);
-        int sampled = summary == null ? 0 : summary.optInt("sample_shipped", 0);
-        setSummary(contacted, waiting, sampled);
+        int totalTasks = summary == null ? 0 : summary.optInt("today_total_tasks", data.optInt("total", 0));
+        int reachedCount = summary == null ? 0 : summary.optInt("reached_count", summary.optInt("today_contacted", 0));
+        int repliedCount = summary == null ? 0 : summary.optInt("replied_count", 0);
+        setSummary(totalTasks, reachedCount, repliedCount);
 
-        JSONArray items = data.optJSONArray("items");
-        renderTaskCards(items);
+        rawTaskItems = data.optJSONArray("items");
+        if (rawTaskItems == null) {
+            rawTaskItems = new JSONArray();
+        }
+        applyTaskFilters();
     }
 
-    private void setSummary(int contacted, int waiting, int sampled)
+    private void setSummary(int totalTasks, int reachedCount, int repliedCount)
     {
-        textMetricContacted.setText(String.valueOf(Math.max(0, contacted)));
-        textMetricPendingReply.setText(String.valueOf(Math.max(0, waiting)));
-        textMetricSampled.setText(String.valueOf(Math.max(0, sampled)));
+        textMetricContacted.setText(String.valueOf(Math.max(0, totalTasks)));
+        textMetricPendingReply.setText(String.valueOf(Math.max(0, reachedCount)));
+        textMetricSampled.setText(String.valueOf(Math.max(0, repliedCount)));
     }
 
     private void renderTaskCards(JSONArray items)
@@ -328,110 +398,76 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
     }
 
+    private void applyTaskFilters()
+    {
+        if (rawTaskItems == null) {
+            rawTaskItems = new JSONArray();
+        }
+        int typePos = spinnerTaskType == null ? 0 : spinnerTaskType.getSelectedItemPosition();
+        int statusPos = spinnerTaskStatus == null ? 0 : spinnerTaskStatus.getSelectedItemPosition();
+        String selectedType = TASK_TYPE_VALUES[Math.max(0, Math.min(typePos, TASK_TYPE_VALUES.length - 1))];
+        String selectedStatus = TASK_STATUS_VALUES[Math.max(0, Math.min(statusPos, TASK_STATUS_VALUES.length - 1))];
+
+        JSONArray filtered = new JSONArray();
+        for (int i = 0; i < rawTaskItems.length(); i++) {
+            JSONObject row = rawTaskItems.optJSONObject(i);
+            if (row == null) {
+                continue;
+            }
+            if (!selectedType.isEmpty() && !selectedType.equalsIgnoreCase(row.optString("task_type", ""))) {
+                continue;
+            }
+            if (!selectedStatus.isEmpty() && !selectedStatus.equals(String.valueOf(row.optInt("task_status", -1)))) {
+                continue;
+            }
+            filtered.put(row);
+        }
+        renderTaskCards(filtered);
+    }
+
     private View buildTaskCard(JSONObject row)
     {
         String handle = sanitizeHandle(row.optString("tiktok_id", ""));
-        String nickname = row.optString("nickname", "");
-        String avatarUrl = row.optString("avatar_url", "").trim();
-        String displayName = nickname.trim().isEmpty() ? ("@" + handle) : nickname;
+        String nickname = row.optString("nickname", "").trim();
         float gpm = (float) row.optDouble("quality_score", 0.0);
-        int taskStatus = row.optInt("task_status", 0);
+        View card = LayoutInflater.from(this).inflate(R.layout.item_task_card, taskCardContainer, false);
+        CircleImageView imgAvatar = card.findViewById(R.id.img_task_avatar);
+        TextView textAvatarLetter = card.findViewById(R.id.text_task_avatar_letter);
+        TextView textGpm = card.findViewById(R.id.text_task_gpm);
+        TextView textHandle = card.findViewById(R.id.text_task_handle);
+        TextView textCategory = card.findViewById(R.id.text_task_category);
+        TextView textBadge = card.findViewById(R.id.text_task_status_badge);
+        View actionZalo = card.findViewById(R.id.action_add_zalo);
+        View actionComment = card.findViewById(R.id.action_go_comment);
+        View actionDm = card.findViewById(R.id.action_send_dm);
 
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackgroundResource(R.drawable.bg_task_card);
-        card.setPadding(dp(12), dp(12), dp(12), dp(12));
-        card.setElevation(dp(2));
-        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        cardLp.bottomMargin = dp(10);
-        card.setLayoutParams(cardLp);
-
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        card.addView(top);
-
-        TextView avatar = new TextView(this);
-        avatar.setText(avatarLetter(handle, nickname));
-        avatar.setTextColor(Color.WHITE);
-        avatar.setTypeface(Typeface.DEFAULT_BOLD);
-        avatar.setGravity(Gravity.CENTER);
-        avatar.setTextSize(14f);
+        int avatarBgColor = avatarColor(handle, row.optString("avatar_url", "").trim());
         GradientDrawable avatarBg = new GradientDrawable();
         avatarBg.setShape(GradientDrawable.OVAL);
-        avatarBg.setColor(avatarColor(handle, avatarUrl));
-        avatar.setBackground(avatarBg);
-        LinearLayout.LayoutParams avatarLp = new LinearLayout.LayoutParams(dp(38), dp(38));
-        avatarLp.rightMargin = dp(10);
-        avatar.setLayoutParams(avatarLp);
-        top.addView(avatar);
+        avatarBg.setColor(avatarBgColor);
+        imgAvatar.setImageDrawable(avatarBg);
+        textAvatarLetter.setText(avatarLetter(handle, nickname));
+        textGpm.setText(getString(R.string.console_gpm_format, formatGpm(gpm)));
+        textHandle.setText("@" + handle);
 
-        LinearLayout center = new LinearLayout(this);
-        center.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams centerLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        center.setLayoutParams(centerLp);
-        top.addView(center);
+        String categoryName = row.optString("category_name", "").trim();
+        if (categoryName.isEmpty()) {
+            categoryName = getString(R.string.console_category_default);
+        }
+        if (!nickname.isEmpty()) {
+            textCategory.setText(categoryName + " · " + nickname);
+        } else {
+            textCategory.setText(categoryName);
+        }
 
-        TextView name = new TextView(this);
-        name.setText("@" + handle);
-        name.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
-        name.setTypeface(Typeface.DEFAULT_BOLD);
-        name.setTextSize(15f);
-        center.addView(name);
-
-        TextView sub = new TextView(this);
-        sub.setText(getString(
-                R.string.console_card_sub,
-                displayName.trim().isEmpty() ? getString(R.string.console_no_nickname) : displayName,
-                formatGpm(gpm)
-        ));
-        sub.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
-        sub.setTextSize(12f);
-        center.addView(sub);
-
-        TextView badge = new TextView(this);
-        badge.setText(taskStatusText(taskStatus));
-        badge.setTextSize(11f);
-        badge.setTypeface(Typeface.DEFAULT_BOLD);
-        badge.setPadding(dp(8), dp(4), dp(8), dp(4));
-        badge.setGravity(Gravity.CENTER);
-        styleStatusBadge(badge, taskStatus);
-        top.addView(badge);
-
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-        actions.setPadding(0, dp(10), 0, 0);
-        card.addView(actions);
-
-        Button btnZalo = actionButton(getString(R.string.console_btn_add_zalo), R.drawable.bg_button_success, R.color.btn_success_text);
-        Button btnComment = actionButton(getString(R.string.console_btn_go_comment), R.drawable.bg_button_primary, android.R.color.white);
-        Button btnDm = actionButton(getString(R.string.console_btn_send_dm), R.drawable.bg_button_neutral, R.color.btn_neutral_text);
-
-        LinearLayout.LayoutParams btnLpA = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        btnLpA.rightMargin = dp(6);
-        btnZalo.setLayoutParams(btnLpA);
-
-        LinearLayout.LayoutParams btnLpB = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        btnLpB.rightMargin = dp(6);
-        btnComment.setLayoutParams(btnLpB);
-
-        LinearLayout.LayoutParams btnLpC = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        btnDm.setLayoutParams(btnLpC);
-
-        actions.addView(btnZalo);
-        actions.addView(btnComment);
-        actions.addView(btnDm);
-
-        btnZalo.setOnClickListener(v -> handleContactAction(row));
-        btnComment.setOnClickListener(v -> handleCommentAction(row));
-        btnDm.setOnClickListener(v -> handleDmAction(row, false));
+        applyCardStatusBadge(textBadge, row);
+        actionZalo.setOnClickListener(v -> handleContactAction(row));
+        actionComment.setOnClickListener(v -> handleCommentAction(row));
+        actionDm.setOnClickListener(v -> handleDmAction(row, false));
+        card.setOnLongClickListener(v -> {
+            showTaskDetailDialog(row);
+            return true;
+        });
 
         return card;
     }
@@ -450,6 +486,43 @@ public class ModuleConsoleActivity extends AppCompatActivity
                 Color.parseColor("#C0392B")
         };
         return palette[hash % palette.length];
+    }
+
+    private void applyCardStatusBadge(TextView textBadge, JSONObject row)
+    {
+        int influencerStatus = row.optInt("influencer_status", -1);
+        int taskStatus = row.optInt("task_status", 0);
+        String taskType = row.optString("task_type", "");
+
+        String text = "";
+        int color = Color.parseColor("#4F7EF5");
+
+        if ("comment_warmup".equalsIgnoreCase(taskType) && (taskStatus == 0 || taskStatus == 1)) {
+            text = getString(R.string.console_badge_wait_comment);
+            color = Color.parseColor("#2563EB");
+        } else if (influencerStatus == 4) {
+            text = getString(R.string.console_badge_sampled);
+            color = Color.parseColor("#16A34A");
+        } else if (influencerStatus == 2) {
+            text = getString(R.string.console_badge_replied);
+            color = Color.parseColor("#0EA5E9");
+        } else if (influencerStatus == 3) {
+            text = getString(R.string.console_badge_wait_sample);
+            color = Color.parseColor("#F59E0B");
+        } else if (influencerStatus == 6) {
+            text = getString(R.string.console_badge_blacklist);
+            color = Color.parseColor("#DC2626");
+        } else {
+            text = taskStatusText(taskStatus);
+            color = statusBadgeColor(taskStatus);
+        }
+
+        textBadge.setText(text);
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setCornerRadius(dp(12));
+        badgeBg.setColor(color);
+        textBadge.setBackground(badgeBg);
+        textBadge.setTextColor(Color.WHITE);
     }
 
     private Button actionButton(String text, int bgRes, int textColorRes)
@@ -492,7 +565,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
         CommentAutomationBridge.savePending(this, taskId, prefs.getAdminBase(), text);
         CommentAutomationBridge.startFloatingBubble(this);
-        toast(getString(R.string.console_comment_ready));
+        toast(getString(R.string.console_comment_ready_mobile));
     }
 
     private void handleContactAction(JSONObject row)
@@ -534,6 +607,205 @@ public class ModuleConsoleActivity extends AppCompatActivity
         if (fallbackMode) {
             toast(getString(R.string.console_switched_dm_mode));
         }
+    }
+
+    private void createTaskBatch(String taskType)
+    {
+        apiClient.createBatch(prefs.getAdminBase(), taskType, 30, new SessionApiClient.JsonCallback()
+        {
+            @Override
+            public void onSuccess(JSONObject data)
+            {
+                runOnUiThread(() -> {
+                    String msg = getString(
+                            R.string.console_create_task_result,
+                            taskType,
+                            String.valueOf(data.optInt("created", 0)),
+                            String.valueOf(data.optInt("skipped_existing", 0)),
+                            String.valueOf(data.optInt("blocked_24h", 0))
+                    );
+                    toast(msg);
+                    loadTaskDashboard();
+                });
+            }
+
+            @Override
+            public void onUnauthorized()
+            {
+                runOnUiThread(ModuleConsoleActivity.this::handleUnauthorized);
+            }
+
+            @Override
+            public void onError(String errorMessage)
+            {
+                runOnUiThread(() -> toast(getString(R.string.console_action_failed) + ": " + errorMessage));
+            }
+        });
+    }
+
+    private void resetTaskFilters()
+    {
+        if (spinnerTaskType != null) {
+            spinnerTaskType.setSelection(0, false);
+        }
+        if (spinnerTaskStatus != null) {
+            spinnerTaskStatus.setSelection(0, false);
+        }
+        applyTaskFilters();
+    }
+
+    private void renderModuleBoard(JSONArray menus)
+    {
+        if (moduleBoardContainer == null) {
+            return;
+        }
+        moduleBoardContainer.removeAllViews();
+        if (menus == null || menus.length() == 0) {
+            return;
+        }
+        for (int i = 0; i < menus.length(); i++) {
+            JSONObject section = menus.optJSONObject(i);
+            if (section == null) {
+                continue;
+            }
+            JSONArray items = section.optJSONArray("items");
+            if (items == null || items.length() == 0) {
+                continue;
+            }
+            List<JSONObject> links = new ArrayList<>();
+            collectLinkItems(items, links);
+            if (links.isEmpty()) {
+                continue;
+            }
+
+            TextView sectionTitle = new TextView(this);
+            sectionTitle.setText(MenuTextResolver.resolve(
+                    this,
+                    section.optString("section_i18n", ""),
+                    getString(R.string.console_module_section_default)
+            ));
+            sectionTitle.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
+            sectionTitle.setTypeface(Typeface.DEFAULT_BOLD);
+            sectionTitle.setTextSize(12f);
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            titleLp.bottomMargin = dp(6);
+            titleLp.topMargin = dp(2);
+            sectionTitle.setLayoutParams(titleLp);
+            moduleBoardContainer.addView(sectionTitle);
+
+            LinearLayout groupBox = new LinearLayout(this);
+            groupBox.setOrientation(LinearLayout.VERTICAL);
+            groupBox.setBackgroundResource(R.drawable.bg_card);
+            groupBox.setPadding(dp(10), dp(10), dp(10), dp(10));
+            groupBox.setElevation(dp(1));
+            LinearLayout.LayoutParams boxLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            boxLp.bottomMargin = dp(8);
+            groupBox.setLayoutParams(boxLp);
+
+            int count = 0;
+            for (JSONObject link : links) {
+                if (link == null) {
+                    continue;
+                }
+                String href = link.optString("href", "").trim();
+                if (href.isEmpty()) {
+                    continue;
+                }
+                String text = MenuTextResolver.resolve(
+                        this,
+                        link.optString("text_i18n", ""),
+                        href
+                );
+                String badge = link.optString("badge", "").trim();
+                if (!badge.isEmpty() && !"0".equals(badge)) {
+                    text = text + " (" + badge + ")";
+                }
+                Button btn = actionButton(text, R.drawable.bg_button_secondary, R.color.btn_secondary_text);
+                btn.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                if (count > 0) {
+                    lp.topMargin = dp(6);
+                }
+                btn.setLayoutParams(lp);
+                String finalHref = href;
+                String finalText = text;
+                btn.setOnClickListener(v -> openModule(finalText, finalHref));
+                groupBox.addView(btn);
+                count++;
+            }
+            if (count > 0) {
+                moduleBoardContainer.addView(groupBox);
+            }
+        }
+    }
+
+    private void collectLinkItems(JSONArray items, List<JSONObject> links)
+    {
+        if (items == null || links == null) {
+            return;
+        }
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) {
+                continue;
+            }
+            boolean hidden = item.optBoolean("hidden", false) || item.optInt("hidden", 0) == 1;
+            if (hidden) {
+                continue;
+            }
+            String kind = item.optString("kind", "").trim().toLowerCase(Locale.ROOT);
+            if ("link".equals(kind)) {
+                links.add(item);
+                continue;
+            }
+            JSONArray children = item.optJSONArray("children");
+            if (children != null) {
+                collectLinkItems(children, links);
+            }
+        }
+    }
+
+    private void openModule(String title, String href)
+    {
+        if (TextUtils.isEmpty(href)) {
+            toast(getString(R.string.web_load_failed));
+            return;
+        }
+        Intent intent = new Intent(this, WebModuleActivity.class);
+        intent.putExtra(WebModuleActivity.EXTRA_TITLE, title);
+        intent.putExtra(WebModuleActivity.EXTRA_HREF, href);
+        intent.putExtra(WebModuleActivity.EXTRA_ADMIN_BASE, prefs.getAdminBase());
+        startActivity(intent);
+    }
+
+    private void showTaskDetailDialog(JSONObject row)
+    {
+        String handle = sanitizeHandle(row.optString("tiktok_id", ""));
+        String message = getString(
+                R.string.console_task_detail_template,
+                handle,
+                row.optString("task_type", ""),
+                taskStatusText(row.optInt("task_status", 0)),
+                row.optString("target_channel", "auto"),
+                row.optString("device_name", row.optString("device_code", "-")),
+                row.optString("last_commented_at", "-"),
+                row.optString("last_contacted_at", "-"),
+                row.optString("last_error_message", "-")
+        );
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.console_task_detail_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.common_ok, null)
+                .show();
     }
 
     private SessionApiClient.JsonCallback emptyCallback()
@@ -603,9 +875,9 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
         String nickname = row.optString("nickname", "").trim();
         if (nickname.isEmpty()) {
-            nickname = "friend";
+            nickname = sanitizeHandle(row.optString("tiktok_id", ""));
         }
-        return getString(R.string.console_default_comment, nickname);
+        return getString(R.string.console_preset_comment_vi, nickname);
     }
 
     private void copyText(String text)
@@ -688,38 +960,24 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
     }
 
-    private void styleStatusBadge(TextView view, int status)
+    private int statusBadgeColor(int status)
     {
-        int bg;
-        int fg = Color.WHITE;
         switch (status) {
             case 1:
-                bg = Color.parseColor("#4F7EF5");
-                break;
+                return Color.parseColor("#4F7EF5");
             case 2:
-                bg = Color.parseColor("#21B57D");
-                break;
+                return Color.parseColor("#21B57D");
             case 3:
-                bg = Color.parseColor("#2FB170");
-                break;
+                return Color.parseColor("#2FB170");
             case 4:
-                bg = Color.parseColor("#E04D59");
-                break;
+                return Color.parseColor("#E04D59");
             case 5:
-                bg = Color.parseColor("#7A869A");
-                break;
+                return Color.parseColor("#7A869A");
             case 6:
-                bg = Color.parseColor("#4B5563");
-                break;
+                return Color.parseColor("#4B5563");
             default:
-                bg = Color.parseColor("#8B95A7");
-                break;
+                return Color.parseColor("#8B95A7");
         }
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setCornerRadius(dp(12));
-        drawable.setColor(bg);
-        view.setBackground(drawable);
-        view.setTextColor(fg);
     }
 
     private boolean isVietnamRegion(String region)

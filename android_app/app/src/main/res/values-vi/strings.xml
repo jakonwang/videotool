@@ -17,9 +17,9 @@
     <string name="portal_influencer_title">Cổng Influencer</string>
     <string name="console_user_info">%1$s | %2$s | tenant %3$s</string>
     <string name="console_load_failed">Tải module thất bại</string>
-    <string name="console_no_modules">Không có module khả dụng. Hãy liên hệ quản trị viên để cấp quyền.</string>
+    <string name="console_no_modules">Không có module khả dụng. Vui lòng liên hệ quản trị viên để cấp quyền.</string>
     <string name="console_open">Mở</string>
-    <string name="console_creator_module_disabled">Module Creator CRM đang bị tắt.</string>
+    <string name="console_creator_module_disabled">Module Creator CRM đang tắt.</string>
     <string name="console_create_task_result">%1$s: tạo %2$s, đã có %3$s, chặn 24h %4$s</string>
     <string name="console_action_done">Thao tác thành công</string>
     <string name="console_action_failed">Thao tác thất bại</string>
@@ -31,11 +31,16 @@
     <string name="console_metric_contacted">Đã liên hệ hôm nay</string>
     <string name="console_metric_pending_reply">Chờ phản hồi</string>
     <string name="console_metric_sampled">Đã gửi mẫu</string>
+    <string name="console_metric_total_tasks">Tổng nhiệm vụ hôm nay</string>
+    <string name="console_metric_reached">Đã chạm</string>
+    <string name="console_metric_replied">Đã phản hồi</string>
     <string name="console_btn_refresh">Làm mới</string>
     <string name="console_btn_add_zalo">Thêm Zalo</string>
     <string name="console_btn_go_comment">Đi bình luận</string>
     <string name="console_btn_send_dm">Gửi DM</string>
     <string name="console_card_sub">%1$s · GPM %2$s</string>
+    <string name="console_gpm_format">GPM: %1$s</string>
+    <string name="console_category_default">Chưa phân loại</string>
     <string name="console_no_nickname">Chưa có biệt danh</string>
     <string name="console_status_pending">Chờ xử lý</string>
     <string name="console_status_assigned">Đã giao</string>
@@ -50,11 +55,31 @@
     <string name="console_comment_ready">Đã sao chép nội dung. Bấm bong bóng để tự động bình luận.</string>
     <string name="console_no_external_contact">Chưa có liên hệ ngoài nền tảng, đã chuyển sang DM TikTok.</string>
     <string name="console_switched_dm_mode">Đã chuyển sang DM TikTok.</string>
+    <string name="console_filter_title">Bộ lọc nhiệm vụ</string>
+    <string name="console_filter_reset">Đặt lại</string>
+    <string name="console_filter_type_all">Tất cả loại</string>
+    <string name="console_filter_type_comment">Làm nóng bình luận</string>
+    <string name="console_filter_type_dm">TikTok DM</string>
+    <string name="console_filter_type_zalo">Zalo IM</string>
+    <string name="console_filter_type_wa">WhatsApp IM</string>
+    <string name="console_filter_status_all">Tất cả trạng thái</string>
+    <string name="console_module_board_title">Bảng module</string>
+    <string name="console_module_section_default">Nhóm module</string>
+    <string name="console_task_detail_title">Chi tiết nhiệm vụ</string>
+    <string name="console_task_detail_template">Handle: %1$s\nLoại nhiệm vụ: %2$s\nTrạng thái: %3$s\nKênh: %4$s\nThiết bị: %5$s\nBình luận gần nhất: %6$s\nLiên hệ gần nhất: %7$s\nLỗi gần nhất: %8$s</string>
+    <string name="console_badge_wait_comment">Chờ bình luận</string>
+    <string name="console_badge_sampled">Đã gửi mẫu</string>
+    <string name="console_badge_replied">Đã phản hồi</string>
+    <string name="console_badge_wait_sample">Chờ gửi mẫu</string>
+    <string name="console_badge_blacklist">Blacklist</string>
+    <string name="console_preset_comment_vi">Video mới của bạn rất cuốn hút, %1$s! Mình vừa gửi tin nhắn về gửi mẫu thử và hợp tác hoa hồng cao.</string>
     <string name="auto_no_pending_task">Không có nhiệm vụ bình luận đang chờ</string>
     <string name="auto_comment_ui_not_ready">Giao diện bình luận chưa sẵn sàng</string>
     <string name="auto_comment_button_not_found">Không tìm thấy nút bình luận</string>
     <string name="auto_comment_sent_success">Đã hoàn tất bình luận tự động và cập nhật trạng thái</string>
+    <string name="auto_comment_synced">Đã đồng bộ thao tác</string>
     <string name="auto_comment_send_failed">Bình luận tự động thất bại: %1$s</string>
+    <string name="console_comment_ready_mobile">Đã chuẩn bị nội dung, mở TikTok và hiển thị bong bóng.</string>
 
     <string name="btn_open_execution_center">Trung tâm thực thi</string>
     <string name="btn_logout">Đăng xuất</string>
@@ -92,6 +117,8 @@
     <string name="btn_start">Bật Agent</string>
     <string name="btn_stop">Dừng Agent</string>
     <string name="btn_pull_once">Kéo một lần</string>
+    <string name="btn_pick_device">Chọn thiết bị</string>
+    <string name="btn_test_agent_pull">Kiểm tra pull</string>
     <string name="btn_open_target">Mở lại mục tiêu</string>
     <string name="btn_mark_sent">Đánh dấu đã gửi</string>
     <string name="btn_go_comment_auto">Đi bình luận (Tự động)</string>
@@ -105,12 +132,18 @@
 
     <string name="error_invalid_config">Vui lòng nhập URL admin, token và mã thiết bị.</string>
     <string name="log_config_saved">Đã lưu cấu hình.</string>
+    <string name="agent_base_required">Vui lòng nhập URL admin trước.</string>
+    <string name="agent_pick_device_title">Chọn thiết bị</string>
+    <string name="agent_pick_device_empty">Không có thiết bị khả dụng ở backend.</string>
+    <string name="agent_pick_device_applied">Đã áp dụng thiết bị: %1$s</string>
+    <string name="agent_test_pull_ok">Pull thành công. Nhiệm vụ: %1$s | lý do: %2$s</string>
+    <string name="agent_test_pull_fail">Pull thất bại: %1$s</string>
 
     <string name="menu_overview">Tổng quan</string>
     <string name="menu_dashboard">Bảng điều khiển</string>
     <string name="menu_group_search">Tìm nguồn hàng</string>
     <string name="menu_style_search">Tìm mẫu</string>
-    <string name="menu_offline_orders">Đặt hàng offline</string>
+    <string name="menu_offline_orders">Đơn hàng offline</string>
     <string name="menu_growth_hub">Trung tâm tăng trưởng</string>
     <string name="menu_industry_trend">Xu hướng ngành</string>
     <string name="menu_competitor_analysis">Phân tích đối thủ</string>
@@ -123,6 +156,7 @@
     <string name="menu_category">Cấu hình phân loại</string>
     <string name="menu_message_templates">Mẫu tin nhắn</string>
     <string name="menu_distribute">Liên kết KOL</string>
+    <string name="menu_mobile_device">Thiết bị di động</string>
     <string name="menu_material">Phân phối nội dung</string>
     <string name="menu_video">Kho video</string>
     <string name="menu_upload">Tải lên hàng loạt</string>

@@ -172,6 +172,18 @@ public class SessionApiClient
 
     public void listDashboardTasks(String adminBase, int pageSize, final JsonCallback callback)
     {
+        listDashboardTasks(adminBase, 1, pageSize, "", "", "", callback);
+    }
+
+    public void listDashboardTasks(
+            String adminBase,
+            int page,
+            int pageSize,
+            String keyword,
+            String taskType,
+            String taskStatus,
+            final JsonCallback callback
+    ) {
         String base = AppPrefs.normalizeAdminBase(adminBase);
         HttpUrl url = HttpUrl.parse(base + "/mobile_task/listJson");
         if (url == null) {
@@ -179,11 +191,24 @@ public class SessionApiClient
             return;
         }
         int size = Math.max(10, Math.min(80, pageSize));
-        url = url.newBuilder()
-                .addQueryParameter("page_size", String.valueOf(size))
-                .build();
+        int currentPage = Math.max(1, page);
+        HttpUrl.Builder builder = url.newBuilder()
+                .addQueryParameter("page", String.valueOf(currentPage))
+                .addQueryParameter("page_size", String.valueOf(size));
+        String q = keyword == null ? "" : keyword.trim();
+        if (!q.isEmpty()) {
+            builder.addQueryParameter("keyword", q);
+        }
+        String t = taskType == null ? "" : taskType.trim().toLowerCase();
+        if (!t.isEmpty()) {
+            builder.addQueryParameter("task_type", t);
+        }
+        String s = taskStatus == null ? "" : taskStatus.trim();
+        if (!s.isEmpty()) {
+            builder.addQueryParameter("task_status", s);
+        }
         Request req = new Request.Builder()
-                .url(url)
+                .url(builder.build())
                 .header("Accept", "application/json")
                 .get()
                 .build();

@@ -31,11 +31,16 @@
     <string name="console_metric_contacted">今日已联系</string>
     <string name="console_metric_pending_reply">待回复</string>
     <string name="console_metric_sampled">已寄样</string>
+    <string name="console_metric_total_tasks">今日总任务</string>
+    <string name="console_metric_reached">已触达</string>
+    <string name="console_metric_replied">已回复</string>
     <string name="console_btn_refresh">刷新</string>
-    <string name="console_btn_add_zalo">加Zalo</string>
+    <string name="console_btn_add_zalo">加 Zalo</string>
     <string name="console_btn_go_comment">去评论</string>
     <string name="console_btn_send_dm">发私信</string>
     <string name="console_card_sub">%1$s · GPM %2$s</string>
+    <string name="console_gpm_format">GPM: %1$s</string>
+    <string name="console_category_default">未分类</string>
     <string name="console_no_nickname">未填写昵称</string>
     <string name="console_status_pending">待处理</string>
     <string name="console_status_assigned">已分配</string>
@@ -50,11 +55,31 @@
     <string name="console_comment_ready">话术已复制，点击悬浮球可自动执行评论。</string>
     <string name="console_no_external_contact">该达人未抓取到站外账号，已切换为 TikTok 站内私信模式。</string>
     <string name="console_switched_dm_mode">已切换为 TikTok 站内私信模式。</string>
+    <string name="console_filter_title">任务筛选</string>
+    <string name="console_filter_reset">重置</string>
+    <string name="console_filter_type_all">全部类型</string>
+    <string name="console_filter_type_comment">评论预热</string>
+    <string name="console_filter_type_dm">TikTok 私信</string>
+    <string name="console_filter_type_zalo">Zalo 私信</string>
+    <string name="console_filter_type_wa">WhatsApp 私信</string>
+    <string name="console_filter_status_all">全部状态</string>
+    <string name="console_module_board_title">模块看板</string>
+    <string name="console_module_section_default">模块分组</string>
+    <string name="console_task_detail_title">任务详情</string>
+    <string name="console_task_detail_template">达人：%1$s\n任务类型：%2$s\n状态：%3$s\n渠道：%4$s\n设备：%5$s\n最近评论：%6$s\n最近联系：%7$s\n最近错误：%8$s</string>
+    <string name="console_badge_wait_comment">待评论</string>
+    <string name="console_badge_sampled">已寄样</string>
+    <string name="console_badge_replied">已回复</string>
+    <string name="console_badge_wait_sample">待寄样</string>
+    <string name="console_badge_blacklist">黑名单</string>
+    <string name="console_preset_comment_vi">Video mới của bạn rất cuốn hút, %1$s! Mình vừa gửi tin nhắn về gửi mẫu thử và hợp tác hoa hồng cao.</string>
     <string name="auto_no_pending_task">暂无待处理评论任务</string>
     <string name="auto_comment_ui_not_ready">评论界面尚未就绪</string>
     <string name="auto_comment_button_not_found">未找到评论按钮</string>
     <string name="auto_comment_sent_success">已完成自动评论并回传</string>
+    <string name="auto_comment_synced">操作已同步</string>
     <string name="auto_comment_send_failed">自动评论失败：%1$s</string>
+    <string name="console_comment_ready_mobile">话术已准备，已打开 TikTok 并显示悬浮球。</string>
 
     <string name="btn_open_execution_center">执行中心</string>
     <string name="btn_logout">退出登录</string>
@@ -92,6 +117,8 @@
     <string name="btn_start">启动 Agent</string>
     <string name="btn_stop">停止 Agent</string>
     <string name="btn_pull_once">拉取一次</string>
+    <string name="btn_pick_device">选择设备</string>
+    <string name="btn_test_agent_pull">检测拉取</string>
     <string name="btn_open_target">重新打开目标</string>
     <string name="btn_mark_sent">标记已发送</string>
     <string name="btn_go_comment_auto">去评论（自动）</string>
@@ -105,6 +132,12 @@
 
     <string name="error_invalid_config">请填写后台地址、Token 和设备编码。</string>
     <string name="log_config_saved">配置已保存。</string>
+    <string name="agent_base_required">请先填写后台地址。</string>
+    <string name="agent_pick_device_title">选择设备</string>
+    <string name="agent_pick_device_empty">后台没有可用设备。</string>
+    <string name="agent_pick_device_applied">已应用设备：%1$s</string>
+    <string name="agent_test_pull_ok">拉取成功。任务：%1$s | 原因：%2$s</string>
+    <string name="agent_test_pull_fail">拉取失败：%1$s</string>
 
     <string name="menu_overview">概览</string>
     <string name="menu_dashboard">仪表盘</string>
@@ -123,6 +156,7 @@
     <string name="menu_category">分类配置</string>
     <string name="menu_message_templates">话术模板</string>
     <string name="menu_distribute">达人链路</string>
+    <string name="menu_mobile_device">移动设备</string>
     <string name="menu_material">内容分发</string>
     <string name="menu_video">视频素材</string>
     <string name="menu_upload">批量上传</string>

@@ -31,6 +31,7 @@ public class MenuTextResolver
         MAP.put("admin.menu.category", R.string.menu_category);
         MAP.put("admin.menu.messageTemplates", R.string.menu_message_templates);
         MAP.put("admin.menu.distribute", R.string.menu_distribute);
+        MAP.put("admin.menu.mobileDevice", R.string.menu_mobile_device);
         MAP.put("admin.menu.material", R.string.menu_material);
         MAP.put("admin.menu.materialMenu", R.string.menu_material);
         MAP.put("admin.menu.video", R.string.menu_video);
@@ -59,4 +60,3 @@ public class MenuTextResolver
         return context.getString(resId);
     }
 }
-

@@ -487,3 +487,83 @@
 - 后端兜底：
   - 当新增请求未传 `device_code` 时，后端自动生成唯一编码
   - 当新增请求未传 `device_name` 时，后端按平台自动生成默认名称
+
+## 17. 2026-04-08 Mobile Agent V2（本轮）
+
+### 17.1 移动端首页（ModuleConsole）增强
+- 文件：`android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+- 主要改动：
+  - 新增任务筛选：`任务类型 + 任务状态`（前端即时筛选）
+  - 新增快捷批量建任务按钮：
+    - `创建预热评论任务`（`comment_warmup`）
+    - `创建私信任务`（`tiktok_dm`）
+  - 新增“模块看板”渲染：
+    - 使用 `bootstrap.menus` 动态渲染后台可见菜单
+    - 点击菜单项可直接进入 `WebModuleActivity`
+  - 卡片新增长按详情：
+    - 展示任务类型、状态、渠道、设备、最近联系时间、最近错误
+
+### 17.2 执行中心（AgentControl）增强
+- 文件：`android_app/app/src/main/java/com/videotool/AgentControlActivity.java`
+- 新增功能：
+  - `从后台选择设备`：
+    - 调用 `GET /admin.php/mobile_device/listJson`
+    - 选择后自动回填 `device_code + agent_token`
+  - `检测拉取`：
+    - 使用当前配置调用 `mobile_agent/pull`
+    - 快速验证 token/device_code/后台地址是否可用
+
+### 17.3 多语言修复（zh/en/vi）
+- 文件：
+  - `android_app/app/src/main/res/values/strings.xml`
+  - `android_app/app/src/main/res/values-en/strings.xml`
+  - `android_app/app/src/main/res/values-zh-rCN/strings.xml`
+  - `android_app/app/src/main/res/values-vi/strings.xml`
+- 说明：
+  - 清理 Android 端历史乱码
+  - 补齐 V2 新增文案键（筛选、模块看板、任务详情、设备选择、拉取测试）
+
+### 17.4 菜单翻译映射补齐
+- 文件：`android_app/app/src/main/java/com/videotool/console/MenuTextResolver.java`
+- 增加键：
+  - `admin.menu.mobileDevice -> menu_mobile_device`
+
+### 17.5 版本号
+- 文件：`android_app/app/build.gradle`
+- 版本更新：
+  - `versionCode: 22`
+  - `versionName: 2.2.0`
+
+### 17.6 本地编译验证（Windows）
+1. 设置 JDK（当前环境）：
+   - `set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot`
+2. 编译：
+   - `cd android_app`
+   - `gradlew.bat :app:assembleDebug`
+3. 结果：
+   - `BUILD SUCCESSFUL`
+
+### 17.7 V2.1 视觉与触达交互增强（本轮）
+- ModuleConsole 任务列表 UI（现代 SaaS）：
+  - 背景统一 `#F5F7FA`
+  - 任务项改为 `CardView`（白底、`cornerRadius=12dp`、`elevation=2dp`）
+  - 左侧：`CircleImageView` 头像 + `GPM` 小字
+  - 中间：`@handle`（16sp 加粗）+ `category_name`（无值显示“未分类”）
+  - 右侧：彩色 Badge（支持“待评论 / 已寄样 / 已回复 / 待寄样 / 黑名单”）
+  - 底部：图标+文字扁平动作栏（`加Zalo / 去评论 / 发私信`）
+- 顶部统计条：
+  - 改为横向滑动渐变卡片，展示：
+    - 今日总任务（`today_total_tasks`）
+    - 已触达（`reached_count`）
+    - 已回复（`replied_count`）
+- AgentControl 触达链路优化：
+  - “去评论”优先使用预设越语话术（`console_preset_comment_vi`），自动复制后 DeepLink 跳转 TikTok
+  - 保留并强化悬浮球（40dp，半透明，带 TikStar 图标）
+  - Accessibility 完成“点评论 -> 粘贴 -> 发送”后，Toast 显示“操作已同步”
+  - 自动调用 `mobile_task/update_status` 回传 `comment_prepared`（无需手动改状态）
+- 后端配套：
+  - `MobileTask::listJson` 增加 `category_name` 返回
+  - `buildDashboardSummary()` 增加：
+    - `today_total_tasks`
+    - `reached_count`
+    - `replied_count`

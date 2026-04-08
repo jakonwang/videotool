@@ -137,7 +137,7 @@ public class LoginActivity extends AppCompatActivity
     {
         final String base = AppPrefs.normalizeAdminBase(inputAdminBase.getText().toString());
         final String username = inputUsername.getText().toString().trim();
-        // 密码保持原样，避免因 trim() 误删前后空格导致服务端校验失败
+        // Keep the password as raw input to avoid removing intentional spaces.
         final String password = inputPassword.getText().toString();
 
         if (TextUtils.isEmpty(base) || TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) {

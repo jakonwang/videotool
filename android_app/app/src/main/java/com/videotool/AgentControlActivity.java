@@ -1,5 +1,6 @@
 package com.videotool;
 
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -21,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.videotool.agent.AgentConfig;
+import com.videotool.agent.AgentApiClient;
 import com.videotool.agent.AgentPrefs;
 import com.videotool.agent.AgentTask;
 import com.videotool.agent.MobileAgentService;
@@ -28,6 +30,7 @@ import com.videotool.automation.CommentAutomationBridge;
 import com.videotool.console.SessionApiClient;
 
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -123,6 +126,8 @@ public class AgentControlActivity extends AppCompatActivity {
         Button btnSkip = findViewById(R.id.btn_mark_skip);
         Button btnFail = findViewById(R.id.btn_mark_fail);
         Button btnClearLog = findViewById(R.id.btn_clear_log);
+        Button btnPickDevice = findViewById(R.id.btn_pick_device);
+        Button btnTestPull = findViewById(R.id.btn_test_agent_pull);
 
         btnSave.setOnClickListener(v -> {
             AgentConfig config = collectConfigFromInputs();
@@ -155,6 +160,8 @@ public class AgentControlActivity extends AppCompatActivity {
             extra.putExtra(MobileAgentService.EXTRA_ERROR_MESSAGE, "manual_fail_from_app");
             startAgentService(MobileAgentService.ACTION_MARK_FAIL, extra);
         });
+        btnPickDevice.setOnClickListener(v -> loadDeviceOptions());
+        btnTestPull.setOnClickListener(v -> testAgentPull());
         btnClearLog.setOnClickListener(v -> {
             logBuffer.setLength(0);
             textLog.setText("");
@@ -295,6 +302,9 @@ public class AgentControlActivity extends AppCompatActivity {
         }
         String text = task.getCommentText().trim();
         if (text.isEmpty()) {
+            text = getString(R.string.console_preset_comment_vi, task.getDisplayName());
+        }
+        if (text.trim().isEmpty()) {
             text = task.getBestText();
         }
         copyText(text);
@@ -329,7 +339,7 @@ public class AgentControlActivity extends AppCompatActivity {
         }
         CommentAutomationBridge.savePending(this, task.getId(), cfg.getAdminBase(), text);
         CommentAutomationBridge.startFloatingBubble(this);
-        toast(getString(R.string.console_comment_ready));
+        toast(getString(R.string.console_comment_ready_mobile));
     }
 
     private boolean ensureOverlayPermission()
@@ -389,6 +399,113 @@ public class AgentControlActivity extends AppCompatActivity {
             handle = handle.substring(1);
         }
         return handle;
+    }
+
+    private void loadDeviceOptions()
+    {
+        String base = AgentConfig.normalizeAdminBase(valueOf(inputAdminBase));
+        if (base.isEmpty()) {
+            toast(getString(R.string.agent_base_required));
+            return;
+        }
+        SessionApiClient api = new SessionApiClient(this);
+        api.listDevices(base, new SessionApiClient.JsonCallback()
+        {
+            @Override
+            public void onSuccess(JSONObject data)
+            {
+                runOnUiThread(() -> showDevicePicker(data.optJSONArray("items")));
+            }
+
+            @Override
+            public void onUnauthorized()
+            {
+                runOnUiThread(() -> toast(getString(R.string.console_session_expired)));
+            }
+
+            @Override
+            public void onError(String errorMessage)
+            {
+                runOnUiThread(() -> toast(getString(R.string.console_action_failed) + ": " + errorMessage));
+            }
+        });
+    }
+
+    private void showDevicePicker(JSONArray items)
+    {
+        if (items == null || items.length() == 0) {
+            toast(getString(R.string.agent_pick_device_empty));
+            return;
+        }
+        String[] labels = new String[items.length()];
+        final JSONObject[] rows = new JSONObject[items.length()];
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject row = items.optJSONObject(i);
+            if (row == null) {
+                row = new JSONObject();
+            }
+            rows[i] = row;
+            String name = row.optString("device_name", "-");
+            String code = row.optString("device_code", "-");
+            int online = row.optInt("is_online", 0);
+            labels[i] = name + " (" + code + ")" + (online == 1 ? " • online" : "");
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.agent_pick_device_title)
+                .setItems(labels, (dialog, which) -> applyDeviceOption(rows[which]))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void applyDeviceOption(JSONObject row)
+    {
+        if (row == null) {
+            return;
+        }
+        String token = row.optString("agent_token", "");
+        String code = row.optString("device_code", "");
+        if (!token.isEmpty()) {
+            inputToken.setText(token);
+        }
+        if (!code.isEmpty()) {
+            inputDeviceCode.setText(code);
+        }
+        String name = row.optString("device_name", code);
+        toast(getString(R.string.agent_pick_device_applied, name));
+    }
+
+    private void testAgentPull()
+    {
+        AgentConfig config = collectConfigFromInputs();
+        if (!config.isValid()) {
+            toast(getString(R.string.error_invalid_config));
+            return;
+        }
+        AgentApiClient client = new AgentApiClient();
+        client.pullTask(config, new AgentApiClient.ApiCallback<AgentApiClient.PullResult>()
+        {
+            @Override
+            public void onSuccess(AgentApiClient.PullResult result)
+            {
+                runOnUiThread(() -> {
+                    String task = result.task == null ? "-" : ("#" + result.task.getId() + " " + result.task.getTaskType());
+                    String msg = getString(R.string.agent_test_pull_ok, task, result.reason);
+                    toast(msg);
+                    appendLog(msg);
+                });
+            }
+
+            @Override
+            public void onError(String errorMessage)
+            {
+                runOnUiThread(() -> {
+                    String msg = getString(R.string.agent_test_pull_fail, errorMessage);
+                    toast(msg);
+                    appendLog(msg);
+                });
+            }
+        });
     }
 
     private String valueOf(EditText editText) {
