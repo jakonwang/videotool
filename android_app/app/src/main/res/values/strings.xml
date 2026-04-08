@@ -31,6 +31,9 @@
     <string name="console_metric_contacted">Contacted Today</string>
     <string name="console_metric_pending_reply">Pending Reply</string>
     <string name="console_metric_sampled">Sampled</string>
+    <string name="console_metric_outreach_today">Today Outreach</string>
+    <string name="console_metric_pending_tasks">Pending Tasks</string>
+    <string name="console_metric_active_devices">Active Devices</string>
     <string name="console_metric_total_tasks">Today Total Tasks</string>
     <string name="console_metric_reached">Reached</string>
     <string name="console_metric_replied">Replied</string>
@@ -67,6 +70,14 @@
     <string name="console_filter_status_all">All Status</string>
     <string name="console_module_board_title">Module Board</string>
     <string name="console_module_section_default">Modules</string>
+    <string name="console_section_shortcuts">Workspace Modules</string>
+    <string name="console_section_tasks">Task Queue</string>
+    <string name="console_nav_workbench">Workbench</string>
+    <string name="console_nav_search">Product Search</string>
+    <string name="console_nav_message">Messages</string>
+    <string name="console_nav_profile">Me</string>
+    <string name="console_profile_title">Account &amp; Console</string>
+    <string name="console_profile_manage_device">Manage Devices</string>
     <string name="console_task_detail_title">Task Detail</string>
     <string name="console_task_detail_template">Handle: %1$s\nTask Type: %2$s\nStatus: %3$s\nChannel: %4$s\nDevice: %5$s\nLast Commented: %6$s\nLast Contacted: %7$s\nLast Error: %8$s</string>
     <string name="console_task_quick_action">Quick Status</string>
@@ -82,6 +93,8 @@
     <string name="console_badge_replied">Replied</string>
     <string name="console_badge_wait_sample">Wait Sample</string>
     <string name="console_badge_blacklist">Blacklist</string>
+    <string name="console_task_next_step">Next Action</string>
+    <string name="console_task_optional_actions">Optional Actions</string>
     <string name="console_preset_comment_vi">Video moi cua ban rat cuon hut, %1$s! Minh vua gui tin nhan de gui mau thu va hop tac hoa hong cao.</string>
     <string name="auto_no_pending_task">No pending comment task</string>
     <string name="auto_comment_ui_not_ready">Comment UI not ready</string>
@@ -161,6 +174,18 @@
     <string name="agent_health_item_tiktok">TikTok installed</string>
     <string name="agent_health_item_zalo">Zalo installed</string>
     <string name="agent_health_item_wa">WhatsApp installed</string>
+    <string name="agent_detail_fans">Fans</string>
+    <string name="agent_detail_engagement">Engagement</string>
+    <string name="agent_detail_region">Region</string>
+    <string name="agent_detail_quality">Quality</string>
+    <string name="agent_contact_now">Contact Now</string>
+    <string name="agent_action_favorite">Favorite</string>
+    <string name="agent_action_note">Note</string>
+    <string name="agent_note_title">Task Note</string>
+    <string name="agent_note_hint">Write your note for this creator</string>
+    <string name="agent_note_saved">Note saved</string>
+    <string name="agent_favorite_saved">Saved to favorites</string>
+    <string name="agent_cover_subtitle_default">Mobile execution panel</string>
 
     <string name="menu_overview">Overview</string>
     <string name="menu_dashboard">Dashboard</string>

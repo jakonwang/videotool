@@ -16,6 +16,7 @@ import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,6 +36,9 @@ import org.json.JSONArray;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+
+import de.hdodenhof.circleimageview.CircleImageView;
 
 public class AgentControlActivity extends AppCompatActivity {
     private EditText inputAdminBase;
@@ -48,6 +52,14 @@ public class AgentControlActivity extends AppCompatActivity {
     private TextView textStatus;
     private TextView textCurrentTask;
     private TextView textLog;
+    private TextView textHeroHandle;
+    private TextView textHeroSubtitle;
+    private TextView textHeroAvatarLetter;
+    private TextView textStatFans;
+    private TextView textStatEngagement;
+    private TextView textStatRegion;
+    private TextView textStatQuality;
+    private CircleImageView imgHeroAvatar;
 
     private AgentPrefs prefs;
     private final StringBuilder logBuffer = new StringBuilder();
@@ -114,6 +126,14 @@ public class AgentControlActivity extends AppCompatActivity {
         textStatus = findViewById(R.id.text_status);
         textCurrentTask = findViewById(R.id.text_current_task);
         textLog = findViewById(R.id.text_log);
+        textHeroHandle = findViewById(R.id.text_hero_handle);
+        textHeroSubtitle = findViewById(R.id.text_hero_subtitle);
+        textHeroAvatarLetter = findViewById(R.id.text_hero_avatar_letter);
+        textStatFans = findViewById(R.id.text_stat_fans);
+        textStatEngagement = findViewById(R.id.text_stat_engagement);
+        textStatRegion = findViewById(R.id.text_stat_region);
+        textStatQuality = findViewById(R.id.text_stat_quality);
+        imgHeroAvatar = findViewById(R.id.img_hero_avatar);
     }
 
     private void bindActions() {
@@ -130,6 +150,9 @@ public class AgentControlActivity extends AppCompatActivity {
         Button btnPickDevice = findViewById(R.id.btn_pick_device);
         Button btnTestPull = findViewById(R.id.btn_test_agent_pull);
         Button btnPermissionCheck = findViewById(R.id.btn_permission_check);
+        Button btnContactNow = findViewById(R.id.btn_contact_now);
+        ImageButton btnFavorite = findViewById(R.id.btn_favorite);
+        ImageButton btnNote = findViewById(R.id.btn_note);
 
         btnSave.setOnClickListener(v -> {
             AgentConfig config = collectConfigFromInputs();
@@ -165,6 +188,9 @@ public class AgentControlActivity extends AppCompatActivity {
         btnPickDevice.setOnClickListener(v -> loadDeviceOptions());
         btnTestPull.setOnClickListener(v -> testAgentPull());
         btnPermissionCheck.setOnClickListener(v -> showPermissionHealthReport());
+        btnContactNow.setOnClickListener(v -> startAgentService(MobileAgentService.ACTION_OPEN_TARGET, null));
+        btnFavorite.setOnClickListener(v -> toast(getString(R.string.agent_favorite_saved)));
+        btnNote.setOnClickListener(v -> showNoteDialog());
         btnClearLog.setOnClickListener(v -> {
             logBuffer.setLength(0);
             textLog.setText("");
@@ -254,11 +280,14 @@ public class AgentControlActivity extends AppCompatActivity {
                         + " | " + task.getDisplayName()
                         + " | channel=" + task.getTargetChannel();
                 textCurrentTask.setText(summary);
+                renderTaskHero(task);
             } catch (Exception e) {
                 textCurrentTask.setText(getString(R.string.task_none));
+                renderTaskHero(null);
             }
         } else {
             textCurrentTask.setText(getString(R.string.task_none));
+            renderTaskHero(null);
         }
 
         if (!TextUtils.isEmpty(logLine)) {
@@ -289,6 +318,105 @@ public class AgentControlActivity extends AppCompatActivity {
             logBuffer.append(all);
         }
         textLog.setText(all);
+    }
+
+    private void renderTaskHero(AgentTask task)
+    {
+        if (task == null) {
+            textHeroHandle.setText(getString(R.string.task_none));
+            textHeroSubtitle.setText(getString(R.string.agent_cover_subtitle_default));
+            textHeroAvatarLetter.setText("T");
+            imgHeroAvatar.setImageDrawable(null);
+            imgHeroAvatar.setCircleBackgroundColor(ContextCompat.getColor(this, R.color.brand_primary));
+            textStatFans.setText("--");
+            textStatEngagement.setText("--");
+            textStatRegion.setText("--");
+            textStatQuality.setText("--");
+            return;
+        }
+        String handle = sanitizeHandle(task.getTiktokId());
+        String nickname = task.getNickname().trim();
+        String display = handle.isEmpty() ? task.getDisplayName() : "@" + handle;
+        textHeroHandle.setText(display);
+        if (!nickname.isEmpty() && !nickname.equalsIgnoreCase(handle)) {
+            textHeroSubtitle.setText(nickname + " | " + task.getTaskType());
+        } else {
+            textHeroSubtitle.setText(task.getTaskType());
+        }
+        String avatarLetter = handle.isEmpty() ? task.getDisplayName() : handle;
+        if (avatarLetter == null || avatarLetter.trim().isEmpty()) {
+            avatarLetter = "T";
+        }
+        textHeroAvatarLetter.setText(avatarLetter.substring(0, 1).toUpperCase(Locale.ROOT));
+        imgHeroAvatar.setImageDrawable(null);
+        imgHeroAvatar.setCircleBackgroundColor(ContextCompat.getColor(this, R.color.brand_primary));
+
+        JSONObject payload = task.getRawPayload();
+        textStatFans.setText(formatNumberCompact(payload.optLong("followers_count", 0)));
+        textStatEngagement.setText(formatPercent(payload.optDouble("engagement_rate", 0)));
+        String region = payload.optString("region", "");
+        if (region.trim().isEmpty()) {
+            region = "--";
+        }
+        textStatRegion.setText(region.toUpperCase(Locale.ROOT));
+
+        String quality = payload.optString("quality_grade", "").trim();
+        if (quality.isEmpty()) {
+            double score = payload.optDouble("quality_score", 0);
+            if (score >= 80) {
+                quality = "A";
+            } else if (score >= 60) {
+                quality = "B";
+            } else if (score > 0) {
+                quality = "C";
+            } else {
+                quality = "--";
+            }
+        }
+        textStatQuality.setText(quality);
+    }
+
+    private String formatNumberCompact(long value)
+    {
+        if (value <= 0) {
+            return "--";
+        }
+        if (value >= 1000000) {
+            return String.format(Locale.US, "%.1fM", value / 1000000.0d);
+        }
+        if (value >= 1000) {
+            return String.format(Locale.US, "%.1fK", value / 1000.0d);
+        }
+        return String.valueOf(value);
+    }
+
+    private String formatPercent(double value)
+    {
+        if (value <= 0) {
+            return "--";
+        }
+        if (value > 1d) {
+            return String.format(Locale.US, "%.1f%%", value);
+        }
+        return String.format(Locale.US, "%.1f%%", value * 100d);
+    }
+
+    private void showNoteDialog()
+    {
+        final EditText input = new EditText(this);
+        input.setHint(getString(R.string.agent_note_hint));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.agent_note_title)
+                .setView(input)
+                .setPositiveButton(R.string.common_ok, (dialog, which) -> {
+                    String note = input.getText() == null ? "" : input.getText().toString().trim();
+                    if (!note.isEmpty()) {
+                        appendLog("[NOTE] " + note);
+                    }
+                    toast(getString(R.string.agent_note_saved));
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void quickGoComment()

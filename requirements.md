@@ -461,159 +461,38 @@
 
 
 
-## 16. 2026-04-08 移动设备后台可视化管理（新增）
+## 15. Mobile UI Workbench V3 (2026-04-08)
 
-- 新增页面：`/admin.php/mobile_device`
-  - 菜单位置：`达人运营 -> 移动设备`
-  - 数据来源：`mobile_devices`
-  - 支持筛选：设备编码/名称/序列号、状态
-  - 支持操作：新增、编辑、删除、重置 Token、复制 Token
-- 新增接口：
-  - `POST /admin.php/mobile_device/save`
-  - `POST /admin.php/mobile_device/delete`
-  - `POST /admin.php/mobile_device/regenerateToken`
-- 保留接口：
-  - `GET /admin.php/mobile_device/listJson`
-- 说明：
-  - `agent_token` 与 `device_code` 用于 `mobile_agent/pull|report` 设备级鉴权
-  - 重置 Token 后建议同步更新手机端 Agent 配置
+### 15.1 Module Console UI
+- `ModuleConsoleActivity` rebuilt to "dashboard + workbench" structure:
+  - Top gradient KPI panel: `Today Outreach`, `Pending Tasks`, `Active Devices`.
+  - Middle module board changed to 3-column tile grid (`item_module_tile.xml`) with glass icon style.
+  - Task list switched to card-first interaction with skeleton loading (`item_task_skeleton.xml`).
+  - Bottom navigation added (`menu_console_bottom_nav.xml`): Workbench, Product Search, Messages, Me.
+- Navigation behavior:
+  - Workbench/Me switch in-page sections.
+  - Product Search/Messages open backend modules in `WebModuleActivity`.
 
-### 16.1 新增设备自动生成与填写指引（2026-04-08）
+### 15.2 Task Card Interaction
+- `item_task_card.xml` interaction is now two-stage:
+  - Main CTA button `Next Action` executes by task type:
+    - `comment_warmup` -> prepare comment + open TikTok profile.
+    - `tiktok_dm` -> prepare DM + open TikTok profile.
+    - others -> contact route (Zalo/WA, fallback TikTok DM).
+  - Tapping card primary area toggles optional actions (`Add Zalo`, `Send DM`).
+- Status badge remains quick-operable for fast status update.
 
-- 弹窗增强：
-  - 新增“自动生成”按钮，一键填充默认 `device_code / device_name / capability_json`
-  - 新增填写提示文案（编码规范、名称示例、Token 与能力 JSON 说明）
-  - 保存成功提示明确告知：将 `device_code + agent_token` 填入手机端执行中心
-- 后端兜底：
-  - 当新增请求未传 `device_code` 时，后端自动生成唯一编码
-  - 当新增请求未传 `device_name` 时，后端按平台自动生成默认名称
+### 15.3 Agent Detail Panel Upgrade
+- `AgentControlActivity` now binds new hero/detail widgets in `activity_main.xml`:
+  - Cover + avatar letter + handle subtitle.
+  - 2x2 metric panel (`fans`, `engagement`, `region`, `quality`).
+  - Fixed bottom action bar (`favorite`, `note`, `contact now`).
+- Runtime task state now updates both old control area and new detail panel.
 
-## 17. 2026-04-08 Mobile Agent V2（本轮）
-
-### 17.1 移动端首页（ModuleConsole）增强
-- 文件：`android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
-- 主要改动：
-  - 新增任务筛选：`任务类型 + 任务状态`（前端即时筛选）
-  - 新增快捷批量建任务按钮：
-    - `创建预热评论任务`（`comment_warmup`）
-    - `创建私信任务`（`tiktok_dm`）
-  - 新增“模块看板”渲染：
-    - 使用 `bootstrap.menus` 动态渲染后台可见菜单
-    - 点击菜单项可直接进入 `WebModuleActivity`
-  - 卡片新增长按详情：
-    - 展示任务类型、状态、渠道、设备、最近联系时间、最近错误
-
-### 17.2 执行中心（AgentControl）增强
-- 文件：`android_app/app/src/main/java/com/videotool/AgentControlActivity.java`
-- 新增功能：
-  - `从后台选择设备`：
-    - 调用 `GET /admin.php/mobile_device/listJson`
-    - 选择后自动回填 `device_code + agent_token`
-  - `检测拉取`：
-    - 使用当前配置调用 `mobile_agent/pull`
-    - 快速验证 token/device_code/后台地址是否可用
-
-### 17.3 多语言修复（zh/en/vi）
-- 文件：
-  - `android_app/app/src/main/res/values/strings.xml`
-  - `android_app/app/src/main/res/values-en/strings.xml`
-  - `android_app/app/src/main/res/values-zh-rCN/strings.xml`
-  - `android_app/app/src/main/res/values-vi/strings.xml`
-- 说明：
-  - 清理 Android 端历史乱码
-  - 补齐 V2 新增文案键（筛选、模块看板、任务详情、设备选择、拉取测试）
-
-### 17.4 菜单翻译映射补齐
-- 文件：`android_app/app/src/main/java/com/videotool/console/MenuTextResolver.java`
-- 增加键：
-  - `admin.menu.mobileDevice -> menu_mobile_device`
-
-### 17.5 版本号
-- 文件：`android_app/app/build.gradle`
-- 版本更新：
-  - `versionCode: 22`
-  - `versionName: 2.2.0`
-
-### 17.6 本地编译验证（Windows）
-1. 设置 JDK（当前环境）：
-   - `set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot`
-2. 编译：
-   - `cd android_app`
-   - `gradlew.bat :app:assembleDebug`
-3. 结果：
-   - `BUILD SUCCESSFUL`
-
-### 17.7 V2.1 视觉与触达交互增强（本轮）
-- ModuleConsole 任务列表 UI（现代 SaaS）：
-  - 背景统一 `#F5F7FA`
-  - 任务项改为 `CardView`（白底、`cornerRadius=12dp`、`elevation=2dp`）
-  - 左侧：`CircleImageView` 头像 + `GPM` 小字
-  - 中间：`@handle`（16sp 加粗）+ `category_name`（无值显示“未分类”）
-  - 右侧：彩色 Badge（支持“待评论 / 已寄样 / 已回复 / 待寄样 / 黑名单”）
-  - 底部：图标+文字扁平动作栏（`加Zalo / 去评论 / 发私信`）
-- 顶部统计条：
-  - 改为横向滑动渐变卡片，展示：
-    - 今日总任务（`today_total_tasks`）
-    - 已触达（`reached_count`）
-    - 已回复（`replied_count`）
-- AgentControl 触达链路优化：
-  - “去评论”优先使用预设越语话术（`console_preset_comment_vi`），自动复制后 DeepLink 跳转 TikTok
-  - 保留并强化悬浮球（40dp，半透明，带 TikStar 图标）
-  - Accessibility 完成“点评论 -> 粘贴 -> 发送”后，Toast 显示“操作已同步”
-  - 自动调用 `mobile_task/update_status` 回传 `comment_prepared`（无需手动改状态）
-- 后端配套：
-  - `MobileTask::listJson` 增加 `category_name` 返回
-  - `buildDashboardSummary()` 增加：
-    - `today_total_tasks`
-    - `reached_count`
-    - `replied_count`
-
-### 17.8 V3 任务效率与执行体检增强（本轮）
-- ModuleConsole（任务列表）：
-  - 从“前端本地筛选”升级为“后端分页查询”：
-    - 查询参数：`keyword + task_type + task_status + page/page_size`
-    - 接口复用：`GET /admin.php/mobile_task/listJson`
-  - 新增关键词搜索栏：
-    - 支持按 `handle / nickname / 错误信息` 搜索
-  - 新增分页栏：
-    - `上一页 / 下一页`
-    - 页码信息：`第 x/y 页 · 共 n 条`
-  - 新增快捷状态切换：
-    - 点击任务卡片状态 Badge 可快速标记：`完成 / 跳过 / 失败`
-    - 长按任务详情弹窗也支持三种状态快捷操作
-    - 状态回传接口：`POST /admin.php/mobile_task/update_status`
-
-- AgentControl（执行中心）：
-  - 新增“权限体检”按钮：
-    - 检查项：配置完整性、悬浮窗权限、无障碍服务、TikTok/Zalo/WhatsApp 安装状态
-    - 缺权限时支持一键跳转设置页（无障碍优先，其次悬浮窗）
-  - 设备选择弹窗文案修复：
-    - 在线状态统一使用 i18n 文案 `agent_device_online_suffix`
-
-- Android 多语言资源治理（本轮）：
-  - 重写并清理三语资源文件，修复乱码：
-    - `android_app/app/src/main/res/values/strings.xml`
-    - `android_app/app/src/main/res/values-en/strings.xml`
-    - `android_app/app/src/main/res/values-zh-rCN/strings.xml`
-    - `android_app/app/src/main/res/values-vi/strings.xml`
-  - 新增 V3 文案键：
-    - 搜索/分页：`console_filter_keyword_hint`, `console_filter_search`, `console_pagination_*`
-    - 快捷状态：`console_quick_status_title`, `console_quick_mark_*`
-    - 权限体检：`btn_permission_check`, `agent_health_*`
-- 版本号：
-  - `android_app/app/build.gradle`
-  - `versionCode: 23`
-  - `versionName: 2.3.0`
-
-### 17.9 V3 本地验证（Windows）
-1. 编译：
-   - `cd android_app`
-   - `set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot`
-   - `gradlew.bat :app:assembleDebug`
-2. 结果：
-   - `BUILD SUCCESSFUL`
-3. 功能检查建议：
-   - 首页任务区输入关键词后点击“搜索”，确认列表按关键词筛选
-   - 切换任务类型/状态，确认分页总数与页码同步变化
-   - 点击任务状态 Badge，执行“标记完成/跳过/失败”，确认列表实时刷新
-   - 执行中心点击“权限体检”，确认能输出全部检查项并可跳转设置
+### 15.4 Validation (Windows local)
+- Build command:
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+- Device smoke:
+  - `adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk`
+  - `adb shell am start -W -n com.videotool/.MainActivity`

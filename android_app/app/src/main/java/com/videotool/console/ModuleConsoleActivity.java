@@ -5,31 +5,34 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.LinearInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
+import androidx.core.widget.NestedScrollView;
 
 import com.videotool.AgentControlActivity;
 import com.videotool.R;
 import com.videotool.automation.CommentAutomationBridge;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -53,9 +56,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private TextView textUserInfo;
     private TextView textMetricContacted;
     private TextView textMetricPendingReply;
-    private TextView textMetricSampled;
+    private TextView textMetricActiveDevices;
     private TextView textEmptyHint;
     private TextView textTaskPageInfo;
+    private TextView textProfileUser;
     private Spinner spinnerLanguage;
     private Spinner spinnerTaskType;
     private Spinner spinnerTaskStatus;
@@ -64,6 +68,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private Button btnTaskNextPage;
     private LinearLayout taskCardContainer;
     private LinearLayout moduleBoardContainer;
+    private LinearLayout skeletonContainer;
+    private NestedScrollView scrollWorkbench;
+    private ScrollView scrollProfile;
+    private BottomNavigationView bottomNav;
 
     private boolean languageInitialized = false;
     private boolean suppressTaskFilterCallbacks = false;
@@ -74,6 +82,8 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private int totalTaskPages = 1;
     private int currentTaskPageSize = 20;
     private int currentTaskTotal = 0;
+    private int activeNavItemId = R.id.nav_workbench;
+    private AlphaAnimation skeletonPulseAnim;
 
     @Override
     protected void attachBaseContext(android.content.Context newBase)
@@ -102,6 +112,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         bindLanguageSwitch();
         bindTaskFilters();
         bindButtons();
+        bindBottomNavigation();
         renderUserHeader();
         loadBootstrap();
     }
@@ -111,6 +122,8 @@ public class ModuleConsoleActivity extends AppCompatActivity
     {
         super.onResume();
         renderUserHeader();
+        switchTab(activeNavItemId);
+        loadActiveDeviceCount();
         if (creatorModuleEnabled) {
             loadTaskDashboard(currentTaskPage);
         }
@@ -122,9 +135,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
         textUserInfo = findViewById(R.id.text_user_info);
         textMetricContacted = findViewById(R.id.text_metric_contacted);
         textMetricPendingReply = findViewById(R.id.text_metric_pending_reply);
-        textMetricSampled = findViewById(R.id.text_metric_sampled);
+        textMetricActiveDevices = findViewById(R.id.text_metric_active_devices);
         textEmptyHint = findViewById(R.id.text_empty_hint);
         textTaskPageInfo = findViewById(R.id.text_task_page_info);
+        textProfileUser = findViewById(R.id.text_profile_user);
         spinnerLanguage = findViewById(R.id.spinner_language_console);
         spinnerTaskType = findViewById(R.id.spinner_task_type);
         spinnerTaskStatus = findViewById(R.id.spinner_task_status);
@@ -133,6 +147,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
         btnTaskNextPage = findViewById(R.id.btn_task_page_next);
         taskCardContainer = findViewById(R.id.task_card_container);
         moduleBoardContainer = findViewById(R.id.module_board_container);
+        skeletonContainer = findViewById(R.id.skeleton_container);
+        scrollWorkbench = findViewById(R.id.scroll_workbench);
+        scrollProfile = findViewById(R.id.scroll_profile);
+        bottomNav = findViewById(R.id.bottom_nav);
     }
 
     private void bindTaskFilters()
@@ -239,6 +257,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
     {
         Button btnLogout = findViewById(R.id.btn_logout);
         Button btnExecutionCenter = findViewById(R.id.btn_open_execution_center);
+        Button btnProfileDevices = findViewById(R.id.btn_profile_devices);
         Button btnRefresh = findViewById(R.id.btn_refresh_tasks);
         Button btnSearch = findViewById(R.id.btn_search_task_keyword);
         Button btnCreateCommentTask = findViewById(R.id.btn_create_comment_task);
@@ -247,6 +266,8 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
         btnLogout.setOnClickListener(v -> doLogout());
         btnExecutionCenter.setOnClickListener(v -> startActivity(new Intent(this, AgentControlActivity.class)));
+        btnProfileDevices.setOnClickListener(v ->
+                openModule(getString(R.string.console_profile_manage_device), "/admin.php/device"));
         btnRefresh.setOnClickListener(v -> reloadTaskDashboard(true));
         btnSearch.setOnClickListener(v -> reloadTaskDashboard(true));
         btnCreateCommentTask.setOnClickListener(v -> createTaskBatch("comment_warmup"));
@@ -264,6 +285,48 @@ public class ModuleConsoleActivity extends AppCompatActivity
         });
     }
 
+    private void bindBottomNavigation()
+    {
+        if (bottomNav == null) {
+            return;
+        }
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.nav_workbench) {
+                switchTab(itemId);
+                return true;
+            }
+            if (itemId == R.id.nav_profile) {
+                switchTab(itemId);
+                return true;
+            }
+            if (itemId == R.id.nav_search) {
+                openModule(getString(R.string.console_nav_search), "/admin.php/product_search");
+                return false;
+            }
+            if (itemId == R.id.nav_message) {
+                openModule(getString(R.string.console_nav_message), "/admin.php/outreach_workspace");
+                return false;
+            }
+            return false;
+        });
+        switchTab(R.id.nav_workbench);
+    }
+
+    private void switchTab(int itemId)
+    {
+        activeNavItemId = itemId;
+        if (scrollWorkbench != null) {
+            scrollWorkbench.setVisibility(itemId == R.id.nav_workbench ? View.VISIBLE : View.GONE);
+        }
+        if (scrollProfile != null) {
+            scrollProfile.setVisibility(itemId == R.id.nav_profile ? View.VISIBLE : View.GONE);
+        }
+        if (bottomNav != null && bottomNav.getSelectedItemId() != itemId) {
+            bottomNav.setSelectedItemId(itemId);
+        }
+    }
+
     private void renderUserHeader()
     {
         String role = prefs.getRole();
@@ -271,18 +334,23 @@ public class ModuleConsoleActivity extends AppCompatActivity
         textPortalTitle.setText("influencer".equals(currentPortal)
                 ? getString(R.string.portal_influencer_title)
                 : getString(R.string.portal_merchant_title));
-        textUserInfo.setText(getString(
+        String userInfo = getString(
                 R.string.console_user_info,
                 prefs.getUsername(),
                 role,
                 String.valueOf(prefs.getTenantId())
-        ));
+        );
+        textUserInfo.setText(userInfo);
+        if (textProfileUser != null) {
+            textProfileUser.setText(userInfo);
+        }
     }
 
     private void loadBootstrap()
     {
         textEmptyHint.setVisibility(View.GONE);
         taskCardContainer.removeAllViews();
+        showTaskLoading(false);
         currentTaskPage = 1;
         totalTaskPages = 1;
         currentTaskTotal = 0;
@@ -331,9 +399,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
         renderModuleBoard(data.optJSONArray("menus"));
 
         creatorModuleEnabled = hasEnabledModule(data.optJSONArray("enabled_modules"), "creator_crm");
+        loadActiveDeviceCount();
         if (!creatorModuleEnabled) {
             showEmpty(getString(R.string.console_creator_module_disabled));
-            setSummary(0, 0, 0);
+            setSummary(0, 0);
             updateTaskPager();
             return;
         }
@@ -375,6 +444,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         textEmptyHint.setVisibility(View.GONE);
         taskCardContainer.removeAllViews();
         updateTaskPager();
+        showTaskLoading(true);
         apiClient.listDashboardTasks(
                 prefs.getAdminBase(),
                 currentTaskPage,
@@ -399,7 +469,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
                     @Override
                     public void onError(String errorMessage)
                     {
-                        runOnUiThread(() -> showEmpty(getString(R.string.console_action_failed) + ": " + errorMessage));
+                        runOnUiThread(() -> {
+                            showTaskLoading(false);
+                            showEmpty(getString(R.string.console_action_failed) + ": " + errorMessage);
+                        });
                     }
                 }
         );
@@ -407,11 +480,19 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
     private void applyTaskData(JSONObject data)
     {
+        showTaskLoading(false);
         JSONObject summary = data.optJSONObject("summary");
-        int totalTasks = summary == null ? 0 : summary.optInt("today_total_tasks", data.optInt("total", 0));
-        int reachedCount = summary == null ? 0 : summary.optInt("reached_count", summary.optInt("today_contacted", 0));
-        int repliedCount = summary == null ? 0 : summary.optInt("replied_count", 0);
-        setSummary(totalTasks, reachedCount, repliedCount);
+        int outreachToday = 0;
+        int pendingTasks = 0;
+        if (summary != null) {
+            outreachToday = summary.optInt("today_contacted",
+                    summary.optInt("reached_count",
+                            summary.optInt("today_total_tasks", 0)));
+            pendingTasks = summary.optInt("pending_count", summary.optInt("today_total_tasks", data.optInt("total", 0)));
+        } else {
+            pendingTasks = data.optInt("total", 0);
+        }
+        setSummary(outreachToday, pendingTasks);
 
         rawTaskItems = data.optJSONArray("items");
         if (rawTaskItems == null) {
@@ -425,11 +506,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
         renderTaskCards(rawTaskItems);
     }
 
-    private void setSummary(int totalTasks, int reachedCount, int repliedCount)
+    private void setSummary(int outreachToday, int pendingTasks)
     {
-        textMetricContacted.setText(String.valueOf(Math.max(0, totalTasks)));
-        textMetricPendingReply.setText(String.valueOf(Math.max(0, reachedCount)));
-        textMetricSampled.setText(String.valueOf(Math.max(0, repliedCount)));
+        textMetricContacted.setText(String.valueOf(Math.max(0, outreachToday)));
+        textMetricPendingReply.setText(String.valueOf(Math.max(0, pendingTasks)));
     }
 
     private void renderTaskCards(JSONArray items)
@@ -439,6 +519,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
             showEmpty(getString(R.string.console_no_data));
             return;
         }
+        textEmptyHint.setVisibility(View.GONE);
 
         int rendered = 0;
         for (int i = 0; i < items.length(); i++) {
@@ -485,6 +566,69 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
     }
 
+    private void showTaskLoading(boolean loading)
+    {
+        if (skeletonContainer == null || taskCardContainer == null) {
+            return;
+        }
+        if (loading) {
+            taskCardContainer.setVisibility(View.GONE);
+            skeletonContainer.setVisibility(View.VISIBLE);
+            if (skeletonPulseAnim == null) {
+                skeletonPulseAnim = new AlphaAnimation(0.4f, 1f);
+                skeletonPulseAnim.setDuration(850);
+                skeletonPulseAnim.setRepeatMode(AlphaAnimation.REVERSE);
+                skeletonPulseAnim.setRepeatCount(AlphaAnimation.INFINITE);
+                skeletonPulseAnim.setInterpolator(new LinearInterpolator());
+            }
+            skeletonContainer.startAnimation(skeletonPulseAnim);
+            return;
+        }
+        skeletonContainer.clearAnimation();
+        skeletonContainer.setVisibility(View.GONE);
+        taskCardContainer.setVisibility(View.VISIBLE);
+    }
+
+    private void loadActiveDeviceCount()
+    {
+        apiClient.listDevices(prefs.getAdminBase(), new SessionApiClient.JsonCallback()
+        {
+            @Override
+            public void onSuccess(JSONObject data)
+            {
+                int active = 0;
+                JSONArray items = data.optJSONArray("items");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject row = items.optJSONObject(i);
+                        if (row == null) {
+                            continue;
+                        }
+                        if (row.optInt("is_online", 0) == 1) {
+                            active++;
+                        }
+                    }
+                }
+                final int finalActive = active;
+                runOnUiThread(() -> {
+                    if (textMetricActiveDevices != null) {
+                        textMetricActiveDevices.setText(String.valueOf(Math.max(0, finalActive)));
+                    }
+                });
+            }
+
+            @Override
+            public void onUnauthorized()
+            {
+            }
+
+            @Override
+            public void onError(String errorMessage)
+            {
+            }
+        });
+    }
+
     private View buildTaskCard(JSONObject row)
     {
         String handle = sanitizeHandle(row.optString("tiktok_id", ""));
@@ -497,8 +641,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
         TextView textHandle = card.findViewById(R.id.text_task_handle);
         TextView textCategory = card.findViewById(R.id.text_task_category);
         TextView textBadge = card.findViewById(R.id.text_task_status_badge);
+        Button btnNextStep = card.findViewById(R.id.btn_task_next_step);
+        View primaryArea = card.findViewById(R.id.layout_task_primary);
+        View optionalActions = card.findViewById(R.id.layout_optional_actions);
         View actionZalo = card.findViewById(R.id.action_add_zalo);
-        View actionComment = card.findViewById(R.id.action_go_comment);
         View actionDm = card.findViewById(R.id.action_send_dm);
 
         int avatarBgColor = avatarColor(handle, row.optString("avatar_url", "").trim());
@@ -506,28 +652,33 @@ public class ModuleConsoleActivity extends AppCompatActivity
         imgAvatar.setCircleBackgroundColor(avatarBgColor);
         textAvatarLetter.setText(avatarLetter(handle, nickname));
         textGpm.setText(getString(R.string.console_gpm_format, formatGpm(gpm)));
-        textHandle.setText("@" + handle);
+        if (handle.isEmpty()) {
+            textHandle.setText(nickname.isEmpty() ? "-" : nickname);
+        } else {
+            textHandle.setText("@" + handle);
+        }
 
         String categoryName = row.optString("category_name", "").trim();
         if (categoryName.isEmpty()) {
             categoryName = getString(R.string.console_category_default);
         }
         if (!nickname.isEmpty()) {
-            textCategory.setText(categoryName + " · " + nickname);
+            textCategory.setText(categoryName + " | " + nickname);
         } else {
             textCategory.setText(categoryName);
         }
 
         applyCardStatusBadge(textBadge, row);
         textBadge.setOnClickListener(v -> showQuickStatusDialog(row));
+        btnNextStep.setOnClickListener(v -> handleNextAction(row));
+        primaryArea.setOnClickListener(v ->
+                optionalActions.setVisibility(optionalActions.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
         actionZalo.setOnClickListener(v -> handleContactAction(row));
-        actionComment.setOnClickListener(v -> handleCommentAction(row));
         actionDm.setOnClickListener(v -> handleDmAction(row, false));
         card.setOnLongClickListener(v -> {
             showTaskDetailDialog(row);
             return true;
         });
-
         return card;
     }
 
@@ -649,18 +800,21 @@ public class ModuleConsoleActivity extends AppCompatActivity
         );
     }
 
-    private Button actionButton(String text, int bgRes, int textColorRes)
+    private void handleNextAction(JSONObject row)
     {
-        Button btn = new Button(this);
-        btn.setText(text);
-        btn.setAllCaps(false);
-        btn.setTextSize(12f);
-        btn.setTypeface(Typeface.DEFAULT_BOLD);
-        btn.setBackgroundResource(bgRes);
-        btn.setMinHeight(dp(36));
-        btn.setPadding(dp(8), dp(6), dp(8), dp(6));
-        btn.setTextColor(ContextCompat.getColor(this, textColorRes));
-        return btn;
+        if (row == null) {
+            return;
+        }
+        String taskType = row.optString("task_type", "").trim().toLowerCase(Locale.ROOT);
+        if ("comment_warmup".equals(taskType)) {
+            handleCommentAction(row);
+            return;
+        }
+        if ("tiktok_dm".equals(taskType)) {
+            handleDmAction(row, false);
+            return;
+        }
+        handleContactAction(row);
     }
 
     private void handleCommentAction(JSONObject row)
@@ -793,6 +947,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         if (menus == null || menus.length() == 0) {
             return;
         }
+        List<JSONObject> linkItems = new ArrayList<>();
         for (int i = 0; i < menus.length(); i++) {
             JSONObject section = menus.optJSONObject(i);
             if (section == null) {
@@ -802,80 +957,117 @@ public class ModuleConsoleActivity extends AppCompatActivity
             if (items == null || items.length() == 0) {
                 continue;
             }
-            List<JSONObject> links = new ArrayList<>();
-            collectLinkItems(items, links);
-            if (links.isEmpty()) {
-                continue;
-            }
-
-            TextView sectionTitle = new TextView(this);
-            sectionTitle.setText(MenuTextResolver.resolve(
-                    this,
-                    section.optString("section_i18n", ""),
-                    getString(R.string.console_module_section_default)
-            ));
-            sectionTitle.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
-            sectionTitle.setTypeface(Typeface.DEFAULT_BOLD);
-            sectionTitle.setTextSize(12f);
-            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            titleLp.bottomMargin = dp(6);
-            titleLp.topMargin = dp(2);
-            sectionTitle.setLayoutParams(titleLp);
-            moduleBoardContainer.addView(sectionTitle);
-
-            LinearLayout groupBox = new LinearLayout(this);
-            groupBox.setOrientation(LinearLayout.VERTICAL);
-            groupBox.setBackgroundResource(R.drawable.bg_card);
-            groupBox.setPadding(dp(10), dp(10), dp(10), dp(10));
-            groupBox.setElevation(dp(1));
-            LinearLayout.LayoutParams boxLp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            boxLp.bottomMargin = dp(8);
-            groupBox.setLayoutParams(boxLp);
-
-            int count = 0;
-            for (JSONObject link : links) {
-                if (link == null) {
-                    continue;
-                }
-                String href = link.optString("href", "").trim();
-                if (href.isEmpty()) {
-                    continue;
-                }
-                String text = MenuTextResolver.resolve(
-                        this,
-                        link.optString("text_i18n", ""),
-                        href
-                );
-                String badge = link.optString("badge", "").trim();
-                if (!badge.isEmpty() && !"0".equals(badge)) {
-                    text = text + " (" + badge + ")";
-                }
-                Button btn = actionButton(text, R.drawable.bg_button_secondary, R.color.btn_secondary_text);
-                btn.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                );
-                if (count > 0) {
-                    lp.topMargin = dp(6);
-                }
-                btn.setLayoutParams(lp);
-                String finalHref = href;
-                String finalText = text;
-                btn.setOnClickListener(v -> openModule(finalText, finalHref));
-                groupBox.addView(btn);
-                count++;
-            }
-            if (count > 0) {
-                moduleBoardContainer.addView(groupBox);
-            }
+            collectLinkItems(items, linkItems);
         }
+        if (linkItems.isEmpty()) {
+            return;
+        }
+
+        for (int i = 0; i < linkItems.size(); i += 3) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            if (i > 0) {
+                rowParams.topMargin = dp(4);
+            }
+            row.setLayoutParams(rowParams);
+            for (int col = 0; col < 3; col++) {
+                int idx = i + col;
+                if (idx >= linkItems.size()) {
+                    View spacer = new View(this);
+                    spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+                    row.addView(spacer);
+                    continue;
+                }
+                View tile = buildModuleTile(linkItems.get(idx));
+                LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                tile.setLayoutParams(tileLp);
+                row.addView(tile);
+            }
+            moduleBoardContainer.addView(row);
+        }
+    }
+
+    private View buildModuleTile(JSONObject item)
+    {
+        View tile = LayoutInflater.from(this).inflate(R.layout.item_module_tile, moduleBoardContainer, false);
+        ImageView icon = tile.findViewById(R.id.img_module_icon);
+        TextView title = tile.findViewById(R.id.text_module_title);
+        if (item == null) {
+            return tile;
+        }
+        String href = item.optString("href", "").trim();
+        String moduleTitle = MenuTextResolver.resolve(
+                this,
+                item.optString("text_i18n", ""),
+                getString(R.string.console_module_section_default)
+        );
+        String text = moduleTitle;
+        String badge = item.optString("badge", "").trim();
+        if (!badge.isEmpty() && !"0".equals(badge)) {
+            text = text + "\n" + badge;
+        }
+        title.setText(text);
+        icon.setImageResource(moduleIconForHref(href));
+        if (!href.isEmpty()) {
+            tile.setOnClickListener(v -> openModule(moduleTitle, href));
+        }
+        return tile;
+    }
+
+    private int moduleIconForHref(String href)
+    {
+        String path = href == null ? "" : href.trim().toLowerCase(Locale.ROOT);
+        if (path.contains("product_search")) {
+            return android.R.drawable.ic_menu_search;
+        }
+        if (path.contains("offline_order")) {
+            return android.R.drawable.ic_menu_agenda;
+        }
+        if (path.contains("influencer")) {
+            return android.R.drawable.ic_menu_myplaces;
+        }
+        if (path.contains("outreach_workspace")) {
+            return android.R.drawable.ic_dialog_email;
+        }
+        if (path.contains("message_template")) {
+            return android.R.drawable.ic_menu_edit;
+        }
+        if (path.contains("sample")) {
+            return android.R.drawable.ic_menu_send;
+        }
+        if (path.contains("category")) {
+            return android.R.drawable.ic_menu_sort_by_size;
+        }
+        if (path.contains("industry_trend")) {
+            return android.R.drawable.ic_menu_today;
+        }
+        if (path.contains("competitor_analysis")) {
+            return android.R.drawable.ic_menu_info_details;
+        }
+        if (path.contains("ad_insight")) {
+            return android.R.drawable.ic_menu_view;
+        }
+        if (path.contains("data_import")) {
+            return android.R.drawable.stat_notify_sync;
+        }
+        if (path.contains("video")) {
+            return android.R.drawable.ic_media_play;
+        }
+        if (path.contains("product")) {
+            return android.R.drawable.ic_menu_gallery;
+        }
+        if (path.contains("device")) {
+            return android.R.drawable.ic_menu_manage;
+        }
+        if (path.contains("ops_center")) {
+            return android.R.drawable.ic_menu_manage;
+        }
+        return android.R.drawable.ic_menu_more;
     }
 
     private void collectLinkItems(JSONArray items, List<JSONObject> links)

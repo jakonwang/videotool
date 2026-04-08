@@ -1,10 +1,10 @@
-<resources>
-    <color name="brand_primary">#2463EB</color>
-    <color name="brand_primary_dark">#1B4AB0</color>
-    <color name="brand_accent">#21B57D</color>
+﻿<resources>
+    <color name="brand_primary">#0052FF</color>
+    <color name="brand_primary_dark">#003BCC</color>
+    <color name="brand_accent">#25F4EE</color>
 
     <color name="bg_page_top">#EEF4FF</color>
-    <color name="bg_page_bottom">#F7FAFF</color>
+    <color name="bg_page_bottom">#F8F9FB</color>
     <color name="card_surface">#FFFFFF</color>
     <color name="card_surface_alt">#F3F7FF</color>
     <color name="stroke_soft">#DDE6F6</color>

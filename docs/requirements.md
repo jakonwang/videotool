@@ -460,3 +460,39 @@
 
 
 
+
+## 15. Mobile UI Workbench V3 (2026-04-08)
+
+### 15.1 Module Console UI
+- `ModuleConsoleActivity` rebuilt to "dashboard + workbench" structure:
+  - Top gradient KPI panel: `Today Outreach`, `Pending Tasks`, `Active Devices`.
+  - Middle module board changed to 3-column tile grid (`item_module_tile.xml`) with glass icon style.
+  - Task list switched to card-first interaction with skeleton loading (`item_task_skeleton.xml`).
+  - Bottom navigation added (`menu_console_bottom_nav.xml`): Workbench, Product Search, Messages, Me.
+- Navigation behavior:
+  - Workbench/Me switch in-page sections.
+  - Product Search/Messages open backend modules in `WebModuleActivity`.
+
+### 15.2 Task Card Interaction
+- `item_task_card.xml` interaction is now two-stage:
+  - Main CTA button `Next Action` executes by task type:
+    - `comment_warmup` -> prepare comment + open TikTok profile.
+    - `tiktok_dm` -> prepare DM + open TikTok profile.
+    - others -> contact route (Zalo/WA, fallback TikTok DM).
+  - Tapping card primary area toggles optional actions (`Add Zalo`, `Send DM`).
+- Status badge remains quick-operable for fast status update.
+
+### 15.3 Agent Detail Panel Upgrade
+- `AgentControlActivity` now binds new hero/detail widgets in `activity_main.xml`:
+  - Cover + avatar letter + handle subtitle.
+  - 2x2 metric panel (`fans`, `engagement`, `region`, `quality`).
+  - Fixed bottom action bar (`favorite`, `note`, `contact now`).
+- Runtime task state now updates both old control area and new detail panel.
+
+### 15.4 Validation (Windows local)
+- Build command:
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+- Device smoke:
+  - `adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk`
+  - `adb shell am start -W -n com.videotool/.MainActivity`

@@ -1,9 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/card_task_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
+    android:layout_marginBottom="8dp"
     app:cardBackgroundColor="#FFFFFF"
     app:cardCornerRadius="12dp"
     app:cardElevation="2dp"
@@ -16,20 +17,24 @@
         android:padding="12dp">
 
         <LinearLayout
+            android:id="@+id/layout_task_primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:padding="2dp">
 
             <LinearLayout
-                android:layout_width="56dp"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
-                android:orientation="vertical">
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <FrameLayout
-                    android:layout_width="42dp"
-                    android:layout_height="42dp">
+                    android:layout_width="48dp"
+                    android:layout_height="48dp">
 
                     <de.hdodenhof.circleimageview.CircleImageView
                         android:id="@+id/img_task_avatar"
@@ -43,90 +48,118 @@
                         android:layout_height="match_parent"
                         android:gravity="center"
                         android:textColor="@android:color/white"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold" />
                 </FrameLayout>
 
-                <TextView
-                    android:id="@+id/text_task_gpm"
-                    android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center"
-                    android:textColor="#76839B"
-                    android:textSize="10sp" />
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/text_task_handle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#111827"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/text_task_gpm"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_task_action_chip"
+                        android:paddingLeft="8dp"
+                        android:paddingTop="2dp"
+                        android:paddingRight="8dp"
+                        android:paddingBottom="2dp"
+                        android:textColor="#5B6475"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/text_task_category"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#9CA3AF"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:layout_weight="1"
+                android:gravity="end"
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/text_task_handle"
-                    android:layout_width="match_parent"
+                    android:id="@+id/text_task_status_badge"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#111827"
-                    android:textSize="16sp"
+                    android:paddingLeft="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingRight="10dp"
+                    android:paddingBottom="4dp"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/text_task_category"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#6B7280"
-                    android:textSize="12sp" />
+                <Button
+                    android:id="@+id/btn_task_next_step"
+                    android:layout_width="126dp"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_task_next_step"
+                    android:text="@string/console_task_next_step"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/text_task_status_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:paddingLeft="10dp"
-                android:paddingTop="4dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="4dp"
-                android:textColor="@android:color/white"
-                android:textSize="11sp"
-                android:textStyle="bold" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="10dp"
-            android:background="#EEF1F6" />
-
         <LinearLayout
+            android:id="@+id/layout_optional_actions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
+            android:layout_marginTop="10dp"
+            android:gravity="end"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="8dp"
+                android:text="@string/console_task_optional_actions"
+                android:textColor="#9AA3B2"
+                android:textSize="11sp" />
 
             <LinearLayout
                 android:id="@+id/action_add_zalo"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_task_action_chip"
                 android:clickable="true"
                 android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:minHeight="38dp"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="4dp">
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp">
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
                     android:src="@drawable/ic_line_add_user"
                     android:tint="#16A34A" />
 
@@ -140,49 +173,22 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/action_go_comment"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:minHeight="38dp"
-                android:orientation="horizontal"
-                android:padding="4dp">
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_line_comment"
-                    android:tint="#2563EB" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="@string/console_btn_go_comment"
-                    android:textColor="#445063"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
                 android:id="@+id/action_send_dm"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_task_action_chip"
                 android:clickable="true"
                 android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:minHeight="38dp"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="4dp">
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp">
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
                     android:src="@drawable/ic_line_dm"
                     android:tint="#6B7280" />
 
