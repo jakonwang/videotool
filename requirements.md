@@ -477,3 +477,13 @@
 - 说明：
   - `agent_token` 与 `device_code` 用于 `mobile_agent/pull|report` 设备级鉴权
   - 重置 Token 后建议同步更新手机端 Agent 配置
+
+### 16.1 新增设备自动生成与填写指引（2026-04-08）
+
+- 弹窗增强：
+  - 新增“自动生成”按钮，一键填充默认 `device_code / device_name / capability_json`
+  - 新增填写提示文案（编码规范、名称示例、Token 与能力 JSON 说明）
+  - 保存成功提示明确告知：将 `device_code + agent_token` 填入手机端执行中心
+- 后端兜底：
+  - 当新增请求未传 `device_code` 时，后端自动生成唯一编码
+  - 当新增请求未传 `device_name` 时，后端按平台自动生成默认名称

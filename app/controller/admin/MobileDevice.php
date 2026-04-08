@@ -100,14 +100,24 @@ class MobileDevice extends BaseController
         $payload = $this->parseJsonOrPost();
         $id = max(0, (int) ($payload['id'] ?? 0));
         $deviceCode = trim((string) ($payload['device_code'] ?? ''));
-        if ($deviceCode === '') {
-            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
-        }
-        $deviceCode = mb_substr($deviceCode, 0, 64);
-
+        $deviceName = trim((string) ($payload['device_name'] ?? ''));
         $platform = strtolower(trim((string) ($payload['platform'] ?? 'android')));
         if (!in_array($platform, ['android', 'ios'], true)) {
             $platform = 'android';
+        }
+
+        if ($id <= 0 && $deviceCode === '') {
+            $deviceCode = $this->generateAvailableDeviceCode($platform);
+        }
+        if ($id > 0 && $deviceCode === '') {
+            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+        }
+        $deviceCode = mb_substr($deviceCode, 0, 64);
+        if ($id <= 0 && $deviceName === '') {
+            $deviceName = $this->suggestDeviceName($platform, $deviceCode);
+        }
+        if ($id > 0 && $deviceName === '') {
+            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
 
         $dailyQuota = max(0, min(200000, (int) ($payload['daily_quota'] ?? 120)));
@@ -119,7 +129,7 @@ class MobileDevice extends BaseController
 
         $data = [
             'device_code' => $deviceCode,
-            'device_name' => mb_substr(trim((string) ($payload['device_name'] ?? '')), 0, 128),
+            'device_name' => mb_substr($deviceName, 0, 128),
             'device_serial' => mb_substr(trim((string) ($payload['device_serial'] ?? '')), 0, 128),
             'platform' => $platform,
             'status' => $status,
@@ -287,5 +297,36 @@ class MobileDevice extends BaseController
         } catch (\Throwable $e) {
             return 'agt_' . md5(uniqid('mobile', true) . microtime(true));
         }
+    }
+
+    private function generateAvailableDeviceCode(string $platform): string
+    {
+        $prefix = $platform === 'ios' ? 'ios' : 'android';
+        $date = date('Ymd');
+        for ($i = 0; $i < 8; $i++) {
+            try {
+                $suffix = strtolower(substr(bin2hex(random_bytes(4)), 0, 6));
+            } catch (\Throwable $e) {
+                $suffix = substr(md5(uniqid('mobile', true) . microtime(true)), 0, 6);
+            }
+            $candidate = $prefix . '_' . $date . '_' . $suffix;
+            if (!$this->existsDuplicatedDeviceCode($candidate, 0)) {
+                return $candidate;
+            }
+        }
+
+        return $prefix . '_' . $date . '_' . substr(md5(uniqid('mobile', true)), 0, 6);
+    }
+
+    private function suggestDeviceName(string $platform, string $deviceCode): string
+    {
+        $prefix = $platform === 'ios' ? 'iOS' : 'Android';
+        $parts = explode('_', $deviceCode);
+        $tail = strtoupper((string) end($parts));
+        if ($tail === '') {
+            $tail = strtoupper(substr(md5(uniqid('', true)), 0, 4));
+        }
+
+        return $prefix . '-' . $tail;
     }
 }
