@@ -18,6 +18,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -54,16 +55,25 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private TextView textMetricPendingReply;
     private TextView textMetricSampled;
     private TextView textEmptyHint;
+    private TextView textTaskPageInfo;
     private Spinner spinnerLanguage;
     private Spinner spinnerTaskType;
     private Spinner spinnerTaskStatus;
+    private EditText inputTaskKeyword;
+    private Button btnTaskPrevPage;
+    private Button btnTaskNextPage;
     private LinearLayout taskCardContainer;
     private LinearLayout moduleBoardContainer;
 
     private boolean languageInitialized = false;
+    private boolean suppressTaskFilterCallbacks = false;
     private boolean creatorModuleEnabled = false;
     private String currentPortal = "merchant";
     private JSONArray rawTaskItems = new JSONArray();
+    private int currentTaskPage = 1;
+    private int totalTaskPages = 1;
+    private int currentTaskPageSize = 20;
+    private int currentTaskTotal = 0;
 
     @Override
     protected void attachBaseContext(android.content.Context newBase)
@@ -102,7 +112,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         super.onResume();
         renderUserHeader();
         if (creatorModuleEnabled) {
-            loadTaskDashboard();
+            loadTaskDashboard(currentTaskPage);
         }
     }
 
@@ -114,9 +124,13 @@ public class ModuleConsoleActivity extends AppCompatActivity
         textMetricPendingReply = findViewById(R.id.text_metric_pending_reply);
         textMetricSampled = findViewById(R.id.text_metric_sampled);
         textEmptyHint = findViewById(R.id.text_empty_hint);
+        textTaskPageInfo = findViewById(R.id.text_task_page_info);
         spinnerLanguage = findViewById(R.id.spinner_language_console);
         spinnerTaskType = findViewById(R.id.spinner_task_type);
         spinnerTaskStatus = findViewById(R.id.spinner_task_status);
+        inputTaskKeyword = findViewById(R.id.input_task_keyword);
+        btnTaskPrevPage = findViewById(R.id.btn_task_page_prev);
+        btnTaskNextPage = findViewById(R.id.btn_task_page_next);
         taskCardContainer = findViewById(R.id.task_card_container);
         moduleBoardContainer = findViewById(R.id.module_board_container);
     }
@@ -153,7 +167,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id)
             {
-                applyTaskFilters();
+                if (suppressTaskFilterCallbacks) {
+                    return;
+                }
+                reloadTaskDashboard(true);
             }
 
             @Override
@@ -223,16 +240,28 @@ public class ModuleConsoleActivity extends AppCompatActivity
         Button btnLogout = findViewById(R.id.btn_logout);
         Button btnExecutionCenter = findViewById(R.id.btn_open_execution_center);
         Button btnRefresh = findViewById(R.id.btn_refresh_tasks);
+        Button btnSearch = findViewById(R.id.btn_search_task_keyword);
         Button btnCreateCommentTask = findViewById(R.id.btn_create_comment_task);
         Button btnCreateDmTask = findViewById(R.id.btn_create_dm_task);
         Button btnResetFilters = findViewById(R.id.btn_reset_task_filters);
 
         btnLogout.setOnClickListener(v -> doLogout());
         btnExecutionCenter.setOnClickListener(v -> startActivity(new Intent(this, AgentControlActivity.class)));
-        btnRefresh.setOnClickListener(v -> loadTaskDashboard());
+        btnRefresh.setOnClickListener(v -> reloadTaskDashboard(true));
+        btnSearch.setOnClickListener(v -> reloadTaskDashboard(true));
         btnCreateCommentTask.setOnClickListener(v -> createTaskBatch("comment_warmup"));
         btnCreateDmTask.setOnClickListener(v -> createTaskBatch("tiktok_dm"));
         btnResetFilters.setOnClickListener(v -> resetTaskFilters());
+        btnTaskPrevPage.setOnClickListener(v -> {
+            if (currentTaskPage > 1) {
+                loadTaskDashboard(currentTaskPage - 1);
+            }
+        });
+        btnTaskNextPage.setOnClickListener(v -> {
+            if (currentTaskPage < totalTaskPages) {
+                loadTaskDashboard(currentTaskPage + 1);
+            }
+        });
     }
 
     private void renderUserHeader()
@@ -254,6 +283,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
     {
         textEmptyHint.setVisibility(View.GONE);
         taskCardContainer.removeAllViews();
+        currentTaskPage = 1;
+        totalTaskPages = 1;
+        currentTaskTotal = 0;
+        updateTaskPager();
 
         String lang = prefs.getLanguage();
         if (lang.isEmpty()) {
@@ -301,9 +334,10 @@ public class ModuleConsoleActivity extends AppCompatActivity
         if (!creatorModuleEnabled) {
             showEmpty(getString(R.string.console_creator_module_disabled));
             setSummary(0, 0, 0);
+            updateTaskPager();
             return;
         }
-        loadTaskDashboard();
+        reloadTaskDashboard(true);
     }
 
     private boolean hasEnabledModule(JSONArray modules, String name)
@@ -324,33 +358,51 @@ public class ModuleConsoleActivity extends AppCompatActivity
         return false;
     }
 
-    private void loadTaskDashboard()
+    private void reloadTaskDashboard(boolean resetPage)
+    {
+        if (resetPage) {
+            currentTaskPage = 1;
+        }
+        loadTaskDashboard(currentTaskPage);
+    }
+
+    private void loadTaskDashboard(int page)
     {
         if (!creatorModuleEnabled) {
             return;
         }
+        currentTaskPage = Math.max(1, page);
         textEmptyHint.setVisibility(View.GONE);
         taskCardContainer.removeAllViews();
-        apiClient.listDashboardTasks(prefs.getAdminBase(), 60, new SessionApiClient.JsonCallback()
-        {
-            @Override
-            public void onSuccess(JSONObject data)
-            {
-                runOnUiThread(() -> applyTaskData(data));
-            }
+        updateTaskPager();
+        apiClient.listDashboardTasks(
+                prefs.getAdminBase(),
+                currentTaskPage,
+                currentTaskPageSize,
+                valueOf(inputTaskKeyword),
+                selectedTaskType(),
+                selectedTaskStatus(),
+                new SessionApiClient.JsonCallback()
+                {
+                    @Override
+                    public void onSuccess(JSONObject data)
+                    {
+                        runOnUiThread(() -> applyTaskData(data));
+                    }
 
-            @Override
-            public void onUnauthorized()
-            {
-                runOnUiThread(ModuleConsoleActivity.this::handleUnauthorized);
-            }
+                    @Override
+                    public void onUnauthorized()
+                    {
+                        runOnUiThread(ModuleConsoleActivity.this::handleUnauthorized);
+                    }
 
-            @Override
-            public void onError(String errorMessage)
-            {
-                runOnUiThread(() -> showEmpty(getString(R.string.console_action_failed) + ": " + errorMessage));
-            }
-        });
+                    @Override
+                    public void onError(String errorMessage)
+                    {
+                        runOnUiThread(() -> showEmpty(getString(R.string.console_action_failed) + ": " + errorMessage));
+                    }
+                }
+        );
     }
 
     private void applyTaskData(JSONObject data)
@@ -365,7 +417,12 @@ public class ModuleConsoleActivity extends AppCompatActivity
         if (rawTaskItems == null) {
             rawTaskItems = new JSONArray();
         }
-        applyTaskFilters();
+        currentTaskPage = Math.max(1, data.optInt("page", currentTaskPage));
+        currentTaskPageSize = Math.max(10, data.optInt("page_size", currentTaskPageSize));
+        currentTaskTotal = Math.max(0, data.optInt("total", rawTaskItems.length()));
+        totalTaskPages = Math.max(1, (int) Math.ceil(currentTaskTotal / (double) Math.max(1, currentTaskPageSize)));
+        updateTaskPager();
+        renderTaskCards(rawTaskItems);
     }
 
     private void setSummary(int totalTasks, int reachedCount, int repliedCount)
@@ -398,31 +455,34 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
     }
 
-    private void applyTaskFilters()
+    private String selectedTaskType()
     {
-        if (rawTaskItems == null) {
-            rawTaskItems = new JSONArray();
-        }
         int typePos = spinnerTaskType == null ? 0 : spinnerTaskType.getSelectedItemPosition();
-        int statusPos = spinnerTaskStatus == null ? 0 : spinnerTaskStatus.getSelectedItemPosition();
-        String selectedType = TASK_TYPE_VALUES[Math.max(0, Math.min(typePos, TASK_TYPE_VALUES.length - 1))];
-        String selectedStatus = TASK_STATUS_VALUES[Math.max(0, Math.min(statusPos, TASK_STATUS_VALUES.length - 1))];
+        return TASK_TYPE_VALUES[Math.max(0, Math.min(typePos, TASK_TYPE_VALUES.length - 1))];
+    }
 
-        JSONArray filtered = new JSONArray();
-        for (int i = 0; i < rawTaskItems.length(); i++) {
-            JSONObject row = rawTaskItems.optJSONObject(i);
-            if (row == null) {
-                continue;
-            }
-            if (!selectedType.isEmpty() && !selectedType.equalsIgnoreCase(row.optString("task_type", ""))) {
-                continue;
-            }
-            if (!selectedStatus.isEmpty() && !selectedStatus.equals(String.valueOf(row.optInt("task_status", -1)))) {
-                continue;
-            }
-            filtered.put(row);
+    private String selectedTaskStatus()
+    {
+        int statusPos = spinnerTaskStatus == null ? 0 : spinnerTaskStatus.getSelectedItemPosition();
+        return TASK_STATUS_VALUES[Math.max(0, Math.min(statusPos, TASK_STATUS_VALUES.length - 1))];
+    }
+
+    private void updateTaskPager()
+    {
+        if (textTaskPageInfo != null) {
+            textTaskPageInfo.setText(getString(
+                    R.string.console_pagination_info,
+                    String.valueOf(Math.max(1, currentTaskPage)),
+                    String.valueOf(Math.max(1, totalTaskPages)),
+                    String.valueOf(Math.max(0, currentTaskTotal))
+            ));
         }
-        renderTaskCards(filtered);
+        if (btnTaskPrevPage != null) {
+            btnTaskPrevPage.setEnabled(currentTaskPage > 1);
+        }
+        if (btnTaskNextPage != null) {
+            btnTaskNextPage.setEnabled(currentTaskPage < totalTaskPages);
+        }
     }
 
     private View buildTaskCard(JSONObject row)
@@ -461,6 +521,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
 
         applyCardStatusBadge(textBadge, row);
+        textBadge.setOnClickListener(v -> showQuickStatusDialog(row));
         actionZalo.setOnClickListener(v -> handleContactAction(row));
         actionComment.setOnClickListener(v -> handleCommentAction(row));
         actionDm.setOnClickListener(v -> handleDmAction(row, false));
@@ -523,6 +584,71 @@ public class ModuleConsoleActivity extends AppCompatActivity
         badgeBg.setColor(color);
         textBadge.setBackground(badgeBg);
         textBadge.setTextColor(Color.WHITE);
+    }
+
+    private void showQuickStatusDialog(JSONObject row)
+    {
+        if (row == null) {
+            return;
+        }
+        final int taskId = row.optInt("id", 0);
+        if (taskId <= 0) {
+            toast(getString(R.string.console_action_failed));
+            return;
+        }
+        final String[] labels = new String[]{
+                getString(R.string.console_quick_mark_done),
+                getString(R.string.console_quick_mark_skip),
+                getString(R.string.console_quick_mark_fail)
+        };
+        final String[] events = new String[]{"done", "skip", "fail"};
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.console_quick_status_title, String.valueOf(taskId)))
+                .setItems(labels, (dialog, which) -> quickUpdateTaskStatus(row, events[which]))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void quickUpdateTaskStatus(JSONObject row, String event)
+    {
+        if (row == null) {
+            return;
+        }
+        int taskId = row.optInt("id", 0);
+        if (taskId <= 0) {
+            return;
+        }
+        String renderedText = preferredText(row);
+        apiClient.updateTaskStatus(
+                prefs.getAdminBase(),
+                taskId,
+                event,
+                event,
+                renderedText,
+                new SessionApiClient.JsonCallback()
+                {
+                    @Override
+                    public void onSuccess(JSONObject data)
+                    {
+                        runOnUiThread(() -> {
+                            toast(getString(R.string.console_action_done));
+                            loadTaskDashboard(currentTaskPage);
+                        });
+                    }
+
+                    @Override
+                    public void onUnauthorized()
+                    {
+                        runOnUiThread(ModuleConsoleActivity.this::handleUnauthorized);
+                    }
+
+                    @Override
+                    public void onError(String errorMessage)
+                    {
+                        runOnUiThread(() -> toast(getString(R.string.console_action_failed) + ": " + errorMessage));
+                    }
+                }
+        );
     }
 
     private Button actionButton(String text, int bgRes, int textColorRes)
@@ -625,7 +751,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
                             String.valueOf(data.optInt("blocked_24h", 0))
                     );
                     toast(msg);
-                    loadTaskDashboard();
+                    reloadTaskDashboard(true);
                 });
             }
 
@@ -645,13 +771,19 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
     private void resetTaskFilters()
     {
+        suppressTaskFilterCallbacks = true;
         if (spinnerTaskType != null) {
             spinnerTaskType.setSelection(0, false);
         }
         if (spinnerTaskStatus != null) {
             spinnerTaskStatus.setSelection(0, false);
         }
-        applyTaskFilters();
+        if (inputTaskKeyword != null) {
+            inputTaskKeyword.setText("");
+            inputTaskKeyword.clearFocus();
+        }
+        suppressTaskFilterCallbacks = false;
+        reloadTaskDashboard(true);
     }
 
     private void renderModuleBoard(JSONArray menus)
@@ -805,6 +937,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
                 .setTitle(R.string.console_task_detail_title)
                 .setMessage(message)
                 .setPositiveButton(R.string.common_ok, null)
+                .setNeutralButton(R.string.console_task_quick_action, (dialog, which) -> showQuickStatusDialog(row))
                 .show();
     }
 
@@ -994,6 +1127,14 @@ public class ModuleConsoleActivity extends AppCompatActivity
             return "";
         }
         return raw.replaceAll("[^0-9]", "");
+    }
+
+    private String valueOf(EditText editText)
+    {
+        if (editText == null || editText.getText() == null) {
+            return "";
+        }
+        return editText.getText().toString().trim();
     }
 
     private void showEmpty(String message)

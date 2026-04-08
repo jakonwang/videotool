@@ -567,3 +567,53 @@
     - `today_total_tasks`
     - `reached_count`
     - `replied_count`
+
+### 17.8 V3 任务效率与执行体检增强（本轮）
+- ModuleConsole（任务列表）：
+  - 从“前端本地筛选”升级为“后端分页查询”：
+    - 查询参数：`keyword + task_type + task_status + page/page_size`
+    - 接口复用：`GET /admin.php/mobile_task/listJson`
+  - 新增关键词搜索栏：
+    - 支持按 `handle / nickname / 错误信息` 搜索
+  - 新增分页栏：
+    - `上一页 / 下一页`
+    - 页码信息：`第 x/y 页 · 共 n 条`
+  - 新增快捷状态切换：
+    - 点击任务卡片状态 Badge 可快速标记：`完成 / 跳过 / 失败`
+    - 长按任务详情弹窗也支持三种状态快捷操作
+    - 状态回传接口：`POST /admin.php/mobile_task/update_status`
+
+- AgentControl（执行中心）：
+  - 新增“权限体检”按钮：
+    - 检查项：配置完整性、悬浮窗权限、无障碍服务、TikTok/Zalo/WhatsApp 安装状态
+    - 缺权限时支持一键跳转设置页（无障碍优先，其次悬浮窗）
+  - 设备选择弹窗文案修复：
+    - 在线状态统一使用 i18n 文案 `agent_device_online_suffix`
+
+- Android 多语言资源治理（本轮）：
+  - 重写并清理三语资源文件，修复乱码：
+    - `android_app/app/src/main/res/values/strings.xml`
+    - `android_app/app/src/main/res/values-en/strings.xml`
+    - `android_app/app/src/main/res/values-zh-rCN/strings.xml`
+    - `android_app/app/src/main/res/values-vi/strings.xml`
+  - 新增 V3 文案键：
+    - 搜索/分页：`console_filter_keyword_hint`, `console_filter_search`, `console_pagination_*`
+    - 快捷状态：`console_quick_status_title`, `console_quick_mark_*`
+    - 权限体检：`btn_permission_check`, `agent_health_*`
+- 版本号：
+  - `android_app/app/build.gradle`
+  - `versionCode: 23`
+  - `versionName: 2.3.0`
+
+### 17.9 V3 本地验证（Windows）
+1. 编译：
+   - `cd android_app`
+   - `set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot`
+   - `gradlew.bat :app:assembleDebug`
+2. 结果：
+   - `BUILD SUCCESSFUL`
+3. 功能检查建议：
+   - 首页任务区输入关键词后点击“搜索”，确认列表按关键词筛选
+   - 切换任务类型/状态，确认分页总数与页码同步变化
+   - 点击任务状态 Badge，执行“标记完成/跳过/失败”，确认列表实时刷新
+   - 执行中心点击“权限体检”，确认能输出全部检查项并可跳转设置

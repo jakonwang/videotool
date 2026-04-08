@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -128,6 +129,7 @@ public class AgentControlActivity extends AppCompatActivity {
         Button btnClearLog = findViewById(R.id.btn_clear_log);
         Button btnPickDevice = findViewById(R.id.btn_pick_device);
         Button btnTestPull = findViewById(R.id.btn_test_agent_pull);
+        Button btnPermissionCheck = findViewById(R.id.btn_permission_check);
 
         btnSave.setOnClickListener(v -> {
             AgentConfig config = collectConfigFromInputs();
@@ -162,6 +164,7 @@ public class AgentControlActivity extends AppCompatActivity {
         });
         btnPickDevice.setOnClickListener(v -> loadDeviceOptions());
         btnTestPull.setOnClickListener(v -> testAgentPull());
+        btnPermissionCheck.setOnClickListener(v -> showPermissionHealthReport());
         btnClearLog.setOnClickListener(v -> {
             logBuffer.setLength(0);
             textLog.setText("");
@@ -448,7 +451,7 @@ public class AgentControlActivity extends AppCompatActivity {
             String name = row.optString("device_name", "-");
             String code = row.optString("device_code", "-");
             int online = row.optInt("is_online", 0);
-            labels[i] = name + " (" + code + ")" + (online == 1 ? " • online" : "");
+            labels[i] = name + " (" + code + ")" + (online == 1 ? " " + getString(R.string.agent_device_online_suffix) : "");
         }
 
         new AlertDialog.Builder(this)
@@ -506,6 +509,65 @@ public class AgentControlActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    private void showPermissionHealthReport()
+    {
+        AgentConfig config = collectConfigFromInputs();
+        boolean configOk = config.isValid();
+        boolean overlayOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this);
+        boolean accessibilityOk = CommentAutomationBridge.isAccessibilityEnabled(this);
+        boolean tiktokInstalled = isPackageInstalled("com.zhiliaoapp.musically") || isPackageInstalled("com.ss.android.ugc.trill");
+        boolean zaloInstalled = isPackageInstalled("com.zing.zalo");
+        boolean waInstalled = isPackageInstalled("com.whatsapp");
+
+        String report = ""
+                + renderHealthLine(getString(R.string.agent_health_item_config), configOk) + "\n"
+                + renderHealthLine(getString(R.string.agent_health_item_overlay), overlayOk) + "\n"
+                + renderHealthLine(getString(R.string.agent_health_item_accessibility), accessibilityOk) + "\n"
+                + renderHealthLine(getString(R.string.agent_health_item_tiktok), tiktokInstalled) + "\n"
+                + renderHealthLine(getString(R.string.agent_health_item_zalo), zaloInstalled) + "\n"
+                + renderHealthLine(getString(R.string.agent_health_item_wa), waInstalled);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(R.string.agent_health_title)
+                .setMessage(report)
+                .setNegativeButton(android.R.string.cancel, null);
+        if (!accessibilityOk || !overlayOk) {
+            builder.setPositiveButton(R.string.agent_health_open_settings, (dialog, which) -> {
+                if (!accessibilityOk) {
+                    CommentAutomationBridge.openAccessibilitySettings(this);
+                    return;
+                }
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            });
+        }
+        builder.show();
+    }
+
+    private String renderHealthLine(String label, boolean ok)
+    {
+        String status = ok ? getString(R.string.agent_health_ok) : getString(R.string.agent_health_missing);
+        return getString(R.string.agent_health_item_template, label, status);
+    }
+
+    private boolean isPackageInstalled(String packageName)
+    {
+        if (TextUtils.isEmpty(packageName)) {
+            return false;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                getPackageManager().getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0));
+            } else {
+                getPackageManager().getPackageInfo(packageName, 0);
+            }
+            return true;
+        } catch (Exception ignore) {
+            return false;
+        }
     }
 
     private String valueOf(EditText editText) {

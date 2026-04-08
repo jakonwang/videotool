@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name">TikStar Mobile Agent</string>
 
     <string name="lang_zh">Chinese</string>
@@ -56,6 +56,8 @@
     <string name="console_no_external_contact">No external contact found, switched to TikTok DM mode.</string>
     <string name="console_switched_dm_mode">Switched to TikTok DM mode.</string>
     <string name="console_filter_title">Task Filter</string>
+    <string name="console_filter_keyword_hint">Search by handle / nickname / error</string>
+    <string name="console_filter_search">Search</string>
     <string name="console_filter_reset">Reset</string>
     <string name="console_filter_type_all">All Types</string>
     <string name="console_filter_type_comment">Comment Warmup</string>
@@ -67,12 +69,20 @@
     <string name="console_module_section_default">Modules</string>
     <string name="console_task_detail_title">Task Detail</string>
     <string name="console_task_detail_template">Handle: %1$s\nTask Type: %2$s\nStatus: %3$s\nChannel: %4$s\nDevice: %5$s\nLast Commented: %6$s\nLast Contacted: %7$s\nLast Error: %8$s</string>
+    <string name="console_task_quick_action">Quick Status</string>
+    <string name="console_quick_status_title">Quick Status · Task #%1$s</string>
+    <string name="console_quick_mark_done">Mark Done</string>
+    <string name="console_quick_mark_skip">Mark Skip</string>
+    <string name="console_quick_mark_fail">Mark Failed</string>
+    <string name="console_pagination_prev">Prev</string>
+    <string name="console_pagination_next">Next</string>
+    <string name="console_pagination_info">Page %1$s/%2$s · Total %3$s</string>
     <string name="console_badge_wait_comment">To Comment</string>
     <string name="console_badge_sampled">Sampled</string>
     <string name="console_badge_replied">Replied</string>
     <string name="console_badge_wait_sample">Wait Sample</string>
     <string name="console_badge_blacklist">Blacklist</string>
-    <string name="console_preset_comment_vi">Video mới của bạn rất cuốn hút, %1$s! Mình vừa gửi tin nhắn về gửi mẫu thử và hợp tác hoa hồng cao.</string>
+    <string name="console_preset_comment_vi">Video moi cua ban rat cuon hut, %1$s! Minh vua gui tin nhan de gui mau thu va hop tac hoa hong cao.</string>
     <string name="auto_no_pending_task">No pending comment task</string>
     <string name="auto_comment_ui_not_ready">Comment UI not ready</string>
     <string name="auto_comment_button_not_found">Comment button not found</string>
@@ -119,6 +129,7 @@
     <string name="btn_pull_once">Pull once</string>
     <string name="btn_pick_device">Pick Device</string>
     <string name="btn_test_agent_pull">Test Agent Pull</string>
+    <string name="btn_permission_check">Permission Check</string>
     <string name="btn_open_target">Open target</string>
     <string name="btn_mark_sent">Mark sent</string>
     <string name="btn_go_comment_auto">Go Comment (Auto)</string>
@@ -136,8 +147,20 @@
     <string name="agent_pick_device_title">Select a Device</string>
     <string name="agent_pick_device_empty">No available device in backend.</string>
     <string name="agent_pick_device_applied">Applied device: %1$s</string>
+    <string name="agent_device_online_suffix">• online</string>
     <string name="agent_test_pull_ok">Pull success. Task: %1$s | reason: %2$s</string>
     <string name="agent_test_pull_fail">Pull failed: %1$s</string>
+    <string name="agent_health_title">Permission Health Report</string>
+    <string name="agent_health_open_settings">Open Settings</string>
+    <string name="agent_health_ok">OK</string>
+    <string name="agent_health_missing">Missing</string>
+    <string name="agent_health_item_template">%1$s: %2$s</string>
+    <string name="agent_health_item_config">Config(admin/token/device)</string>
+    <string name="agent_health_item_overlay">Overlay permission</string>
+    <string name="agent_health_item_accessibility">Accessibility service</string>
+    <string name="agent_health_item_tiktok">TikTok installed</string>
+    <string name="agent_health_item_zalo">Zalo installed</string>
+    <string name="agent_health_item_wa">WhatsApp installed</string>
 
     <string name="menu_overview">Overview</string>
     <string name="menu_dashboard">Dashboard</string>

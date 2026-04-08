@@ -1,5 +1,5 @@
-<resources>
-    <string name="app_name">TikStar 移动执行器</string>
+﻿<resources>
+    <string name="app_name">TikStar 移动执行端</string>
 
     <string name="lang_zh">中文</string>
     <string name="lang_en">英文</string>
@@ -16,18 +16,18 @@
     <string name="portal_merchant_title">商家端</string>
     <string name="portal_influencer_title">达人端</string>
     <string name="console_user_info">%1$s | %2$s | 租户 %3$s</string>
-    <string name="console_load_failed">加载模块失败</string>
-    <string name="console_no_modules">当前没有可用模块，请联系管理员开通权限。</string>
+    <string name="console_load_failed">模块加载失败</string>
+    <string name="console_no_modules">当前无可用模块，请联系管理员开通权限。</string>
     <string name="console_open">打开</string>
     <string name="console_creator_module_disabled">达人 CRM 模块未启用。</string>
-    <string name="console_create_task_result">%1$s：新建 %2$s，已存在 %3$s，24h 拦截 %4$s</string>
+    <string name="console_create_task_result">%1$s：新增 %2$s，已存在 %3$s，24小时拦截 %4$s</string>
     <string name="console_action_done">操作成功</string>
     <string name="console_action_failed">操作失败</string>
     <string name="console_pending_tasks">待处理任务</string>
     <string name="console_device_status">设备状态</string>
     <string name="console_no_data">暂无数据</string>
     <string name="console_session_expired">登录已失效，请重新登录。</string>
-    <string name="console_quick_actions_title">达人 CRM 快捷操作</string>
+    <string name="console_quick_actions_title">达人 CRM 快捷动作</string>
     <string name="console_metric_contacted">今日已联系</string>
     <string name="console_metric_pending_reply">待回复</string>
     <string name="console_metric_sampled">已寄样</string>
@@ -52,10 +52,12 @@
     <string name="console_default_comment">%1$s，你最近的视频很棒！我刚给你发了私信，想沟通寄样合作。</string>
     <string name="console_overlay_required">请先开启悬浮窗权限。</string>
     <string name="console_accessibility_required">请先开启 Reach 无障碍服务。</string>
-    <string name="console_comment_ready">话术已复制，点击悬浮球可自动执行评论。</string>
-    <string name="console_no_external_contact">该达人未抓取到站外账号，已切换为 TikTok 站内私信模式。</string>
-    <string name="console_switched_dm_mode">已切换为 TikTok 站内私信模式。</string>
+    <string name="console_comment_ready">话术已复制，点击悬浮球可自动评论。</string>
+    <string name="console_no_external_contact">未抓取到站外联系方式，已切换 TikTok 站内私信。</string>
+    <string name="console_switched_dm_mode">已切换 TikTok 站内私信模式。</string>
     <string name="console_filter_title">任务筛选</string>
+    <string name="console_filter_keyword_hint">按账号/昵称/错误关键词搜索</string>
+    <string name="console_filter_search">搜索</string>
     <string name="console_filter_reset">重置</string>
     <string name="console_filter_type_all">全部类型</string>
     <string name="console_filter_type_comment">评论预热</string>
@@ -67,19 +69,27 @@
     <string name="console_module_section_default">模块分组</string>
     <string name="console_task_detail_title">任务详情</string>
     <string name="console_task_detail_template">达人：%1$s\n任务类型：%2$s\n状态：%3$s\n渠道：%4$s\n设备：%5$s\n最近评论：%6$s\n最近联系：%7$s\n最近错误：%8$s</string>
+    <string name="console_task_quick_action">快捷状态</string>
+    <string name="console_quick_status_title">快捷状态 · 任务 #%1$s</string>
+    <string name="console_quick_mark_done">标记完成</string>
+    <string name="console_quick_mark_skip">标记跳过</string>
+    <string name="console_quick_mark_fail">标记失败</string>
+    <string name="console_pagination_prev">上一页</string>
+    <string name="console_pagination_next">下一页</string>
+    <string name="console_pagination_info">第 %1$s/%2$s 页 · 共 %3$s 条</string>
     <string name="console_badge_wait_comment">待评论</string>
     <string name="console_badge_sampled">已寄样</string>
     <string name="console_badge_replied">已回复</string>
     <string name="console_badge_wait_sample">待寄样</string>
     <string name="console_badge_blacklist">黑名单</string>
-    <string name="console_preset_comment_vi">Video mới của bạn rất cuốn hút, %1$s! Mình vừa gửi tin nhắn về gửi mẫu thử và hợp tác hoa hồng cao.</string>
+    <string name="console_preset_comment_vi">Video moi cua ban rat cuon hut, %1$s! Minh vua gui tin nhan de gui mau thu va hop tac hoa hong cao.</string>
     <string name="auto_no_pending_task">暂无待处理评论任务</string>
-    <string name="auto_comment_ui_not_ready">评论界面尚未就绪</string>
+    <string name="auto_comment_ui_not_ready">评论界面未就绪</string>
     <string name="auto_comment_button_not_found">未找到评论按钮</string>
-    <string name="auto_comment_sent_success">已完成自动评论并回传</string>
+    <string name="auto_comment_sent_success">已完成自动评论并同步</string>
     <string name="auto_comment_synced">操作已同步</string>
     <string name="auto_comment_send_failed">自动评论失败：%1$s</string>
-    <string name="console_comment_ready_mobile">话术已准备，已打开 TikTok 并显示悬浮球。</string>
+    <string name="console_comment_ready_mobile">内容已准备，TikTok 已打开并显示悬浮球。</string>
 
     <string name="btn_open_execution_center">执行中心</string>
     <string name="btn_logout">退出登录</string>
@@ -93,10 +103,10 @@
     <string name="web_load_failed">无法打开模块页面。</string>
     <string name="web_open_external_failed">无法打开外部应用。</string>
     <string name="accessibility_service_label">触达无障碍助手</string>
-    <string name="accessibility_service_desc">辅助点击评论、粘贴并发送，用于达人触达任务。</string>
+    <string name="accessibility_service_desc">用于点击评论、粘贴并发送，辅助 TikTok 触达任务。</string>
 
     <string name="agent_title">TikStar OPS 移动执行器</string>
-    <string name="agent_subtitle">自动拉取任务、复制话术并打开目标 App，发送动作仍由人工完成。</string>
+    <string name="agent_subtitle">自动拉取任务、复制话术并打开目标应用，发送动作仍由人工确认。</string>
 
     <string name="label_admin_base">后台地址（自动补全 /admin.php）</string>
     <string name="label_token">设备 Token</string>
@@ -119,7 +129,8 @@
     <string name="btn_pull_once">拉取一次</string>
     <string name="btn_pick_device">选择设备</string>
     <string name="btn_test_agent_pull">检测拉取</string>
-    <string name="btn_open_target">重新打开目标</string>
+    <string name="btn_permission_check">权限体检</string>
+    <string name="btn_open_target">打开目标</string>
     <string name="btn_mark_sent">标记已发送</string>
     <string name="btn_go_comment_auto">去评论（自动）</string>
     <string name="btn_mark_skip">标记跳过</string>
@@ -136,8 +147,20 @@
     <string name="agent_pick_device_title">选择设备</string>
     <string name="agent_pick_device_empty">后台没有可用设备。</string>
     <string name="agent_pick_device_applied">已应用设备：%1$s</string>
+    <string name="agent_device_online_suffix">• 在线</string>
     <string name="agent_test_pull_ok">拉取成功。任务：%1$s | 原因：%2$s</string>
     <string name="agent_test_pull_fail">拉取失败：%1$s</string>
+    <string name="agent_health_title">权限体检报告</string>
+    <string name="agent_health_open_settings">前往设置</string>
+    <string name="agent_health_ok">正常</string>
+    <string name="agent_health_missing">缺失</string>
+    <string name="agent_health_item_template">%1$s：%2$s</string>
+    <string name="agent_health_item_config">配置（地址/Token/设备）</string>
+    <string name="agent_health_item_overlay">悬浮窗权限</string>
+    <string name="agent_health_item_accessibility">无障碍服务</string>
+    <string name="agent_health_item_tiktok">TikTok 已安装</string>
+    <string name="agent_health_item_zalo">Zalo 已安装</string>
+    <string name="agent_health_item_wa">WhatsApp 已安装</string>
 
     <string name="menu_overview">概览</string>
     <string name="menu_dashboard">仪表盘</string>
@@ -163,10 +186,10 @@
     <string name="menu_product">商品管理</string>
     <string name="menu_terminal_section">终端</string>
     <string name="menu_terminal">终端</string>
-    <string name="menu_platform">平台管理</string>
-    <string name="menu_device">设备管理</string>
+    <string name="menu_platform">平台</string>
+    <string name="menu_device">设备</string>
     <string name="menu_system">系统设置</string>
-    <string name="menu_settings">系统设置</string>
+    <string name="menu_settings">设置</string>
     <string name="menu_ops_center">运维中心</string>
     <string name="menu_user">用户管理</string>
     <string name="menu_extension_manager">模块管理</string>
