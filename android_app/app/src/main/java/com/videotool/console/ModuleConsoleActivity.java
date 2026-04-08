@@ -502,10 +502,8 @@ public class ModuleConsoleActivity extends AppCompatActivity
         View actionDm = card.findViewById(R.id.action_send_dm);
 
         int avatarBgColor = avatarColor(handle, row.optString("avatar_url", "").trim());
-        GradientDrawable avatarBg = new GradientDrawable();
-        avatarBg.setShape(GradientDrawable.OVAL);
-        avatarBg.setColor(avatarBgColor);
-        imgAvatar.setImageDrawable(avatarBg);
+        imgAvatar.setImageDrawable(null);
+        imgAvatar.setCircleBackgroundColor(avatarBgColor);
         textAvatarLetter.setText(avatarLetter(handle, nickname));
         textGpm.setText(getString(R.string.console_gpm_format, formatGpm(gpm)));
         textHandle.setText("@" + handle);
