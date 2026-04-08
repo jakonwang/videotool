@@ -33,4 +33,4 @@ jobs:
           node-version: '22'
 
       - name: Run i18n key check
-        run: node scripts/check_i18n_keys.js
+        run: node scripts/check_i18n_keys.js --scope=all

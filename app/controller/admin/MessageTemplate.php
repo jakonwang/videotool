@@ -18,12 +18,12 @@ class MessageTemplate extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
-    private function jsonErr(string $msg, int $code = 1, $data = null)
+    private function jsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
     public function index()

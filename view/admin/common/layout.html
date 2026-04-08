@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
-    <script src="/static/i18n/i18n.ops2.js?v=20260407_ops2c"></script>
+    <script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
+    <script src="/static/i18n/i18n.ops2.js?v=20260407_ops2_sidebar1"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -214,7 +214,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 8px 14px 8px 28px; /* 更紧凑 + 统一与图标对齐 */
+            padding: 8px 14px 8px 40px;
             margin: 2px 0;
             border-radius: 10px;
             color: #9CA3AF;
@@ -691,28 +691,28 @@
         <nav class="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button" aria-label="菜单">
+                    <a class="nav-link" data-widget="pushmenu" href="#" role="button" aria-label="Menu">
                         <i class="fas fa-bars"></i>
                     </a>
                 </li>
             </ul>
-            <div class="admin-topbar-title" data-i18n="admin.topTitle">后台管理</div>
+            <div class="admin-topbar-title" data-i18n="admin.topTitle">TikStar OPS</div>
             <ul class="navbar-nav ml-auto align-items-center">
                 <li class="nav-item d-none d-sm-flex">
-                    <span class="admin-topbar-user mr-2" title="{:session('admin_username') ?: ''}">
-                        {:session('admin_username') ?: ''}
+                    <span class="admin-topbar-user mr-2" title="{:session('admin_username') ?: '--'}">
+                        {:session('admin_username') ?: '--'}
                     </span>
                 </li>
                 <li class="nav-item">
                     <button type="button" class="btn btn-outline-secondary btn-sm admin-logout-btn" id="btnAdminLogout">
-                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
+                        <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">Logout</span>
                     </button>
                 </li>
                 <li class="nav-item ml-2 d-none d-sm-flex">
                     <div class="btn-group btn-group-sm" role="group" aria-label="Language">
-                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZhTop">中文</button>
+                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZhTop">ZH</button>
                         <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangEnTop">English</button>
-                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangViTop">Tiếng Việt</button>
+                        <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangViTop">VI</button>
                     </div>
                 </li>
             </ul>
@@ -723,39 +723,39 @@
                 <span class="brand-text font-weight-light"><i class="fas fa-star mr-1"></i>TikStar OPS</span>
             </a>
             <div class="sidebar">
-                <nav class="mt-2" aria-label="主导航">
+                <nav class="mt-2" aria-label="Main Navigation">
                     <div class="admin-sidenav">
                         {include file="admin/common/sidebar" /}
 
                         <div class="admin-sidenav-footer">
                             <div class="rowline">
-                                <span class="k">设备</span>
-                                <span class="v" id="sbDeviceCount">—</span>
+                                <span class="k">Devices</span>
+                                <span class="v" id="sbDeviceCount">--</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">上传量</span>
-                                <span class="v" id="sbUploadsSize">—</span>
+                                <span class="k">Uploads</span>
+                                <span class="v" id="sbUploadsSize">--</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">版本</span>
+                                <span class="k">Version</span>
                                 <span class="muted">{$Think.config.app.version|default='1.0.2'}</span>
                             </div>
                             <div class="rowline">
-                                <span class="k">账号</span>
-                                <span class="muted text-truncate" style="max-width: 120px;" title="{:session('admin_username') ?: ''}">
-                                    {:session('admin_username') ?: '—'}
+                                <span class="k">Account</span>
+                                <span class="muted text-truncate" style="max-width: 120px;" title="{:session('admin_username') ?: '--'}">
+                                    {:session('admin_username') ?: '--'}
                                 </span>
                             </div>
                             <div class="rowline">
                                 <button type="button" class="btn btn-outline-secondary btn-sm w-100 admin-logout-btn" id="btnAdminLogout2">
-                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">退出</span>
+                                    <i class="fas fa-sign-out-alt mr-1"></i> <span data-i18n="admin.menu.logout">Logout</span>
                                 </button>
                             </div>
                             <div class="rowline">
                                 <div class="btn-group btn-group-sm w-100" role="group" aria-label="Language">
-                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZh">中文</button>
+                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangZh">ZH</button>
                                     <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangEn">English</button>
-                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangVi">Tiếng Việt</button>
+                                    <button type="button" class="btn btn-outline-secondary admin-lang-btn" id="btnLangVi">VI</button>
                                 </div>
                             </div>
                         </div>
@@ -768,7 +768,7 @@
             <section class="content-header">
                 <div class="container-fluid d-flex align-items-center justify-content-between flex-wrap">
                     <div>
-                        <h1 class="page-title mb-0">{block name="page_title"}后台管理{/block}</h1>
+                        <h1 class="page-title mb-0">{block name="page_title"}Admin{/block}</h1>
                         <small class="text-muted">{block name="breadcrumb"}{/block}</small>
                     </div>
                     <div class="mt-2 mt-sm-0">
@@ -788,20 +788,20 @@
             <div class="float-right d-none d-sm-inline">
                 <strong>Version</strong> {$Think.config.app.version|default='1.0.2'}
             </div>
-            <strong>TikStar OPS</strong> · Copyright &copy; {:date('Y')}
+            <strong>TikStar OPS</strong> &copy; {:date('Y')}
         </footer>
     </div>
 
     <div class="toast-container position-fixed p-3" style="right:0;">
         <div id="globalToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="2500">
             <div class="toast-header">
-                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">提示</span></strong>
-                <small class="text-muted">现在</small>
+                <strong class="mr-auto"><i class="fas fa-info-circle mr-1"></i><span id="toastTitle">Info</span></strong>
+                <small class="text-muted">now</small>
                 <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="toast-body" id="toastBody">操作成功</div>
+            <div class="toast-body" id="toastBody">Success</div>
         </div>
     </div>
 
@@ -809,15 +809,15 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="confirmTitle">请确认</h5>
+                    <h5 class="modal-title" id="confirmTitle">Confirm</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body" id="confirmMessage">确认执行该操作吗？</div>
+                <div class="modal-body" id="confirmMessage">Are you sure?</div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-danger" id="confirmOkBtn">确认</button>
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmOkBtn">Confirm</button>
                 </div>
             </div>
         </div>
@@ -847,10 +847,10 @@
             return {
                 showToast(type, message, title) {
                     const typeMap = {
-                        success: {icon: 'fa-check-circle', title: title || '成功'},
-                        error: {icon: 'fa-times-circle', title: title || '错误'},
-                        warning: {icon: 'fa-exclamation-triangle', title: title || '提醒'},
-                        info: {icon: 'fa-info-circle', title: title || '提示'}
+                        success: {icon: 'fa-check-circle', title: title || 'Success'},
+                        error: {icon: 'fa-times-circle', title: title || 'Error'},
+                        warning: {icon: 'fa-exclamation-triangle', title: title || 'Warning'},
+                        info: {icon: 'fa-info-circle', title: title || 'Info'}
                     };
                     const meta = typeMap[type] || typeMap.info;
                     toastTitle.html(`<i class="fas ${meta.icon} mr-1"></i>${meta.title}`);
@@ -858,7 +858,7 @@
                     toastEl.toast('show');
                 },
                 confirm(message, onOk) {
-                    confirmMessage.text(message || '确认执行该操作吗？');
+                    confirmMessage.text(message || 'Are you sure?');
                     confirmCallback = onOk;
                     confirmModal.modal('show');
                 }
@@ -887,7 +887,7 @@
             }
             $.get('/admin.php/stats/overview').done(function (res) {
                 if (res && res.code === 0 && res.data) {
-                    $('#sbDeviceCount').text(res.data.devices ?? '—');
+                    $('#sbDeviceCount').text(res.data.devices ?? '--');
                 }
             });
             $.get('/admin.php/stats/storageUsage').done(function (res) {
@@ -1005,4 +1005,3 @@
     {block name="script"}{/block}
 </body>
 </html>
-

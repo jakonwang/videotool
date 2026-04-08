@@ -5,6 +5,8 @@ namespace app\controller\admin;
 
 use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
+use app\service\AdminAuthService;
+use app\service\CatalogTokenService;
 use app\service\VolcArkVisionConfig;
 use app\service\ProductStyleEmbeddingService;
 use app\service\VisionOpenAIConfig;
@@ -31,6 +33,53 @@ class ProductSearch extends BaseController
         return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
+    /** @return string[] lowercase column names */
+    private function styleItemColumns(): array
+    {
+        static $cache = null;
+        if (is_array($cache)) {
+            return $cache;
+        }
+        try {
+            $table = (string) (new ItemModel())->getTable();
+            $table = str_replace('`', '', trim($table));
+            if ($table === '') {
+                $table = 'product_style_items';
+            }
+            $rows = Db::query('SHOW COLUMNS FROM `' . $table . '`');
+            $cols = [];
+            foreach ($rows as $row) {
+                $name = strtolower((string) ($row['Field'] ?? ''));
+                if ($name !== '') {
+                    $cols[] = $name;
+                }
+            }
+            $cache = array_values(array_unique($cols));
+        } catch (\Throwable $e) {
+            // Fallback to a conservative subset for older schemas.
+            $cache = [
+                'id',
+                'product_code',
+                'image_ref',
+                'hot_type',
+                'wholesale_price',
+                'min_order_qty',
+                'price_levels_json',
+                'embedding',
+                'status',
+                'created_at',
+                'updated_at',
+            ];
+        }
+
+        return $cache;
+    }
+
+    private function styleItemHasColumn(string $name): bool
+    {
+        return in_array(strtolower(trim($name)), $this->styleItemColumns(), true);
+    }
+
     public function index()
     {
         return View::fetch('admin/product_search/index', []);
@@ -38,7 +87,12 @@ class ProductSearch extends BaseController
 
     public function listJson()
     {
+        $hasAiDescription = $this->styleItemHasColumn('ai_description');
         $keyword = trim((string) $this->request->param('keyword', ''));
+        $category = trim((string) $this->request->param('category', ''));
+        $priceMinRaw = trim((string) $this->request->param('price_min', ''));
+        $priceMaxRaw = trim((string) $this->request->param('price_max', ''));
+        $moqMinRaw = trim((string) $this->request->param('moq_min', ''));
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 10);
         if ($pageSize <= 0) {
@@ -50,7 +104,33 @@ class ProductSearch extends BaseController
 
         $q = ItemModel::order('id', 'desc');
         if ($keyword !== '') {
-            $q->whereLike('product_code', '%' . $keyword . '%');
+            $q->where(static function ($query) use ($keyword, $hasAiDescription): void {
+                $query->whereLike('product_code', '%' . $keyword . '%')
+                    ->whereOr('hot_type', 'like', '%' . $keyword . '%');
+                if ($hasAiDescription) {
+                    $query->whereOr('ai_description', 'like', '%' . $keyword . '%');
+                }
+            });
+        }
+        if ($category !== '') {
+            $q->where('hot_type', $category);
+        }
+
+        $priceMin = is_numeric($priceMinRaw) ? (float) $priceMinRaw : null;
+        $priceMax = is_numeric($priceMaxRaw) ? (float) $priceMaxRaw : null;
+        if ($priceMin !== null && $priceMax !== null && $priceMax < $priceMin) {
+            [$priceMin, $priceMax] = [$priceMax, $priceMin];
+        }
+        if ($priceMin !== null) {
+            $q->where('wholesale_price', '>=', $priceMin);
+        }
+        if ($priceMax !== null) {
+            $q->where('wholesale_price', '<=', $priceMax);
+        }
+
+        $moqMin = is_numeric($moqMinRaw) ? (int) $moqMinRaw : null;
+        if ($moqMin !== null && $moqMin > 0) {
+            $q->where('min_order_qty', '>=', $moqMin);
         }
 
         $list = $q->paginate([
@@ -62,7 +142,7 @@ class ProductSearch extends BaseController
         $items = [];
         foreach ($list as $row) {
             $emb = (string) ($row->embedding ?? '');
-            $aiDesc = trim((string) ($row->ai_description ?? ''));
+            $aiDesc = $hasAiDescription ? trim((string) ($row->ai_description ?? '')) : '';
             $items[] = [
                 'id' => (int) $row->id,
                 'product_code' => (string) ($row->product_code ?? ''),
@@ -70,11 +150,33 @@ class ProductSearch extends BaseController
                 'hot_type' => (string) ($row->hot_type ?? ''),
                 'wholesale_price' => round((float) ($row->wholesale_price ?? 0), 2),
                 'min_order_qty' => max(1, (int) ($row->min_order_qty ?? 1)),
+                'price_levels_json' => trim((string) ($row->price_levels_json ?? '')),
                 'ai_description' => $aiDesc,
-                'ai_description_short' => $aiDesc !== '' ? (mb_strlen($aiDesc) > 60 ? mb_substr($aiDesc, 0, 60) . '…' : $aiDesc) : '',
+                'ai_description_short' => $aiDesc !== '' ? (mb_strlen($aiDesc) > 60 ? mb_substr($aiDesc, 0, 60) . '...' : $aiDesc) : '',
                 'has_embedding' => $emb !== '' && $emb[0] === '[',
                 'created_at' => (string) ($row->created_at ?? ''),
+                'updated_at' => (string) ($row->updated_at ?? ''),
             ];
+        }
+
+        $categoryOptions = [];
+        try {
+            $categoryRows = ItemModel::whereRaw("TRIM(IFNULL(hot_type,'')) <> ''")
+                ->group('hot_type')
+                ->order('hot_type', 'asc')
+                ->column('hot_type');
+            foreach ($categoryRows as $cat) {
+                $name = trim((string) $cat);
+                if ($name === '') {
+                    continue;
+                }
+                $categoryOptions[] = [
+                    'value' => $name,
+                    'label' => $name,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $categoryOptions = [];
         }
 
         $pythonOk = $this->checkPythonEmbed();
@@ -82,19 +184,21 @@ class ProductSearch extends BaseController
         if (!$pythonOk) {
             $log = ProductStyleEmbeddingService::getLastRawOutput();
             $pythonDiag = $log !== ''
-                ? substr(preg_replace('/\s+/u', ' ', $log), 0, 500)
-                : '无子进程输出：可能未找到 Python、php.ini 禁用了 exec，或 Web 服务账号 PATH 与 shell 不一致。Linux 请在 .env 设置 PRODUCT_SEARCH_PYTHON=python3 或 /usr/bin/python3；Windows 请指定 python.exe 绝对路径。';
+                ? substr((string) preg_replace('/\s+/u', ' ', $log), 0, 500)
+                : 'No subprocess output. Check Python path, exec permission, and web user PATH.';
         }
 
         $visionCfg = VisionOpenAIConfig::get();
         $visionDescCount = 0;
-        try {
-            $visionDescCount = (int) Db::name('product_style_items')
-                ->where('status', 1)
-                ->whereRaw('ai_description IS NOT NULL AND TRIM(ai_description) <> \'\'')
-                ->count();
-        } catch (\Throwable $e) {
-            $visionDescCount = 0;
+        if ($hasAiDescription) {
+            try {
+                $visionDescCount = (int) Db::name('product_style_items')
+                    ->where('status', 1)
+                    ->whereRaw('ai_description IS NOT NULL AND TRIM(ai_description) <> \'\'')
+                    ->count();
+            } catch (\Throwable $e) {
+                $visionDescCount = 0;
+            }
         }
 
         $volcCfg = VolcArkVisionConfig::get();
@@ -104,6 +208,8 @@ class ProductSearch extends BaseController
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
+            'category_options' => $categoryOptions,
+            'current_role' => AdminAuthService::role(),
             'python_ok' => $pythonOk,
             'python_diag' => $pythonDiag,
             /** 兼容旧前端字段：寻款仅使用豆包，此处恒为 false */
@@ -358,14 +464,46 @@ class ProductSearch extends BaseController
             if ($minOrderQty < 1) {
                 $minOrderQty = 1;
             }
+            $hasPriceLevels = $this->styleItemHasColumn('price_levels_json');
+            $hasAiDescription = $this->styleItemHasColumn('ai_description');
+            $priceLevelsRaw = trim((string) $this->request->param('price_levels_json', (string) ($row->price_levels_json ?? '')));
+            $priceLevelsNormalized = '';
+            if ($hasPriceLevels && $priceLevelsRaw !== '') {
+                $decoded = json_decode($priceLevelsRaw, true);
+                if (!is_array($decoded)) {
+                    return $this->jsonErr('price_levels_json must be a valid JSON object');
+                }
+                $clean = [];
+                foreach ($decoded as $k => $v) {
+                    $key = CatalogTokenService::normalizeLevel((string) $k);
+                    if ($key === '') {
+                        continue;
+                    }
+                    $num = (float) $v;
+                    if (!is_finite($num) || $num < 0) {
+                        continue;
+                    }
+                    $clean[$key] = round($num, 2);
+                }
+                $priceLevelsNormalized = $clean === []
+                    ? ''
+                    : (string) json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
             $publicRoot = root_path() . 'public';
 
             $update = [
                 'product_code' => $productCode,
                 'hot_type' => $hotType,
-                'wholesale_price' => $wholesalePrice,
-                'min_order_qty' => $minOrderQty,
             ];
+            if ($this->styleItemHasColumn('wholesale_price')) {
+                $update['wholesale_price'] = $wholesalePrice;
+            }
+            if ($this->styleItemHasColumn('min_order_qty')) {
+                $update['min_order_qty'] = $minOrderQty;
+            }
+            if ($hasPriceLevels) {
+                $update['price_levels_json'] = $priceLevelsNormalized;
+            }
 
             $file = $this->request->file('image');
             if ($file && $file->isValid()) {
@@ -386,7 +524,7 @@ class ProductSearch extends BaseController
                     return $this->jsonErr('特征提取失败，请检查 Python 环境');
                 }
                 $aiNew = ProductStyleVisionDescribeService::describeEarring($tmp);
-                if ($aiNew !== null && $aiNew !== '') {
+                if ($hasAiDescription && $aiNew !== null && $aiNew !== '') {
                     $update['ai_description'] = $aiNew;
                 }
                 $saved = ProductStyleImportService::persistStyleImageToPublic($tmp, $publicRoot);
@@ -412,7 +550,7 @@ class ProductSearch extends BaseController
                     return $this->jsonErr('特征提取失败，请检查 Python 环境');
                 }
                 $aiNew = ProductStyleVisionDescribeService::describeEarring($resolved['temp']);
-                if ($aiNew !== null && $aiNew !== '') {
+                if ($hasAiDescription && $aiNew !== null && $aiNew !== '') {
                     $update['ai_description'] = $aiNew;
                 }
                 if (strpos($resolved['temp'], 'style_import') !== false && is_file($resolved['temp'])) {
@@ -423,7 +561,7 @@ class ProductSearch extends BaseController
             }
 
             $row->save($update);
-            if (isset($update['ai_description']) && (string) $update['ai_description'] !== '') {
+            if ($hasAiDescription && isset($update['ai_description']) && (string) $update['ai_description'] !== '') {
                 ProductStyleIndexRowService::syncProductAiDescription($productCode, (string) $update['ai_description']);
             }
 
@@ -438,6 +576,40 @@ class ProductSearch extends BaseController
     /**
      * 下载示例 CSV
      */
+    /**
+     * POST: generate signed customer catalog token link.
+     */
+    public function generateCatalogToken()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('only_post');
+            }
+            $priceLevel = CatalogTokenService::normalizeLevel((string) $this->request->param('price_level', 'level1'));
+            $expireDays = (int) $this->request->param('expire_days', 30);
+            if ($expireDays < 1) {
+                $expireDays = 1;
+            }
+            if ($expireDays > 3650) {
+                $expireDays = 3650;
+            }
+
+            $tokenInfo = CatalogTokenService::generate($priceLevel, $expireDays);
+            $url = '/index.php/product_search?token=' . rawurlencode($tokenInfo['token']);
+
+            return $this->jsonOk([
+                'token' => $tokenInfo['token'],
+                'price_level' => $tokenInfo['price_level'],
+                'expire_at' => $tokenInfo['expire_at'],
+                'expire_at_text' => date('Y-m-d H:i:s', (int) $tokenInfo['expire_at']),
+                'url' => $url,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('product_search generateCatalogToken: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return $this->jsonErr('generate_token_failed');
+        }
+    }
+
     public function sampleCsv()
     {
         $csv = "\xEF\xBB\xBF产品编号,图片,爆款类型\nEH001,https://example.com/a.jpg,耳钉\nEH002,/uploads/demo.jpg,耳环\n";
@@ -467,17 +639,28 @@ class ProductSearch extends BaseController
 
             $keys = array_keys(Db::name('product_style_items')->getFields());
             $hasImagePath = in_array('image_path', $keys, true);
+            $hasAiDescription = in_array('ai_description', $keys, true);
 
             $headers = ['id', 'product_code', 'image_ref'];
             if ($hasImagePath) {
                 $headers[] = 'image_path';
             }
-            $headers = array_merge($headers, ['hot_type', 'ai_description', 'status', 'created_at', 'updated_at']);
+            $headers[] = 'hot_type';
+            if ($hasAiDescription) {
+                $headers[] = 'ai_description';
+            }
+            $headers = array_merge($headers, ['status', 'created_at', 'updated_at']);
             fputcsv($out, $headers);
 
-            $field = 'id,product_code,image_ref,hot_type,ai_description,status,created_at,updated_at';
+            $field = 'id,product_code,image_ref,hot_type,status,created_at,updated_at';
+            if ($hasAiDescription) {
+                $field = 'id,product_code,image_ref,hot_type,ai_description,status,created_at,updated_at';
+            }
             if ($hasImagePath) {
-                $field = 'id,product_code,image_ref,image_path,hot_type,ai_description,status,created_at,updated_at';
+                $field = 'id,product_code,image_ref,image_path,hot_type,status,created_at,updated_at';
+                if ($hasAiDescription) {
+                    $field = 'id,product_code,image_ref,image_path,hot_type,ai_description,status,created_at,updated_at';
+                }
             }
 
             $batch = 2000;
@@ -504,7 +687,9 @@ class ProductSearch extends BaseController
                         $line[] = (string) ($r['image_path'] ?? '');
                     }
                     $line[] = (string) ($r['hot_type'] ?? '');
-                    $line[] = (string) ($r['ai_description'] ?? '');
+                    if ($hasAiDescription) {
+                        $line[] = (string) ($r['ai_description'] ?? '');
+                    }
                     $line[] = (int) ($r['status'] ?? 0);
                     $line[] = (string) ($r['created_at'] ?? '');
                     $line[] = (string) ($r['updated_at'] ?? '');

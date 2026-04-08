@@ -110,7 +110,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
+<script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -154,6 +154,12 @@
         status: '',
       });
 
+      function respMsg(json, fallbackKey) {
+        if (json && json.error_key) return tt(json.error_key);
+        if (json && json.msg) return String(json.msg);
+        return tt(fallbackKey || 'common.operationFailed');
+      }
+
       async function fetchList() {
         loading.value = true;
         try {
@@ -167,7 +173,7 @@
 
           const res = await fetch('/admin.php/platform/listJson?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (!json || json.code !== 0) throw new Error(respMsg(json, 'common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
@@ -219,9 +225,9 @@
             document.execCommand('copy');
             document.body.removeChild(tmp);
           }
-          ElMessage.success('已复制链接');
+          ElMessage.success(tt('common.copyDone'));
         } catch (e) {
-          ElMessage.error(lang === 'en' ? 'Copy failed' : '复制失败');
+          ElMessage.error(tt('common.copyFail'));
         }
       }
 
@@ -232,7 +238,15 @@
       }
 
       async function doDelete(row) {
-        await ElMessageBox.confirm(`确定要删除平台「${row.name || ''}」吗？删除后关联的设备与视频将一并移除。`, '删除确认', { type: 'warning' });
+        await ElMessageBox.confirm(
+          tt('page.platform.deleteConfirm', { name: row.name || '-' }),
+          tt('common.delete'),
+          {
+            type: 'warning',
+            confirmButtonText: tt('common.delete'),
+            cancelButtonText: tt('common.cancel'),
+          }
+        );
         const resp = await fetch('/admin.php/platform/delete/' + row.id, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -241,12 +255,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || '删除成功');
+          ElMessage.success(respMsg(json, 'common.deleted'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || '删除失败');
+          ElMessage.error(respMsg(json, 'common.deleteFailed'));
         }
       }
 
@@ -317,23 +331,23 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Platform name':'平台名称'" min-width="160" sortable="custom" prop="name">
+          <el-table-column :label="tt('page.platform.colName')" min-width="160" sortable="custom" prop="name">
             <template #default="{ row }">
               <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Code':'平台代码'" width="160" sortable="custom" prop="code">
+          <el-table-column :label="tt('page.platform.colCode')" width="160" sortable="custom" prop="code">
             <template #default="{ row }">
               <span class="code-cell">{{ row.code || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Icon':'图标'" width="120">
+          <el-table-column :label="tt('page.platform.colIcon')" width="120">
             <template #default="{ row }">
               <span v-if="row.icon" v-html="row.icon"></span>
               <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Link':'访问链接'" min-width="360">
+          <el-table-column :label="tt('page.platform.colLink')" min-width="360">
             <template #default="{ row }">
               <div class="link-cell">
                 <div class="link-text" :title="row.link">{{ row.link || '—' }}</div>
@@ -342,15 +356,15 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Status':'状态'" width="120" sortable="custom" prop="status">
+          <el-table-column :label="tt('page.platform.colStatus')" width="120" sortable="custom" prop="status">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" :label="lang==='en'?'Created':'创建时间'" min-width="180" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
+          <el-table-column prop="created_at" :label="tt('page.platform.colCreatedAt')" min-width="180" sortable="custom" />
+          <el-table-column :label="tt('page.platform.colActions')" width="160" fixed="right">
             <template #default="{ row }">
               <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>

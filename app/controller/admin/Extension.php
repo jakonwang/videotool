@@ -15,12 +15,12 @@ class Extension extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
-    private function jsonErr(string $msg, int $code = 1)
+    private function jsonErr(string $msg, int $code = 1, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg]);
+        return $this->apiJsonErr($msg, $code, null, $errorKey);
     }
 
     /**
@@ -125,4 +125,3 @@ class Extension extends BaseController
         return $this->jsonOk([], '已更新');
     }
 }
-

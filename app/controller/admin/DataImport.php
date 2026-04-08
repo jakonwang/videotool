@@ -15,12 +15,12 @@ class DataImport extends BaseController
 {
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return $this->apiJsonOk($data, $msg);
     }
 
     private function jsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
     {
-        return json(['code' => $code, 'msg' => $msg, 'error_key' => $errorKey, 'data' => $data]);
+        return $this->apiJsonErr($msg, $code, $data, $errorKey);
     }
 
     public function index()

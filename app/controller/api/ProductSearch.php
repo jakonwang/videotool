@@ -5,6 +5,7 @@ namespace app\controller\api;
 
 use app\BaseController;
 use app\model\ProductStyleItem as ItemModel;
+use app\service\CatalogTokenService;
 use think\facade\Db;
 
 /**
@@ -63,6 +64,7 @@ class ProductSearch extends BaseController
     {
         $keyword = trim((string) $this->request->param('keyword', ''));
         $category = trim((string) $this->request->param('category', ''));
+        $token = trim((string) $this->request->param('token', ''));
         $page = (int) $this->request->param('page', 1);
         $pageSize = (int) $this->request->param('page_size', 30);
         if ($page < 1) {
@@ -86,6 +88,9 @@ class ProductSearch extends BaseController
             $query->where('hot_type', $category);
         }
 
+        $tokenInfo = $this->resolveCatalogToken($token);
+        $priceLevel = $tokenInfo['price_level'];
+
         $list = $query->paginate([
             'list_rows' => $pageSize,
             'page' => $page,
@@ -93,13 +98,17 @@ class ProductSearch extends BaseController
 
         $items = [];
         foreach ($list as $row) {
+            $basePrice = round((float) ($row->wholesale_price ?? 0), 2);
+            $levelPrice = $this->levelPriceForRow($row, $priceLevel);
             $items[] = [
                 'id' => (int) ($row->id ?? 0),
                 'product_code' => trim((string) ($row->product_code ?? '')),
                 'image_ref' => trim((string) ($row->image_ref ?? '')),
                 'hot_type' => trim((string) ($row->hot_type ?? '')),
                 'category' => trim((string) ($row->hot_type ?? '')),
-                'wholesale_price' => (float) ($row->wholesale_price ?? 0),
+                'wholesale_price' => $levelPrice,
+                'base_wholesale_price' => $basePrice,
+                'price_level' => $priceLevel,
                 'min_order_qty' => max(1, (int) ($row->min_order_qty ?? 1)),
             ];
         }
@@ -118,6 +127,8 @@ class ProductSearch extends BaseController
                 'page' => $current,
                 'page_size' => $rows,
                 'has_more' => $hasMore,
+                'price_level' => $priceLevel,
+                'token_valid' => $tokenInfo['valid'],
             ],
         ]);
     }
@@ -178,6 +189,12 @@ class ProductSearch extends BaseController
         }
 
         $inputItems = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : [];
+        $token = trim((string) ($payload['token'] ?? ''));
+        if ($token === '') {
+            $token = trim((string) $this->request->param('token', ''));
+        }
+        $tokenInfo = $this->resolveCatalogToken($token);
+        $priceLevel = $tokenInfo['price_level'];
         if ($inputItems === []) {
             return $this->jsonOut(['code' => 1, 'msg' => 'items_required', 'data' => null]);
         }
@@ -217,7 +234,7 @@ class ProductSearch extends BaseController
             if ($qty < $minQty) {
                 $qty = $minQty;
             }
-            $unitPrice = round((float) ($row->wholesale_price ?? 0), 2);
+            $unitPrice = $this->levelPriceForRow($row, $priceLevel);
             $subtotal = round($unitPrice * $qty, 2);
             $totalAmount += $subtotal;
             $items[] = [
@@ -227,6 +244,7 @@ class ProductSearch extends BaseController
                 'hot_type' => trim((string) ($row->hot_type ?? '')),
                 'unit_price' => $unitPrice,
                 'min_order_qty' => $minQty,
+                'price_level' => $priceLevel,
                 'qty' => $qty,
                 'subtotal' => $subtotal,
             ];
@@ -241,6 +259,7 @@ class ProductSearch extends BaseController
             'phone' => $phone,
             'whatsapp' => $whatsapp,
             'zalo' => $zalo,
+            'price_level' => $priceLevel,
         ];
 
         try {
@@ -282,5 +301,44 @@ class ProductSearch extends BaseController
             $suffix = strtoupper(substr(md5((string) mt_rand(100000, 999999)), 0, 6));
         }
         return $prefix . $suffix;
+    }
+
+    /**
+     * @return array{valid:bool,price_level:string}
+     */
+    private function resolveCatalogToken(string $token): array
+    {
+        $defaultLevel = 'level1';
+        $raw = trim($token);
+        if ($raw === '') {
+            return ['valid' => false, 'price_level' => $defaultLevel];
+        }
+        $verified = CatalogTokenService::verify($raw);
+        if (!$verified['ok']) {
+            return ['valid' => false, 'price_level' => $defaultLevel];
+        }
+        return ['valid' => true, 'price_level' => CatalogTokenService::normalizeLevel((string) $verified['price_level'])];
+    }
+
+    /**
+     * @param mixed $row
+     */
+    private function levelPriceForRow($row, string $priceLevel): float
+    {
+        $basePrice = round((float) ($row->wholesale_price ?? 0), 2);
+        $level = CatalogTokenService::normalizeLevel($priceLevel);
+        $jsonRaw = trim((string) ($row->price_levels_json ?? ''));
+        if ($jsonRaw === '') {
+            return $basePrice;
+        }
+        $parsed = json_decode($jsonRaw, true);
+        if (!is_array($parsed) || !array_key_exists($level, $parsed)) {
+            return $basePrice;
+        }
+        $candidate = (float) $parsed[$level];
+        if (!is_finite($candidate) || $candidate < 0) {
+            return $basePrice;
+        }
+        return round($candidate, 2);
     }
 }

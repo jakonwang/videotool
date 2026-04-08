@@ -1,234 +1,182 @@
-# 功能需求与实现说明
-
-> 本文档为 **UTF-8** 编码。根目录 `requirements.md` 与本文内容一致；若某工具写入根目录该文件名时中文变为问号，请以 **`docs/requirements.md`** 为准或用 `Copy-Item docs/requirements.md requirements.md` 同步。
-
-## TikStar OPS 系统模块（2026-04）
-
-### Module Manager 模块化管理（2026-04-06）
-
-- 新增 `extensions` 表（模块清单）：`name`（唯一标识）、`title`（显示名）、`version`、`is_enabled`（0/1）、`config_json`（配置 JSON）。
-- 新增迁移脚本：`php database/run_migration_extensions.php`（Windows：`php database\run_migration_extensions.php`，Linux：`php database/run_migration_extensions.php`）。
-- 新增服务：`app/service/ModuleManagerService.php`，提供：
-  - `scanModules()`：扫描内置模块 + `extensions/*/module.json`，并自动同步到 `extensions` 表；
-  - `install($name)`：执行 `database/extensions/{name}/install.php|install.sql`（若存在）后启用模块；
-  - `uninstall($name, $purgeData=false)`：可选执行卸载脚本并禁用模块；
-  - `getEnabledMenus()`：返回当前已启用模块对应侧栏菜单。
-- 新增后台页：`/admin.php/extension`（`view/admin/extension/index.html`），以 `el-card` 管理模块安装/卸载/启停。
-- 后台侧栏改造：`view/admin/common/layout.html` 不再硬编码菜单，改由 `BaseController` 注入 `ModuleManagerService::getEnabledMenus(...)` 的结果并在 `view/admin/common/sidebar.html` 渲染。
-- 多语言规范：模块名称/描述在前端以 `AppI18n.t('extension.' + name + '.title')` 与 `AppI18n.t('extension.' + name + '.desc')` 动态获取；模块管理页所有文案均使用 `AppI18n.t`。
-
-### Module Manager 治理增强（2026-04-06）
-
-- 新增迁移脚本：`php database/run_migration_module_governance.php`（Windows：`php database\run_migration_module_governance.php`，Linux：`php database/run_migration_module_governance.php`）。
-- 新增模块安装日志表 `extension_install_logs`：记录 `install/uninstall/toggle` 的操作人、结果、错误消息与详情。
-- 新增模块依赖表 `extension_dependencies`：支持 `A -> B` 依赖关系；启用/安装前自动校验依赖是否已启用，禁用/卸载前校验是否存在启用中的反向依赖模块。
-- 新增角色权限表 `extension_role_permissions`：按角色（`super_admin/operator/viewer`）控制模块可见范围。
-- 管理员角色增强：`admin_users` 新增 `role` 字段（默认 `super_admin`）；登录后写入 Session 并参与模块菜单可见性判定。
-- 模块管理页增强：`/admin.php/extension` 新增“模块 / 权限 / 日志”三页签，可查看依赖状态、维护角色可见权限（仅超级管理员可改）与审计日志。
-
-### 分类 + 达人 CRM + 话术增强（2026-04-06）
-
-- 新增后台模块 **分类管理**：`/admin.php/category`，支持 `product` / `influencer` 两类分类的 CRUD（名称、类型、排序、状态），接口：`listJson`、`options`、`save`、`delete`。
-- 商品表单 `view/admin/product/form.html` 改为分类下拉选择（`category_id` + `category_name` 双写入），选项来源 `GET /admin.php/category/options?type=product`。
-- 达人名录 `view/admin/influencer/index.html` 升级为 CRM：  
-  - `status` 扩展为 `0待联系/1已发私信/2已回复/3待寄样/4已寄样/5合作中/6黑名单`；  
-  - 增加快捷状态切换；  
-  - 支持 `category_id` 选择、标签（`tags_json`）筛选、`last_contacted_at` 排序；  
-  - 编辑弹窗新增寄样字段（`sample_tracking_no`、`sample_status`）；  
-  - 新增联系历史弹窗（数据源 `GET /admin.php/influencer/outreachHistory`）。
-- 话术渲染增强：`MessageOutreachService` 新增变量 `{{current_time_period}}`、`{{random_emoji}}`；模板支持 `lang(zh/en/vi)` + `template_key` 多语言分组，渲染时按达人 `region` 自动选语言版本。
-- 新增外联历史表 `outreach_logs`：每次渲染 `POST /admin.php/message_template/render` 记录模板、语言、商品与渲染正文，并自动更新 `influencers.last_contacted_at`。
-- 数据迁移脚本：`php database/run_migration_category_crm_outreach.php`（Windows 用反斜杠路径，Linux 用正斜杠路径）。
+﻿# 鍔熻兘闇€姹備笌瀹炵幇璇存槑锛圱ikStar OPS 2.0锛?
+> 鏇存柊鏃ユ湡锛?026-04-07  
+> 缁存姢绾﹀畾锛歚docs/requirements.md` 涓烘鏈紝鏍圭洰褰?`requirements.md` 涓庡叾淇濇寔涓€鑷淬€?
+## 1. 鎬讳綋鏂瑰悜锛堝凡钀藉湴锛?
+- 涓荤嚎锛氬厛鍋?**杈句汉 CRM 娴佺▼鑷姩鍖?V1**锛屽苟琛屼笂绾?**琛屼笟/绔炲搧/骞垮憡鎯呮姤 MVP**銆?- Zalo / WhatsApp 绛栫暐锛氶噰鐢?**鍗婅嚜鍔ㄩ棴鐜?*锛堢敓鎴愬唴瀹?+ 澶嶅埗 + 鎵撳紑浼氳瘽 + 浜哄伐鍙戦€侊級锛屼笉鍋氭棤浜哄€煎畧鑷姩鍙戦€併€?- 鏁版嵁绛栫暐锛氬疄鐜?**鍙彃鎷旀暟鎹眰**锛圕SV 瀵煎叆鍙敤锛孉PI Adapter 宸查鐣欙級銆?- 澶氳瑷€锛氬悗鍙?UI 鏂囨缁熶竴璧?`AppI18n.t`锛屾敮鎸?`zh/en/vi`銆?
+## 2. 褰撳墠淇℃伅鏋舵瀯锛堜晶鏍忓姩鎬佹覆鏌擄級
+
+渚ф爮鐢?`app/service/ModuleManagerService.php` 鐨?`getEnabledMenus()` 鍔ㄦ€佺敓鎴愶紝骞舵寜妯″潡鍚敤鐘舵€佷笌瑙掕壊杩囨护銆?
+| 涓€绾у垎缁?| 浜岀骇鑿滃崟 | 璺敱 | 璇存槑 |
+|---|---|---|---|
+| 姒傝 | 浠〃鐩?| `/admin.php` | KPI 涓庢€昏 |
+| 瀵绘 | 娆惧紡妫€绱€佺嚎涓嬮瀹?| `/admin.php/product_search`銆乣/admin.php/offline_order` | 鍥炬悳銆佸浘鍐屻€侀瀹氳鍗?|
+| 澧為暱涓彴 | 琛屼笟瓒嬪娍銆佺珵鍝佸垎鏋愩€佸箍鍛婃儏鎶ャ€佹暟鎹鍏?| `/admin.php/industry_trend`銆乣/admin.php/competitor_analysis`銆乣/admin.php/ad_insight`銆乣/admin.php/data_import` | 鎯呮姤 MVP + 瀵煎叆浠诲姟 |
+| 杈句汉杩愯惀 | 鍒嗙被閰嶇疆銆佽揪浜哄悕褰曘€佸鑱斿伐浣滃彴銆佸瘎鏍风鐞嗐€佽瘽鏈ā鏉裤€佽揪浜洪摼璺?| `/admin.php/category`銆乣/admin.php/influencer`銆乣/admin.php/outreach_workspace`銆乣/admin.php/sample`銆乣/admin.php/message_template`銆乣/admin.php/distribute` | CRM 鑷姩鍖栦富娴佺▼ |
+| 绱犳潗涓庡晢鍝?| 瑙嗛銆佹壒閲忎笂浼犮€佸唴瀹瑰垎鍙?| `/admin.php/video`銆乣/admin.php/video/batchUpload`銆乣/admin.php/product` | 绱犳潗褰掓。涓庡晢鍝佸垎鍙?|
+| 缁堢 | 骞冲彴銆佽澶?| `/admin.php/platform`銆乣/admin.php/device` | 缁堢绠＄悊 |
+| 绯荤粺 | 璁剧疆銆佽繍缁翠腑蹇冦€佸紓甯搞€佺敤鎴枫€佹ā鍧楃鐞?| `/admin.php/settings`銆乣/admin.php/ops_center`銆乣/admin.php/download_log`銆乣/admin.php/user`銆乣/admin.php/extension` | 瓒呯鍩燂紙operator 榛樿涓嶅彲瑙佺郴缁熺粍锛?|
+
+## 3. 杈句汉 CRM 鑷姩鍖?V1锛堝凡瀹炵幇锛?
+### 3.1 鍒嗙被鑱斿姩
+
+- 鍒嗙被缁熶竴鏉ユ簮锛歚GET /admin.php/category/options?type=influencer`銆?- 浣跨敤浣嶇疆锛?  - 杈句汉鍒楄〃绛涢€夋爮鐨勨€滃垎绫烩€濅笅鎷夈€?  - 杈句汉缂栬緫寮圭獥鐨勨€滃垎绫烩€濋€夋嫨鍣ㄣ€?- 琛ㄦ牸鏄剧ず `category_name`锛屼负绌烘椂鏄剧ず鈥滄湭鍒嗙被鈥濄€?
+### 3.2 鐘舵€佹満涓庡璁?
+- 杈句汉鐘舵€佸浐瀹氫负锛?  - `0 寰呰仈绯籤
+  - `1 宸插彂绉佷俊`
+  - `2 宸插洖澶峘
+  - `3 寰呭瘎鏍穈
+  - `4 宸插瘎鏍穈
+  - `5 鍚堜綔涓璥
+  - `6 榛戝悕鍗昤
+- 鍙樻洿鍏ュ彛锛氳揪浜虹紪杈戙€佸揩鎹锋搷浣溿€佸鑱斿伐浣滃彴鍔ㄤ綔銆佸瘎鏍峰姩浣溿€?- 鐘舵€佹祦杞棩蹇楋細`influencer_status_logs`銆?- 缁熶竴娴佽浆鏈嶅姟锛歚app/service/InfluencerStatusFlowService.php`銆?
+### 3.3 澶栬仈宸ヤ綔鍙帮紙Outreach Workspace锛?
+- 椤甸潰锛歚/admin.php/outreach_workspace`銆?- 浠诲姟闃熷垪琛細`influencer_outreach_tasks`銆?- 浠诲姟鐘舵€侊細
+  - `0 pending`
+  - `1 copied`
+  - `2 jumped`
+  - `3 completed`
+  - `4 skipped`
+- 鏍稿績鎺ュ彛锛?  - `POST /admin.php/outreach_workspace/generate` 鎵归噺鐢熸垚浠诲姟銆?  - `GET /admin.php/outreach_workspace/nextTask` 鎷夊彇涓嬩竴鏉′换鍔°€?  - `POST /admin.php/outreach_workspace/action` 鎵ц鍔ㄤ綔锛坈opy / jump / complete / skip / reset / to_wait_sample锛夈€?- 寮圭獥鏀寔鑱旂郴鏂瑰紡閫氶亾閫夋嫨锛歚auto / WhatsApp / Zalo`銆?- 澶嶅埗閫昏緫鍏煎 `navigator.clipboard` 涓?`document.execCommand('copy')` 鍥為€€銆?
+### 3.4 澶栬仈鍘嗗彶涓庢渶杩戣仈绯绘椂闂?
+- 澶栬仈鏃ュ織琛細`outreach_logs`銆?- 璁板綍鍏ュ彛锛?  - `POST /admin.php/message_template/render`
+  - `POST /admin.php/influencer/logOutreachAction`
+- 鏃ュ織瀛楁鍖呭惈锛氭ā鏉?ID銆佸晢鍝?ID銆佹搷浣滅被鍨嬨€佹覆鏌撴鏂囥€佹椂闂淬€?- 鑷姩鏇存柊锛歚influencers.last_contacted_at`銆?
+### 3.5 鏍囩绯荤粺
+
+- 鏁版嵁瀛楁锛歚influencers.tags_json`銆?- 鍓嶇浜や簰锛氬鏍囩杈撳叆銆佹爣绛剧瓫閫夛紙鍒楄〃椤舵爮锛夈€?- 鍒楄〃鏀寔鎸夋爣绛惧叧閿瓧杩囨护銆?
+### 3.6 瀵勬牱绠＄悊鎷嗗垎
+
+- 鐙珛椤甸潰锛歚/admin.php/sample`銆?- 鏁版嵁琛細`sample_shipments`銆?- 鏀寔瀛楁锛氬崟鍙枫€佸揩閫掑叕鍙搞€佸瘎鏍风姸鎬併€佺鏀剁姸鎬併€佸瘎鍑?绛炬敹鏃堕棿銆佸娉ㄣ€?- 鍙粠杈句汉鍚嶅綍蹇嵎鈥滃瘎鏍封€濆苟鑱斿姩鐘舵€佸埌 `4 宸插瘎鏍穈銆?
+## 4. 璇濇湳娓叉煋涓庡璇█鍙橀噺锛堝凡瀹炵幇锛?
+### 4.1 鍙橀噺寮曟搸
+
+`app/service/MessageOutreachService.php` 鏀寔锛?
+- `{{current_time_period}}`锛氭寜鏈嶅姟鍣ㄦ椂闂磋緭鍑鸿秺鍗楄闂€欍€?  - `05-11` 鈫?`Ch脿o bu峄昳 s谩ng`
+  - `12-18` 鈫?`Ch脿o bu峄昳 chi峄乽`
+  - `19-23` / `00-04` 鈫?`Ch脿o bu峄昳 t峄慽`
+- `{{random_emoji}}`锛氫粠棰勮 Emoji 姹犻殢鏈烘娊鍙栥€?
+### 4.2 妯℃澘璇█鍖归厤
+
+- 妯℃澘琛細`message_templates`锛屾敮鎸?`lang` 涓?`template_key`銆?- 娓叉煋鎺ュ彛锛歚POST /admin.php/message_template/render`銆?- 璇█绛栫暐锛氭寜杈句汉 `region` 鎺ㄦ柇璇█锛屼紭鍏堝尮閰嶅悓 `template_key` 鐨勭洰鏍囪瑷€妯℃澘锛屽け璐ュ洖閫€鑻辨枃鐗堟湰銆?
+### 4.3 璺宠浆鍗忚
+
+- `wa_url`锛氭湁 WhatsApp 鏃剁敓鎴?`https://wa.me/{number}?text=...`銆?- `zalo_url`锛氭湁 Zalo 鏃剁敓鎴?`https://zalo.me/{id}`銆?- 娓叉煋杩斿洖锛歚text`銆乣wa_url`銆乣zalo_url`銆?
+## 5. 澧為暱涓彴鎯呮姤 MVP锛堝凡瀹炵幇锛?
+### 5.1 琛屼笟瓒嬪娍
+
+- 椤甸潰锛歚/admin.php/industry_trend`銆?- 琛細`growth_industry_metrics`銆?- 鑳藉姏锛氬垪琛ㄣ€佹眹鎬汇€丆SV 瀵煎叆銆丆SV 瀵煎嚭銆?
+### 5.2 绔炲搧鍒嗘瀽
+
+- 椤甸潰锛歚/admin.php/competitor_analysis`銆?- 琛細`growth_competitors`銆乣growth_competitor_metrics`銆?- 鑳藉姏锛氱珵鍝佷富浣撶淮鎶ゃ€佹寚鏍囧鍏ュ鍑恒€佸姣旀煡鐪嬨€?
+### 5.3 骞垮憡鎯呮姤
+
+- 椤甸潰锛歚/admin.php/ad_insight`銆?- 琛細`growth_ad_creatives`銆乣growth_ad_metrics`銆?- 鑳藉姏锛氬垱鎰忓簱绠＄悊銆佹棩缁村害鎸囨爣瀵煎叆瀵煎嚭銆?
+### 5.4 鍙彃鎷旀暟鎹眰
+
+- 椤甸潰锛歚/admin.php/data_import`銆?- 琛細`data_sources`銆乣import_jobs`銆乣import_job_logs`銆?- 鑳藉姏锛?  - 鏁版嵁婧愰厤缃紙CSV / API Adapter锛夈€?  - 浠诲姟鎵ц銆佹棩蹇楁煡鐪嬨€佸け璐ラ噸璇曘€?
+## 6. 瀵绘涓庣嚎涓嬮瀹氶棴鐜紙宸插疄鐜帮級
+
+### 6.1 瀵绘鍚庡彴
+
+- 椤甸潰锛歚/admin.php/product_search`銆?- 鏀寔锛欳SV/Excel 瀵煎叆銆丄I 鎻忚堪銆佹壒閲忓垹闄ゃ€佺紪杈戙€佸鍑恒€佺ず渚嬩笅杞姐€?- 鍥剧墖鍒楁敮鎸佺偣鍑绘斁澶ч瑙堬紙`el-image` 棰勮锛夈€?- 鏀寔鐢熸垚瀹㈡埛鍥惧唽閾炬帴 Token 涓庡垎浜捣鎶ャ€?
+### 6.2 鍥炬悳 API锛堝叏閲忔瘮瀵癸級
+
+- 鎺ュ彛锛歚POST /index.php/api/product_search/searchByImage`锛堝吋瀹?`/api/search/searchByImage`锛夈€?- 閫昏緫锛氭寜鎵规閬嶅巻鍙敤绱㈠紩锛屼笉鍐嶄粎鍥哄畾 50 鏉℃牱鏈€?- 鏃犵簿纭尮閰嶆椂鏀寔鍏抽敭璇嶅洖閫€銆?
+### 6.3 鏁版嵁鎵╁睍锛堜环鏍间笌璁㈠崟锛?
+- 娆惧紡琛ㄦ柊澧烇細
+  - `wholesale_price`
+  - `min_order_qty`
+  - `price_levels_json`锛堝垎绾т环锛?- 璁㈠崟琛細`offline_orders`銆?  - `order_no`銆乣customer_info`銆乣items_json`銆乣total_amount`銆乣status`銆?
+### 6.4 瀹㈡埛鍥惧唽 H5
+
+- 椤甸潰锛歚/index.php/styleCatalog`锛堝吋瀹?`/index.php/product_search`锛夈€?- 灞曠ず锛氭寜鍏抽敭璇?鍒嗙被娴忚锛岀Щ鍔ㄧ鐎戝竷娴侊紝鏄剧ず鎵瑰彂浠蜂笌璧锋壒閲忋€?- 浜や簰锛氬姞鍏ラ瀹氥€佽喘鐗╄溅銆佹彁浜よ仈绯讳汉锛堝鍚?鐢佃瘽/WhatsApp/Zalo锛夈€?- 涓嬪崟鎺ュ彛锛歚POST /index.php/api/product_search/offlineOrder`銆?
+### 6.5 绾夸笅棰勫畾鍚庡彴
+
+- 椤甸潰锛歚/admin.php/offline_order`銆?- 鑳藉姏锛氬垪琛ㄣ€佺姸鎬佹洿鏂帮紙寰呯‘璁?宸茶浆姝ｅ紡璁㈠崟/宸插彇娑堬級銆佹槑缁嗗脊绐椼€丒xcel 瀵煎嚭銆?
+### 6.6 鍒嗙骇浠锋牸 Token
+
+- 鏈嶅姟锛歚app/service/CatalogTokenService.php`銆?- 鍚庡彴鎺ュ彛锛歚POST /admin.php/product_search/generateCatalogToken`銆?- 鐢ㄩ€旓細閫氳繃甯?Token 鐨勫浘鍐岄摼鎺ュ悜涓嶅悓瀹㈡埛灞曠ず涓嶅悓浠锋牸灞傜骇銆?
+## 7. i18n 娌荤悊锛堝凡瀹炵幇锛?
+- 鍓嶇瑙勮寖锛氭柊澧?UI 鏂囨蹇呴』閫氳繃 `AppI18n.t` 鑾峰彇銆?- 璇嶅吀鏂囦欢锛?  - `public/static/i18n/i18n.js`
+  - `public/static/i18n/i18n.ops2.js`
+  - 瀹㈡埛鍥惧唽浣跨敤 `public/static/i18n/influencer_i18n.js`
+- 鏍￠獙鑴氭湰锛歚node scripts/check_i18n_keys.js --scope=all`銆?- CI锛歚.github/workflows/i18n-check.yml` 鍦?`main` 涓?PR 涓婅嚜鍔ㄦ牎楠屻€?
+## 8. 鏁版嵁杩佺Щ涓庢墽琛岄『搴?
+### 8.1 鏂板簱鍒濆鍖?
+- 鐩存帴鎵ц `database/schema.sql`銆?
+### 8.2 澧為噺鍗囩骇锛堟帹鑽愰『搴忥級
+
+1. `php database/run_migration_tikstar_ops2.php`
+2. `php database/run_migration_product_style_orders.php`
+3. `php database/run_migration_product_style_price_levels.php`
+
+濡傚巻鍙插簱杈冩棫锛屽啀鎸夐渶琛ユ墽琛岋細
+
+- `php database/run_migration_extensions.php`
+- `php database/run_migration_module_governance.php`
+- `php database/run_migration_category_crm_outreach.php`
+- `php database/run_migration_product_style_search.php`
+
+## 9. 鍐掔儫楠岃瘉
+
+- 涓€閿剼鏈細`powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+- 瑕嗙洊鑼冨洿锛?  - CRM锛氬垎绫汇€佽揪浜恒€佷换鍔＄敓鎴愩€佸鍒?璺宠浆鍔ㄤ綔銆佺姸鎬佽仈鍔ㄣ€佹棩蹇椼€?  - 鎯呮姤锛氳涓?绔炲搧/骞垮憡鏁版嵁璇诲啓銆佸鍏ヤ换鍔′笌閲嶈瘯銆?  - 鏁版嵁灞傦細鏁版嵁婧愪笌浣滀笟鏃ュ織銆?
+## 10. 褰撳墠鏈仛锛堝埢鎰忎繚鐣欙級
+
+- 涓嶅疄鐜版棤浜哄€煎畧鑷姩鍙戦€?Zalo/WhatsApp锛堜粎鍗婅嚜鍔紝闄嶄綆灏佹帶涓庡悎瑙勯闄╋級銆?- 鎯呮姤妯″潡棣栨湡涓嶅仛鐖櫕锛屽厛璧?CSV/API 鎺ュ叆灞傘€?- 璞嗗寘 AI 鑷姩瀹氫环鍔熻兘褰撳墠涓嶇撼鍏ュ疄鐜拌寖鍥淬€?
+## 11. 缁存姢璇存槑
+
+1. 鑻ユ牴鐩綍 `requirements.md` 琚伐鍏疯鍐欎负涔辩爜锛岃浠?`docs/requirements.md` 涓哄噯銆?2. 鍚屾鍛戒护锛?   - PowerShell锛歚Copy-Item -Force docs\requirements.md requirements.md`
+   - Linux/macOS锛歚cp docs/requirements.md requirements.md`
+
+## 12. Product Search UI Refactor (2026-04-07)
+
+### 12.1 Admin UI changes
+- view/admin/product_search/index.html switched from el-table to responsive card grid (el-row + el-col + el-card).
+- Each card now includes: image preview, style name/category, code, wholesale price, min order qty.
+- Hover action layer added: Details, Edit, Share Poster, Delete.
+- Existing customer catalog token flow is preserved (generate/copy token link).
+- AI quick access button (AI) added on card corner; supports copying AI text for Zalo outreach.
+
+### 12.2 Filter and search interaction
+- Primary row keeps only: keyword search + image search entry.
+- Image search supports click-to-upload and drag-drop upload; request API:
+  - POST /index.php/api/product_search/searchByImage
+- Advanced filters moved into collapse panel:
+  - category
+  - price_min / price_max
+  - moq_min
+- Batch delete remains available via card selection on current page.
+- Share poster keeps QR generation based on token link and supports level/expire params.
+
+### 12.3 Backend list API extension
+- app/controller/admin/ProductSearch.php:listJson() now supports params:
+  - keyword (matches product_code, hot_type, ai_description)
+  - category
+  - price_min, price_max
+  - moq_min
+- Response now includes:
+  - updated_at
+  - category_options
+  - current_role
+- Backward compatibility: if legacy DB lacks `ai_description` column, list/filter/export/update now auto-degrade without SQL errors.
+
+### 12.4 Price level display rules
+- In admin view (current_role != viewer), card shows level price badges parsed from price_levels_json.
+- Priority order: level1, level2, level3, then custom keys.
+
+### 12.5 i18n compliance
+- Added zh/en/vi keys under page.styleSearch.* in public/static/i18n/i18n.js for:
+  - card actions
+  - advanced filters
+  - image-search status and errors
+  - detail modal and AI copy actions
+
+### 12.6 Usage notes
+1. Drag an image into the image-search box or click to upload.
+2. System auto-runs image matching and fills matched style code into keyword field.
+3. Use Advanced filters for category/price/MOQ constraints.
+4. Hover a card to run operations, or open AI modal to copy selling points for customer chat.
 
-### 定位
 
-- **TikStar OPS** 作为运营中台，整合：**寻款**（商品/款式图搜索索引）、**达人运营**（TikTok `@handle` 名录、联系信息导入与更新、达人分发链、联系话术）、**素材库**（视频与商品归类、批量上传）、**终端**（平台/设备）与**系统**（设置、用户、桌面端发卡/版本、缓存与异常）。
 
-### 侧栏信息架构（与 `view/admin/common/layout.html` 一致）
-
-| 模块 | 分组文案（i18n 键） | 子菜单 / 入口 | 说明 |
-|------|---------------------|---------------|------|
-| 概览 | `admin.menu.overview` | 仪表盘 | 统计与快捷入口 |
-| 寻款 | `admin.menu.groupSearch` | `admin.menu.styleSearch` → `/product_search` | 图片搜款式、CSV/Excel 异步导入索引 |
-| 达人 | `admin.menu.groupCreator` + `admin.menu.groupCreatorMenu`（折叠） | `admin.menu.influencerList` → `/influencer`；`admin.menu.distribute` → `/distribute`；`admin.menu.messageTemplates` → `/message_template` | TikTok 名录、达人链、话术模板 |
-| 素材 | `admin.menu.material` + `admin.menu.materialMenu`（折叠） | 视频、上传、商品 | 内容与商品维度的素材管理 |
-| 终端 | `admin.menu.terminal` | 平台、设备 | 取片设备与平台 |
-| 系统 | `admin.menu.system` | 设置、用户、发卡、版本、缓存、异常 | |
-
-### 面包屑约定
-
-- 寻款页：`page.styleSearch.breadcrumb`（如「寻款 / 索引」）。
-- 达人名录 / 达人链 / 话术：`page.influencer.breadcrumb`、`page.distribute.breadcrumb`、`page.messageTemplate.breadcrumb`（统一在「达人」域下）。
-
----
-
-## 品牌与达人 CRM（2026-04）
-
-### 系统名称
-
-- 后台侧栏与默认页面标题展示为 **TikStar OPS**（原「社媒素材库」文案已替换）。
-
-### 达人名录（tiktok_id = TikTok 用户名 @handle）
-
-- 数据库表 `influencers`：`tiktok_id` 为**规范化**用户名——小写、前缀 `@`，与 TikTok **@handle** 对应，全局唯一；另有昵称、头像 URL、粉丝数、`contact_info`（TEXT，JSON 文本）、地区、`status`（0 待联系 / 1 合作中 / 2 黑名单）。
-- 后台路径 **达人 → 名录**（`/admin.php/influencer`）：分页列表、关键词与状态筛选、**导入更新**（异步）、**示例 CSV 下载**、**全量导出 CSV**（`GET /admin.php/influencer/exportCsv`，UTF-8 BOM，列名 `contact` 与导入兼容）、行内 **编辑/删除**（删除前自动将相关达人链的 `influencer_id` 置空）。
-- 支持 **.csv / .txt / .xlsx / .xls / .xlsm**：首行可识别表头（含 `tiktok_id`、`handle`、`用户名` 等）；无法识别时默认**第一列为 TikTok 用户名**。
-- 导入任务表 `influencer_import_tasks`；前端创建任务后轮询 `POST /admin.php/influencer/importTaskTick`。
-- **升级数据库**（Windows / Linux 均可）：项目根目录执行  
-  `php database/run_migration_influencers_crm.php`  
-  （依赖 `config/database.php`；已存在结构会跳过）。**全新建库**：`database/schema.sql` 已包含 `influencers`、`influencer_import_tasks` 与 `product_links.influencer_id`。
-
-### 达人链可选关联达人
-
-- `product_links.influencer_id` 可空；生成页输入框支持 **输入关键字调用** `GET /influencer/search` 下拉点选；须与名录中已有 `tiktok_id` 一致；列表接口返回 `influencer` 对象便于展示。
-
-### 达人外联：话术模板与一键联系（2026-04）
-
-- **数据表** `message_templates`：模板名称、正文 `body`（占位符）、`sort_order`、`status`。
-- **商品扩展**（`products`）：`thumb_url`（列表缩略图）、`tiktok_shop_url`（TikTok Shop/橱窗链接），与 `goods_url` 并存；话术渲染时可用 `{{tiktok_shop_url}}` 等变量。
-- **迁移**（已有库）：  
-  `php database/run_migration_outreach.php`（Windows：`php database\run_migration_outreach.php`）  
-  或手动执行 `database/migrations/20260415_outreach_product_thumb.sql`（注意重复执行时的列已存在错误）。  
-  新装以 `database/schema.sql` 为准。
-- **服务** `app/service/MessageOutreachService.php`：解析达人 `contact_info` 中的 WhatsApp/Zalo，`buildRenderVars` 填充 `{{tiktok_id}}`、`{{nickname}}`、`{{region}}`、`{{whatsapp}}`、`{{zalo}}`、`{{product_name}}`、`{{goods_url}}`、`{{tiktok_shop_url}}`、`{{distribute_link}}`；`distribute_link` 优先匹配「该达人 + 该商品」的启用达人链，否则退回该商品任意启用链。
-- **后台路由**（`admin.php`，需登录）：  
-  | 方法 | 路径 | 说明 |
-  |------|------|------|
-  | GET | `/message_template` | 话术管理页（Vue 渲染） |
-  | GET | `/message_template/list` | 列表 JSON |
-  | POST | `/message_template/save` | 保存模板 |
-  | POST | `/message_template/delete` | 删除模板 |
-  | POST | `/message_template/render` | 渲染话术（`template_id`、`influencer_id`、可选 `product_id`），返回 `text`、`wa_url`、`zalo_url` |
-- **名录页** `view/admin/influencer/index.html`：行操作 **话术** 打开弹窗，选择模板与可选商品，预览正文，支持复制、WhatsApp 预填、Zalo 打开。若尚无启用模板，会提示先至侧栏 **达人 → 话术** 新建（`page.influencer.noTemplates`）；关联商品下拉占位 `page.influencer.productOptionalPh`；无 WhatsApp 号码时 `page.influencer.noWhatsapp`。
-- **商品** `POST /admin.php/product/uploadThumb`：上传缩略图至 `public/uploads/product_thumbs/{Ymd}/`，表单见 `view/admin/product/form.html`。
-
-### 后台 JSON 接口（入口 `admin.php`）
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/influencer/list` | 达人分页列表 |
-| GET | `/influencer/search` | 下拉搜索，`q` |
-| POST | `/influencer/importCsv` | 上传文件，返回 `task_id` |
-| GET | `/influencer/importTaskStatus` | 任务快照 |
-| POST | `/influencer/importTaskTick` | 推进一步 |
-| GET | `/influencer/sampleCsv` | 下载导入示例 CSV |
-| GET | `/influencer/exportCsv` | 全量导出达人 CSV（UTF-8 BOM） |
-| POST | `/influencer/update` | JSON 编辑达人（不可改 `tiktok_id`） |
-| POST | `/influencer/delete` | JSON `{"id":n}` 删除达人 |
-
-### 多语言
-
-- **调试报错页**：根目录 **`.env`** 中 `APP_DEBUG = true` 时 ThinkPHP 在浏览器输出**完整异常与堆栈**（便于复制）；生产环境须 `false`。模板见 **`.env.example`**；细则见 **`TROUBLESHOOTING.md`**「开启页面详细报错」。
-- 运维速查：**`README.md`** 中有「多语言（i18n）与脚本缓存版本」总述。
-- `public/static/i18n/i18n.js` 增加 **中文 / English / Tiếng Việt**（`?lang=vi`）。修改脚本后需**全站**提高所有引用 `i18n.js` 的 **`?v=`**（当前示例：**`20260406_category1`**），包括 `layout.html`、登录页、寻款/达人链等独立页，以及各 Vue 独立页；达人前台另 bump `influencer_i18n.js` 的 `?v=`。
-
-### 寻款索引 i18n（2026-04）
-
-- `view/admin/product_search/index.html`：提示框、筛选、表格列、导入进度弹窗、编辑弹窗及脚本内 `ElMessage` / `ElMessageBox` 文案已走 `AppI18n.t`（`page.styleSearch.*` 与 `common.*`）；`tt` 支持占位符 `{var}`。
-
-### 达人名录 i18n（2026-04）
-
-- `view/admin/influencer/index.html`：导入轮询、会话过期、复制成功/失败、保存/删除成功提示与删除确认框均走 i18n；导入进度与结束摘要复用寻款一致键。
-
-### 达人链页 i18n（2026-04）
-
-- `view/admin/distribute/index.html`：页眉与表格列、启停/删除/复制等提示与确认框均走 `page.distribute.*` / `common.*`；勿在模板中误用 `$\{tt(...)\}` 导致文案不随 Vue 渲染。
-
-### 登录页 i18n（2026-04）
-
-- `view/admin/auth/login.html`：`i18n.js` 版本与全站对齐；登录失败兜底文案使用 `auth.loginFailed`。
-
-### 仪表盘业务 KPI（2026-04）
-
-- 首页 SSR 与 `GET /admin.php/stats/overview` 同源（`StatsService::overview()`），含寻款索引、达人名录、达人链等；表不存在或未迁移时对应项为 `0`。
-
----
-
-## 商品与达人分发（2026-03）
-
-### 需求摘要
-
-- 视频可按**商品**归类；后台维护商品（名称、可选商品页 URL、缩略图、TikTok 商品链）。
-- **分发链接**对应一个商品；达人打开链接后，从该商品已绑定视频中**随机**取一条**未下载**（`is_downloaded=0`）的素材。
-- **全局核销**：任意达人下载某条视频并标记后，该视频对所有人不再参与随机（与现有 IP 设备流共享 `videos.is_downloaded`）。
-
-### 数据表
-
-- `products`、`product_links`、`videos.product_id`（可空）、`videos.device_id`（可空）。
-
-### API
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/video/influencerRandom?token=` | 达人页拉取随机未下载视频 |
-| POST | `/api/video/markDownloaded` | 下载后核销 |
-| GET | `/api/video/download` | 代理下载 |
-
-### 系统设置与默认封面
-
-- `system_settings`、七牛合并 `QiniuService::getMergedQiniuConfig()`、读写 **`app\service\SystemConfigService`**（勿与 `think\Model::set()` 冲突）。
-
----
-
-## 仪表盘统计（2026-03）
-
-- `GET /admin.php/stats/overview`、`trends`、`platformDistribution`、`downloadErrorTrends`、`downloadErrorTop`、`productDistribution`、`storageUsage`。
-- 实现：`app/service/StatsService.php`、`app/controller/admin/Stats.php`、首页 `view/admin/index/index.html`。仪表盘 **所有 KPI 数字**（含已下载/未下载、下载率、平台/设备、今日上传/下载与环比、寻款/达人/达人链等）均在 **`Index::dashboardScalars()`** 中从 `StatsService::overview()` 转为扁平标量（`d_*`、`video_total`、`asof_display`）再传入视图；模板**禁止**再使用 `{$stats.xxx|default=...}`，以免 ThinkPHP 编译出含 `$stats['downloaded']` 等片段时在个别环境报 **unexpected identifier "videos" / "downloaded"** 等。
-- 升级：`php database/run_migration_product_distribution.php` 或 `database/migrations/20260330_product_distribution.sql`。
-
----
-
-## 后台：视频 / 商品 / 达人链 / 平台 / 设备 / 缓存 / 下载异常（Vue3 + Element Plus）
-
-- **视频** `GET /admin.php/video/list`；`view/admin/video/index.html`。注意：脚本区「下拉选项」注释**不可**与 `const PLATFORM_OPTIONS = []` 写在同一行（`//` 会吞掉整行，导致未定义）；分页区「反选」按钮须正确闭合 `</el-button>`。**内联脚本中** `ElMessage.success('...')` 等字符串须**成对闭合引号**，否则未闭合字符串会延续到后面模板里的 `Home / Library / Videos`，浏览器报 **unexpected identifier "videos"**。列表/筛选/表头/弹窗等文案统一 `page.video.*` 与 `tt()`，避免乱码引号破坏属性（如 `:placeholder`）。
-- **商品** `GET /admin.php/product/list`（含 `thumb_url`、`tiktok_shop_url`、`category_name`）；`view/admin/product/index.html`（列表「商品链接」列仅展示 **TikTok 商品链接** `tiktok_shop_url`，操作区 **复制链接** 仅复制该字段；支持按分类筛选；行内 **编辑** 为弹窗，提交 `POST /admin.php/product/edit/{id}`，缩略图上传同 `POST /admin.php/product/uploadThumb`）；独立页 **添加商品** 仍为 `GET/POST /admin.php/product/add`，`view/admin/product/form.html`。列表表头、复制空内容、删除确认等均走 i18n（`page.product.colName`、`page.product.colCategory`、`page.product.copyLink`、`page.product.editTitle` 等及 `page.product.deleteConfirmMsg`）。
-- **达人** `GET /admin.php/influencer/list` 增加 `category_name` 及分类聚合，`view/admin/influencer/index.html` 支持分类筛选与编辑分类；导入/导出 CSV 兼容 `category_name` 列。
-- **分类字段迁移**：`php database/run_migration_product_influencer_category.php`（Windows：`php database\\run_migration_product_influencer_category.php`；Linux：`php database/run_migration_product_influencer_category.php`）。
-- **达人链** `GET /admin.php/distribute/list`；`view/admin/distribute/index.html`。
-- **平台** `GET /admin.php/platform/list`；`view/admin/platform/index.html`。
-- **设备** `GET /admin.php/device/list`；`view/admin/device/index.html`。
-- **缓存** `GET /admin.php/cache/list`；`view/admin/cache/index.html`。
-- **下载异常** `GET /admin.php/downloadLog/list`；`POST /admin.php/downloadLog/clear`：从所选日期 runtime 日志中删除与列表规则一致的「下载/缓存相关异常」行，其余保留；`view/admin/download_log/index.html`。
-
----
-
-## 后台：用户登录与管理员管理（Session）（2026-04）
-
-- 表 `admin_users`；迁移 `php database/run_migration_admin_users.php`。
-- 登录 `auth/login`、`auth/logout`；用户 CRUD `user/*`；中间件 `AdminAuthMiddleware.php`（未登录 JSON 返回 `401`）。
-- 默认账号 `admin / admin123`（登录后请改密）；`config/session.php` 中 `expire` 单位为秒，可用 `.env` 的 `SESSION_EXPIRE` 覆盖。
-
-### 多语言切换
-
-- 后台：`?lang=`、`localStorage(app_lang)`、`public/static/i18n/i18n.js`。
-- 达人取片页：`?ilang=`、`influencer_i18n.js`，与后台独立。
-
----
-
-## 后台统一页面规范（2026-03）
-
-- 骨架类：`admin-page-container`、`admin-modern-card`、`admin-header-actions`、`admin-filter-section`、`admin-footer-pagination`（见 `view/admin/common/layout.html`）。
-
----
-
-## 图片搜款式「寻款」（2026-04；豆包视觉）
-
-- CSV/Excel 导入、本地 Python 向量、豆包 `ai_description`；配置见 `config/services.php`、`config/product_search.php`。
-- 详细路由、异步导入、开放 API、H5 等：**`tools/product_style_search/README.md`**、代码与 `route/admin.php`。
-- CSV 列说明：`docs/耳环款式CSV说明.md`。
-- 迁移脚本：`database/run_migration_product_style_search.php`（及唯一编号、图搜队列、image_path 等，见 `database/` 目录）。
-
----
-
-## 桌面端：发卡与版本、公开下载（2026-04）
-
-- 表 `app_licenses`、`app_versions`；迁移 `php database/run_migration_client_app.php`。
-- 开放 API：`/index.php/api/client/verifyLicense`、`checkUpdate`；说明 **`docs/client-desktop-api.md`**；公开下载页 `index.php/download`。
-
----
-
-## 根目录 `requirements.md` 乱码说明（维护必读）
-
-1. 在本环境中，若直接用部分工具**重写**仓库根目录的 **`requirements.md`**，非 ASCII 字符可能被**误写成问号 `?`**，从而在编辑器里看到「全是乱码/问号」。
-2. **规范做法**：以 **`docs/requirements.md`** 为**正本**（UTF-8 中文可正常保存）；同步到根目录请在项目根执行：`Copy-Item -Force docs\requirements.md requirements.md`（PowerShell），或 Linux：`cp docs/requirements.md requirements.md`。
-3. 若 Git 历史里该文件曾被错误提交为问号，需用**正确 UTF-8 文件**覆盖后再提交。

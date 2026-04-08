@@ -559,6 +559,8 @@
           const API_ENTRY = (typeof window !== 'undefined' && window.__H5_API_ENTRY__ != null && String(window.__H5_API_ENTRY__).trim() !== '')
             ? String(window.__H5_API_ENTRY__).trim()
             : '/index.php';
+          const pageParams = new URLSearchParams(window.location.search || '');
+          const catalogToken = String(pageParams.get('token') || '').trim();
           const i18n = window.InfluencerI18n;
           const currentLang = ref(i18n ? i18n.getLang('vi') : 'vi');
           if (i18n && i18n.applyHtmlLang) i18n.applyHtmlLang(currentLang.value);
@@ -680,6 +682,7 @@
               p.set('page_size', String(pageSize.value));
               if (keyword.value) p.set('keyword', keyword.value.trim());
               if (category.value) p.set('category', category.value.trim());
+              if (catalogToken) p.set('token', catalogToken);
               const res = await fetch(API_ENTRY + '/api/product_search/catalog?' + p.toString(), {
                 credentials: 'same-origin',
               });
@@ -825,6 +828,9 @@
                   qty: Math.max(1, Number(it.qty || 1)),
                 })),
               };
+              if (catalogToken) {
+                payload.token = catalogToken;
+              }
               const res = await fetch(API_ENTRY + '/api/product_search/offlineOrder', {
                 method: 'POST',
                 credentials: 'same-origin',

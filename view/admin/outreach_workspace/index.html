@@ -47,6 +47,33 @@
     }
     return tt(fallbackKey || 'common.operationFailed');
   }
+  async function copyTextSafe(text) {
+    const value = String(text || '');
+    if (!value) return;
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(value);
+        return;
+      } catch (_) {}
+    }
+    if (typeof document === 'undefined') {
+      throw new Error(tt('common.copyFail'));
+    }
+    const input = document.createElement('textarea');
+    input.value = value;
+    input.setAttribute('readonly', 'readonly');
+    input.style.position = 'fixed';
+    input.style.top = '-9999px';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.focus();
+    input.select();
+    const ok = document.execCommand && document.execCommand('copy');
+    document.body.removeChild(input);
+    if (!ok) {
+      throw new Error(tt('common.copyFail'));
+    }
+  }
 
   createApp({
     setup() {
@@ -61,6 +88,7 @@
       const previewText = ref('');
       const jumpWa = ref('');
       const jumpZalo = ref('');
+      const jumpChannel = ref('auto');
       const processing = ref(false);
 
       const generateVisible = ref(false);
@@ -141,6 +169,7 @@
           previewText.value = '';
           jumpWa.value = '';
           jumpZalo.value = '';
+          jumpChannel.value = 'auto';
           return;
         }
         try {
@@ -160,9 +189,21 @@
           previewText.value = d.text || '';
           jumpWa.value = d.wa_url || '';
           jumpZalo.value = d.zalo_url || '';
+          if (jumpZalo.value) jumpChannel.value = 'zalo';
+          else if (jumpWa.value) jumpChannel.value = 'wa';
+          else jumpChannel.value = 'auto';
         } catch (e) {
           previewText.value = e.message || tt('common.loadingFailed');
         }
+      }
+
+      function pickJumpUrl() {
+        const wa = String(jumpWa.value || '').trim();
+        const zalo = String(jumpZalo.value || '').trim();
+        const c = String(jumpChannel.value || 'auto');
+        if (c === 'wa') return wa;
+        if (c === 'zalo') return zalo;
+        return wa || zalo;
       }
 
       async function runGenerate() {
@@ -206,16 +247,25 @@
         if (!item) return;
         processing.value = true;
         try {
+          if (openAfterCopy) {
+            const c = String(jumpChannel.value || 'auto');
+            const u = pickJumpUrl();
+            if (!u) {
+              if (c === 'wa') ElMessage.warning(tt('page.outreach.noWhatsapp'));
+              else if (c === 'zalo') ElMessage.warning(tt('page.outreach.noZalo'));
+              else ElMessage.warning(tt('page.outreach.noJumpTarget'));
+              return;
+            }
+            const popup = window.open(u, '_blank', 'noopener');
+            if (!popup) {
+              ElMessage.warning(tt('page.outreach.popupBlocked'));
+              return;
+            }
+          }
           if (action === 'copy' || action === 'jump') {
             const text = String(previewText.value || '');
             if (text) {
-              await navigator.clipboard.writeText(text);
-            }
-          }
-          if (openAfterCopy) {
-            const u = jumpWa.value || jumpZalo.value;
-            if (u) {
-              window.open(u, '_blank', 'noopener');
+              await copyTextSafe(text);
             }
           }
           const res = await fetch('/admin.php/outreach_workspace/action', {
@@ -274,6 +324,7 @@
         previewText,
         jumpWa,
         jumpZalo,
+        jumpChannel,
         fetchNextTask,
         doRenderCurrent,
         doAction,
@@ -322,6 +373,11 @@
             </div>
             <div class="outreach-preview">{{ previewText }}</div>
             <div class="outreach-actions" style="margin-top:10px;">
+              <el-select v-model="jumpChannel" size="small" style="width:170px;">
+                <el-option :label="tt('page.outreach.jumpAuto')" value="auto" />
+                <el-option :label="tt('page.outreach.jumpWa')" value="wa" />
+                <el-option :label="tt('page.outreach.jumpZalo')" value="zalo" />
+              </el-select>
               <el-button size="small" :loading="processing" @click="doAction('copy', false)">{{ tt('page.outreach.copy') }}</el-button>
               <el-button size="small" type="primary" :loading="processing" @click="doAction('jump', true)">{{ tt('page.outreach.copyAndOpen') }}</el-button>
               <el-button size="small" type="success" :loading="processing" @click="doAction('complete', false)">{{ tt('page.outreach.complete') }}</el-button>

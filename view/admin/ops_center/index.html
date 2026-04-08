@@ -6,6 +6,7 @@
 {block name="page_actions"}{/block}
 
 {block name="style"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
 <style>
     .ops-center-card {
         padding: 20px;
@@ -15,33 +16,11 @@
         color: #6b7280;
         font-size: 13px;
     }
-    .ops-center-tabs {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .ops-center-tabs-el {
         margin-bottom: 14px;
-        flex-wrap: wrap;
     }
-    .ops-center-tab {
-        border: 1px solid #dcdfe6;
-        background: #fff;
-        color: #606266;
-        border-radius: 6px;
-        font-size: 13px;
-        line-height: 1;
-        padding: 10px 14px;
-        cursor: pointer;
-        transition: all .2s ease;
-    }
-    .ops-center-tab:hover {
-        border-color: #b3d8ff;
-        color: #409eff;
-        background: #ecf5ff;
-    }
-    .ops-center-tab.is-active {
-        border-color: #409eff;
-        color: #409eff;
-        background: #ecf5ff;
+    .ops-center-tabs-el .el-tabs__header {
+        margin-bottom: 10px;
     }
     .ops-center-frame-wrap {
         border: 1px solid #e5e7eb;
@@ -62,116 +41,136 @@
 {block name="content"}
 <div class="admin-page-container">
     <div class="admin-modern-card ops-center-card">
-        <p class="ops-center-desc" data-i18n="page.opsCenter.desc">统一管理发卡、版本与缓存，减少侧栏层级。</p>
-        <div class="ops-center-tabs" role="tablist" aria-label="Ops Tabs">
-            <button type="button" class="ops-center-tab is-active" data-tab="license" data-i18n="page.opsCenter.tabLicense">发卡</button>
-            <button type="button" class="ops-center-tab" data-tab="version" data-i18n="page.opsCenter.tabVersion">版本</button>
-            <button type="button" class="ops-center-tab" data-tab="cache" data-i18n="page.opsCenter.tabCache">缓存</button>
-        </div>
-        <div class="ops-center-frame-wrap">
-            <iframe id="opsCenterFrame" title="Ops Center Panel" loading="lazy"></iframe>
+        <div id="opsCenterApp">
+            <p class="ops-center-desc">{{ tt('page.opsCenter.desc') }}</p>
+            <el-tabs v-model="activeTab" @tab-change="onTabChange" class="ops-center-tabs-el">
+                <el-tab-pane :label="tt('page.opsCenter.tabLicense')" name="license"></el-tab-pane>
+                <el-tab-pane :label="tt('page.opsCenter.tabVersion')" name="version"></el-tab-pane>
+                <el-tab-pane :label="tt('page.opsCenter.tabCache')" name="cache"></el-tab-pane>
+                <el-tab-pane :label="tt('page.opsCenter.tabErrors')" name="errors"></el-tab-pane>
+            </el-tabs>
+            <div class="ops-center-frame-wrap">
+                <iframe id="opsCenterFrame" ref="frameEl" :src="frameSrc" title="Ops Center Panel" loading="lazy" @load="onFrameLoad"></iframe>
+            </div>
         </div>
     </div>
 </div>
 {/block}
 
 {block name="script"}
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
     (function () {
-        const frame = document.getElementById('opsCenterFrame');
-        const tabs = Array.prototype.slice.call(document.querySelectorAll('.ops-center-tab'));
-        if (!frame || !tabs.length) return;
+        const { createApp, ref, onMounted, onBeforeUnmount } = Vue;
 
-        const i18n = window.AppI18n || null;
-        const lang = i18n ? i18n.getLang('zh') : 'zh';
-        if (i18n) {
-            i18n.applyDom(document);
-        }
+        createApp({
+            setup() {
+                const i18n = window.AppI18n || null;
+                const lang = i18n ? i18n.getLang('zh') : 'zh';
+                if (i18n) {
+                    i18n.applyDom(document);
+                }
 
-        const tabUrlMap = {
-            license: '/admin.php/client_license',
-            version: '/admin.php/client_version',
-            cache: '/admin.php/cache'
-        };
+                const tabUrlMap = {
+                    license: '/admin.php/client_license',
+                    version: '/admin.php/client_version',
+                    cache: '/admin.php/cache',
+                    errors: '/admin.php/downloadLog',
+                };
 
-        let resizeTimer = null;
-        const loadedMap = {};
+                const queryTab = String(new URL(window.location.href).searchParams.get('tab') || 'license');
+                const activeTab = ref(Object.prototype.hasOwnProperty.call(tabUrlMap, queryTab) ? queryTab : 'license');
+                const frameSrc = ref('');
+                const frameEl = ref(null);
+                let resizeTimer = 0;
 
-        function urlWithLang(url) {
-            const u = new URL(url, window.location.origin);
-            u.searchParams.set('lang', lang);
-            return u.pathname + '?' + u.searchParams.toString();
-        }
+                const tt = (key, vars) => (i18n ? i18n.t(key, vars || null, lang) : key);
 
-        function injectEmbeddedStyle(doc) {
-            if (!doc || !doc.head) return;
-            if (doc.getElementById('ops-center-embed-style')) return;
-            const style = doc.createElement('style');
-            style.id = 'ops-center-embed-style';
-            style.textContent = ''
-                + '.main-sidebar,.main-header,.main-footer,.content-header{display:none !important;}'
-                + '.content-wrapper{margin-left:0 !important;min-height:auto !important;}'
-                + '.content-wrapper>.content{padding-top:0 !important;}'
-                + '.container-fluid{padding-left:0 !important;padding-right:0 !important;}'
-                + '.admin-page-container{padding:0 !important;background:transparent !important;}'
-                + '.admin-modern-card{box-shadow:none !important;border-radius:0 !important;padding:12px !important;}'
-                + 'body{background:#f8fafc !important;}';
-            doc.head.appendChild(style);
-        }
+                function urlWithLang(url) {
+                    const u = new URL(url, window.location.origin);
+                    u.searchParams.set('lang', lang);
+                    return u.pathname + '?' + u.searchParams.toString();
+                }
 
-        function resizeFrame() {
-            try {
-                const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-                if (!doc) return;
-                const bodyH = doc.body ? doc.body.scrollHeight : 0;
-                const htmlH = doc.documentElement ? doc.documentElement.scrollHeight : 0;
-                const h = Math.max(760, bodyH, htmlH);
-                frame.style.height = h + 'px';
-            } catch (e) {}
-        }
+                function injectEmbeddedStyle(doc) {
+                    if (!doc || !doc.head) return;
+                    if (doc.getElementById('ops-center-embed-style')) return;
+                    const style = doc.createElement('style');
+                    style.id = 'ops-center-embed-style';
+                    style.textContent = ''
+                        + '.main-sidebar,.main-header,.main-footer,.content-header{display:none !important;}'
+                        + '.content-wrapper{margin-left:0 !important;min-height:auto !important;}'
+                        + '.content-wrapper>.content{padding-top:0 !important;}'
+                        + '.container-fluid{padding-left:0 !important;padding-right:0 !important;}'
+                        + '.admin-page-container{padding:0 !important;background:transparent !important;}'
+                        + '.admin-modern-card{box-shadow:none !important;border-radius:0 !important;padding:12px !important;}'
+                        + 'body{background:#f8fafc !important;}';
+                    doc.head.appendChild(style);
+                }
 
-        function activate(tabKey) {
-            const key = Object.prototype.hasOwnProperty.call(tabUrlMap, tabKey) ? tabKey : 'license';
-            tabs.forEach(function (btn) {
-                const active = btn.getAttribute('data-tab') === key;
-                btn.classList.toggle('is-active', active);
-                btn.setAttribute('aria-selected', active ? 'true' : 'false');
-            });
+                function resizeFrame() {
+                    const frame = frameEl.value;
+                    if (!frame) return;
+                    try {
+                        const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+                        if (!doc) return;
+                        const bodyH = doc.body ? doc.body.scrollHeight : 0;
+                        const htmlH = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+                        const h = Math.max(760, bodyH, htmlH);
+                        frame.style.height = h + 'px';
+                    } catch (e) {}
+                }
 
-            const targetUrl = urlWithLang(tabUrlMap[key]);
-            if (!loadedMap[key] || frame.getAttribute('data-tab') !== key) {
-                frame.setAttribute('data-tab', key);
-                frame.src = targetUrl;
-                loadedMap[key] = true;
-            }
+                function syncUrl(tabKey) {
+                    const u = new URL(window.location.href);
+                    u.searchParams.set('tab', tabKey);
+                    window.history.replaceState(null, '', u.pathname + '?' + u.searchParams.toString());
+                }
 
-            const u = new URL(window.location.href);
-            u.searchParams.set('tab', key);
-            window.history.replaceState(null, '', u.pathname + '?' + u.searchParams.toString());
-        }
+                function loadTab(tabKey) {
+                    const key = Object.prototype.hasOwnProperty.call(tabUrlMap, tabKey) ? tabKey : 'license';
+                    activeTab.value = key;
+                    frameSrc.value = urlWithLang(tabUrlMap[key]);
+                    syncUrl(key);
+                }
 
-        frame.addEventListener('load', function () {
-            try {
-                const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-                injectEmbeddedStyle(doc);
-                resizeFrame();
-            } catch (e) {}
-        });
+                function onTabChange(name) {
+                    loadTab(String(name || 'license'));
+                }
 
-        tabs.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                activate(btn.getAttribute('data-tab'));
-            });
-        });
+                function onFrameLoad() {
+                    const frame = frameEl.value;
+                    if (!frame) return;
+                    try {
+                        const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+                        injectEmbeddedStyle(doc);
+                        resizeFrame();
+                    } catch (e) {}
+                }
 
-        if (resizeTimer) {
-            clearInterval(resizeTimer);
-        }
-        resizeTimer = setInterval(resizeFrame, 1200);
+                onMounted(function () {
+                    loadTab(activeTab.value);
+                    resizeTimer = window.setInterval(resizeFrame, 1200);
+                });
 
-        const initTab = new URL(window.location.href).searchParams.get('tab') || 'license';
-        activate(initTab);
+                onBeforeUnmount(function () {
+                    if (resizeTimer) {
+                        window.clearInterval(resizeTimer);
+                        resizeTimer = 0;
+                    }
+                });
+
+                return {
+                    activeTab,
+                    frameSrc,
+                    frameEl,
+                    tt,
+                    onTabChange,
+                    onFrameLoad,
+                };
+            },
+        }).use(ElementPlus).mount('#opsCenterApp');
     })();
 </script>
 {/block}
-

@@ -20,6 +20,7 @@ class ProductStyleItem extends Model
         'hot_type'     => 'string',
         'wholesale_price' => 'float',
         'min_order_qty' => 'int',
+        'price_levels_json' => 'string',
         'ai_description' => 'string',
         'embedding'    => 'string',
         'status'       => 'int',

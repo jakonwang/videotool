@@ -19,7 +19,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
+<script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -43,6 +43,15 @@
     'Accept': 'application/json, text/javascript, */*;q=0.01',
     'X-Requested-With': 'XMLHttpRequest',
   };
+
+  function respMsg(json, fallbackKey) {
+    if (json && json.error_key) {
+      const translated = tt(json.error_key);
+      if (translated && translated !== json.error_key) return translated;
+    }
+    if (json && json.msg) return String(json.msg);
+    return tt(fallbackKey || 'common.loadingFailed');
+  }
 
   function parseJsonBody(res, text) {
     if (res.status === 413) {
@@ -75,7 +84,7 @@
     const text = await res.text();
     const j = parseJsonBody(res, text);
     if (j && j.code === 401) {
-      throw new Error(j.msg || '未登录或会话已过期，请刷新页面重新登录');
+      throw new Error(respMsg(j, 'common.sessionExpired'));
     }
     return j;
   }
@@ -108,8 +117,8 @@
           });
           const text = await res.text();
           const json = parseJsonBody(res, text);
-          if (json && json.code === 401) throw new Error(json.msg || '未登录或会话已过期，请刷新页面重新登录');
-          if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
+          if (json && json.code === 401) throw new Error(respMsg(json, 'common.sessionExpired'));
+          if (!json || json.code !== 0) throw new Error(respMsg(json, 'common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
         } catch (e) {
@@ -145,7 +154,7 @@
             batchVisible.value = false;
             const keys = (j.data && j.data.keys) ? j.data.keys : [];
             const text = keys.length ? keys.join('\n') : '';
-            ElMessage.success(j.msg || '生成成功');
+            ElMessage.success(respMsg(j, 'common.done'));
             if (text) {
               ElMessageBox.alert(
                 '<pre style="max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap;">' +
@@ -156,10 +165,10 @@
             }
             fetchList();
           } else {
-            ElMessage.error((j && j.msg) || '失败');
+            ElMessage.error(respMsg(j, 'common.saveFailed'));
           }
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '请求失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         }
       }
 
@@ -179,13 +188,13 @@
           const j = await postForm('/admin.php/client_license/update/' + editForm.id, body);
           if (j && j.code === 0) {
             editVisible.value = false;
-            ElMessage.success(j.msg || tt('common.save'));
+            ElMessage.success(respMsg(j, 'common.saved'));
             fetchList();
           } else {
-            ElMessage.error((j && j.msg) || '失败');
+            ElMessage.error(respMsg(j, 'common.saveFailed'));
           }
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '请求失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         }
       }
 
@@ -193,13 +202,13 @@
         try {
           const j = await postForm('/admin.php/client_license/toggle/' + row.id, {});
           if (j && j.code === 0) {
-            ElMessage.success(j.msg || 'ok');
+            ElMessage.success(respMsg(j, 'common.done'));
             fetchList();
           } else {
-            ElMessage.error((j && j.msg) || '失败');
+            ElMessage.error(respMsg(j, 'common.saveFailed'));
           }
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : '请求失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         }
       }
 
@@ -212,14 +221,14 @@
           );
           const j = await postForm('/admin.php/client_license/unbind/' + row.id, {});
           if (j && j.code === 0) {
-            ElMessage.success(j.msg || 'ok');
+            ElMessage.success(respMsg(j, 'common.done'));
             fetchList();
           } else {
-            ElMessage.error((j && j.msg) || '失败');
+            ElMessage.error(respMsg(j, 'common.saveFailed'));
           }
         } catch (e) {
           if (e === 'cancel') return;
-          ElMessage.error(e && e.message ? e.message : '请求失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         }
       }
 
@@ -232,16 +241,16 @@
           );
           const j = await postForm('/admin.php/client_license/delete/' + row.id, {});
           if (j && j.code === 0) {
-            ElMessage.success(j.msg || tt('common.delete'));
+            ElMessage.success(respMsg(j, 'common.deleted'));
             const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
             page.value = Math.min(page.value, maxPage);
             fetchList();
           } else {
-            ElMessage.error((j && j.msg) || '失败');
+            ElMessage.error(respMsg(j, 'common.deleteFailed'));
           }
         } catch (e) {
           if (e === 'cancel') return;
-          ElMessage.error(e && e.message ? e.message : '请求失败');
+          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
         }
       }
 

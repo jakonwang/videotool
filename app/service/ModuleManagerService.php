@@ -847,6 +847,50 @@ class ModuleManagerService
         }
     }
 
+    private static function normalizedToken(string $value): string
+    {
+        $raw = strtolower(trim($value));
+        return (string) preg_replace('/[^a-z0-9]/', '', $raw);
+    }
+
+    private static function controllerIs(string $currentController, string ...$candidates): bool
+    {
+        $curRaw = strtolower(trim($currentController));
+        $curNorm = self::normalizedToken($curRaw);
+        foreach ($candidates as $candidate) {
+            $candRaw = strtolower(trim($candidate));
+            if ($candRaw === '' || $candRaw === $curRaw) {
+                if ($candRaw === $curRaw) {
+                    return true;
+                }
+                continue;
+            }
+            if (self::normalizedToken($candRaw) === $curNorm) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function actionIs(string $currentAction, string ...$candidates): bool
+    {
+        $actRaw = strtolower(trim($currentAction));
+        $actNorm = self::normalizedToken($actRaw);
+        foreach ($candidates as $candidate) {
+            $candRaw = strtolower(trim($candidate));
+            if ($candRaw === '' || $candRaw === $actRaw) {
+                if ($candRaw === $actRaw) {
+                    return true;
+                }
+                continue;
+            }
+            if (self::normalizedToken($candRaw) === $actNorm) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * @param array<string, mixed> $where
      */
@@ -920,11 +964,10 @@ class ModuleManagerService
     {
         $currentController = strtolower(trim($currentController));
         $currentAction = strtolower(trim($currentAction));
-        $isBatchUploadAction = in_array($currentAction, ['batchupload', 'batch_upload', 'batch-upload'], true);
+        $isBatchUploadAction = self::actionIs($currentAction, 'batchupload', 'batch_upload', 'batch-upload');
         $role = AdminAuthService::role();
         $enabled = self::enabledModuleMap();
         $badges = self::menuBadges();
-        $operatorOnly = $role === self::ROLE_OPERATOR;
 
         $isEnabled = static function (string $moduleName, int $fallback = 0) use ($enabled): bool {
             return (int) ($enabled[$moduleName] ?? $fallback) === 1;
@@ -953,7 +996,7 @@ class ModuleManagerService
 
         $menus = [];
 
-        if (!$operatorOnly && $overviewEnabled) {
+        if ($overviewEnabled) {
             $menus[] = [
                 'section_i18n' => 'admin.menu.overview',
                 'items' => [
@@ -962,36 +1005,46 @@ class ModuleManagerService
                         'href' => '/admin.php',
                         'icon' => 'layout-dashboard',
                         'text_i18n' => 'admin.menu.dashboard',
-                        'active' => $currentController === 'index',
+                        'active' => self::controllerIs($currentController, 'index'),
                     ],
                 ],
             ];
         }
 
-        if (!$operatorOnly && $searchEnabled) {
+        if ($searchEnabled) {
+            $searchChildren = [
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/product_search',
+                    'icon' => 'camera',
+                    'text_i18n' => 'admin.menu.styleSearch',
+                    'active' => self::controllerIs($currentController, 'productsearch', 'product_search'),
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/offline_order',
+                    'icon' => 'shopping-cart',
+                    'text_i18n' => 'admin.menu.offlineOrders',
+                    'active' => self::controllerIs($currentController, 'offlineorder', 'offline_order'),
+                    'badge' => ($badges['offline_order_pending'] ?? 0) > 0 ? (string) $badges['offline_order_pending'] : '',
+                ],
+            ];
             $menus[] = [
                 'section_i18n' => 'admin.menu.groupSearch',
                 'items' => [
                     [
-                        'kind' => 'link',
-                        'href' => '/admin.php/product_search',
-                        'icon' => 'camera',
-                        'text_i18n' => 'admin.menu.styleSearch',
-                        'active' => $currentController === 'productsearch',
-                    ],
-                    [
-                        'kind' => 'link',
-                        'href' => '/admin.php/offline_order',
-                        'icon' => 'shopping-cart',
-                        'text_i18n' => 'admin.menu.offlineOrders',
-                        'active' => $currentController === 'offlineorder',
-                        'badge' => ($badges['offline_order_pending'] ?? 0) > 0 ? (string) $badges['offline_order_pending'] : '',
+                        'kind' => 'group',
+                        'id' => 'search',
+                        'icon' => 'search',
+                        'text_i18n' => 'admin.menu.groupSearch',
+                        'expanded' => self::menuTreeHasActive($searchChildren),
+                        'children' => $searchChildren,
                     ],
                 ],
             ];
         }
 
-        if (!$operatorOnly && $growthEnabled) {
+        if ($growthEnabled) {
             $growthChildren = [];
             if ($industryEnabled) {
                 $growthChildren[] = [
@@ -999,7 +1052,7 @@ class ModuleManagerService
                     'href' => '/admin.php/industry_trend',
                     'icon' => 'trending-up',
                     'text_i18n' => 'admin.menu.industryTrend',
-                    'active' => $currentController === 'industrytrend',
+                    'active' => self::controllerIs($currentController, 'industrytrend', 'industry_trend'),
                     'badge' => ($badges['industry_total'] ?? 0) > 0 ? (string) $badges['industry_total'] : '',
                 ];
             }
@@ -1009,7 +1062,7 @@ class ModuleManagerService
                     'href' => '/admin.php/competitor_analysis',
                     'icon' => 'target',
                     'text_i18n' => 'admin.menu.competitorAnalysis',
-                    'active' => $currentController === 'competitoranalysis',
+                    'active' => self::controllerIs($currentController, 'competitoranalysis', 'competitor_analysis'),
                     'badge' => ($badges['competitor_total'] ?? 0) > 0 ? (string) $badges['competitor_total'] : '',
                 ];
             }
@@ -1019,7 +1072,7 @@ class ModuleManagerService
                     'href' => '/admin.php/ad_insight',
                     'icon' => 'megaphone',
                     'text_i18n' => 'admin.menu.adInsight',
-                    'active' => $currentController === 'adinsight',
+                    'active' => self::controllerIs($currentController, 'adinsight', 'ad_insight'),
                     'badge' => ($badges['ad_total'] ?? 0) > 0 ? (string) $badges['ad_total'] : '',
                 ];
             }
@@ -1029,7 +1082,7 @@ class ModuleManagerService
                     'href' => '/admin.php/data_import',
                     'icon' => 'database',
                     'text_i18n' => 'admin.menu.dataImport',
-                    'active' => $currentController === 'dataimport',
+                    'active' => self::controllerIs($currentController, 'dataimport', 'data_import'),
                     'badge' => ($badges['import_running'] ?? 0) > 0 ? (string) $badges['import_running'] : '',
                 ];
             }
@@ -1053,23 +1106,13 @@ class ModuleManagerService
 
         if ($creatorEnabled) {
             $creatorChildren = [];
-            if ($creatorCategoryEnabled) {
-                $creatorChildren[] = [
-                    'kind' => 'link',
-                    'href' => '/admin.php/category',
-                    'icon' => 'tag',
-                    'text_i18n' => 'admin.menu.category',
-                    'active' => $currentController === 'category',
-                    'badge' => ($badges['creator_category_total'] ?? 0) > 0 ? (string) $badges['creator_category_total'] : '',
-                ];
-            }
             if ($creatorInfluencerEnabled) {
                 $creatorChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/influencer',
                     'icon' => 'users',
                     'text_i18n' => 'admin.menu.influencerList',
-                    'active' => $currentController === 'influencer',
+                    'active' => self::controllerIs($currentController, 'influencer'),
                     'badge' => ($badges['influencer_pending'] ?? 0) > 0 ? (string) $badges['influencer_pending'] : '',
                 ];
             }
@@ -1079,7 +1122,7 @@ class ModuleManagerService
                     'href' => '/admin.php/outreach_workspace',
                     'icon' => 'send',
                     'text_i18n' => 'admin.menu.outreachWorkspace',
-                    'active' => $currentController === 'outreachworkspace',
+                    'active' => self::controllerIs($currentController, 'outreachworkspace', 'outreach_workspace'),
                     'badge' => ($badges['outreach_pending'] ?? 0) > 0 ? (string) $badges['outreach_pending'] : '',
                 ];
             }
@@ -1089,8 +1132,18 @@ class ModuleManagerService
                     'href' => '/admin.php/sample',
                     'icon' => 'package',
                     'text_i18n' => 'admin.menu.sampleManagement',
-                    'active' => $currentController === 'sample',
+                    'active' => self::controllerIs($currentController, 'sample'),
                     'badge' => ($badges['sample_pending'] ?? 0) > 0 ? (string) $badges['sample_pending'] : '',
+                ];
+            }
+            if ($creatorCategoryEnabled) {
+                $creatorChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/category?type=influencer',
+                    'icon' => 'tag',
+                    'text_i18n' => 'admin.menu.category',
+                    'active' => self::controllerIs($currentController, 'category'),
+                    'badge' => ($badges['creator_category_total'] ?? 0) > 0 ? (string) $badges['creator_category_total'] : '',
                 ];
             }
             if ($creatorTemplateEnabled) {
@@ -1099,7 +1152,7 @@ class ModuleManagerService
                     'href' => '/admin.php/message_template',
                     'icon' => 'message-circle',
                     'text_i18n' => 'admin.menu.messageTemplates',
-                    'active' => $currentController === 'messagetemplate',
+                    'active' => self::controllerIs($currentController, 'messagetemplate', 'message_template'),
                     'badge' => ($badges['template_total'] ?? 0) > 0 ? (string) $badges['template_total'] : '',
                 ];
             }
@@ -1109,7 +1162,7 @@ class ModuleManagerService
                     'href' => '/admin.php/distribute',
                     'icon' => 'link-2',
                     'text_i18n' => 'admin.menu.distribute',
-                    'active' => $currentController === 'distribute',
+                    'active' => self::controllerIs($currentController, 'distribute'),
                     'badge' => ($badges['creator_links_total'] ?? 0) > 0 ? (string) $badges['creator_links_total'] : '',
                 ];
             }
@@ -1138,7 +1191,7 @@ class ModuleManagerService
                     'href' => '/admin.php/video',
                     'icon' => 'video',
                     'text_i18n' => 'admin.menu.video',
-                    'active' => $currentController === 'video' && !$isBatchUploadAction,
+                    'active' => self::controllerIs($currentController, 'video') && !$isBatchUploadAction,
                     'badge' => ($badges['video_total'] ?? 0) > 0 ? (string) $badges['video_total'] : '',
                 ],
                 [
@@ -1146,14 +1199,14 @@ class ModuleManagerService
                     'href' => '/admin.php/video/batchUpload',
                     'icon' => 'cloud-upload',
                     'text_i18n' => 'admin.menu.upload',
-                    'active' => $currentController === 'video' && $isBatchUploadAction,
+                    'active' => self::controllerIs($currentController, 'video') && $isBatchUploadAction,
                 ],
                 [
                     'kind' => 'link',
                     'href' => '/admin.php/product',
                     'icon' => 'shopping-bag',
-                    'text_i18n' => 'admin.menu.contentDistribution',
-                    'active' => $currentController === 'product',
+                    'text_i18n' => 'admin.menu.product',
+                    'active' => self::controllerIs($currentController, 'product'),
                     'badge' => ($badges['product_total'] ?? 0) > 0 ? (string) $badges['product_total'] : '',
                 ],
             ];
@@ -1172,21 +1225,21 @@ class ModuleManagerService
             ];
         }
 
-        if (!$operatorOnly && $terminalEnabled) {
+        if ($terminalEnabled) {
             $terminalChildren = [
                 [
                     'kind' => 'link',
                     'href' => '/admin.php/platform',
                     'icon' => 'layers',
                     'text_i18n' => 'admin.menu.platform',
-                    'active' => $currentController === 'platform',
+                    'active' => self::controllerIs($currentController, 'platform'),
                 ],
                 [
                     'kind' => 'link',
                     'href' => '/admin.php/device',
                     'icon' => 'smartphone',
                     'text_i18n' => 'admin.menu.device',
-                    'active' => $currentController === 'device',
+                    'active' => self::controllerIs($currentController, 'device'),
                 ],
             ];
             $menus[] = [
@@ -1204,15 +1257,26 @@ class ModuleManagerService
             ];
         }
 
-        if (!$operatorOnly && $systemEnabled) {
-            $opsCenterActive = in_array($currentController, ['opscenter', 'clientlicense', 'clientversion', 'cache'], true);
+        if ($role === self::ROLE_SUPER_ADMIN && $systemEnabled) {
+            $opsCenterActive = self::controllerIs(
+                $currentController,
+                'opscenter',
+                'ops_center',
+                'clientlicense',
+                'client_license',
+                'clientversion',
+                'client_version',
+                'cache',
+                'downloadlog',
+                'download_log'
+            );
             $systemChildren = [
                 [
                     'kind' => 'link',
                     'href' => '/admin.php/settings',
                     'icon' => 'sliders-horizontal',
                     'text_i18n' => 'admin.menu.settings',
-                    'active' => $currentController === 'settings',
+                    'active' => self::controllerIs($currentController, 'settings'),
                 ],
                 [
                     'kind' => 'link',
@@ -1220,13 +1284,6 @@ class ModuleManagerService
                     'icon' => 'wrench',
                     'text_i18n' => 'admin.menu.opsCenter',
                     'active' => $opsCenterActive,
-                ],
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/downloadLog',
-                    'icon' => 'triangle-alert',
-                    'text_i18n' => 'admin.menu.errors',
-                    'active' => $currentController === 'downloadlog',
                     'badge' => ($badges['ops_error_total'] ?? 0) > 0 ? (string) $badges['ops_error_total'] : '',
                 ],
                 [
@@ -1234,22 +1291,15 @@ class ModuleManagerService
                     'href' => '/admin.php/user',
                     'icon' => 'users',
                     'text_i18n' => 'admin.menu.user',
-                    'active' => $currentController === 'user',
+                    'active' => self::controllerIs($currentController, 'user'),
                 ],
                 [
                     'kind' => 'link',
                     'href' => '/admin.php/extension',
                     'icon' => 'puzzle',
                     'text_i18n' => 'admin.menu.extensionManager',
-                    'active' => $currentController === 'extension',
+                    'active' => self::controllerIs($currentController, 'extension'),
                     'hidden' => !self::canManageModules($role),
-                ],
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/auth/logout',
-                    'icon' => 'log-out',
-                    'text_i18n' => 'admin.menu.logout',
-                    'active' => false,
                 ],
             ];
             $systemChildren = array_values(array_filter($systemChildren, static function ($item) {

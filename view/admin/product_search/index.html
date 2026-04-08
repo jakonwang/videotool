@@ -1,4 +1,4 @@
-{extend name="admin/common/layout" /}
+﻿{extend name="admin/common/layout" /}
 
 {block name="title"}寻款{/block}
 {block name="page_title"}{/block}
@@ -8,13 +8,51 @@
 {block name="style"}
 <style>
     .content-header { display: none; }
-    .admin-modern-card .el-table__inner-wrapper::before { height: 0; }
     .hint-box { font-size: 13px; color: #4b5563; line-height: 1.6; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
     .hint-box code { font-size: 12px; }
-    .style-img-cell { display: flex; align-items: center; min-height: 68px; }
-    .style-img-fallback { font-size: 12px; color: #6b7280; word-break: break-all; line-height: 1.45; max-width: 200px; }
     .import-log-viewer { background: #0f172a; color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.55; max-height: 240px; overflow-y: auto; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; }
     .import-log-viewer .log-line { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
+    .style-search-main-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .style-search-extra-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+    .style-search-keyword { width: 320px; max-width: 100%; }
+    .style-image-dropzone { width: 280px; max-width: 100%; min-height: 54px; border: 1px dashed #94a3b8; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; transition: all .2s ease; }
+    .style-image-dropzone:hover { border-color: #2563eb; background: #eff6ff; }
+    .style-image-dropzone.is-dragover { border-color: #16a34a; background: #f0fdf4; }
+    .style-image-dropzone.is-loading { opacity: .7; pointer-events: none; }
+    .style-image-drop-icon { width: 30px; height: 30px; border-radius: 9999px; background: #e2e8f0; color: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    .style-image-drop-text { min-width: 0; }
+    .style-image-drop-title { font-size: 13px; font-weight: 600; color: #0f172a; line-height: 1.25; }
+    .style-image-drop-sub { font-size: 12px; color: #64748b; line-height: 1.2; }
+    .style-advanced-panel { margin-top: 8px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; padding: 12px 12px 4px; }
+    .style-card-grid-wrap { min-height: 220px; }
+    .style-card-col { margin-bottom: 16px; }
+    .style-card { border-radius: 12px; overflow: hidden; }
+    .style-card-media { position: relative; width: 100%; aspect-ratio: 1 / 1; background: #f3f4f6; overflow: hidden; }
+    .style-card-media .el-image { width: 100%; height: 100%; display: block; }
+    .style-card-fallback { font-size: 12px; color: #64748b; padding: 12px; line-height: 1.45; word-break: break-all; }
+    .style-card-body { padding: 10px 12px 12px; }
+    .style-card-name { font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .style-card-code { margin-top: 4px; font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .style-card-pricing { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #334155; }
+    .style-card-pricing .value { font-size: 14px; font-weight: 600; color: #111827; line-height: 1.2; }
+    .style-card-levels { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .style-card-check { position: absolute; left: 10px; top: 10px; z-index: 4; background: rgba(255, 255, 255, .9); border-radius: 999px; padding: 2px 6px 2px 2px; }
+    .style-card-ai-btn { position: absolute; right: 10px; top: 10px; z-index: 4; border: 0; border-radius: 999px; width: 30px; height: 30px; background: rgba(15, 23, 42, .86); color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .style-card-actions-layer { position: absolute; inset: 0; z-index: 3; display: flex; gap: 8px; align-items: center; justify-content: center; background: rgba(15, 23, 42, .56); opacity: 0; pointer-events: none; transition: opacity .2s ease; padding: 10px; }
+    .style-card:hover .style-card-actions-layer { opacity: 1; pointer-events: auto; }
+    .style-detail-image-wrap { width: 180px; height: 180px; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb; background: #f8fafc; flex-shrink: 0; }
+    .style-detail-image-wrap .el-image { width: 100%; height: 100%; display: block; }
+    .style-detail-top { display: flex; gap: 14px; margin-bottom: 12px; }
+    .style-detail-top-meta { flex: 1; min-width: 0; }
+    .style-detail-ai-title { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+    .style-detail-ai-content { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #1f2937; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; }
+    @media (max-width: 768px) {
+        .style-search-keyword { width: 100%; }
+        .style-image-dropzone { width: 100%; }
+        .style-card-pricing { grid-template-columns: 1fr; }
+        .style-detail-top { flex-direction: column; }
+        .style-detail-image-wrap { width: 100%; height: 240px; }
+    }
 </style>
 {/block}
 
@@ -24,8 +62,9 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260415_i18n_fix1"></script>
+<script src="/static/i18n/i18n.js?v=20260407_product_search_cards"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
@@ -64,14 +103,34 @@
       const items = ref([]);
       const total = ref(0);
       const page = ref(1);
-      const pageSize = ref(10);
-      const query = reactive({ keyword: '' });
+      const pageSize = ref(12);
+      const query = reactive({
+        keyword: '',
+        category: '',
+        price_min: null,
+        price_max: null,
+        moq_min: null,
+      });
+      const categoryOptions = ref([]);
+      const advancedVisible = ref(false);
+      const currentRole = ref('super_admin');
+      const isAdminView = computed(() => currentRole.value !== 'viewer');
       const pythonOk = ref(false);
       const pythonDiag = ref('');
       const importing = ref(false);
-      const fileList = ref([]);
-      const tableRef = ref(null);
-      const selectedRows = ref([]);
+      const selectedIds = ref([]);
+      const selectedRows = computed(() => {
+        const idSet = new Set(selectedIds.value.map((v) => Number(v)));
+        return items.value.filter((row) => idSet.has(Number(row.id)));
+      });
+      const allCurrentSelected = computed(() => {
+        if (!items.value.length) return false;
+        const idSet = new Set(selectedIds.value.map((v) => Number(v)));
+        return items.value.every((row) => idSet.has(Number(row.id)));
+      });
+      const imageSearchInputRef = ref(null);
+      const imageSearching = ref(false);
+      const imageDragOver = ref(false);
       const batchDeleting = ref(false);
       const visionDescribeOnImport = ref(false);
       const visionDescCount = ref(0);
@@ -84,6 +143,10 @@
       const importLogs = ref([]);
       const importDone = ref(false);
       const importPollError = ref('');
+      const detailVisible = ref(false);
+      const detailRow = ref(null);
+      const aiDialogVisible = ref(false);
+      const aiDialogRow = ref(null);
       let importPollTimer = null;
 
       function stopImportPolling() {
@@ -178,21 +241,75 @@
         loop();
       }
 
+      function toNumberOrNull(v) {
+        if (v === '' || v === null || v === undefined) return null;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function formatPrice(v) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return String(v || '');
+        return n.toFixed(2);
+      }
+
+      function parsePriceLevels(raw) {
+        if (!raw) return {};
+        try {
+          const parsed = typeof raw === 'object' ? raw : JSON.parse(String(raw));
+          if (parsed && typeof parsed === 'object') return parsed;
+        } catch (_) {}
+        return {};
+      }
+
+      function buildLevelBadges(raw) {
+        const levels = parsePriceLevels(raw);
+        const fixed = ['level1', 'level2', 'level3'];
+        const typeMap = { level1: 'success', level2: 'warning', level3: 'danger' };
+        const badges = [];
+        fixed.forEach((key) => {
+          if (levels[key] === undefined || levels[key] === null || levels[key] === '') return;
+          badges.push({ key, type: typeMap[key], text: key.toUpperCase() + ': ' + formatPrice(levels[key]) });
+        });
+        Object.keys(levels).forEach((key) => {
+          if (fixed.includes(key)) return;
+          const v = levels[key];
+          if (v === undefined || v === null || v === '') return;
+          badges.push({ key, type: 'info', text: key + ': ' + formatPrice(v) });
+        });
+        return badges;
+      }
+
+      function normalizeRow(row) {
+        const safe = row || {};
+        return { ...safe, level_badges: buildLevelBadges(safe.price_levels_json || '') };
+      }
+
       async function fetchList() {
         loading.value = true;
         try {
           const p = new URLSearchParams();
           p.set('page', String(page.value));
           p.set('page_size', String(pageSize.value));
-          if (query.keyword) p.set('keyword', query.keyword);
+          if (String(query.keyword || '').trim()) p.set('keyword', String(query.keyword || '').trim());
+          if (String(query.category || '').trim()) p.set('category', String(query.category || '').trim());
+          const priceMin = toNumberOrNull(query.price_min);
+          const priceMax = toNumberOrNull(query.price_max);
+          const moqMin = toNumberOrNull(query.moq_min);
+          if (priceMin !== null) p.set('price_min', String(priceMin));
+          if (priceMax !== null) p.set('price_max', String(priceMax));
+          if (moqMin !== null && moqMin > 0) p.set('moq_min', String(Math.floor(moqMin)));
           const res = await fetch('/admin.php/product_search/listJson?' + p.toString(), {
             credentials: 'same-origin',
             headers: { ...apiFetchHeaders },
           });
           const json = parseJsonBody(res, await res.text());
           if (!json || json.code !== 0) throw new Error(json && json.msg ? json.msg : tt('page.styleSearch.loadFail'));
-          items.value = (json.data && json.data.items) ? json.data.items : [];
+          const list = (json.data && json.data.items) ? json.data.items : [];
+          items.value = Array.isArray(list) ? list.map(normalizeRow) : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
+          categoryOptions.value = Array.isArray(json.data && json.data.category_options) ? json.data.category_options : [];
+          currentRole.value = String((json.data && json.data.current_role) || 'super_admin');
           pythonOk.value = !!(json.data && json.data.python_ok);
           pythonDiag.value = (json.data && json.data.python_diag) ? String(json.data.python_diag) : '';
           visionDescribeOnImport.value = !!(json.data && json.data.vision_describe_on_import);
@@ -201,11 +318,32 @@
           visionAnyProviderReady.value = json.data && json.data.vision_any_provider_ready != null
             ? !!json.data.vision_any_provider_ready
             : true;
+          const pageIdSet = new Set(items.value.map((row) => Number(row.id)));
+          selectedIds.value = selectedIds.value.filter((id) => pageIdSet.has(Number(id)));
         } catch (e) {
           ElMessage.error(e.message || tt('page.styleSearch.loadFail'));
         } finally {
           loading.value = false;
         }
+      }
+
+      function triggerSearch() {
+        page.value = 1;
+        fetchList();
+      }
+
+      function resetFilters() {
+        query.keyword = '';
+        query.category = '';
+        query.price_min = null;
+        query.price_max = null;
+        query.moq_min = null;
+        page.value = 1;
+        fetchList();
+      }
+
+      function toggleAdvanced() {
+        advancedVisible.value = !advancedVisible.value;
       }
 
       async function doImport() {
@@ -303,8 +441,27 @@
         }
       }
 
-      function onSelectionChange(rows) {
-        selectedRows.value = rows || [];
+      function isRowSelected(id) {
+        return selectedIds.value.includes(Number(id));
+      }
+
+      function toggleRowSelected(id, checked) {
+        const sid = Number(id);
+        const set = new Set(selectedIds.value.map((v) => Number(v)));
+        if (checked) {
+          set.add(sid);
+        } else {
+          set.delete(sid);
+        }
+        selectedIds.value = Array.from(set);
+      }
+
+      function toggleSelectAllCurrent(checked) {
+        if (checked) {
+          selectedIds.value = items.value.map((row) => Number(row.id));
+        } else {
+          selectedIds.value = [];
+        }
       }
 
       async function doBatchDelete() {
@@ -351,8 +508,7 @@
             msg: json.msg || tt('common.done'),
             n: json.data && json.data.deleted != null ? json.data.deleted : ids.length,
           }));
-          selectedRows.value = [];
-          tableRef.value && typeof tableRef.value.clearSelection === 'function' && tableRef.value.clearSelection();
+          selectedIds.value = [];
           fetchList();
         } catch (e) {
           ElMessage.error(e.message || tt('page.styleSearch.batchDeleteFail'));
@@ -394,6 +550,82 @@
         }
       }
 
+      function triggerImageSearchInput() {
+        if (imageSearching.value) return;
+        const input = imageSearchInputRef.value;
+        if (input) input.click();
+      }
+
+      function onImageDragOver() {
+        imageDragOver.value = true;
+      }
+
+      function onImageDragLeave() {
+        imageDragOver.value = false;
+      }
+
+      function onImageDrop(e) {
+        imageDragOver.value = false;
+        const file = e && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0] ? e.dataTransfer.files[0] : null;
+        if (file) runImageSearch(file);
+      }
+
+      function onImageSearchInputChange(e) {
+        const file = e && e.target && e.target.files && e.target.files[0] ? e.target.files[0] : null;
+        if (e && e.target) e.target.value = '';
+        if (file) runImageSearch(file);
+      }
+
+      function isValidImageFile(file) {
+        if (!file) return false;
+        const type = String(file.type || '').toLowerCase();
+        if (type.startsWith('image/')) return true;
+        const name = String(file.name || '').toLowerCase();
+        return /\.(png|jpe?g|webp|gif|bmp)$/i.test(name);
+      }
+
+      async function runImageSearch(file) {
+        if (!isValidImageFile(file)) {
+          ElMessage.warning(tt('page.styleSearch.imageSearchPickImage'));
+          return;
+        }
+        imageSearching.value = true;
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const hint = String(query.keyword || '').trim();
+          if (hint !== '') fd.append('hint', hint);
+          const res = await fetch('/index.php/api/product_search/searchByImage', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (!json || json.code !== 0) {
+            throw new Error((json && json.msg) || tt('page.styleSearch.imageSearchFail'));
+          }
+          const data = json.data || {};
+          const list = Array.isArray(data.items) ? data.items : [];
+          const matchedCode = String(data.matched_code || '').trim();
+          const firstCode = list.length > 0 ? String((list[0] && list[0].product_code) || '').trim() : '';
+          const finalCode = matchedCode || firstCode;
+          if (finalCode) {
+            query.keyword = finalCode;
+            page.value = 1;
+            await fetchList();
+            ElMessage.success(tt('page.styleSearch.imageSearchMatched', { code: finalCode }));
+          } else {
+            await fetchList();
+            ElMessage.success(tt('page.styleSearch.imageSearchDone'));
+          }
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.styleSearch.imageSearchFail'));
+        } finally {
+          imageSearching.value = false;
+        }
+      }
+
       /** 可直链预览的图片地址（http(s)、站内 /、data:image） */
       function imageDisplayUrl(ref) {
         const s = String(ref || '').trim();
@@ -408,10 +640,83 @@
         return imageDisplayUrl(ref) !== '';
       }
 
+      function openDetail(row) {
+        detailRow.value = row || null;
+        detailVisible.value = true;
+      }
+
+      function openAiDialog(row) {
+        aiDialogRow.value = row || null;
+        aiDialogVisible.value = true;
+      }
+
+      function aiText(row) {
+        return String((row && row.ai_description) || (row && row.ai_description_short) || '').trim();
+      }
+
+      async function copyText(text) {
+        const v = String(text || '');
+        if (!v) return false;
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && window.isSecureContext) {
+          await navigator.clipboard.writeText(v);
+          return true;
+        }
+        const ta = document.createElement('textarea');
+        ta.value = v;
+        ta.setAttribute('readonly', 'readonly');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return !!ok;
+      }
+
+      async function copyAiToZalo(row) {
+        const text = aiText(row || aiDialogRow.value);
+        if (!text) {
+          ElMessage.warning(tt('page.styleSearch.aiEmpty'));
+          return;
+        }
+        try {
+          const ok = await copyText(text);
+          if (!ok) throw new Error('copy-failed');
+          ElMessage.success(tt('page.styleSearch.aiCopied'));
+        } catch (_) {
+          ElMessage.error(tt('common.copyFail'));
+        }
+      }
+
       const editVisible = ref(false);
       const editSaving = ref(false);
       const editImageInputKey = ref(0);
-      const editForm = reactive({ id: 0, product_code: '', hot_type: '', image_ref: '', wholesale_price: 0, min_order_qty: 1 });
+      const editForm = reactive({
+        id: 0,
+        product_code: '',
+        hot_type: '',
+        image_ref: '',
+        wholesale_price: 0,
+        min_order_qty: 1,
+        price_levels_json: '',
+      });
+      const tokenDialogVisible = ref(false);
+      const tokenLoading = ref(false);
+      const tokenForm = reactive({
+        price_level: 'level1',
+        expire_days: 30,
+        url: '',
+        expire_at_text: '',
+      });
+      const shareDialogVisible = ref(false);
+      const shareLoading = ref(false);
+      const shareForm = reactive({
+        price_level: 'level1',
+        expire_days: 30,
+      });
+      const shareSourceRow = ref(null);
+      const sharePosterDataUrl = ref('');
 
       function openEdit(row) {
         editForm.id = row.id;
@@ -420,6 +725,7 @@
         editForm.image_ref = row.image_ref || '';
         editForm.wholesale_price = Number(row.wholesale_price || 0);
         editForm.min_order_qty = Math.max(1, Number(row.min_order_qty || 1));
+        editForm.price_levels_json = String(row.price_levels_json || '');
         editImageInputKey.value++;
         editVisible.value = true;
       }
@@ -437,6 +743,7 @@
           fd.append('hot_type', String(editForm.hot_type || '').trim());
           fd.append('wholesale_price', String(Number(editForm.wholesale_price || 0)));
           fd.append('min_order_qty', String(Math.max(1, Number(editForm.min_order_qty || 1))));
+          fd.append('price_levels_json', String(editForm.price_levels_json || '').trim());
           fd.append('image_ref', String(editForm.image_ref || '').trim());
           if (input && input.files && input.files[0]) {
             fd.append('image', input.files[0]);
@@ -473,18 +780,204 @@
         }
       }
 
+      async function requestCatalogToken(priceLevel, expireDays) {
+        const body = new URLSearchParams();
+        body.set('price_level', String(priceLevel || 'level1').trim() || 'level1');
+        body.set('expire_days', String(Math.max(1, Number(expireDays || 30))));
+        const res = await fetch('/admin.php/product_search/generateCatalogToken', {
+          method: 'POST',
+          headers: { ...apiFetchHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          credentials: 'same-origin',
+          body: body.toString(),
+        });
+        const json = parseJsonBody(res, await res.text());
+        if (!json || json.code !== 0) {
+          throw new Error((json && json.msg) || tt('page.styleSearch.fail'));
+        }
+        return json.data || {};
+      }
+
+      function openTokenDialog() {
+        tokenForm.price_level = 'level1';
+        tokenForm.expire_days = 30;
+        tokenForm.url = '';
+        tokenForm.expire_at_text = '';
+        tokenDialogVisible.value = true;
+      }
+
+      async function generateTokenLink() {
+        tokenLoading.value = true;
+        try {
+          const data = await requestCatalogToken(tokenForm.price_level, tokenForm.expire_days);
+          tokenForm.url = window.location.origin + String(data.url || '');
+          tokenForm.expire_at_text = String(data.expire_at_text || '');
+          ElMessage.success(tt('common.done'));
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.styleSearch.fail'));
+        } finally {
+          tokenLoading.value = false;
+        }
+      }
+
+      async function copyTokenLink() {
+        if (!tokenForm.url) {
+          ElMessage.warning(tt('page.styleSearch.generateTokenFirst'));
+          return;
+        }
+        try {
+          const ok = await copyText(tokenForm.url);
+          if (!ok) throw new Error('copy-failed');
+          ElMessage.success(tt('common.copyDone'));
+        } catch (_) {
+          ElMessage.error(tt('common.copyFail'));
+        }
+      }
+
+      function openSharePoster(row) {
+        shareSourceRow.value = row || null;
+        shareForm.price_level = 'level1';
+        shareForm.expire_days = 30;
+        sharePosterDataUrl.value = '';
+        shareDialogVisible.value = true;
+      }
+
+      function loadImage(url) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(tt('page.styleSearch.imgLoadFail')));
+          img.src = String(url || '');
+        });
+      }
+
+      function drawContain(ctx, img, x, y, w, h) {
+        const iw = Number(img.width || 0);
+        const ih = Number(img.height || 0);
+        if (iw <= 0 || ih <= 0) return;
+        const scale = Math.min(w / iw, h / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        const dx = x + (w - dw) / 2;
+        const dy = y + (h - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+
+      async function buildSharePoster() {
+        if (!shareSourceRow.value) {
+          ElMessage.warning(tt('common.noData'));
+          return;
+        }
+        if (!window.QRCode || typeof window.QRCode.toDataURL !== 'function') {
+          ElMessage.error(tt('page.styleSearch.qrLibMissing'));
+          return;
+        }
+        shareLoading.value = true;
+        try {
+          const tokenData = await requestCatalogToken(shareForm.price_level, shareForm.expire_days);
+          const catalogUrl = window.location.origin + String(tokenData.url || '');
+          const qrDataUrl = await window.QRCode.toDataURL(catalogUrl, {
+            width: 320,
+            margin: 1,
+            color: { dark: '#0f172a', light: '#ffffff' },
+          });
+
+          const row = shareSourceRow.value;
+          const imageUrl = imageDisplayUrl(row.image_ref) || String(row.image_ref || '');
+          const [img, qr] = await Promise.all([loadImage(imageUrl), loadImage(qrDataUrl)]);
+          const canvas = document.createElement('canvas');
+          canvas.width = 1080;
+          canvas.height = 1600;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error(tt('page.styleSearch.fail'));
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 52px sans-serif';
+          ctx.fillText(tt('page.styleSearch.posterTitle'), 70, 96);
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(60, 140, 960, 920);
+          drawContain(ctx, img, 70, 150, 940, 900);
+
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 42px sans-serif';
+          ctx.fillText(String(row.product_code || '-'), 70, 1128);
+
+          const priceValue = Number(row.wholesale_price || 0);
+          ctx.fillStyle = '#334155';
+          ctx.font = '36px sans-serif';
+          ctx.fillText(tt('page.styleSearch.posterPrice', { price: priceValue.toFixed(2).replace(/\\.00$/, '') }), 70, 1184);
+          ctx.fillText(tt('page.styleSearch.posterMinOrder', { qty: Number(row.min_order_qty || 1) }), 70, 1230);
+
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillRect(660, 1090, 330, 330);
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.strokeRect(660, 1090, 330, 330);
+          drawContain(ctx, qr, 675, 1105, 300, 300);
+
+          ctx.fillStyle = '#334155';
+          ctx.font = '24px sans-serif';
+          ctx.fillText(tt('page.styleSearch.posterScanHint'), 690, 1450);
+
+          sharePosterDataUrl.value = canvas.toDataURL('image/png');
+          ElMessage.success(tt('page.styleSearch.posterReady'));
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.styleSearch.fail'));
+        } finally {
+          shareLoading.value = false;
+        }
+      }
+
+      function downloadSharePoster() {
+        if (!sharePosterDataUrl.value) {
+          ElMessage.warning(tt('page.styleSearch.buildPosterFirst'));
+          return;
+        }
+        const code = shareSourceRow.value && shareSourceRow.value.product_code ? String(shareSourceRow.value.product_code) : 'style';
+        const a = document.createElement('a');
+        a.href = sharePosterDataUrl.value;
+        a.download = code + '_share_poster.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      function formatCurrency(v) {
+        const n = Number(v || 0);
+        if (!Number.isFinite(n)) return '0.00';
+        return n.toFixed(2);
+      }
+
+      function formatQty(v) {
+        const n = Number(v || 1);
+        if (!Number.isFinite(n) || n <= 0) return '1';
+        return String(Math.floor(n));
+      }
+
       onMounted(() => { fetchList(); });
       onUnmounted(() => { stopImportPolling(); });
 
       return {
-        loading, items, total, page, pageSize, query, pythonOk, pythonDiag, importing,
+        loading, items, total, page, pageSize, query, categoryOptions, advancedVisible, currentRole, isAdminView,
+        pythonOk, pythonDiag, importing,
         importDialogVisible, importTaskId, importPercent, importStatusText, importLogs, importDone, importPollError,
         closeImportDialog,
-        tableRef, selectedRows, batchDeleting,
+        selectedRows, allCurrentSelected, batchDeleting, isRowSelected, toggleRowSelected, toggleSelectAllCurrent,
+        imageSearchInputRef, imageSearching, imageDragOver,
         visionDescribeOnImport, visionDescCount, volcArkEnabled, visionAnyProviderReady,
+        detailVisible, detailRow, aiDialogVisible, aiDialogRow,
         editVisible, editSaving, editImageInputKey, editForm,
-        fetchList, doImport, doDelete, doBatchDelete, onSelectionChange, openEdit, saveEdit, openH5, openCatalogH5, copyCatalogLink, lang, tt,
-        imageDisplayUrl, isImagePreviewable,
+        tokenDialogVisible, tokenLoading, tokenForm,
+        shareDialogVisible, shareLoading, shareForm, shareSourceRow, sharePosterDataUrl,
+        fetchList, triggerSearch, resetFilters, toggleAdvanced,
+        doImport, doDelete, doBatchDelete, openEdit, saveEdit, openH5, openCatalogH5, copyCatalogLink, lang, tt,
+        triggerImageSearchInput, onImageDragOver, onImageDragLeave, onImageDrop, onImageSearchInputChange,
+        openDetail, openAiDialog, aiText, copyAiToZalo,
+        openTokenDialog, generateTokenLink, copyTokenLink,
+        openSharePoster, buildSharePoster, downloadSharePoster,
+        imageDisplayUrl, isImagePreviewable, formatCurrency, formatQty,
       };
     },
     template: `
@@ -495,8 +988,9 @@
             <div style="font-size:18px;font-weight:600;color:#111827;">{{ tt('page.styleSearch.pageTitle') }}</div>
             <div class="admin-action-buttons">
               <el-button type="default" @click="openH5">{{ tt('page.styleSearch.openH5') }}</el-button>
-              <el-button type="default" @click="openCatalogH5">{{ tt('common.open') }} Catalog</el-button>
+              <el-button type="default" @click="openCatalogH5">{{ tt('page.styleSearch.openCatalogH5') }}</el-button>
               <el-button type="default" @click="copyCatalogLink">{{ tt('page.product.copyLink') }}</el-button>
+              <el-button type="default" @click="openTokenDialog">{{ tt('page.styleSearch.customerCatalogLink') }}</el-button>
               <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/sampleCsv" style="border-radius:8px;">{{ tt('page.styleSearch.sampleCsv') }}</a>
               <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/exportCsv" rel="noopener" style="border-radius:8px;">{{ tt('page.styleSearch.exportCsv') }}</a>
             </div>
@@ -522,70 +1016,109 @@
         </div>
 
         <div class="admin-filter-section">
-          <div class="admin-custom-form">
-            <el-input v-model="query.keyword" clearable size="default" :placeholder="tt('page.styleSearch.phProductCode')" style="width:220px;" @keyup.enter="fetchList" />
-            <div class="admin-filter-buttons">
-              <el-button type="primary" @click="()=>{page=1;fetchList();}">{{ tt('common.filter') }}</el-button>
-              <input id="csvFileInput" type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:240px;" />
-              <el-button type="success" :loading="importing" @click="doImport">{{ tt('common.import') }}</el-button>
-              <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">{{ tt('page.styleSearch.batchDelete') }}</el-button>
+          <div class="style-search-main-row">
+            <div class="style-image-dropzone"
+              :class="{ 'is-dragover': imageDragOver, 'is-loading': imageSearching }"
+              @click="triggerImageSearchInput"
+              @dragover.prevent="onImageDragOver"
+              @dragleave.prevent="onImageDragLeave"
+              @drop.prevent="onImageDrop"
+            >
+              <input ref="imageSearchInputRef" type="file" accept="image/*" style="display:none;" @change="onImageSearchInputChange" />
+              <div class="style-image-drop-icon">{{ tt('page.styleSearch.imageSearchBadge') }}</div>
+              <div class="style-image-drop-text">
+                <div class="style-image-drop-title">{{ imageSearching ? tt('page.styleSearch.imageSearching') : tt('page.styleSearch.imageSearchTitle') }}</div>
+                <div class="style-image-drop-sub">{{ tt('page.styleSearch.imageSearchSubtitle') }}</div>
+              </div>
             </div>
+            <el-input v-model="query.keyword" clearable size="default" class="style-search-keyword"
+              :placeholder="tt('page.styleSearch.keywordPlaceholder')" @keyup.enter="triggerSearch" />
+            <el-button type="primary" @click="triggerSearch">{{ tt('common.filter') }}</el-button>
+            <el-button @click="resetFilters">{{ tt('common.reset') }}</el-button>
+            <el-button text @click="toggleAdvanced">{{ advancedVisible ? tt('page.styleSearch.hideAdvanced') : tt('page.styleSearch.showAdvanced') }}</el-button>
           </div>
+          <div class="style-search-extra-row">
+            <input id="csvFileInput" type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:240px;" />
+            <el-button type="success" :loading="importing" @click="doImport">{{ tt('common.import') }}</el-button>
+            <el-checkbox :model-value="allCurrentSelected" @change="toggleSelectAllCurrent">{{ tt('page.styleSearch.selectCurrentPage') }}</el-checkbox>
+            <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">
+              {{ tt('page.styleSearch.batchDelete') }} ({{ selectedRows.length }})
+            </el-button>
+          </div>
+          <el-collapse-transition>
+            <div v-show="advancedVisible" class="style-advanced-panel">
+              <el-form :inline="true" label-position="top" @submit.prevent>
+                <el-form-item :label="tt('page.styleSearch.filterCategory')">
+                  <el-select v-model="query.category" clearable :placeholder="tt('page.styleSearch.filterCategoryAll')" style="width:180px;">
+                    <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item :label="tt('page.styleSearch.filterPriceMin')">
+                  <el-input-number v-model="query.price_min" :min="0" :step="1" controls-position="right" style="width:160px;" />
+                </el-form-item>
+                <el-form-item :label="tt('page.styleSearch.filterPriceMax')">
+                  <el-input-number v-model="query.price_max" :min="0" :step="1" controls-position="right" style="width:160px;" />
+                </el-form-item>
+                <el-form-item :label="tt('page.styleSearch.filterMoqMin')">
+                  <el-input-number v-model="query.moq_min" :min="1" :step="1" controls-position="right" style="width:160px;" />
+                </el-form-item>
+              </el-form>
+            </div>
+          </el-collapse-transition>
         </div>
 
-        <el-table ref="tableRef" :data="items" stripe v-loading="loading" row-key="id" @selection-change="onSelectionChange">
-          <el-table-column type="selection" width="48" reserve-selection />
-          <el-table-column prop="id" label="ID" width="70" />
-          <el-table-column prop="product_code" :label="tt('page.styleSearch.phProductCode')" min-width="120" />
-          <el-table-column :label="tt('page.styleSearch.colRefImage')" min-width="120" width="120">
-            <template #default="{ row }">
-              <div class="style-img-cell">
-                <el-image
-                  v-if="isImagePreviewable(row.image_ref)"
-                  :src="imageDisplayUrl(row.image_ref)"
-                  :preview-src-list="[imageDisplayUrl(row.image_ref)]"
-                  fit="cover"
-                  lazy
-                  preview-teleported
-                  style="width:64px;height:64px;border-radius:8px;border:1px solid #e5e7eb;cursor:zoom-in;"
-                >
-                  <template #error>
-                    <div class="style-img-fallback" style="max-width:100px;">{{ tt('page.styleSearch.imgLoadFail') }}</div>
-                  </template>
-                </el-image>
-                <div v-else class="style-img-fallback" :title="row.image_ref">{{ row.image_ref }}</div>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="hot_type" :label="tt('page.styleSearch.colHotType')" width="120" />
-          <el-table-column label="批发价" width="100">
-            <template #default="{ row }">
-              <span>{{ Number(row.wholesale_price || 0).toFixed(2) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="起批量" width="90">
-            <template #default="{ row }">
-              <span>{{ Number(row.min_order_qty || 1) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column :label="tt('page.styleSearch.colAi')" min-width="160" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span style="font-size:12px;color:#374151;">{{ row.ai_description_short || tt('page.styleSearch.emDash') }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column :label="tt('page.styleSearch.colEmb')" width="80">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.has_embedding ? 'success' : 'danger'">{{ row.has_embedding ? tt('page.styleSearch.embOk') : tt('page.styleSearch.embNo') }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" :label="tt('page.styleSearch.colImportedAt')" width="170" />
-          <el-table-column :label="tt('page.styleSearch.colActions')" width="130" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="openEdit(row)">{{ tt('common.edit') }}</el-button>
-              <el-button link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <div class="style-card-grid-wrap" v-loading="loading">
+          <el-row :gutter="16">
+            <el-col v-for="row in items" :key="row.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="6" class="style-card-col">
+              <el-card class="style-card" shadow="hover" :body-style="{ padding: '0' }">
+                <div class="style-card-media">
+                  <el-image
+                    v-if="isImagePreviewable(row.image_ref)"
+                    :src="imageDisplayUrl(row.image_ref)"
+                    :preview-src-list="[imageDisplayUrl(row.image_ref)]"
+                    fit="cover"
+                    lazy
+                    preview-teleported
+                    style="cursor:zoom-in;"
+                  >
+                    <template #error>
+                      <div class="style-card-fallback">{{ tt('page.styleSearch.imgLoadFail') }}</div>
+                    </template>
+                  </el-image>
+                  <div v-else class="style-card-fallback">{{ row.image_ref || tt('page.styleSearch.emDash') }}</div>
+
+                  <el-checkbox class="style-card-check" :model-value="isRowSelected(row.id)" @change="(v)=>toggleRowSelected(row.id, v)" @click.stop />
+                  <button type="button" class="style-card-ai-btn" @click.stop="openAiDialog(row)">AI</button>
+
+                  <div class="style-card-actions-layer">
+                    <el-button size="small" @click.stop="openDetail(row)">{{ tt('page.styleSearch.btnDetail') }}</el-button>
+                    <el-button size="small" type="primary" @click.stop="openEdit(row)">{{ tt('common.edit') }}</el-button>
+                    <el-button size="small" type="success" @click.stop="openSharePoster(row)">{{ tt('page.styleSearch.sharePoster') }}</el-button>
+                    <el-button size="small" type="danger" @click.stop="doDelete(row)">{{ tt('common.delete') }}</el-button>
+                  </div>
+                </div>
+                <div class="style-card-body">
+                  <div class="style-card-name">{{ row.hot_type || tt('page.styleSearch.unnamedStyle') }}</div>
+                  <div class="style-card-code">{{ tt('page.styleSearch.codePrefix') }}{{ row.product_code || tt('page.styleSearch.emDash') }}</div>
+                  <div class="style-card-pricing">
+                    <div>
+                      <div>{{ tt('page.styleSearch.colWholesalePrice') }}</div>
+                      <div class="value">{{ formatCurrency(row.wholesale_price) }}</div>
+                    </div>
+                    <div>
+                      <div>{{ tt('page.styleSearch.colMinOrderQty') }}</div>
+                      <div class="value">{{ formatQty(row.min_order_qty) }}</div>
+                    </div>
+                  </div>
+                  <div v-if="isAdminView && row.level_badges && row.level_badges.length" class="style-card-levels">
+                    <el-tag v-for="badge in row.level_badges" :key="badge.key" size="small" effect="light" :type="badge.type">{{ badge.text }}</el-tag>
+                  </div>
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
+          <el-empty v-if="!loading && !items.length" :description="tt('common.noData')" />
+        </div>
 
         <el-dialog v-model="importDialogVisible" :title="tt('page.styleSearch.importDlgTitle')" width="560px" destroy-on-close align-center @closed="closeImportDialog">
           <div style="margin-bottom:12px;font-size:13px;color:#475569;">{{ tt('page.styleSearch.importTaskLabel') }} {{ importTaskId }} · {{ importStatusText }}</div>
@@ -601,6 +1134,50 @@
           </template>
         </el-dialog>
 
+        <el-dialog v-model="detailVisible" :title="tt('page.styleSearch.detailTitle')" width="760px" destroy-on-close align-center>
+          <div v-if="detailRow">
+            <div class="style-detail-top">
+              <div class="style-detail-image-wrap">
+                <el-image
+                  v-if="isImagePreviewable(detailRow.image_ref)"
+                  :src="imageDisplayUrl(detailRow.image_ref)"
+                  :preview-src-list="[imageDisplayUrl(detailRow.image_ref)]"
+                  fit="cover"
+                  preview-teleported
+                  style="cursor:zoom-in;"
+                />
+                <div v-else class="style-card-fallback">{{ detailRow.image_ref || tt('page.styleSearch.emDash') }}</div>
+              </div>
+              <div class="style-detail-top-meta">
+                <el-descriptions :column="2" border size="small">
+                  <el-descriptions-item :label="tt('page.styleSearch.labelProductCode')">{{ detailRow.product_code || tt('page.styleSearch.emDash') }}</el-descriptions-item>
+                  <el-descriptions-item :label="tt('page.styleSearch.labelHotType')">{{ detailRow.hot_type || tt('page.styleSearch.emDash') }}</el-descriptions-item>
+                  <el-descriptions-item :label="tt('page.styleSearch.colWholesalePrice')">{{ formatCurrency(detailRow.wholesale_price) }}</el-descriptions-item>
+                  <el-descriptions-item :label="tt('page.styleSearch.colMinOrderQty')">{{ formatQty(detailRow.min_order_qty) }}</el-descriptions-item>
+                  <el-descriptions-item :label="tt('page.styleSearch.colImportedAt')">{{ detailRow.created_at || tt('page.styleSearch.emDash') }}</el-descriptions-item>
+                  <el-descriptions-item :label="tt('page.styleSearch.detailUpdatedAt')">{{ detailRow.updated_at || tt('page.styleSearch.emDash') }}</el-descriptions-item>
+                </el-descriptions>
+              </div>
+            </div>
+            <div>
+              <div class="style-detail-ai-title">{{ tt('page.styleSearch.aiSellingPoints') }}</div>
+              <div class="style-detail-ai-content">{{ aiText(detailRow) || tt('page.styleSearch.aiEmpty') }}</div>
+            </div>
+          </div>
+          <template #footer>
+            <el-button @click="detailVisible = false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" @click="copyAiToZalo(detailRow)">{{ tt('page.styleSearch.copyToZalo') }}</el-button>
+          </template>
+        </el-dialog>
+
+        <el-dialog v-model="aiDialogVisible" :title="tt('page.styleSearch.aiSellingPoints')" width="560px" destroy-on-close align-center>
+          <div class="style-detail-ai-content" style="max-height:320px;">{{ aiText(aiDialogRow) || tt('page.styleSearch.aiEmpty') }}</div>
+          <template #footer>
+            <el-button @click="aiDialogVisible = false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" @click="copyAiToZalo(aiDialogRow)">{{ tt('page.styleSearch.copyToZalo') }}</el-button>
+          </template>
+        </el-dialog>
+
         <el-dialog v-model="editVisible" :title="tt('page.styleSearch.editTitle')" width="520px" destroy-on-close align-center>
           <el-form label-width="96px" @submit.prevent>
             <el-form-item :label="tt('page.styleSearch.labelProductCode')">
@@ -609,11 +1186,17 @@
             <el-form-item :label="tt('page.styleSearch.labelHotType')">
               <el-input v-model="editForm.hot_type" maxlength="200" :placeholder="tt('page.styleSearch.phOptional')" />
             </el-form-item>
-            <el-form-item label="批发价">
+            <el-form-item :label="tt('page.styleSearch.colWholesalePrice')">
               <el-input-number v-model="editForm.wholesale_price" :min="0" :step="0.1" :precision="2" style="width:100%;" />
             </el-form-item>
-            <el-form-item label="起批量">
+            <el-form-item :label="tt('page.styleSearch.colMinOrderQty')">
               <el-input-number v-model="editForm.min_order_qty" :min="1" :step="1" style="width:100%;" />
+            </el-form-item>
+            <el-form-item :label="tt('page.styleSearch.priceLevelsJsonLabel')">
+              <el-input v-model="editForm.price_levels_json" type="textarea" :rows="3" :placeholder="tt('page.styleSearch.priceLevelsJsonPh')" />
+              <div style="margin-top:8px;font-size:12px;color:#6b7280;line-height:1.5;">
+                {{ tt('page.styleSearch.priceLevelsJsonHint') }}
+              </div>
             </el-form-item>
             <el-form-item :label="tt('page.styleSearch.labelRefImage')">
               <el-input v-model="editForm.image_ref" type="textarea" :rows="3" :placeholder="tt('page.styleSearch.phImageRef')" />
@@ -627,6 +1210,50 @@
           <template #footer>
             <el-button @click="editVisible = false">{{ tt('common.cancel') }}</el-button>
             <el-button type="primary" :loading="editSaving" @click="saveEdit">{{ tt('common.save') }}</el-button>
+          </template>
+        </el-dialog>
+
+        <el-dialog v-model="tokenDialogVisible" :title="tt('page.styleSearch.tokenDialogTitle')" width="560px" destroy-on-close align-center>
+          <el-form label-width="132px" @submit.prevent>
+            <el-form-item :label="tt('page.styleSearch.tokenPriceLevel')">
+              <el-input v-model="tokenForm.price_level" :placeholder="tt('page.styleSearch.tokenPriceLevelPh')" />
+            </el-form-item>
+            <el-form-item :label="tt('page.styleSearch.tokenExpireDays')">
+              <el-input-number v-model="tokenForm.expire_days" :min="1" :max="3650" :step="1" style="width:100%;" />
+            </el-form-item>
+            <el-form-item :label="tt('page.styleSearch.customerCatalogLink')">
+              <el-input v-model="tokenForm.url" readonly :placeholder="tt('page.styleSearch.generateTokenFirst')" />
+            </el-form-item>
+            <el-form-item :label="tt('page.styleSearch.expireAt')">
+              <el-input v-model="tokenForm.expire_at_text" readonly />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="tokenDialogVisible = false">{{ tt('common.cancel') }}</el-button>
+            <el-button :loading="tokenLoading" @click="generateTokenLink">{{ tt('page.styleSearch.generateToken') }}</el-button>
+            <el-button type="primary" @click="copyTokenLink">{{ tt('common.copy') }}</el-button>
+          </template>
+        </el-dialog>
+
+        <el-dialog v-model="shareDialogVisible" :title="tt('page.styleSearch.sharePoster')" width="680px" destroy-on-close align-center>
+          <el-form label-width="132px" @submit.prevent>
+            <el-form-item :label="tt('page.styleSearch.tokenPriceLevel')">
+              <el-input v-model="shareForm.price_level" :placeholder="tt('page.styleSearch.tokenPriceLevelPh')" />
+            </el-form-item>
+            <el-form-item :label="tt('page.styleSearch.tokenExpireDays')">
+              <el-input-number v-model="shareForm.expire_days" :min="1" :max="3650" :step="1" style="width:100%;" />
+            </el-form-item>
+          </el-form>
+          <div style="margin:8px 0 14px;">
+            <el-button type="primary" :loading="shareLoading" @click="buildSharePoster">{{ tt('page.styleSearch.buildPoster') }}</el-button>
+            <el-button @click="downloadSharePoster">{{ tt('page.styleSearch.downloadPoster') }}</el-button>
+          </div>
+          <div style="min-height:240px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">
+            <img v-if="sharePosterDataUrl" :src="sharePosterDataUrl" style="max-width:100%;max-height:60vh;border-radius:8px;" />
+            <span v-else style="font-size:13px;color:#6b7280;">{{ tt('page.styleSearch.buildPosterFirst') }}</span>
+          </div>
+          <template #footer>
+            <el-button @click="shareDialogVisible = false">{{ tt('page.styleSearch.close') }}</el-button>
           </template>
         </el-dialog>
 

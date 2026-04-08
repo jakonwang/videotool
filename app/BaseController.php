@@ -15,6 +15,32 @@ use think\Validate;
 abstract class BaseController
 {
     /**
+     * @var array<string, string>
+     */
+    private const ERROR_KEY_MAP = [
+        '仅支持 POST' => 'common.onlyPost',
+        'only_post' => 'common.onlyPost',
+        '无效 id' => 'common.invalidId',
+        '无效 task_id' => 'common.invalidId',
+        '无效 influencer_id' => 'common.invalidId',
+        'invalid_params' => 'common.invalidParams',
+        '参数错误' => 'common.invalidParams',
+        '参数错误' => 'common.invalidParams',
+        '记录不存在' => 'common.notFound',
+        '任务不存在' => 'common.notFound',
+        'not_found' => 'common.notFound',
+        '请上传文件' => 'common.pickFile',
+        '请选择文件' => 'common.pickFile',
+        'file_required' => 'common.pickFile',
+        'csv_only' => 'page.dataImport.csvOnly',
+        'save_failed' => 'common.saveFailed',
+        '保存失败' => 'common.saveFailed',
+        '删除失败' => 'common.deleteFailed',
+        'loading_failed' => 'common.loadingFailed',
+        '会话已过期' => 'common.sessionExpired',
+        '未登录' => 'common.sessionExpired',
+    ];
+    /**
      * Request实例
      * @var \think\Request
      */
@@ -76,6 +102,41 @@ abstract class BaseController
     // 初始化
     protected function initialize()
     {}
+
+    protected function apiJsonOk(array $data = [], string $msg = 'ok')
+    {
+        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+    }
+
+    protected function apiJsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
+    {
+        $resolvedKey = trim($errorKey);
+        if ($resolvedKey === '') {
+            $resolvedKey = $this->inferErrorKey($msg);
+        }
+
+        return json([
+            'code' => $code,
+            'msg' => $msg,
+            'error_key' => $resolvedKey,
+            'data' => $data,
+        ]);
+    }
+
+    protected function inferErrorKey(string $msg): string
+    {
+        $raw = trim($msg);
+        if ($raw === '') {
+            return '';
+        }
+        foreach (self::ERROR_KEY_MAP as $needle => $key) {
+            if (str_contains($raw, $needle)) {
+                return $key;
+            }
+        }
+
+        return '';
+    }
 
     /**
      * 验证数据
