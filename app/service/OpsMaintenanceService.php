@@ -287,14 +287,56 @@ class OpsMaintenanceService
 
     private static function resolvePhpBin(): string
     {
+        $candidates = [];
+
         $envPhp = trim((string) getenv('OPS_PHP_BIN'));
         if ($envPhp !== '') {
-            return $envPhp;
+            $candidates[] = $envPhp;
         }
-        $bin = trim((string) PHP_BINARY);
-        if ($bin !== '') {
-            return $bin;
+
+        $currentBin = trim((string) PHP_BINARY);
+        if ($currentBin !== '' && !self::isFpmBinary($currentBin)) {
+            $candidates[] = $currentBin;
         }
+
+        $phpBindir = rtrim((string) PHP_BINDIR, "\\/");
+        if ($phpBindir !== '') {
+            $candidates[] = $phpBindir . DIRECTORY_SEPARATOR . 'php';
+            if (DIRECTORY_SEPARATOR === '\\') {
+                $candidates[] = $phpBindir . DIRECTORY_SEPARATOR . 'php.exe';
+            }
+        }
+
+        $pathPhp = self::detectPhpFromPath();
+        if ($pathPhp !== '') {
+            $candidates[] = $pathPhp;
+        }
+
+        if (DIRECTORY_SEPARATOR === '/') {
+            $candidates[] = '/usr/bin/php';
+            $candidates[] = '/usr/local/bin/php';
+            $candidates[] = '/opt/php/bin/php';
+            $candidates[] = '/www/server/php/82/bin/php';
+            $candidates[] = '/www/server/php/81/bin/php';
+            $candidates[] = '/www/server/php/80/bin/php';
+            $candidates[] = '/www/server/php/74/bin/php';
+        }
+
+        $seen = [];
+        foreach ($candidates as $candidate) {
+            $bin = trim((string) $candidate);
+            if ($bin === '') {
+                continue;
+            }
+            if (isset($seen[$bin])) {
+                continue;
+            }
+            $seen[$bin] = 1;
+            if (self::isUsableCliPhp($bin)) {
+                return $bin;
+            }
+        }
+
         return 'php';
     }
 
@@ -357,6 +399,61 @@ class OpsMaintenanceService
             }
         }
         return $count;
+    }
+
+    private static function detectPhpFromPath(): string
+    {
+        $root = self::projectRoot();
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $ret = self::runCommand('where php', $root);
+            if ((int) ($ret['code'] ?? 1) !== 0) {
+                return '';
+            }
+            $lines = preg_split('/\r\n|\r|\n/', (string) ($ret['output'] ?? '')) ?: [];
+            foreach ($lines as $line) {
+                $v = trim((string) $line);
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+            return '';
+        }
+
+        $ret = self::runCommand('command -v php', $root);
+        if ((int) ($ret['code'] ?? 1) !== 0) {
+            return '';
+        }
+        return trim((string) ($ret['output'] ?? ''));
+    }
+
+    private static function isUsableCliPhp(string $bin): bool
+    {
+        $candidate = trim($bin);
+        if ($candidate === '') {
+            return false;
+        }
+        if (self::isFpmBinary($candidate)) {
+            return false;
+        }
+
+        $ret = self::runCommand(escapeshellarg($candidate) . ' -v', self::projectRoot());
+        if ((int) ($ret['code'] ?? 1) !== 0) {
+            return false;
+        }
+        $out = strtolower(trim((string) ($ret['output'] ?? '')));
+        if ($out === '') {
+            return false;
+        }
+        if (strpos($out, 'php-fpm') !== false) {
+            return false;
+        }
+        return strpos($out, 'php ') !== false;
+    }
+
+    private static function isFpmBinary(string $bin): bool
+    {
+        $base = strtolower(basename($bin));
+        return $base === 'php-fpm' || strpos($base, 'php-fpm') !== false;
     }
 
     private static function fileChecksum(string $path): string

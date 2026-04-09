@@ -720,6 +720,7 @@
 ### 20.2 后端实现
 - 新增服务：`app/service/OpsMaintenanceService.php`
   - 扫描并排序 `database/run_migration*.php`
+  - 自动识别 CLI `php` 可执行文件（避免误用 `php-fpm` 导致 `code=64`）
   - 自动维护迁移历史表 `ops_migration_history`（脚本名 + checksum + 状态 + 最后执行时间）
   - 仅执行“未执行或脚本内容已变更”的迁移，已应用脚本自动跳过
   - 汇总每个脚本的输出与退出码（含 `skipped` 标识）
@@ -749,3 +750,4 @@
 3. 点击 `更新数据表` 执行增量迁移（已执行且 checksum 未变化的脚本会自动跳过）
 4. 点击 `Git 更新` 拉取远端最新代码
 5. 若提示工作区有未提交变更，可先处理变更，或在确认风险后勾选“允许带本地修改执行 Pull”
+6. Linux 若 `PHP_BINARY` 指向 `php-fpm`，系统会自动回退探测 CLI `php`；如需强制指定可在运行环境设置 `OPS_PHP_BIN=/usr/bin/php`
