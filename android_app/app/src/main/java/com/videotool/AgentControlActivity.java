@@ -16,7 +16,6 @@ import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,6 +48,7 @@ public class AgentControlActivity extends AppCompatActivity {
     private CheckBox cbTiktokDm;
     private CheckBox cbZaloIm;
     private CheckBox cbWaIm;
+    private CheckBox cbAutoMode;
     private TextView textStatus;
     private TextView textCurrentTask;
     private TextView textLog;
@@ -123,6 +123,7 @@ public class AgentControlActivity extends AppCompatActivity {
         cbTiktokDm = findViewById(R.id.cb_tiktok_dm);
         cbZaloIm = findViewById(R.id.cb_zalo_im);
         cbWaIm = findViewById(R.id.cb_wa_im);
+        cbAutoMode = findViewById(R.id.cb_auto_mode);
         textStatus = findViewById(R.id.text_status);
         textCurrentTask = findViewById(R.id.text_current_task);
         textLog = findViewById(R.id.text_log);
@@ -150,9 +151,8 @@ public class AgentControlActivity extends AppCompatActivity {
         Button btnPickDevice = findViewById(R.id.btn_pick_device);
         Button btnTestPull = findViewById(R.id.btn_test_agent_pull);
         Button btnPermissionCheck = findViewById(R.id.btn_permission_check);
+        Button btnCopyZalo = findViewById(R.id.btn_copy_zalo);
         Button btnContactNow = findViewById(R.id.btn_contact_now);
-        ImageButton btnFavorite = findViewById(R.id.btn_favorite);
-        ImageButton btnNote = findViewById(R.id.btn_note);
 
         btnSave.setOnClickListener(v -> {
             AgentConfig config = collectConfigFromInputs();
@@ -188,9 +188,8 @@ public class AgentControlActivity extends AppCompatActivity {
         btnPickDevice.setOnClickListener(v -> loadDeviceOptions());
         btnTestPull.setOnClickListener(v -> testAgentPull());
         btnPermissionCheck.setOnClickListener(v -> showPermissionHealthReport());
+        btnCopyZalo.setOnClickListener(v -> copyCurrentZalo());
         btnContactNow.setOnClickListener(v -> startAgentService(MobileAgentService.ACTION_OPEN_TARGET, null));
-        btnFavorite.setOnClickListener(v -> toast(getString(R.string.agent_favorite_saved)));
-        btnNote.setOnClickListener(v -> showNoteDialog());
         btnClearLog.setOnClickListener(v -> {
             logBuffer.setLength(0);
             textLog.setText("");
@@ -204,6 +203,7 @@ public class AgentControlActivity extends AppCompatActivity {
         inputDeviceCode.setText(config.getDeviceCode());
         inputPollInterval.setText(String.valueOf(config.getPollIntervalSec()));
         setTaskTypesToInputs(config.getTaskTypes());
+        cbAutoMode.setChecked(config.isAutoMode());
     }
 
     private AgentConfig collectConfigFromInputs() {
@@ -219,6 +219,7 @@ public class AgentControlActivity extends AppCompatActivity {
         }
         config.setPollIntervalSec(interval);
         config.setTaskTypes(readTaskTypesFromInputs());
+        config.setAutoMode(cbAutoMode.isChecked());
         return config;
     }
 
@@ -353,27 +354,20 @@ public class AgentControlActivity extends AppCompatActivity {
 
         JSONObject payload = task.getRawPayload();
         textStatFans.setText(formatNumberCompact(payload.optLong("followers_count", 0)));
-        textStatEngagement.setText(formatPercent(payload.optDouble("engagement_rate", 0)));
+        double gpm = payload.optDouble("gpm", payload.optDouble("quality_score", 0));
+        textStatEngagement.setText(gpm > 0 ? String.format(Locale.US, "%.1f", gpm) : "--");
         String region = payload.optString("region", "");
         if (region.trim().isEmpty()) {
             region = "--";
         }
         textStatRegion.setText(region.toUpperCase(Locale.ROOT));
 
-        String quality = payload.optString("quality_grade", "").trim();
-        if (quality.isEmpty()) {
-            double score = payload.optDouble("quality_score", 0);
-            if (score >= 80) {
-                quality = "A";
-            } else if (score >= 60) {
-                quality = "B";
-            } else if (score > 0) {
-                quality = "C";
-            } else {
-                quality = "--";
-            }
+        int cooperationCount = payload.optInt("cooperation_count",
+                payload.optInt("cooperate_count", 0));
+        if (cooperationCount <= 0 && payload.optInt("influencer_status", 0) == 5) {
+            cooperationCount = 1;
         }
-        textStatQuality.setText(quality);
+        textStatQuality.setText(cooperationCount > 0 ? String.valueOf(cooperationCount) : "--");
     }
 
     private String formatNumberCompact(long value)
@@ -417,6 +411,25 @@ public class AgentControlActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void copyCurrentZalo()
+    {
+        AgentTask task = prefs.loadCurrentTask();
+        if (task == null) {
+            toast(getString(R.string.agent_copy_zalo_missing));
+            return;
+        }
+        String zalo = task.resolveZaloUrl();
+        if (zalo.trim().isEmpty() && !task.getZaloId().trim().isEmpty()) {
+            zalo = "https://zalo.me/" + task.getZaloId().trim();
+        }
+        if (zalo.trim().isEmpty()) {
+            toast(getString(R.string.agent_copy_zalo_missing));
+            return;
+        }
+        copyText(zalo);
+        toast(getString(R.string.agent_copy_zalo_done));
     }
 
     private void quickGoComment()
@@ -614,7 +627,7 @@ public class AgentControlActivity extends AppCompatActivity {
             return;
         }
         AgentApiClient client = new AgentApiClient();
-        client.pullTask(config, new AgentApiClient.ApiCallback<AgentApiClient.PullResult>()
+        AgentApiClient.ApiCallback<AgentApiClient.PullResult> callback = new AgentApiClient.ApiCallback<AgentApiClient.PullResult>()
         {
             @Override
             public void onSuccess(AgentApiClient.PullResult result)
@@ -636,7 +649,12 @@ public class AgentControlActivity extends AppCompatActivity {
                     appendLog(msg);
                 });
             }
-        });
+        };
+        if (config.isAutoMode()) {
+            client.pullTaskAuto(config, callback);
+        } else {
+            client.pullTask(config, callback);
+        }
     }
 
     private void showPermissionHealthReport()

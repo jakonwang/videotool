@@ -202,8 +202,12 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('auto_dm/campaign/create', 'app\controller\admin\AutoDm@create');
     Route::get('auto_dm/campaign/list', 'app\controller\admin\AutoDm@list');
     Route::get('auto_dm/campaign/listJson', 'app\controller\admin\AutoDm@list');
+    Route::post('auto_dm/campaign/rebuild_followups', 'app\controller\admin\AutoDm@rebuildFollowups');
     Route::post('auto_dm/campaign/pause', 'app\controller\admin\AutoDm@pause');
     Route::post('auto_dm/campaign/resume', 'app\controller\admin\AutoDm@resume');
+    Route::get('auto_dm/reply_queue/list', 'app\controller\admin\AutoDm@replyQueueList');
+    Route::get('auto_dm/reply_queue/listJson', 'app\controller\admin\AutoDm@replyQueueList');
+    Route::post('auto_dm/reply_queue/confirm', 'app\controller\admin\AutoDm@replyQueueConfirm');
     Route::get('auto_dm', 'app\controller\admin\AutoDm@index');
 
     // Mobile outreach tasking (Android + Appium agent)

@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="app_name">TikStar 移动执行端</string>
 
     <string name="lang_zh">中文</string>
@@ -107,6 +107,7 @@
 
     <string name="agent_title">TikStar OPS 移动执行器</string>
     <string name="agent_subtitle">自动拉取任务、复制话术并打开目标应用，发送动作仍由人工确认。</string>
+    <string name="agent_auto_mode">开启无人值守自动私信模式（Zalo / WhatsApp）</string>
 
     <string name="label_admin_base">后台地址（自动补全 /admin.php）</string>
     <string name="label_token">设备 Token</string>
@@ -218,4 +219,24 @@
     <string name="menu_ops_center">运维中心</string>
     <string name="menu_user">用户管理</string>
     <string name="menu_extension_manager">模块管理</string>
+
+    <string name="console_metric_creator_total">达人总数</string>
+    <string name="console_metric_wait_sample">待寄样</string>
+    <string name="console_section_reminders">待办提醒</string>
+    <string name="console_reminder_empty">当前暂无紧急提醒</string>
+    <string name="console_reminder_replied">Replied, follow up now</string>
+    <string name="console_reminder_wait_sample">Waiting for sample arrangement</string>
+    <string name="console_reminder_item_template">%1$s · %2$s</string>
+    <string name="console_btn_write_note">Write Note</string>
+    <string name="console_btn_blacklist">Blacklist</string>
+    <string name="console_card_meta_template">GPM %1$s · %2$s</string>
+    <string name="console_note_hint">Write internal follow-up note</string>
+    <string name="console_note_saved">Note saved</string>
+    <string name="console_blacklist_confirm">Set this creator to blacklist?</string>
+    <string name="console_blacklist_done">Creator moved to blacklist</string>
+    <string name="agent_detail_gpm">GPM</string>
+    <string name="agent_detail_coop">Cooperations</string>
+    <string name="agent_copy_zalo">Copy Zalo</string>
+    <string name="agent_copy_zalo_done">Zalo link copied</string>
+    <string name="agent_copy_zalo_missing">No Zalo contact in current task</string>
 </resources>

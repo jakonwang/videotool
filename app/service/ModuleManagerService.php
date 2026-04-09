@@ -119,6 +119,15 @@ class ModuleManagerService
                 'dependencies' => ['creator_crm'],
                 'min_role' => self::ROLE_OPERATOR,
             ],
+            'auto_dm_campaign' => [
+                'name' => 'auto_dm_campaign',
+                'title' => 'Auto DM Campaigns',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['creator_crm'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
             'sample_management' => [
                 'name' => 'sample_management',
                 'title' => 'Sample Management',
@@ -934,6 +943,7 @@ class ModuleManagerService
             'creator_category_total' => self::safeCount('categories', ['type' => 'influencer']),
             'template_total' => self::safeCount('message_templates', ['status' => 1]),
             'outreach_pending' => self::safeCount('influencer_outreach_tasks', ['task_status' => 0]),
+            'auto_dm_pending' => self::safeCount('auto_dm_tasks', ['task_status' => 0]),
             'sample_pending' => self::safeCount('sample_shipments', ['shipment_status' => 0]) + self::safeCount('sample_shipments', ['shipment_status' => 1]),
             'mobile_device_total' => self::safeCount('mobile_devices', ['status' => 1]),
             'industry_total' => self::safeCount('growth_industry_metrics'),
@@ -995,6 +1005,7 @@ class ModuleManagerService
         $creatorCategoryEnabled = $creatorEnabled && $isEnabled('category', 1);
         $creatorInfluencerEnabled = $creatorEnabled && $isEnabled('influencer', 1);
         $creatorOutreachEnabled = $creatorEnabled && $isEnabled('outreach_workspace', 1);
+        $creatorAutoDmEnabled = $creatorEnabled && $isEnabled('auto_dm_campaign', 1);
         $creatorSampleEnabled = $creatorEnabled && $isEnabled('sample_management', 1);
         $creatorTemplateEnabled = $creatorEnabled && $isEnabled('message_template', 1);
         $creatorDistributeEnabled = $creatorEnabled && $isEnabled('distribute', 1);
@@ -1133,6 +1144,16 @@ class ModuleManagerService
                     'text_i18n' => 'admin.menu.outreachWorkspace',
                     'active' => self::controllerIs($currentController, 'outreachworkspace', 'outreach_workspace'),
                     'badge' => ($badges['outreach_pending'] ?? 0) > 0 ? (string) $badges['outreach_pending'] : '',
+                ];
+            }
+            if ($creatorAutoDmEnabled) {
+                $creatorChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/auto_dm',
+                    'icon' => 'message-square',
+                    'text_i18n' => 'admin.menu.autoDmCampaign',
+                    'active' => self::controllerIs($currentController, 'autodm', 'auto_dm'),
+                    'badge' => ($badges['auto_dm_pending'] ?? 0) > 0 ? (string) $badges['auto_dm_pending'] : '',
                 ];
             }
             if ($creatorEnabled) {

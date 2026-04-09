@@ -11,6 +11,11 @@
   .outreach-actions { display:flex; gap:8px; flex-wrap:wrap; }
   .outreach-next { border:1px solid #ebeef5; border-radius:8px; padding:12px; margin-bottom:12px; }
   .outreach-preview { white-space:pre-wrap; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:12px; min-height:88px; }
+  .outreach-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:12px; }
+  .outreach-summary-item { border:1px solid #e5e7eb; border-radius:8px; padding:10px; background:#f9fafb; }
+  .outreach-summary-label { font-size:12px; color:#6b7280; }
+  .outreach-summary-value { margin-top:4px; font-size:20px; line-height:1; font-weight:700; color:#111827; }
+  .outreach-block-title { font-size:13px; font-weight:700; color:#1f2937; margin:14px 0 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
 </style>
 {/block}
 
@@ -83,6 +88,8 @@
       const page = ref(1);
       const pageSize = ref(20);
       const query = reactive({ keyword: '', task_status: '', assigned_only: 0 });
+      const workspaceSummary = reactive({ pending: 0, copied: 0, jumped: 0, completed: 0 });
+      const autoDmSummary = reactive({ pending: 0, sending: 0, sent: 0, reply_pending: 0, converted: 0, blocked: 0 });
 
       const nextItem = ref(null);
       const previewText = ref('');
@@ -111,6 +118,10 @@
       const mobileDeviceId = ref('');
       const mobileTasks = ref([]);
       const mobileRetryingMap = ref({});
+      const replyQueueLoading = ref(false);
+      const replyQueueRows = ref([]);
+      const replyQueuePager = reactive({ page: 1, page_size: 10, total: 0 });
+      const replyConfirmingMap = ref({});
 
       const statusLabel = (s) => {
         const key = 'page.outreach.status' + String(Number(s || 0));
@@ -135,6 +146,18 @@
         return !!mobileRetryingMap.value[key];
       }
 
+      function setReplyConfirming(id, loading) {
+        const key = Number(id || 0);
+        if (!key) return;
+        replyConfirmingMap.value = { ...replyConfirmingMap.value, [key]: !!loading };
+      }
+
+      function isReplyConfirming(id) {
+        const key = Number(id || 0);
+        if (!key) return false;
+        return !!replyConfirmingMap.value[key];
+      }
+
       async function fetchList() {
         loading.value = true;
         try {
@@ -149,6 +172,18 @@
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           list.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? Number(json.data.total) : 0;
+          const ws = json.data && json.data.summary ? json.data.summary : {};
+          workspaceSummary.pending = Number(ws.pending || 0);
+          workspaceSummary.copied = Number(ws.copied || 0);
+          workspaceSummary.jumped = Number(ws.jumped || 0);
+          workspaceSummary.completed = Number(ws.completed || 0);
+          const ad = json.data && json.data.auto_dm ? json.data.auto_dm : {};
+          autoDmSummary.pending = Number(ad.pending || 0);
+          autoDmSummary.sending = Number(ad.sending || 0);
+          autoDmSummary.sent = Number(ad.sent || 0);
+          autoDmSummary.reply_pending = Number(ad.reply_pending || 0);
+          autoDmSummary.converted = Number(ad.converted || 0);
+          autoDmSummary.blocked = Number(ad.blocked || 0);
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
         } finally {
@@ -419,6 +454,52 @@
         }
       }
 
+      async function fetchReplyQueue() {
+        replyQueueLoading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(replyQueuePager.page));
+          p.set('page_size', String(replyQueuePager.page_size));
+          p.set('state', 'pending');
+          const res = await fetch('/admin.php/auto_dm/reply_queue/list?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          replyQueueRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          replyQueuePager.total = Number((json.data && json.data.total) || 0);
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          replyQueueLoading.value = false;
+        }
+      }
+
+      async function confirmReply(row, category) {
+        if (!row || !row.id) return;
+        const taskId = Number(row.id || 0);
+        if (!taskId) return;
+        setReplyConfirming(taskId, true);
+        try {
+          const res = await fetch('/admin.php/auto_dm/reply_queue/confirm', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              task_id: taskId,
+              confirm_category: String(category || 'other')
+            })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          fetchReplyQueue();
+          fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          setReplyConfirming(taskId, false);
+        }
+      }
+
       onMounted(async () => {
         if (i18n) i18n.applyDom(document);
         await loadBaseOptions();
@@ -426,6 +507,7 @@
         await fetchList();
         await fetchNextTask();
         await fetchMobileTasks();
+        await fetchReplyQueue();
       });
 
       return {
@@ -436,6 +518,8 @@
         page,
         pageSize,
         query,
+        workspaceSummary,
+        autoDmSummary,
         statusLabel,
         fetchList,
         generateVisible,
@@ -464,11 +548,65 @@
         mobileTaskCanRetry,
         retryMobileTask,
         isMobileRetrying,
-        fetchMobileTasks
+        fetchMobileTasks,
+        replyQueueLoading,
+        replyQueueRows,
+        replyQueuePager,
+        fetchReplyQueue,
+        confirmReply,
+        isReplyConfirming
       };
     },
     template: `
       <div class="outreach-card">
+        <div class="outreach-block-title">{{ tt('page.outreach.workspaceFunnel') }}</div>
+        <div class="outreach-summary">
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.outreach.status0') }}</div>
+            <div class="outreach-summary-value">{{ workspaceSummary.pending }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.outreach.status1') }}</div>
+            <div class="outreach-summary-value">{{ workspaceSummary.copied }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.outreach.status2') }}</div>
+            <div class="outreach-summary-value">{{ workspaceSummary.jumped }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.outreach.status3') }}</div>
+            <div class="outreach-summary-value">{{ workspaceSummary.completed }}</div>
+          </div>
+        </div>
+
+        <div class="outreach-block-title">{{ tt('page.outreach.autoDmFunnel') }}</div>
+        <div class="outreach-summary">
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.autoDm.funnelPending') }}</div>
+            <div class="outreach-summary-value">{{ autoDmSummary.pending }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.autoDm.funnelSending') }}</div>
+            <div class="outreach-summary-value">{{ autoDmSummary.sending }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.autoDm.funnelSent') }}</div>
+            <div class="outreach-summary-value">{{ autoDmSummary.sent }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.autoDm.funnelReplyPending') }}</div>
+            <div class="outreach-summary-value">{{ autoDmSummary.reply_pending }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.autoDm.funnelConverted') }}</div>
+            <div class="outreach-summary-value">{{ autoDmSummary.converted }}</div>
+          </div>
+          <div class="outreach-summary-item">
+            <div class="outreach-summary-label">{{ tt('page.autoDm.funnelBlocked') }}</div>
+            <div class="outreach-summary-value">{{ autoDmSummary.blocked }}</div>
+          </div>
+        </div>
+
         <el-form :inline="true" style="margin-bottom:12px;">
           <el-form-item>
             <el-input v-model="query.keyword" :placeholder="tt('page.outreach.filterKeyword')" clearable style="width:180px;" />
@@ -601,6 +739,47 @@
               </template>
             </el-table-column>
           </el-table>
+        </div>
+
+        <div class="outreach-next" style="margin-top:14px;">
+          <div class="outreach-block-title" style="margin:0 0 10px;">
+            <span>{{ tt('page.autoDm.replyQueueTitle') }}</span>
+            <el-button size="small" @click="fetchReplyQueue">{{ tt('common.refresh') }}</el-button>
+          </div>
+          <el-table :data="replyQueueRows" v-loading="replyQueueLoading" stripe>
+            <el-table-column :label="tt('page.outreach.colInfluencer')" min-width="180">
+              <template #default="{row}">{{ row.tiktok_id }} / {{ row.nickname }}</template>
+            </el-table-column>
+            <el-table-column prop="campaign_name" :label="tt('page.autoDm.colName')" min-width="180" />
+            <el-table-column :label="tt('page.autoDm.stepNo')" width="100">
+              <template #default="{row}">{{ tt('page.autoDm.stepNo') }} {{ Number(row.step_no || 0) }}</template>
+            </el-table-column>
+            <el-table-column prop="reply_text" :label="tt('page.autoDm.replyText')" min-width="200" show-overflow-tooltip />
+            <el-table-column :label="tt('page.autoDm.replyRuleCategory')" width="140">
+              <template #default="{row}">{{ row.rule_category || 'other' }}</template>
+            </el-table-column>
+            <el-table-column prop="reply_at" :label="tt('page.autoDm.replyAt')" min-width="160" />
+            <el-table-column :label="tt('page.outreach.colActions')" width="260" fixed="right">
+              <template #default="{row}">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <el-button size="small" type="success" plain :loading="isReplyConfirming(row.id)" @click="confirmReply(row,'intent')">{{ tt('page.autoDm.confirmIntent') }}</el-button>
+                  <el-button size="small" type="warning" plain :loading="isReplyConfirming(row.id)" @click="confirmReply(row,'inquiry')">{{ tt('page.autoDm.confirmInquiry') }}</el-button>
+                  <el-button size="small" type="info" plain :loading="isReplyConfirming(row.id)" @click="confirmReply(row,'reject')">{{ tt('page.autoDm.confirmReject') }}</el-button>
+                  <el-button size="small" type="danger" plain :loading="isReplyConfirming(row.id)" @click="confirmReply(row,'unsubscribe')">{{ tt('page.autoDm.confirmUnsubscribe') }}</el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+            <el-pagination
+              v-model:current-page="replyQueuePager.page"
+              v-model:page-size="replyQueuePager.page_size"
+              layout="total, prev, pager, next"
+              :total="replyQueuePager.total"
+              @update:current-page="fetchReplyQueue"
+              @update:page-size="() => { replyQueuePager.page=1; fetchReplyQueue(); }"
+            />
+          </div>
         </div>
 
         <el-dialog v-model="generateVisible" :title="tt('page.outreach.generateTitle')" width="560px">

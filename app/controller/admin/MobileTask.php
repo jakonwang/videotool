@@ -554,6 +554,18 @@ class MobileTask extends BaseController
         }
         $sampleShipped = (int) $sampledQuery->count();
 
+        $waitSampleQuery = Db::name('influencers')->where('status', 3);
+        if ($this->tableHasTenantId('influencers')) {
+            $waitSampleQuery->where('tenant_id', $tenantId);
+        }
+        $waitSampleCount = (int) $waitSampleQuery->count();
+
+        $creatorTotalQuery = Db::name('influencers');
+        if ($this->tableHasTenantId('influencers')) {
+            $creatorTotalQuery->where('tenant_id', $tenantId);
+        }
+        $creatorTotal = (int) $creatorTotalQuery->count();
+
         return [
             'today_total_tasks' => $todayTotalTasks,
             'today_contacted' => $contactedToday,
@@ -561,6 +573,8 @@ class MobileTask extends BaseController
             'replied_count' => $repliedCount,
             'pending_reply' => $pendingReply,
             'sample_shipped' => $sampleShipped,
+            'wait_sample_count' => $waitSampleCount,
+            'influencer_total' => $creatorTotal,
         ];
     }
 

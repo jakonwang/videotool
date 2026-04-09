@@ -16,6 +16,7 @@ public class AgentConfig {
     private String deviceCode;
     private int pollIntervalSec;
     private List<String> taskTypes;
+    private boolean autoMode;
 
     public AgentConfig() {
         this.adminBase = "";
@@ -23,6 +24,7 @@ public class AgentConfig {
         this.deviceCode = "";
         this.pollIntervalSec = DEFAULT_POLL_INTERVAL_SEC;
         this.taskTypes = defaultTaskTypes();
+        this.autoMode = false;
     }
 
     public static AgentConfig defaultConfig() {
@@ -85,6 +87,14 @@ public class AgentConfig {
         this.taskTypes = sanitized;
     }
 
+    public boolean isAutoMode() {
+        return autoMode;
+    }
+
+    public void setAutoMode(boolean autoMode) {
+        this.autoMode = autoMode;
+    }
+
     public boolean isValid() {
         return !getAdminBase().isEmpty() && !getToken().isEmpty() && !getDeviceCode().isEmpty();
     }
@@ -95,6 +105,7 @@ public class AgentConfig {
         obj.put("token", getToken());
         obj.put("device_code", getDeviceCode());
         obj.put("poll_interval_sec", getPollIntervalSec());
+        obj.put("auto_mode", isAutoMode() ? 1 : 0);
         JSONArray arr = new JSONArray();
         for (String type : getTaskTypes()) {
             arr.put(type);
@@ -112,6 +123,7 @@ public class AgentConfig {
         config.setToken(obj.optString("token", ""));
         config.setDeviceCode(obj.optString("device_code", ""));
         config.setPollIntervalSec(obj.optInt("poll_interval_sec", DEFAULT_POLL_INTERVAL_SEC));
+        config.setAutoMode(obj.optInt("auto_mode", 0) == 1 || obj.optBoolean("auto_mode", false));
 
         List<String> types = new ArrayList<>();
         JSONArray arr = obj.optJSONArray("task_types");
@@ -156,10 +168,12 @@ public class AgentConfig {
                 return "tiktok_dm";
             case "zalo":
             case "zalo_im":
+            case "zalo_auto_dm":
                 return "zalo_im";
             case "wa":
             case "whatsapp":
             case "wa_im":
+            case "wa_auto_dm":
                 return "wa_im";
             default:
                 return "";

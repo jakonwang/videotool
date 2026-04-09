@@ -28,7 +28,12 @@ class AdminAuthMiddleware
             return $next($request);
         }
 
-        if ($path === '/mobile_agent/pull' || $path === '/mobile_agent/report') {
+        if (
+            $path === '/mobile_agent/pull'
+            || $path === '/mobile_agent/report'
+            || $path === '/mobile_agent/pull_auto'
+            || $path === '/mobile_agent/report_auto'
+        ) {
             if ($this->passesMobileAgentAuth($request)) {
                 return $next($request);
             }
@@ -94,7 +99,7 @@ class AdminAuthMiddleware
         if (preg_match('#^/data_import(/|$)#i', $path)) {
             return 'data_import';
         }
-        if (preg_match('#^/(influencer|outreach_workspace|sample|category|message_template|distribute|mobile_task|mobile_device|mobile_agent)(/|$)#i', $path)) {
+        if (preg_match('#^/(influencer|outreach_workspace|sample|category|message_template|distribute|mobile_task|mobile_device|mobile_agent|auto_dm)(/|$)#i', $path)) {
             return 'creator_crm';
         }
         if (preg_match('#^/(video|product)(/|$)#i', $path)) {
@@ -138,7 +143,7 @@ class AdminAuthMiddleware
         if (preg_match('#/(list|listJson|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
             return true;
         }
-        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|stats|mobile_task|mobile_device|mobile_agent)/#i', $path)) {
+        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|stats|mobile_task|mobile_device|mobile_agent|auto_dm)/#i', $path)) {
             return true;
         }
         if (preg_match('#^/(client_version|client_license)/(list|add|batchGenerate|update|toggle|delete|unbind|uploadPackage)#i', $path)) {

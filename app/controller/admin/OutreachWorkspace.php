@@ -88,11 +88,16 @@ class OutreachWorkspace extends BaseController
             $items[] = $this->mapTaskRow($arr);
         }
 
+        $summary = $this->buildWorkspaceSummary();
+        $autoDm = $this->buildAutoDmSummary();
+
         return $this->jsonOk([
             'items' => $items,
             'total' => (int) $list->total(),
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
+            'summary' => $summary,
+            'auto_dm' => $autoDm,
         ]);
     }
 
@@ -429,6 +434,68 @@ class OutreachWorkspace extends BaseController
             }
         }
         return $this->request->post();
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function buildWorkspaceSummary(): array
+    {
+        $query = Db::name('influencer_outreach_tasks');
+        if ($this->tableHasTenantId('influencer_outreach_tasks')) {
+            $query->where('tenant_id', $this->currentTenantId());
+        }
+        $pending = clone $query;
+        $copied = clone $query;
+        $jumped = clone $query;
+        $completed = clone $query;
+
+        return [
+            'pending' => (int) $pending->where('task_status', self::TASK_PENDING)->count(),
+            'copied' => (int) $copied->where('task_status', self::TASK_COPIED)->count(),
+            'jumped' => (int) $jumped->where('task_status', self::TASK_JUMPED)->count(),
+            'completed' => (int) $completed->where('task_status', self::TASK_COMPLETED)->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function buildAutoDmSummary(): array
+    {
+        try {
+            $query = Db::name('auto_dm_tasks');
+            if ($this->tableHasTenantId('auto_dm_tasks')) {
+                $query->where('tenant_id', $this->currentTenantId());
+            }
+            $pending = clone $query;
+            $sending = clone $query;
+            $sent = clone $query;
+            $blocked = clone $query;
+            $replyPending = clone $query;
+            $converted = clone Db::name('auto_dm_reply_reviews');
+            if ($this->tableHasTenantId('auto_dm_reply_reviews')) {
+                $converted->where('tenant_id', $this->currentTenantId());
+            }
+
+            return [
+                'pending' => (int) $pending->whereIn('task_status', [0, 1])->count(),
+                'sending' => (int) $sending->where('task_status', 2)->count(),
+                'sent' => (int) $sent->where('task_status', 3)->count(),
+                'blocked' => (int) $blocked->whereIn('task_status', [4, 5, 6])->count(),
+                'reply_pending' => (int) $replyPending->where('reply_state', 1)->count(),
+                'converted' => (int) $converted->whereIn('confirm_category', ['intent', 'inquiry'])->count(),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'pending' => 0,
+                'sending' => 0,
+                'sent' => 0,
+                'blocked' => 0,
+                'reply_pending' => 0,
+                'converted' => 0,
+            ];
+        }
     }
 }
 

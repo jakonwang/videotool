@@ -752,3 +752,303 @@
 4. 点击 `Git 更新` 拉取远端最新代码
 5. 若提示工作区有未提交变更，可先处理变更，或在确认风险后勾选“允许带本地修改执行 Pull”
 6. Linux 若 `PHP_BINARY` 指向 `php-fpm`，系统会自动回退探测 CLI `php`；如需强制指定可在运行环境设置 `OPS_PHP_BIN=/usr/bin/php`
+
+## 21. Mobile Console 极简 UI 重构（ModuleConsoleActivity）
+
+### 21.1 视觉规范落地
+- 画布背景统一为 `#F8FAFC`
+- 首页与模块入口改为纯白卡片（16dp 圆角，2dp 阴影）
+- 字体色阶统一：
+  - 主标题：`#1E293B`
+  - 次要信息：`#64748B`
+  - 动作点：`#0052FF`
+- 清理任务卡片与模块卡片中的高饱和红/绿/黄文字，状态色改为低饱和胶囊背景 + 中性文字
+
+### 21.2 代码落点
+- `android_app/app/src/main/res/layout/activity_module_console.xml`
+- `android_app/app/src/main/res/layout/item_module_tile.xml`
+- `android_app/app/src/main/res/layout/item_task_card.xml`
+- `android_app/app/src/main/res/values/colors.xml`
+- `android_app/app/src/main/res/drawable/bg_card*.xml`
+- `android_app/app/src/main/res/drawable/bg_input.xml`
+- `android_app/app/src/main/res/drawable/bg_spinner.xml`
+- `android_app/app/src/main/res/drawable/bg_button_primary.xml`
+- `android_app/app/src/main/res/color/bottom_nav_item_tint.xml`
+- `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+
+### 21.3 验证
+- Windows 本地构建通过：
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+
+### 21.4 功能网格 RecyclerView 规范（2026-04-09）
+- 功能入口网格改为标准 `RecyclerView + GridLayoutManager(2列)`，不再手工拼接 `LinearLayout` 行列。
+- Item 统一高度（`item_module_tile.xml` 固定高度）并由栅格间距装饰器控制左右/底部间距，保证两列整齐对齐。
+- 图标风格统一为单色线性矢量图（stroke 宽度 `1.5`），并使用极淡品牌色圆形底板（约 5% 透明度）。
+- 卡片内间距规范：
+  - 图标与文字垂直间距：`12dp`
+  - 文字下方额外留白：`paddingBottom=20dp`
+
+### 21.5 视觉修复（按钮着色问题）
+- 修复 Material 主题下按钮被系统 `backgroundTint` 强制染色导致的“全部变蓝、文案不清晰”问题。
+- 在 `AppButtonBase` 中显式关闭按钮 tint，确保 `Primary / Secondary / Neutral` 使用各自背景与文字色。
+- 该修复覆盖：
+  - 工作台筛选区按钮
+  - “我的”页（执行中心 / 设备管理 / 退出登录）按钮
+
+### 21.6 DingTalk 风格首页重构（2026-04-09）
+- 目标：解决“全白页面、层次不清”的视觉问题，统一为钉钉风格的蓝色头部 + 灰底白卡。
+- 结构调整：
+  - 首页顶部改为品牌蓝渐变头部（`bg_console_header`），并保留语言切换与用户信息。
+  - 指标区改为悬浮统计卡（达人总数/今日外联/待寄样），形成“头部 + 卡片”层次。
+  - 功能模块、提醒区、任务筛选区、分页区全部统一白色卡片容器，背景统一浅灰底。
+- 样式统一：
+  - 主色改为钉钉系蓝：`#1677FF`（含深色与渐变色阶）。
+  - 卡片圆角 `16dp`，按钮圆角 `12dp`，底部导航改为圆角顶边白底。
+  - 按钮维持 `Primary / Secondary / Neutral` 三级语义，避免单一纯蓝大块。
+- 兼容修复：
+  - `ModuleConsoleActivity` 新增状态栏/导航栏配色控制，顶部深色背景下状态栏图标可读。
+- 主要变更文件：
+  - `android_app/app/src/main/res/layout/activity_module_console.xml`
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+  - `android_app/app/src/main/res/layout/item_task_card.xml`
+  - `android_app/app/src/main/res/values/colors.xml`
+  - `android_app/app/src/main/res/values/styles.xml`
+  - `android_app/app/src/main/res/drawable/bg_console_header.xml`
+  - `android_app/app/src/main/res/drawable/bg_console_header_arc.xml`
+  - `android_app/app/src/main/res/drawable/bg_card.xml`
+  - `android_app/app/src/main/res/drawable/bg_card_alt.xml`
+  - `android_app/app/src/main/res/drawable/bg_button_primary.xml`
+  - `android_app/app/src/main/res/drawable/bg_button_secondary.xml`
+  - `android_app/app/src/main/res/drawable/bg_button_neutral.xml`
+  - `android_app/app/src/main/res/drawable/bg_spinner.xml`
+  - `android_app/app/src/main/res/drawable/bg_bottom_nav.xml`
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+- 本地验证：
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+  - `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+
+### 21.7 DingTalk 1:1 细化（二次微调，2026-04-09）
+- 底部导航：
+  - 图标改为统一线性图标（替换系统默认图标）。
+  - 图标尺寸固定 `22dp`，激活/未激活文字采用独立 `TextAppearance`（11sp）。
+  - 调整上下内边距，贴近钉钉导航密度。
+- 模块卡片（工作台入口）：
+  - 卡片高度由 152dp 收敛到 136dp，圆角 14dp。
+  - 图标容器收敛到 42dp，图标 20dp，标题改为 12sp 常规字重。
+  - 网格间距由 12dp 调整为 10dp，提升信息密度。
+- 任务卡片：
+  - 卡片外边距、内边距、头像、标题、状态胶囊、次级文案全面收敛。
+  - 主动作按钮改为线性箭头图标；次要动作（备注/黑名单）替换为自定义线性图标。
+  - 次要动作行高度压缩到 34dp，满足“高信息密度 + 可点按”平衡。
+- 交互细节：
+  - 按压缩放由 `0.95` 改为 `0.97`，触感更轻、更接近企业工具风格。
+- 主要代码文件：
+  - `android_app/app/src/main/res/layout/activity_module_console.xml`
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+  - `android_app/app/src/main/res/layout/item_task_card.xml`
+  - `android_app/app/src/main/res/menu/menu_console_bottom_nav.xml`
+  - `android_app/app/src/main/res/values/styles.xml`
+  - `android_app/app/src/main/res/drawable/bg_glass_icon.xml`
+  - `android_app/app/src/main/res/drawable/ic_line_note.xml`
+  - `android_app/app/src/main/res/drawable/ic_line_ban.xml`
+  - `android_app/app/src/main/res/drawable/ic_line_chevron_right.xml`
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+- i18n 修正：补齐中文语言包中遗留英文文案（Creators/Waiting Sample/To-do Reminders）。
+
+### 21.8 功能模块改为每行 4 个（2026-04-09）
+- 按用户要求，工作台模块入口由 2 列改为 4 列。
+- 适配策略：
+  - `ModuleConsoleActivity` 使用固定 `4` 列网格布局。
+  - 网格间距压缩到 `8dp`，避免内容拥挤。
+  - 模块卡片密度收敛：高度 `104dp`，图标容器 `30dp`，图标 `16dp`，标题 `11sp`。
+- 变更文件：
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+
+### 21.9 工作台改为“分组九宫格”与导航压缩（2026-04-09）
+- 工作台模块区改为“分组切换 + 九宫格”：
+  - 顶部增加模块分组切换条（按后台菜单一级分组）。
+  - 每次仅显示当前分组前 9 个模块（3x3），避免全部模块堆叠。
+  - 切换分组后即时刷新对应模块网格。
+- 网格规则：
+  - 列数固定为 3（九宫格）。
+  - 模块卡片改为小尺寸高密度（适配 3 列）。
+- 底部导航优化：
+  - 高度压缩到 `52dp`。
+  - 图标缩小到 `20dp`，文字 `10sp`，减少“行高过高”的视觉负担。
+- 新增样式资源：
+  - `bg_module_section_chip_active.xml`
+  - `bg_module_section_chip_inactive.xml`
+- 主要代码文件：
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+  - `android_app/app/src/main/res/layout/activity_module_console.xml`
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+  - `android_app/app/src/main/res/values/styles.xml`
+
+### 21.10 紧凑化修正（行高/间距，2026-04-09）
+- 针对“行高、间距过大”问题，执行全局紧凑化：
+  - 头部区域高度与内边距收敛（标题、语言选择器、统计卡数字与标签均降级）。
+  - 工作台区块间距从 10-12dp 收敛到 6-8dp。
+  - 任务筛选区输入框/下拉/按钮高度统一收敛到 `36dp`，分页按钮收敛到 `34dp`。
+  - 模块卡片进一步缩小：`88dp` 高度、`26dp` 图标底板、`10sp` 文案。
+- 底部导航进一步压缩：
+  - 高度收敛到 `46dp`。
+  - 图标收敛到 `18dp`。
+  - 切换为 `unlabeled` 模式（仅图标），彻底压低“底部行高”观感。
+- 分组芯片同步紧凑化：
+  - 高度 `26dp`，字号 `10sp`，左右间距和内边距减小。
+- 变更文件：
+  - `android_app/app/src/main/res/layout/activity_module_console.xml`
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+  - `android_app/app/src/main/res/values/styles.xml`
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+
+### 21.11 紧凑化二次修正（行高/间距，2026-04-09）
+- 在 21.10 基础上再次收敛垂直密度，目标为“同屏更多信息 + 保持可点击”：
+  - 顶部头图高度由 `202dp` 进一步收敛到 `186dp`，统计卡数字由 `22sp` 收敛到 `20sp`。
+  - 首页内容区域左右留白由 `12dp` 收敛到 `10dp`，分区间距统一收敛到 `4-6dp`。
+  - 任务筛选区控件高度统一收敛到 `34dp`，分页按钮收敛到 `32dp`。
+  - 底部导航再次收敛到 `42dp`，图标 `17dp`，继续保持仅图标模式。
+- 任务卡片与骨架屏密度优化：
+  - 任务卡片圆角 `12dp`，内边距 `10dp`，头像 `42dp`，次级动作行高度 `30dp`。
+  - 骨架屏由 `96dp` 收敛到 `84dp`，间距与占位尺寸同步缩小，减少加载态“空洞感”。
+- 模块区进一步紧凑：
+  - 九宫格卡片高度由 `88dp` 收敛到 `82dp`，图标底板 `24dp`，标题 `9sp`。
+  - 分组芯片高度由 `26dp` 收敛到 `24dp`，字号 `9sp`。
+- 交互控件细化：
+  - `Spinner` 文案和内边距收敛（selected `11sp`，dropdown `12sp`，上下 padding 缩小）。
+  - 基础按钮样式 `AppButtonBase` 收敛到 `minHeight=34dp`、`textSize=10sp`。
+- 本地验证：
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+  - `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+  - `adb shell am start -n com.videotool/.MainActivity`
+
+### 21.12 可读性回调（字体/行高上调，2026-04-09）
+- 根据“整体行高和字体太小”的反馈，对移动端控制台执行可读性回调：
+  - 顶部区域与统计卡回调到中等密度：头部高度与字体上调，指标数字回调到 `22sp`。
+  - 模块九宫格回调：模块卡片高度 `96dp`，图标与标题字号上调（标题 `11sp`）。
+  - 任务区回调：筛选控件与按钮高度统一到 `36dp`，分页按钮回调 `34dp`。
+  - 任务卡片回调：头像、Handle、状态胶囊、次级文案与次要动作按钮字号/高度同步上调。
+  - 分组 chips 回调：高度 `26dp`，字号 `10sp`，提升分组可读性。
+  - 底部导航回调：高度 `48dp`，图标 `19dp`，避免点击区域过小。
+- 相关变更文件：
+  - `android_app/app/src/main/res/layout/activity_module_console.xml`
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+  - `android_app/app/src/main/res/layout/item_task_card.xml`
+  - `android_app/app/src/main/res/layout/item_spinner_selected.xml`
+  - `android_app/app/src/main/res/layout/item_spinner_dropdown.xml`
+  - `android_app/app/src/main/res/drawable/bg_spinner.xml`
+  - `android_app/app/src/main/res/values/styles.xml`
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+- 本地验证：
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+  - `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+
+### 21.13 个人中心高级化重构（2026-04-09）
+- 将 `ModuleConsoleActivity` 的“我的”页重构为高级账号面板：
+  - 顶部 Hero：渐变背景 + 头像首字母 + 门户 Badge（商家端/达人端）。
+  - 信息芯片：角色、租户、服务地址（Endpoint）三类账号信息分层展示。
+  - 快捷操作区：执行中心、设备管理、退出登录改为三张可点击动作卡（主次色分级 + 图标 + 描述文案）。
+- 交互与架构调整：
+  - `bindButtons()` 从 `Button` 强类型改为 `View` 通用绑定，降低 UI 组件耦合，后续可自由替换为卡片/行项。
+  - `renderUserHeader()` 增加个人中心字段映射：
+    - `text_profile_avatar`（用户名首字母）
+    - `text_profile_portal_badge`
+    - `text_profile_role_value`
+    - `text_profile_tenant_value`
+    - `text_profile_endpoint_value`（无地址时显示 `Not configured`）
+- 新增资源：
+  - `bg_profile_hero.xml`
+  - `bg_profile_avatar.xml`
+  - `bg_profile_chip.xml`
+  - `bg_profile_meta_chip.xml`
+  - `bg_profile_action_primary.xml`
+  - `bg_profile_action_secondary.xml`
+  - `bg_profile_action_logout.xml`
+- 新增 i18n key（Android strings）：
+  - `console_profile_quick_actions`
+  - `console_profile_label_role`
+  - `console_profile_label_tenant`
+  - `console_profile_label_endpoint`
+  - `console_profile_endpoint_unknown`
+  - `console_profile_action_exec_desc`
+  - `console_profile_action_device_desc`
+  - `console_profile_action_logout_desc`
+- 主要改动文件：
+  - `android_app/app/src/main/res/layout/activity_module_console.xml`
+  - `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+  - `android_app/app/src/main/res/values/strings.xml`
+  - `android_app/app/src/main/res/values-en/strings.xml`
+  - `android_app/app/src/main/res/drawable/bg_profile_*.xml`
+
+### 21.14 模块卡片垂直居中修正（2026-04-09）
+- 针对“模块区域下边距视觉偏大”问题，修正模块卡片的纵向对齐方式：
+  - `item_module_tile.xml` 内部容器由 `center_horizontal` 调整为 `center`，使图标与标题整体垂直居中。
+  - 收敛上下内边距（`8dp -> 4dp`），减少底部空白感。
+  - 标题与图标间距微调（`6dp -> 5dp`），避免视觉断层。
+- 变更文件：
+  - `android_app/app/src/main/res/layout/item_module_tile.xml`
+- 验证：
+  - `cd android_app`
+  - `gradlew.bat :app:assembleDebug`
+  - `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+
+## 22. 2026-04-09 达人联系深度优化 V2（回复率优先）
+
+### 22.1 统一外联引擎（工作台 + 自动私信联动）
+- `outreach_workspace/listJson` 新增返回：
+  - `summary`：半自动任务漏斗（pending/copied/jumped/completed）
+  - `auto_dm`：自动私信漏斗（pending/sending/sent/reply_pending/converted/blocked）
+- 外联工作台页面增加：
+  - 外联漏斗卡片
+  - 自动私信漏斗卡片
+  - 回复待确认列表与一键确认流转
+
+### 22.2 自动私信活动升级（序列化 + A/B）
+- `POST /admin.php/auto_dm/campaign/create` 扩展参数：
+  - `ab_templates`
+  - `followup_plan`
+  - `stop_on_reply`
+  - `reply_confirm_mode`
+- 新增 `POST /admin.php/auto_dm/campaign/rebuild_followups`：
+  - 对“已发送且未回复”的达人补生成 Step1/Step2
+  - 命中 `stop_on_reply=1` 的达人不再补发后续步骤
+
+### 22.3 回复待确认闭环
+- 新增接口：
+  - `GET /admin.php/auto_dm/reply_queue/list`
+  - `POST /admin.php/auto_dm/reply_queue/confirm`
+- 规则分类（V1）：`intent/inquiry/reject/unsubscribe/other`
+- 确认后自动：
+  - 写入 `auto_dm_reply_reviews`
+  - 写入 `outreach_logs.action_type=auto_dm_reply_confirmed`
+  - 根据确认结果联动 CRM 状态（如 `2已回复/3待寄样/6黑名单`）
+
+### 22.4 Mobile Agent 回传扩展
+- `POST /admin.php/mobile_agent/report_auto` 支持：
+  - `delivery_status`
+  - `reply_detected`
+  - `reply_text`
+  - `reply_time`
+  - `conversation_snippet`
+- 命中退订词时，自动写入 `do_not_contact` 并停发后续步骤。
+
+### 22.5 数据结构与迁移
+- 新增迁移脚本：`database/run_migration_auto_dm_v2.php`
+- 主要变更：
+  - `auto_dm_campaigns`：`ab_config_json`、`sequence_config_json`、`stop_on_reply`、`reply_confirm_mode`
+  - `auto_dm_tasks`：`step_no`、`variant_template_id`、`reply_state`、`reply_text`、`reply_at`、`next_execute_at`、`delivery_status`、`conversation_snippet`
+  - 新表：`auto_dm_reply_reviews`
+- 运维中心迁移顺序已加入：`run_migration_auto_dm_v2.php`
+
+### 22.6 执行命令（Windows / Linux）
+1. Windows：
+   - `php database\run_migration_auto_dm_v1.php`
+   - `php database\run_migration_auto_dm_v2.php`
+2. Linux：
+   - `php database/run_migration_auto_dm_v1.php`
+   - `php database/run_migration_auto_dm_v2.php`

@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="app_name">TikStar Mobile Agent</string>
 
     <string name="lang_zh">Tieng Trung</string>
@@ -107,6 +107,7 @@
 
     <string name="agent_title">TikStar OPS Mobile Agent</string>
     <string name="agent_subtitle">Tu dong keo task, sao chep noi dung va mo app muc tieu. Gui tin van do nguoi dung xac nhan.</string>
+    <string name="agent_auto_mode">Bat che do nhan tin tu dong khong can thao tac (Zalo / WhatsApp)</string>
 
     <string name="label_admin_base">URL admin (tu them /admin.php)</string>
     <string name="label_token">Token thiet bi</string>
@@ -218,4 +219,24 @@
     <string name="menu_ops_center">Ops Center</string>
     <string name="menu_user">User Management</string>
     <string name="menu_extension_manager">Module Manager</string>
+
+    <string name="console_metric_creator_total">Tong so creator</string>
+    <string name="console_metric_wait_sample">Cho gui mau</string>
+    <string name="console_section_reminders">Nhac viec</string>
+    <string name="console_reminder_empty">Hien khong co nhac viec khan cap.</string>
+    <string name="console_reminder_replied">Da phan hoi, can theo sat</string>
+    <string name="console_reminder_wait_sample">Cho sap xep gui mau</string>
+    <string name="console_reminder_item_template">%1$s · %2$s</string>
+    <string name="console_btn_write_note">Ghi chu</string>
+    <string name="console_btn_blacklist">Danh den</string>
+    <string name="console_card_meta_template">GPM %1$s · %2$s</string>
+    <string name="console_note_hint">Nhap ghi chu noi bo</string>
+    <string name="console_note_saved">Da luu ghi chu</string>
+    <string name="console_blacklist_confirm">Dua creator nay vao danh den?</string>
+    <string name="console_blacklist_done">Da dua vao danh den</string>
+    <string name="agent_detail_gpm">GPM</string>
+    <string name="agent_detail_coop">Cooperations</string>
+    <string name="agent_copy_zalo">Copy Zalo</string>
+    <string name="agent_copy_zalo_done">Zalo link copied</string>
+    <string name="agent_copy_zalo_missing">No Zalo contact in current task</string>
 </resources>

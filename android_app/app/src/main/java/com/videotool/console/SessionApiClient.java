@@ -256,6 +256,25 @@ public class SessionApiClient
         }
     }
 
+    public void updateInfluencerStatus(String adminBase, int influencerId, int status, final JsonCallback callback)
+    {
+        String base = AppPrefs.normalizeAdminBase(adminBase);
+        if (influencerId <= 0 || status < 0 || status > 6) {
+            callback.onError("invalid_influencer_status");
+            return;
+        }
+        RequestBody body = new FormBody.Builder()
+                .add("id", String.valueOf(influencerId))
+                .add("status", String.valueOf(status))
+                .build();
+        Request req = new Request.Builder()
+                .url(base + "/influencer/updateStatus")
+                .header("Accept", "application/json")
+                .post(body)
+                .build();
+        requestJson(req, callback);
+    }
+
     private void requestJson(Request request, final JsonCallback callback)
     {
         client.newCall(request).enqueue(new Callback()

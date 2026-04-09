@@ -1,0 +1,773 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.autoDm.title') : 'Auto DM Campaigns' }}{/literal}{/block}
+{block name="page_title"}<span data-i18n="page.autoDm.title">Auto DM Campaigns</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.autoDm.breadcrumb">Creator Ops / Auto DM Campaigns</span>{/block}
+
+{block name="style"}
+<style>
+  .auto-dm-wrap { padding: 16px; }
+  .auto-dm-card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 2px 10px rgba(0, 0, 0, .04); }
+  .auto-dm-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .auto-dm-summary-item { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+  .auto-dm-summary-label { color: #6b7280; font-size: 12px; }
+  .auto-dm-summary-value { color: #111827; font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .auto-dm-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .auto-dm-stats { color: #4b5563; font-size: 12px; line-height: 18px; }
+  .auto-dm-empty { text-align: center; color: #9ca3af; padding: 28px 0; }
+</style>
+{/block}
+
+{block name="content"}
+<div id="autoDmApp" class="auto-dm-wrap"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, reactive, ref, computed, onMounted } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+  const headers = {
+    'Accept': 'application/json, text/javascript, */*;q=0.01',
+    'X-Requested-With': 'XMLHttpRequest'
+  };
+
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch (_) { return null; }
+  }
+
+  function resolveApiMessage(json, fallbackKey) {
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    if (json && json.msg) return String(json.msg);
+    return tt(fallbackKey || 'common.operationFailed');
+  }
+
+  function statusTagType(status) {
+    const s = Number(status || 0);
+    if (s === 1) return 'success';
+    if (s === 2) return 'info';
+    return 'warning';
+  }
+
+  function statusText(status) {
+    const s = Number(status || 0);
+    if (s === 1) return tt('page.autoDm.statusText.running');
+    if (s === 2) return tt('page.autoDm.statusText.completed');
+    return tt('page.autoDm.statusText.paused');
+  }
+
+  function channelText(channel) {
+    const c = String(channel || '').toLowerCase();
+    if (c === 'zalo') return tt('page.autoDm.channelText.zalo');
+    if (c === 'wa' || c === 'whatsapp') return tt('page.autoDm.channelText.wa');
+    return tt('page.autoDm.channelText.auto');
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const creating = ref(false);
+      const rows = ref([]);
+      const templates = ref([]);
+      const products = ref([]);
+      const dialogVisible = ref(false);
+      const replyQueueLoading = ref(false);
+      const replyQueueRows = ref([]);
+      const replyQueuePager = reactive({ page: 1, page_size: 10, total: 0 });
+      const confirmLoadingMap = ref({});
+
+      const query = reactive({
+        keyword: '',
+        campaign_status: ''
+      });
+
+      const pager = reactive({
+        page: 1,
+        page_size: 20,
+        total: 0
+      });
+
+      const summary = reactive({
+        running_campaigns: 0,
+        pending_tasks: 0,
+        reply_pending: 0,
+        today_sent: 0,
+        today_failed: 0,
+        today_blocked: 0,
+        today_reply_detected: 0,
+        today_reply_confirmed: 0,
+        today_unsubscribed: 0
+      });
+
+      const form = reactive({
+        campaign_name: '',
+        template_id: 0,
+        product_id: 0,
+        preferred_channel: 'auto',
+        daily_limit: 80,
+        min_interval_sec: 90,
+        time_window_start: '09:00',
+        time_window_end: '21:00',
+        fail_fuse_threshold: 3,
+        keyword: '',
+        status: '',
+        category_id: 0,
+        region: '',
+        quality_grade: '',
+        limit: 300,
+        stop_on_reply: 1,
+        reply_confirm_mode: 'manual',
+        ab_templates_raw: '',
+        step1_hours: 24,
+        step2_hours: 72
+      });
+
+      const statusOptions = computed(() => [
+        { value: '', label: tt('page.autoDm.statusAll') },
+        { value: '1', label: tt('page.autoDm.statusRunning') },
+        { value: '0', label: tt('page.autoDm.statusPaused') },
+        { value: '2', label: tt('page.autoDm.statusCompleted') }
+      ]);
+
+      const channelOptions = computed(() => [
+        { value: 'auto', label: tt('page.autoDm.channelAuto') },
+        { value: 'zalo', label: tt('page.autoDm.channelZalo') },
+        { value: 'wa', label: tt('page.autoDm.channelWa') }
+      ]);
+
+      const influencerStatusOptions = computed(() => [
+        { value: '', label: tt('page.autoDm.statusAll') },
+        { value: '0', label: '0' },
+        { value: '1', label: '1' },
+        { value: '2', label: '2' },
+        { value: '3', label: '3' },
+        { value: '4', label: '4' },
+        { value: '5', label: '5' },
+        { value: '6', label: '6' }
+      ]);
+
+      const replyConfirmModeOptions = computed(() => [
+        { value: 'manual', label: tt('page.autoDm.replyModeManual') },
+        { value: 'rule_manual', label: tt('page.autoDm.replyModeRuleManual') }
+      ]);
+
+      function setConfirmLoading(id, loading) {
+        const key = Number(id || 0);
+        if (!key) return;
+        confirmLoadingMap.value = { ...confirmLoadingMap.value, [key]: !!loading };
+      }
+
+      function isConfirmLoading(id) {
+        const key = Number(id || 0);
+        if (!key) return false;
+        return !!confirmLoadingMap.value[key];
+      }
+
+      function parseAbTemplatesInput() {
+        const raw = String(form.ab_templates_raw || '').trim();
+        if (!raw) return [];
+        const ids = raw.split(/[\s,;]+/).map((item) => Number(item)).filter((num) => Number.isInteger(num) && num > 0);
+        return Array.from(new Set(ids)).map((id, index) => ({ template_id: id, weight: 100, code: String.fromCharCode(65 + (index % 26)) }));
+      }
+
+      function buildFollowupPlan() {
+        const step1 = Number(form.step1_hours || 24);
+        const step2 = Number(form.step2_hours || 72);
+        return {
+          steps: [
+            { step_no: 0, delay_hours: 0 },
+            { step_no: 1, delay_hours: Math.max(1, step1) },
+            { step_no: 2, delay_hours: Math.max(1, step2) }
+          ]
+        };
+      }
+
+      function statsLine(row) {
+        const sent = Number(row.total_sent || 0);
+        const failed = Number(row.total_failed || 0);
+        const blocked = Number(row.total_blocked || 0);
+        const targets = Number(row.total_targets || 0);
+        return tt('page.autoDm.statsTarget') + ' ' + targets
+          + ' / ' + tt('page.autoDm.statsSent') + ' ' + sent
+          + ' / ' + tt('page.autoDm.statsFailed') + ' ' + failed
+          + ' / ' + tt('page.autoDm.statsBlocked') + ' ' + blocked;
+      }
+
+      async function fetchTemplates() {
+        try {
+          const res = await fetch('/admin.php/message_template/listJson?page_size=200', { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) return;
+          templates.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (_) {}
+      }
+
+      async function fetchProducts() {
+        try {
+          const res = await fetch('/admin.php/product/listJson?page_size=200', { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) return;
+          products.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (_) {}
+      }
+
+      async function fetchList() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(pager.page));
+          p.set('page_size', String(pager.page_size));
+          if (query.keyword) p.set('keyword', String(query.keyword));
+          if (query.campaign_status !== '') p.set('campaign_status', String(query.campaign_status));
+
+          const res = await fetch('/admin.php/auto_dm/campaign/list?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+
+          const data = json.data || {};
+          rows.value = Array.isArray(data.items) ? data.items : [];
+          pager.total = Number(data.total || 0);
+          const s = data.summary || {};
+          summary.running_campaigns = Number(s.running_campaigns || 0);
+          summary.pending_tasks = Number(s.pending_tasks || 0);
+          summary.reply_pending = Number(s.reply_pending || 0);
+          summary.today_sent = Number(s.today_sent || 0);
+          summary.today_failed = Number(s.today_failed || 0);
+          summary.today_blocked = Number(s.today_blocked || 0);
+          summary.today_reply_detected = Number(s.today_reply_detected || 0);
+          summary.today_reply_confirmed = Number(s.today_reply_confirmed || 0);
+          summary.today_unsubscribed = Number(s.today_unsubscribed || 0);
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function openCreate() {
+        form.campaign_name = '';
+        form.template_id = 0;
+        form.product_id = 0;
+        form.preferred_channel = 'auto';
+        form.daily_limit = 80;
+        form.min_interval_sec = 90;
+        form.time_window_start = '09:00';
+        form.time_window_end = '21:00';
+        form.fail_fuse_threshold = 3;
+        form.keyword = '';
+        form.status = '';
+        form.category_id = 0;
+        form.region = '';
+        form.quality_grade = '';
+        form.limit = 300;
+        form.stop_on_reply = 1;
+        form.reply_confirm_mode = 'manual';
+        form.ab_templates_raw = '';
+        form.step1_hours = 24;
+        form.step2_hours = 72;
+        dialogVisible.value = true;
+      }
+
+      async function createCampaign() {
+        if (Number(form.template_id || 0) <= 0) {
+          ElMessage.warning(tt('page.autoDm.noTemplate'));
+          return;
+        }
+        creating.value = true;
+        try {
+          const res = await fetch('/admin.php/auto_dm/campaign/create', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              campaign_name: String(form.campaign_name || '').trim(),
+              template_id: Number(form.template_id || 0),
+              product_id: Number(form.product_id || 0),
+              preferred_channel: String(form.preferred_channel || 'auto'),
+              daily_limit: Number(form.daily_limit || 80),
+              min_interval_sec: Number(form.min_interval_sec || 90),
+              time_window_start: String(form.time_window_start || '09:00'),
+              time_window_end: String(form.time_window_end || '21:00'),
+              fail_fuse_threshold: Number(form.fail_fuse_threshold || 3),
+              keyword: String(form.keyword || '').trim(),
+              status: String(form.status || '').trim(),
+              category_id: Number(form.category_id || 0),
+              region: String(form.region || '').trim(),
+              quality_grade: String(form.quality_grade || '').trim(),
+              limit: Number(form.limit || 300),
+              stop_on_reply: Number(form.stop_on_reply || 0),
+              reply_confirm_mode: String(form.reply_confirm_mode || 'manual'),
+              ab_templates: parseAbTemplatesInput(),
+              followup_plan: buildFollowupPlan()
+            })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          const data = json.data || {};
+          ElMessage.success(tt('page.autoDm.createDone', {
+            created: Number(data.created || 0),
+            blocked: Number(data.blocked || 0),
+            cooling: Number(data.cooling || 0),
+            skipped: Number(data.skipped || 0)
+          }));
+          dialogVisible.value = false;
+          pager.page = 1;
+          await fetchList();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          creating.value = false;
+        }
+      }
+
+      async function setCampaignState(row, action) {
+        if (!row || Number(row.id || 0) <= 0) return;
+        const isPause = action === 'pause';
+        const confirmText = isPause
+          ? tt('page.autoDm.pauseConfirm', { id: Number(row.id || 0) })
+          : tt('page.autoDm.resumeConfirm', { id: Number(row.id || 0) });
+        await ElMessageBox.confirm(confirmText, tt('common.ok'), {
+          type: 'warning',
+          confirmButtonText: tt('common.ok'),
+          cancelButtonText: tt('common.cancel')
+        });
+
+        const endpoint = isPause ? '/admin.php/auto_dm/campaign/pause' : '/admin.php/auto_dm/campaign/resume';
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({ campaign_id: Number(row.id || 0) })
+        });
+        const json = parseJson(await res.text());
+        if (!json || json.code !== 0) {
+          throw new Error(resolveApiMessage(json, 'common.operationFailed'));
+        }
+        ElMessage.success(tt('common.updated'));
+        await fetchList();
+      }
+
+      async function onPause(row) {
+        try {
+          await setCampaignState(row, 'pause');
+        } catch (e) {
+          const msg = String((e && e.message) ? e.message : e || '');
+          if (msg === 'cancel' || msg === 'close') return;
+          ElMessage.error((e && e.message) ? e.message : tt('common.operationFailed'));
+        }
+      }
+
+      async function onResume(row) {
+        try {
+          await setCampaignState(row, 'resume');
+        } catch (e) {
+          const msg = String((e && e.message) ? e.message : e || '');
+          if (msg === 'cancel' || msg === 'close') return;
+          ElMessage.error((e && e.message) ? e.message : tt('common.operationFailed'));
+        }
+      }
+
+      async function rebuildFollowups(row) {
+        if (!row || Number(row.id || 0) <= 0) return;
+        try {
+          const res = await fetch('/admin.php/auto_dm/campaign/rebuild_followups', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ campaign_id: Number(row.id || 0) })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.operationFailed'));
+          const d = json.data || {};
+          ElMessage.success(tt('page.autoDm.rebuildDone', {
+            created: Number(d.created || 0),
+            skipped: Number(d.skipped || 0),
+            blocked: Number(d.blocked || 0)
+          }));
+          fetchList();
+        } catch (e) {
+          ElMessage.error((e && e.message) ? e.message : tt('common.operationFailed'));
+        }
+      }
+
+      async function fetchReplyQueue() {
+        replyQueueLoading.value = true;
+        try {
+          const p = new URLSearchParams();
+          p.set('page', String(replyQueuePager.page));
+          p.set('page_size', String(replyQueuePager.page_size));
+          p.set('state', 'pending');
+          const res = await fetch('/admin.php/auto_dm/reply_queue/list?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          replyQueueRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          replyQueuePager.total = Number((json.data && json.data.total) || 0);
+        } catch (e) {
+          ElMessage.error((e && e.message) ? e.message : tt('common.loadingFailed'));
+        } finally {
+          replyQueueLoading.value = false;
+        }
+      }
+
+      async function confirmReply(row, category) {
+        if (!row || Number(row.id || 0) <= 0) return;
+        const taskId = Number(row.id || 0);
+        setConfirmLoading(taskId, true);
+        try {
+          const res = await fetch('/admin.php/auto_dm/reply_queue/confirm', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              task_id: taskId,
+              confirm_category: String(category || 'other')
+            })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          fetchReplyQueue();
+          fetchList();
+        } catch (e) {
+          ElMessage.error((e && e.message) ? e.message : tt('common.saveFailed'));
+        } finally {
+          setConfirmLoading(taskId, false);
+        }
+      }
+
+      onMounted(async () => {
+        await Promise.all([fetchTemplates(), fetchProducts(), fetchList(), fetchReplyQueue()]);
+      });
+
+      return {
+        tt,
+        loading,
+        creating,
+        rows,
+        templates,
+        products,
+        query,
+        pager,
+        summary,
+        replyQueueLoading,
+        replyQueueRows,
+        replyQueuePager,
+        dialogVisible,
+        form,
+        statusOptions,
+        channelOptions,
+        influencerStatusOptions,
+        replyConfirmModeOptions,
+        fetchList,
+        openCreate,
+        createCampaign,
+        onPause,
+        onResume,
+        rebuildFollowups,
+        fetchReplyQueue,
+        confirmReply,
+        isConfirmLoading,
+        statusTagType,
+        statusText,
+        channelText,
+        statsLine
+      };
+    },
+    template: `
+      <div class="auto-dm-card">
+        <div class="auto-dm-summary">
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summaryRunning') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.running_campaigns }}</div>
+          </div>
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summaryPending') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.pending_tasks }}</div>
+          </div>
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summarySent') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.today_sent }}</div>
+          </div>
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summaryFailed') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.today_failed }}</div>
+          </div>
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summaryBlocked') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.today_blocked }}</div>
+          </div>
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summaryReplyPending') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.reply_pending }}</div>
+          </div>
+          <div class="auto-dm-summary-item">
+            <div class="auto-dm-summary-label">{{ tt('page.autoDm.summaryReplyConfirmed') }}</div>
+            <div class="auto-dm-summary-value">{{ summary.today_reply_confirmed }}</div>
+          </div>
+        </div>
+
+        <div class="auto-dm-filters">
+          <el-input v-model="query.keyword" :placeholder="tt('page.autoDm.keywordPh')" style="width: 220px;" clearable />
+          <el-select v-model="query.campaign_status" style="width: 160px;">
+            <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+          <el-button type="primary" @click="pager.page=1;fetchList()">{{ tt('common.search') }}</el-button>
+          <el-button @click="query.keyword='';query.campaign_status='';pager.page=1;fetchList()">{{ tt('common.reset') }}</el-button>
+          <el-button type="success" @click="openCreate">{{ tt('page.autoDm.create') }}</el-button>
+        </div>
+
+        <el-table v-loading="loading" :data="rows" border stripe>
+          <el-table-column prop="campaign_name" :label="tt('page.autoDm.colName')" min-width="180" />
+          <el-table-column prop="template_id" :label="tt('page.autoDm.colTemplate')" width="100" />
+          <el-table-column :label="tt('page.autoDm.colChannel')" width="150">
+            <template #default="{ row }">{{ channelText(row.preferred_channel) }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('page.autoDm.colWindow')" width="150">
+            <template #default="{ row }">{{ row.time_window_start }} - {{ row.time_window_end }}</template>
+          </el-table-column>
+          <el-table-column prop="daily_limit" :label="tt('page.autoDm.colLimit')" width="110" />
+          <el-table-column :label="tt('page.autoDm.colStats')" min-width="260">
+            <template #default="{ row }">
+              <div class="auto-dm-stats">{{ statsLine(row) }}</div>
+              <div class="auto-dm-stats">
+                {{ tt('page.autoDm.funnelPending') }} {{ (row.funnel && row.funnel.pending) || 0 }}
+                / {{ tt('page.autoDm.funnelSent') }} {{ (row.funnel && row.funnel.sent) || 0 }}
+                / {{ tt('page.autoDm.funnelReplyPending') }} {{ (row.funnel && row.funnel.reply_pending) || 0 }}
+                / {{ tt('page.autoDm.funnelConverted') }} {{ (row.funnel && row.funnel.converted) || 0 }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.autoDm.colStatus')" width="110">
+            <template #default="{ row }">
+              <el-tag size="small" :type="statusTagType(row.campaign_status)">
+                {{ statusText(row.campaign_status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="updated_at" :label="tt('page.autoDm.colUpdated')" width="170" />
+          <el-table-column :label="tt('page.autoDm.colActions')" width="150" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="Number(row.campaign_status || 0) === 1"
+                type="warning"
+                size="small"
+                @click="onPause(row)"
+              >{{ tt('page.autoDm.pause') }}</el-button>
+              <el-button
+                v-else-if="Number(row.campaign_status || 0) === 0"
+                type="success"
+                size="small"
+                @click="onResume(row)"
+              >{{ tt('page.autoDm.resume') }}</el-button>
+              <el-button size="small" plain type="info" @click="rebuildFollowups(row)">{{ tt('page.autoDm.rebuildFollowups') }}</el-button>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div v-if="!loading && rows.length===0" class="auto-dm-empty">{{ tt('common.noData') }}</div>
+
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+          <el-pagination
+            background
+            layout="total, prev, pager, next"
+            :current-page="pager.page"
+            :page-size="pager.page_size"
+            :total="pager.total"
+            @current-change="(p)=>{pager.page=p;fetchList();}"
+          />
+        </div>
+
+        <div style="margin-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <strong>{{ tt('page.autoDm.replyQueueTitle') }}</strong>
+            <el-button size="small" @click="fetchReplyQueue">{{ tt('common.refresh') }}</el-button>
+          </div>
+          <el-table :data="replyQueueRows" v-loading="replyQueueLoading" border stripe>
+            <el-table-column :label="tt('page.outreach.colInfluencer')" min-width="180">
+              <template #default="{ row }">{{ row.tiktok_id }} / {{ row.nickname }}</template>
+            </el-table-column>
+            <el-table-column prop="campaign_name" :label="tt('page.autoDm.colName')" min-width="180" />
+            <el-table-column :label="tt('page.autoDm.stepNo')" width="90">
+              <template #default="{ row }">{{ tt('page.autoDm.stepNo') }} {{ Number(row.step_no || 0) }}</template>
+            </el-table-column>
+            <el-table-column prop="reply_text" :label="tt('page.autoDm.replyText')" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="rule_category" :label="tt('page.autoDm.replyRuleCategory')" width="130" />
+            <el-table-column prop="reply_at" :label="tt('page.autoDm.replyAt')" min-width="160" />
+            <el-table-column :label="tt('page.autoDm.replyActions')" width="280" fixed="right">
+              <template #default="{ row }">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <el-button size="small" type="success" plain :loading="isConfirmLoading(row.id)" @click="confirmReply(row, 'intent')">{{ tt('page.autoDm.confirmIntent') }}</el-button>
+                  <el-button size="small" type="warning" plain :loading="isConfirmLoading(row.id)" @click="confirmReply(row, 'inquiry')">{{ tt('page.autoDm.confirmInquiry') }}</el-button>
+                  <el-button size="small" type="info" plain :loading="isConfirmLoading(row.id)" @click="confirmReply(row, 'reject')">{{ tt('page.autoDm.confirmReject') }}</el-button>
+                  <el-button size="small" type="danger" plain :loading="isConfirmLoading(row.id)" @click="confirmReply(row, 'unsubscribe')">{{ tt('page.autoDm.confirmUnsubscribe') }}</el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+            <el-pagination
+              background
+              layout="total, prev, pager, next"
+              :current-page="replyQueuePager.page"
+              :page-size="replyQueuePager.page_size"
+              :total="replyQueuePager.total"
+              @current-change="(p)=>{replyQueuePager.page=p;fetchReplyQueue();}"
+            />
+          </div>
+        </div>
+
+        <el-dialog v-model="dialogVisible" :title="tt('page.autoDm.dialogTitle')" width="760px">
+          <el-form label-position="top">
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldName')">
+                  <el-input v-model="form.campaign_name" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldTemplate')">
+                  <el-select v-model="form.template_id" style="width:100%;">
+                    <el-option :label="tt('page.autoDm.allTemplates')" :value="0" />
+                    <el-option v-for="tpl in templates" :key="tpl.id" :label="(tpl.name || ('#'+tpl.id)) + ' [' + (tpl.lang || 'en') + ']'" :value="Number(tpl.id || 0)" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldProduct')">
+                  <el-select v-model="form.product_id" style="width:100%;">
+                    <el-option :label="tt('page.autoDm.allProducts')" :value="0" />
+                    <el-option v-for="prod in products" :key="prod.id" :label="prod.name || ('#'+prod.id)" :value="Number(prod.id || 0)" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldChannel')">
+                  <el-select v-model="form.preferred_channel" style="width:100%;">
+                    <el-option v-for="opt in channelOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="8">
+                <el-form-item :label="tt('page.autoDm.fieldDailyLimit')">
+                  <el-input-number v-model="form.daily_limit" :min="1" :max="100000" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="tt('page.autoDm.fieldMinInterval')">
+                  <el-input-number v-model="form.min_interval_sec" :min="10" :max="86400" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="tt('page.autoDm.fieldFuse')">
+                  <el-input-number v-model="form.fail_fuse_threshold" :min="1" :max="100" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldWindowStart')">
+                  <el-input v-model="form.time_window_start" placeholder="09:00" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldWindowEnd')">
+                  <el-input v-model="form.time_window_end" placeholder="21:00" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldKeyword')">
+                  <el-input v-model="form.keyword" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldStatus')">
+                  <el-select v-model="form.status" style="width:100%;">
+                    <el-option v-for="opt in influencerStatusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="6">
+                <el-form-item :label="tt('page.autoDm.fieldCategory')">
+                  <el-input-number v-model="form.category_id" :min="0" :max="999999" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item :label="tt('page.autoDm.fieldRegion')">
+                  <el-input v-model="form.region" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item :label="tt('page.autoDm.fieldQuality')">
+                  <el-input v-model="form.quality_grade" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item :label="tt('page.autoDm.fieldLimit')">
+                  <el-input-number v-model="form.limit" :min="1" :max="5000" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="8">
+                <el-form-item :label="tt('page.autoDm.fieldStopOnReply')">
+                  <el-switch v-model="form.stop_on_reply" :active-value="1" :inactive-value="0" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="tt('page.autoDm.fieldReplyMode')">
+                  <el-select v-model="form.reply_confirm_mode" style="width:100%;">
+                    <el-option v-for="opt in replyConfirmModeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="tt('page.autoDm.fieldAbTemplates')">
+                  <el-input v-model="form.ab_templates_raw" :placeholder="tt('page.autoDm.fieldAbTemplatesPh')" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldStep1Hours')">
+                  <el-input-number v-model="form.step1_hours" :min="1" :max="720" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldStep2Hours')">
+                  <el-input-number v-model="form.step2_hours" :min="1" :max="720" style="width:100%;" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-form>
+          <template #footer>
+            <el-button @click="dialogVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" :loading="creating" @click="createCampaign">{{ tt('common.save') }}</el-button>
+          </template>
+        </el-dialog>
+      </div>
+    `
+  }).mount('#autoDmApp');
+})();
+{/literal}
+</script>
+{/block}

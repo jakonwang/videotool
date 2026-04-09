@@ -1,28 +1,30 @@
 ﻿<resources>
-    <color name="brand_primary">#0052FF</color>
-    <color name="brand_primary_dark">#003BCC</color>
-    <color name="brand_accent">#25F4EE</color>
+    <color name="brand_primary">#1677FF</color>
+    <color name="brand_primary_dark">#0F5ED6</color>
+    <color name="action_gradient_start">#2D8CFF</color>
+    <color name="action_gradient_end">#1764E8</color>
+    <color name="brand_accent">#1677FF</color>
 
-    <color name="bg_page_top">#EEF4FF</color>
-    <color name="bg_page_bottom">#F8F9FB</color>
+    <color name="bg_page_top">#EAF2FF</color>
+    <color name="bg_page_bottom">#F2F4F7</color>
     <color name="card_surface">#FFFFFF</color>
-    <color name="card_surface_alt">#F3F7FF</color>
-    <color name="stroke_soft">#DDE6F6</color>
+    <color name="card_surface_alt">#F8FAFD</color>
+    <color name="stroke_soft">#E5EAF2</color>
 
-    <color name="text_primary">#0F172A</color>
-    <color name="text_secondary">#5D6B86</color>
-    <color name="text_muted">#7E8CA8</color>
+    <color name="text_primary">#1F2D3D</color>
+    <color name="text_secondary">#5F6B7A</color>
+    <color name="text_muted">#98A2B3</color>
     <color name="text_inverse">#FFFFFF</color>
 
-    <color name="btn_secondary_bg">#E8EEFF</color>
-    <color name="btn_secondary_text">#1D4ECD</color>
-    <color name="btn_neutral_bg">#EEF2F8</color>
-    <color name="btn_neutral_text">#34445F</color>
-    <color name="btn_danger_bg">#FDECEE</color>
-    <color name="btn_danger_text">#C23648</color>
-    <color name="btn_success_bg">#EAF9F2</color>
-    <color name="btn_success_text">#1C8F61</color>
+    <color name="btn_secondary_bg">#EAF3FF</color>
+    <color name="btn_secondary_text">#1764E8</color>
+    <color name="btn_neutral_bg">#EEF1F5</color>
+    <color name="btn_neutral_text">#5F6B7A</color>
+    <color name="btn_danger_bg">#FDEEEF</color>
+    <color name="btn_danger_text">#C5484D</color>
+    <color name="btn_success_bg">#EAF8F0</color>
+    <color name="btn_success_text">#1D8C57</color>
 
-    <color name="log_panel_bg">#0F1D34</color>
-    <color name="log_panel_text">#D9E5FF</color>
+    <color name="log_panel_bg">#F4F7FC</color>
+    <color name="log_panel_text">#334155</color>
 </resources>

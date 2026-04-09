@@ -15,7 +15,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class AgentApiClient {
-    public static final String AGENT_VERSION = "android-agent/1.0.0";
+    public static final String AGENT_VERSION = "android-agent/1.1.0";
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     private final OkHttpClient client;
@@ -53,15 +53,73 @@ public class AgentApiClient {
     }
 
     public void pullTask(final AgentConfig config, final ApiCallback<PullResult> callback) {
+        pullTaskInternal(config, callback, false);
+    }
+
+    public void pullTaskAuto(final AgentConfig config, final ApiCallback<PullResult> callback) {
+        pullTaskInternal(config, callback, true);
+    }
+
+    public void report(
+            final AgentConfig config,
+            final int taskId,
+            final String event,
+            final String renderedText,
+            final String errorCode,
+            final String errorMessage,
+            final String screenshotPath,
+            final ApiCallback<ReportResult> callback
+    ) {
+        reportInternal(config, taskId, event, renderedText, errorCode, errorMessage, screenshotPath, callback, false);
+    }
+
+    public void reportAuto(
+            final AgentConfig config,
+            final int taskId,
+            final String event,
+            final String renderedText,
+            final String errorCode,
+            final String errorMessage,
+            final String screenshotPath,
+            final ApiCallback<ReportResult> callback
+    ) {
+        reportInternal(config, taskId, event, renderedText, errorCode, errorMessage, screenshotPath, callback, true);
+    }
+
+    private void pullTaskInternal(final AgentConfig config, final ApiCallback<PullResult> callback, final boolean autoMode) {
         try {
-            String url = config.getAdminBase() + "/mobile_agent/pull";
+            String url = config.getAdminBase() + (autoMode ? "/mobile_agent/pull_auto" : "/mobile_agent/pull");
             JSONObject payload = new JSONObject();
             payload.put("token", config.getToken());
             payload.put("device_code", config.getDeviceCode());
             payload.put("agent_version", AGENT_VERSION);
             JSONArray taskTypes = new JSONArray();
-            for (String type : config.getTaskTypes()) {
-                taskTypes.put(type);
+            if (autoMode) {
+                boolean includeZalo = false;
+                boolean includeWa = false;
+                for (String type : config.getTaskTypes()) {
+                    String key = type == null ? "" : type.trim().toLowerCase();
+                    if ("zalo_im".equals(key)) {
+                        includeZalo = true;
+                    }
+                    if ("wa_im".equals(key)) {
+                        includeWa = true;
+                    }
+                }
+                if (!includeZalo && !includeWa) {
+                    includeZalo = true;
+                    includeWa = true;
+                }
+                if (includeZalo) {
+                    taskTypes.put("zalo_auto_dm");
+                }
+                if (includeWa) {
+                    taskTypes.put("wa_auto_dm");
+                }
+            } else {
+                for (String type : config.getTaskTypes()) {
+                    taskTypes.put(type);
+                }
             }
             payload.put("task_types", taskTypes);
 
@@ -111,7 +169,7 @@ public class AgentApiClient {
         }
     }
 
-    public void report(
+    private void reportInternal(
             final AgentConfig config,
             final int taskId,
             final String event,
@@ -119,10 +177,11 @@ public class AgentApiClient {
             final String errorCode,
             final String errorMessage,
             final String screenshotPath,
-            final ApiCallback<ReportResult> callback
+            final ApiCallback<ReportResult> callback,
+            final boolean autoMode
     ) {
         try {
-            String url = config.getAdminBase() + "/mobile_agent/report";
+            String url = config.getAdminBase() + (autoMode ? "/mobile_agent/report_auto" : "/mobile_agent/report");
             JSONObject payload = new JSONObject();
             payload.put("token", config.getToken());
             payload.put("device_code", config.getDeviceCode());

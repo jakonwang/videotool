@@ -127,6 +127,22 @@
       const historyVisible = ref(false);
       const historyRows = ref([]);
       const mobileTaskLoadingMap = ref({});
+      const selectedRows = ref([]);
+      const autoDmVisible = ref(false);
+      const autoDmSubmitting = ref(false);
+      const autoDmForm = reactive({
+        campaign_name: '',
+        template_id: null,
+        product_id: null,
+        preferred_channel: 'auto',
+        daily_limit: 80,
+        min_interval_sec: 90,
+        time_window_start: '09:00',
+        time_window_end: '21:00',
+        fail_fuse_threshold: 3,
+        stop_on_reply: 1,
+        reply_confirm_mode: 'manual'
+      });
 
       function stopImportPolling() {
         if (importPollTimer) {
@@ -616,6 +632,87 @@
         return createMobileTask(row, 'tiktok_dm');
       }
 
+      function onTableSelectionChange(rows) {
+        selectedRows.value = Array.isArray(rows) ? rows : [];
+      }
+
+      async function openAutoDmDialog() {
+        if (!Array.isArray(selectedRows.value) || selectedRows.value.length === 0) {
+          ElMessage.warning(tt('page.influencer.autoDmNeedSelection'));
+          return;
+        }
+        await loadOutreachLists();
+        autoDmForm.campaign_name = '';
+        autoDmForm.template_id = null;
+        autoDmForm.product_id = null;
+        autoDmForm.preferred_channel = 'auto';
+        autoDmForm.daily_limit = 80;
+        autoDmForm.min_interval_sec = 90;
+        autoDmForm.time_window_start = '09:00';
+        autoDmForm.time_window_end = '21:00';
+        autoDmForm.fail_fuse_threshold = 3;
+        autoDmForm.stop_on_reply = 1;
+        autoDmForm.reply_confirm_mode = 'manual';
+        autoDmVisible.value = true;
+      }
+
+      async function createAutoDmCampaign() {
+        if (!Array.isArray(selectedRows.value) || selectedRows.value.length === 0) {
+          ElMessage.warning(tt('page.influencer.autoDmNeedSelection'));
+          return;
+        }
+        const ids = selectedRows.value.map((row) => Number(row.id || 0)).filter((id) => id > 0);
+        if (!ids.length) {
+          ElMessage.warning(tt('page.influencer.autoDmNeedSelection'));
+          return;
+        }
+        if (!autoDmForm.template_id) {
+          ElMessage.warning(tt('page.influencer.autoDmTemplateRequired'));
+          return;
+        }
+        autoDmSubmitting.value = true;
+        try {
+          const res = await fetch('/admin.php/auto_dm/campaign/create', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+              campaign_name: String(autoDmForm.campaign_name || '').trim(),
+              template_id: Number(autoDmForm.template_id || 0),
+              product_id: Number(autoDmForm.product_id || 0),
+              preferred_channel: String(autoDmForm.preferred_channel || 'auto'),
+              daily_limit: Number(autoDmForm.daily_limit || 80),
+              min_interval_sec: Number(autoDmForm.min_interval_sec || 90),
+              time_window_start: String(autoDmForm.time_window_start || '09:00'),
+              time_window_end: String(autoDmForm.time_window_end || '21:00'),
+              fail_fuse_threshold: Number(autoDmForm.fail_fuse_threshold || 3),
+              stop_on_reply: Number(autoDmForm.stop_on_reply || 0),
+              reply_confirm_mode: String(autoDmForm.reply_confirm_mode || 'manual'),
+              influencer_ids: ids,
+              followup_plan: {
+                steps: [
+                  { step_no: 0, delay_hours: 0 },
+                  { step_no: 1, delay_hours: 24 },
+                  { step_no: 2, delay_hours: 72 }
+                ]
+              }
+            })
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (!json || json.code !== 0) {
+            ElMessage.error(resolveApiMessage(json, 'common.saveFailed'));
+            return;
+          }
+          const d = json.data || {};
+          ElMessage.success(tt('page.influencer.autoDmCreated', { created: Number(d.created || 0) }));
+          autoDmVisible.value = false;
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          autoDmSubmitting.value = false;
+        }
+      }
+
       async function quickSetStatus(row, status) {
         try {
           const res = await fetch('/admin.php/influencer/updateStatus', {
@@ -920,6 +1017,13 @@
         mobileTaskLoading,
         queueMobileWarmup,
         queueMobileDm,
+        selectedRows,
+        onTableSelectionChange,
+        autoDmVisible,
+        autoDmSubmitting,
+        autoDmForm,
+        openAutoDmDialog,
+        createAutoDmCampaign,
       };
     },
     template: `
@@ -984,10 +1088,12 @@
           <el-form-item style="margin-left:auto;">
             <el-button type="primary" @click="onSearch">{{ tt('common.search') }}</el-button>
             <el-button @click="onReset">{{ tt('common.reset') }}</el-button>
+            <el-button type="success" plain @click="openAutoDmDialog">{{ tt('page.influencer.autoDmBatch') }}</el-button>
           </el-form-item>
         </el-form>
 
-        <el-table :data="rows" stripe v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle" row-key="id" table-layout="fixed">
+        <el-table :data="rows" stripe v-loading="loading" :header-cell-style="headerCellStyle" :cell-style="cellStyle" row-key="id" table-layout="fixed" @selection-change="onTableSelectionChange">
+          <el-table-column type="selection" width="44" align="center" />
           <el-table-column prop="tiktok_id" :label="tt('page.influencer.colHandle')" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="inf-nowrap">{{ row.tiktok_id }}</span>
@@ -1130,6 +1236,50 @@
                 </el-tooltip>
               </div>
             </div>
+          </template>
+        </el-dialog>
+
+        <el-dialog v-model="autoDmVisible" :title="tt('page.influencer.autoDmBatchTitle')" width="620px" destroy-on-close>
+          <div style="margin-bottom:10px;color:#4b5563;font-size:13px;">
+            {{ tt('page.influencer.autoDmSelected', { count: selectedRows.length }) }}
+          </div>
+          <el-form label-position="top">
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldName')">
+                  <el-input v-model="autoDmForm.campaign_name" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldTemplate')">
+                  <el-select v-model="autoDmForm.template_id" style="width:100%;" filterable>
+                    <el-option v-for="t in tplList" :key="t.id" :label="(t.name || ('#' + t.id)) + ' [' + (t.lang || 'en') + ']'" :value="t.id" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldProduct')">
+                  <el-select v-model="autoDmForm.product_id" clearable style="width:100%;" filterable>
+                    <el-option v-for="p in productList" :key="p.id" :label="p.name || ('#' + p.id)" :value="p.id" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item :label="tt('page.autoDm.fieldChannel')">
+                  <el-select v-model="autoDmForm.preferred_channel" style="width:100%;">
+                    <el-option :label="tt('page.autoDm.channelAuto')" value="auto" />
+                    <el-option :label="tt('page.autoDm.channelZalo')" value="zalo" />
+                    <el-option :label="tt('page.autoDm.channelWa')" value="wa" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-form>
+          <template #footer>
+            <el-button @click="autoDmVisible=false">{{ tt('common.cancel') }}</el-button>
+            <el-button type="primary" :loading="autoDmSubmitting" @click="createAutoDmCampaign">{{ tt('common.save') }}</el-button>
           </template>
         </el-dialog>
 

@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -12,8 +13,12 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.HapticFeedbackConstants;
+import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
+import android.view.animation.AnimationUtils;
 import android.view.animation.LinearInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -26,8 +31,12 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.widget.NestedScrollView;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.videotool.AgentControlActivity;
 import com.videotool.R;
@@ -41,13 +50,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import de.hdodenhof.circleimageview.CircleImageView;
-
 public class ModuleConsoleActivity extends AppCompatActivity
 {
     private static final String[] LANG_CODES = new String[]{"zh", "en", "vi"};
     private static final String[] TASK_TYPE_VALUES = new String[]{"", "comment_warmup", "tiktok_dm", "zalo_im", "wa_im"};
     private static final String[] TASK_STATUS_VALUES = new String[]{"", "0", "1", "2", "3", "4", "5", "6"};
+    private static final int MODULE_GRID_SPAN_COUNT = 3;
+    private static final int MODULE_GRID_MAX_ITEMS = 9;
 
     private AppPrefs prefs;
     private SessionApiClient apiClient;
@@ -60,6 +69,11 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private TextView textEmptyHint;
     private TextView textTaskPageInfo;
     private TextView textProfileUser;
+    private TextView textProfileAvatar;
+    private TextView textProfilePortalBadge;
+    private TextView textProfileRoleValue;
+    private TextView textProfileTenantValue;
+    private TextView textProfileEndpointValue;
     private Spinner spinnerLanguage;
     private Spinner spinnerTaskType;
     private Spinner spinnerTaskStatus;
@@ -67,11 +81,14 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private Button btnTaskPrevPage;
     private Button btnTaskNextPage;
     private LinearLayout taskCardContainer;
-    private LinearLayout moduleBoardContainer;
+    private RecyclerView moduleBoardRecycler;
+    private LinearLayout moduleSectionContainer;
+    private LinearLayout reminderContainer;
     private LinearLayout skeletonContainer;
     private NestedScrollView scrollWorkbench;
     private ScrollView scrollProfile;
     private BottomNavigationView bottomNav;
+    private ModuleBoardAdapter moduleBoardAdapter;
 
     private boolean languageInitialized = false;
     private boolean suppressTaskFilterCallbacks = false;
@@ -83,7 +100,8 @@ public class ModuleConsoleActivity extends AppCompatActivity
     private int currentTaskPageSize = 20;
     private int currentTaskTotal = 0;
     private int activeNavItemId = R.id.nav_workbench;
-    private AlphaAnimation skeletonPulseAnim;
+    private final List<ModuleSection> moduleSections = new ArrayList<>();
+    private int selectedModuleSectionIndex = 0;
 
     @Override
     protected void attachBaseContext(android.content.Context newBase)
@@ -97,6 +115,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         LocaleHelper.applySavedLocale(this);
         setContentView(R.layout.activity_module_console);
+        applyConsoleSystemBars();
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
@@ -112,9 +131,27 @@ public class ModuleConsoleActivity extends AppCompatActivity
         bindLanguageSwitch();
         bindTaskFilters();
         bindButtons();
+        bindMicroInteractions();
         bindBottomNavigation();
         renderUserHeader();
         loadBootstrap();
+    }
+
+    private void applyConsoleSystemBars()
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(color(R.color.brand_primary_dark));
+            getWindow().setNavigationBarColor(color(R.color.card_surface));
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            View decorView = getWindow().getDecorView();
+            int uiFlags = decorView.getSystemUiVisibility();
+            uiFlags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                uiFlags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            decorView.setSystemUiVisibility(uiFlags);
+        }
     }
 
     @Override
@@ -123,7 +160,6 @@ public class ModuleConsoleActivity extends AppCompatActivity
         super.onResume();
         renderUserHeader();
         switchTab(activeNavItemId);
-        loadActiveDeviceCount();
         if (creatorModuleEnabled) {
             loadTaskDashboard(currentTaskPage);
         }
@@ -139,6 +175,11 @@ public class ModuleConsoleActivity extends AppCompatActivity
         textEmptyHint = findViewById(R.id.text_empty_hint);
         textTaskPageInfo = findViewById(R.id.text_task_page_info);
         textProfileUser = findViewById(R.id.text_profile_user);
+        textProfileAvatar = findViewById(R.id.text_profile_avatar);
+        textProfilePortalBadge = findViewById(R.id.text_profile_portal_badge);
+        textProfileRoleValue = findViewById(R.id.text_profile_role_value);
+        textProfileTenantValue = findViewById(R.id.text_profile_tenant_value);
+        textProfileEndpointValue = findViewById(R.id.text_profile_endpoint_value);
         spinnerLanguage = findViewById(R.id.spinner_language_console);
         spinnerTaskType = findViewById(R.id.spinner_task_type);
         spinnerTaskStatus = findViewById(R.id.spinner_task_status);
@@ -146,11 +187,33 @@ public class ModuleConsoleActivity extends AppCompatActivity
         btnTaskPrevPage = findViewById(R.id.btn_task_page_prev);
         btnTaskNextPage = findViewById(R.id.btn_task_page_next);
         taskCardContainer = findViewById(R.id.task_card_container);
-        moduleBoardContainer = findViewById(R.id.module_board_container);
+        moduleBoardRecycler = findViewById(R.id.module_board_recycler);
+        moduleSectionContainer = findViewById(R.id.module_section_container);
+        reminderContainer = findViewById(R.id.reminder_container);
         skeletonContainer = findViewById(R.id.skeleton_container);
         scrollWorkbench = findViewById(R.id.scroll_workbench);
         scrollProfile = findViewById(R.id.scroll_profile);
         bottomNav = findViewById(R.id.bottom_nav);
+        setupModuleBoardRecycler();
+    }
+
+    private void setupModuleBoardRecycler()
+    {
+        if (moduleBoardRecycler == null) {
+            return;
+        }
+        moduleBoardRecycler.setNestedScrollingEnabled(false);
+        moduleBoardRecycler.setHasFixedSize(true);
+        if (moduleBoardRecycler.getLayoutManager() == null) {
+            moduleBoardRecycler.setLayoutManager(new GridLayoutManager(this, MODULE_GRID_SPAN_COUNT));
+        }
+        if (moduleBoardRecycler.getItemDecorationCount() == 0) {
+            moduleBoardRecycler.addItemDecoration(new GridSpacingDecoration(MODULE_GRID_SPAN_COUNT, dp(8)));
+        }
+        if (moduleBoardAdapter == null) {
+            moduleBoardAdapter = new ModuleBoardAdapter();
+            moduleBoardRecycler.setAdapter(moduleBoardAdapter);
+        }
     }
 
     private void bindTaskFilters()
@@ -255,24 +318,40 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
     private void bindButtons()
     {
-        Button btnLogout = findViewById(R.id.btn_logout);
-        Button btnExecutionCenter = findViewById(R.id.btn_open_execution_center);
-        Button btnProfileDevices = findViewById(R.id.btn_profile_devices);
-        Button btnRefresh = findViewById(R.id.btn_refresh_tasks);
-        Button btnSearch = findViewById(R.id.btn_search_task_keyword);
-        Button btnCreateCommentTask = findViewById(R.id.btn_create_comment_task);
-        Button btnCreateDmTask = findViewById(R.id.btn_create_dm_task);
-        Button btnResetFilters = findViewById(R.id.btn_reset_task_filters);
+        View btnLogout = findViewById(R.id.btn_logout);
+        View btnExecutionCenter = findViewById(R.id.btn_open_execution_center);
+        View btnProfileDevices = findViewById(R.id.btn_profile_devices);
+        View btnRefresh = findViewById(R.id.btn_refresh_tasks);
+        View btnSearch = findViewById(R.id.btn_search_task_keyword);
+        View btnCreateCommentTask = findViewById(R.id.btn_create_comment_task);
+        View btnCreateDmTask = findViewById(R.id.btn_create_dm_task);
+        View btnResetFilters = findViewById(R.id.btn_reset_task_filters);
 
-        btnLogout.setOnClickListener(v -> doLogout());
-        btnExecutionCenter.setOnClickListener(v -> startActivity(new Intent(this, AgentControlActivity.class)));
-        btnProfileDevices.setOnClickListener(v ->
-                openModule(getString(R.string.console_profile_manage_device), "/admin.php/device"));
-        btnRefresh.setOnClickListener(v -> reloadTaskDashboard(true));
-        btnSearch.setOnClickListener(v -> reloadTaskDashboard(true));
-        btnCreateCommentTask.setOnClickListener(v -> createTaskBatch("comment_warmup"));
-        btnCreateDmTask.setOnClickListener(v -> createTaskBatch("tiktok_dm"));
-        btnResetFilters.setOnClickListener(v -> resetTaskFilters());
+        if (btnLogout != null) {
+            btnLogout.setOnClickListener(v -> doLogout());
+        }
+        if (btnExecutionCenter != null) {
+            btnExecutionCenter.setOnClickListener(v -> startActivity(new Intent(this, AgentControlActivity.class)));
+        }
+        if (btnProfileDevices != null) {
+            btnProfileDevices.setOnClickListener(v ->
+                    openModule(getString(R.string.console_profile_manage_device), "/admin.php/device"));
+        }
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> reloadTaskDashboard(true));
+        }
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> reloadTaskDashboard(true));
+        }
+        if (btnCreateCommentTask != null) {
+            btnCreateCommentTask.setOnClickListener(v -> createTaskBatch("comment_warmup"));
+        }
+        if (btnCreateDmTask != null) {
+            btnCreateDmTask.setOnClickListener(v -> createTaskBatch("tiktok_dm"));
+        }
+        if (btnResetFilters != null) {
+            btnResetFilters.setOnClickListener(v -> resetTaskFilters());
+        }
         btnTaskPrevPage.setOnClickListener(v -> {
             if (currentTaskPage > 1) {
                 loadTaskDashboard(currentTaskPage - 1);
@@ -313,6 +392,20 @@ public class ModuleConsoleActivity extends AppCompatActivity
         switchTab(R.id.nav_workbench);
     }
 
+    private void bindMicroInteractions()
+    {
+        applyTouchFeedback(findViewById(R.id.btn_logout));
+        applyTouchFeedback(findViewById(R.id.btn_open_execution_center));
+        applyTouchFeedback(findViewById(R.id.btn_profile_devices));
+        applyTouchFeedback(findViewById(R.id.btn_refresh_tasks));
+        applyTouchFeedback(findViewById(R.id.btn_search_task_keyword));
+        applyTouchFeedback(findViewById(R.id.btn_create_comment_task));
+        applyTouchFeedback(findViewById(R.id.btn_create_dm_task));
+        applyTouchFeedback(findViewById(R.id.btn_reset_task_filters));
+        applyTouchFeedback(findViewById(R.id.btn_task_page_prev));
+        applyTouchFeedback(findViewById(R.id.btn_task_page_next));
+    }
+
     private void switchTab(int itemId)
     {
         activeNavItemId = itemId;
@@ -322,27 +415,48 @@ public class ModuleConsoleActivity extends AppCompatActivity
         if (scrollProfile != null) {
             scrollProfile.setVisibility(itemId == R.id.nav_profile ? View.VISIBLE : View.GONE);
         }
-        if (bottomNav != null && bottomNav.getSelectedItemId() != itemId) {
-            bottomNav.setSelectedItemId(itemId);
-        }
     }
 
     private void renderUserHeader()
     {
+        String username = prefs.getUsername().trim();
         String role = prefs.getRole();
         currentPortal = prefs.getPortal();
+        String portalLabel = "influencer".equals(currentPortal)
+                ? getString(R.string.portal_influencer_title)
+                : getString(R.string.portal_merchant_title);
         textPortalTitle.setText("influencer".equals(currentPortal)
                 ? getString(R.string.portal_influencer_title)
                 : getString(R.string.portal_merchant_title));
         String userInfo = getString(
                 R.string.console_user_info,
-                prefs.getUsername(),
+                username,
                 role,
                 String.valueOf(prefs.getTenantId())
         );
         textUserInfo.setText(userInfo);
         if (textProfileUser != null) {
-            textProfileUser.setText(userInfo);
+            textProfileUser.setText(username.isEmpty() ? "-" : username);
+        }
+        if (textProfileAvatar != null) {
+            String letter = username.isEmpty() ? "U" : username.substring(0, 1).toUpperCase(Locale.ROOT);
+            textProfileAvatar.setText(letter);
+        }
+        if (textProfilePortalBadge != null) {
+            textProfilePortalBadge.setText(portalLabel);
+        }
+        if (textProfileRoleValue != null) {
+            textProfileRoleValue.setText(role.isEmpty() ? "-" : role);
+        }
+        if (textProfileTenantValue != null) {
+            textProfileTenantValue.setText("T-" + prefs.getTenantId());
+        }
+        if (textProfileEndpointValue != null) {
+            String endpoint = AppPrefs.baseOrigin(prefs.getAdminBase());
+            if (endpoint.isEmpty()) {
+                endpoint = getString(R.string.console_profile_endpoint_unknown);
+            }
+            textProfileEndpointValue.setText(endpoint);
         }
     }
 
@@ -399,10 +513,9 @@ public class ModuleConsoleActivity extends AppCompatActivity
         renderModuleBoard(data.optJSONArray("menus"));
 
         creatorModuleEnabled = hasEnabledModule(data.optJSONArray("enabled_modules"), "creator_crm");
-        loadActiveDeviceCount();
         if (!creatorModuleEnabled) {
             showEmpty(getString(R.string.console_creator_module_disabled));
-            setSummary(0, 0);
+            setSummary(0, 0, 0);
             updateTaskPager();
             return;
         }
@@ -482,17 +595,20 @@ public class ModuleConsoleActivity extends AppCompatActivity
     {
         showTaskLoading(false);
         JSONObject summary = data.optJSONObject("summary");
+        int creatorTotal = 0;
         int outreachToday = 0;
-        int pendingTasks = 0;
+        int waitSampleCount = 0;
         if (summary != null) {
+            creatorTotal = summary.optInt("influencer_total", 0);
             outreachToday = summary.optInt("today_contacted",
-                    summary.optInt("reached_count",
-                            summary.optInt("today_total_tasks", 0)));
-            pendingTasks = summary.optInt("pending_count", summary.optInt("today_total_tasks", data.optInt("total", 0)));
-        } else {
-            pendingTasks = data.optInt("total", 0);
+                    summary.optInt("reached_count", 0));
+            waitSampleCount = summary.optInt("wait_sample_count",
+                    summary.optInt("sample_shipped", 0));
         }
-        setSummary(outreachToday, pendingTasks);
+        if (creatorTotal <= 0) {
+            creatorTotal = data.optInt("total", 0);
+        }
+        setSummary(creatorTotal, outreachToday, waitSampleCount);
 
         rawTaskItems = data.optJSONArray("items");
         if (rawTaskItems == null) {
@@ -504,12 +620,14 @@ public class ModuleConsoleActivity extends AppCompatActivity
         totalTaskPages = Math.max(1, (int) Math.ceil(currentTaskTotal / (double) Math.max(1, currentTaskPageSize)));
         updateTaskPager();
         renderTaskCards(rawTaskItems);
+        renderReminders(rawTaskItems);
     }
 
-    private void setSummary(int outreachToday, int pendingTasks)
+    private void setSummary(int creatorTotal, int outreachToday, int waitSampleCount)
     {
-        textMetricContacted.setText(String.valueOf(Math.max(0, outreachToday)));
-        textMetricPendingReply.setText(String.valueOf(Math.max(0, pendingTasks)));
+        textMetricContacted.setText(String.valueOf(Math.max(0, creatorTotal)));
+        textMetricPendingReply.setText(String.valueOf(Math.max(0, outreachToday)));
+        textMetricActiveDevices.setText(String.valueOf(Math.max(0, waitSampleCount)));
     }
 
     private void renderTaskCards(JSONArray items)
@@ -533,6 +651,75 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
         if (rendered <= 0) {
             showEmpty(getString(R.string.console_no_data));
+            return;
+        }
+        taskCardContainer.setLayoutAnimation(AnimationUtils.loadLayoutAnimation(this, R.anim.layout_task_stagger_in));
+        taskCardContainer.scheduleLayoutAnimation();
+    }
+
+    private void renderReminders(JSONArray items)
+    {
+        if (reminderContainer == null) {
+            return;
+        }
+        reminderContainer.removeAllViews();
+        List<JSONObject> urgent = new ArrayList<>();
+        if (items != null) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject row = items.optJSONObject(i);
+                if (row == null) {
+                    continue;
+                }
+                int influencerStatus = row.optInt("influencer_status", 0);
+                if (influencerStatus == 2 || influencerStatus == 3) {
+                    urgent.add(row);
+                }
+            }
+        }
+        if (urgent.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setBackgroundResource(R.drawable.bg_card_alt);
+            empty.setPadding(dp(12), dp(12), dp(12), dp(12));
+            empty.setTextColor(color(R.color.text_secondary));
+            empty.setTextSize(11f);
+            empty.setText(getString(R.string.console_reminder_empty));
+            empty.setElevation(dp(2));
+            reminderContainer.addView(empty);
+            return;
+        }
+
+        int max = Math.min(3, urgent.size());
+        for (int i = 0; i < max; i++) {
+            JSONObject row = urgent.get(i);
+            TextView item = new TextView(this);
+            item.setBackgroundResource(R.drawable.bg_card);
+            item.setTextColor(color(R.color.text_primary));
+            item.setTextSize(12f);
+            item.setPadding(dp(12), dp(12), dp(12), dp(12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            if (i > 0) {
+                lp.topMargin = dp(10);
+            }
+            item.setLayoutParams(lp);
+            item.setElevation(dp(2));
+            String handle = sanitizeHandle(row.optString("tiktok_id", ""));
+            if (handle.isEmpty()) {
+                handle = row.optString("nickname", "-");
+            } else {
+                handle = "@" + handle;
+            }
+            int influencerStatus = row.optInt("influencer_status", 0);
+            String reminderType = influencerStatus == 2
+                    ? getString(R.string.console_reminder_replied)
+                    : getString(R.string.console_reminder_wait_sample);
+            item.setText(getString(R.string.console_reminder_item_template, handle, reminderType));
+            item.setOnClickListener(v -> openModule(
+                    getString(R.string.console_nav_message),
+                    "/admin.php/outreach_workspace"));
+            reminderContainer.addView(item);
         }
     }
 
@@ -574,59 +761,39 @@ public class ModuleConsoleActivity extends AppCompatActivity
         if (loading) {
             taskCardContainer.setVisibility(View.GONE);
             skeletonContainer.setVisibility(View.VISIBLE);
-            if (skeletonPulseAnim == null) {
-                skeletonPulseAnim = new AlphaAnimation(0.4f, 1f);
-                skeletonPulseAnim.setDuration(850);
-                skeletonPulseAnim.setRepeatMode(AlphaAnimation.REVERSE);
-                skeletonPulseAnim.setRepeatCount(AlphaAnimation.INFINITE);
-                skeletonPulseAnim.setInterpolator(new LinearInterpolator());
-            }
-            skeletonContainer.startAnimation(skeletonPulseAnim);
+            startSkeletonPulse();
             return;
         }
-        skeletonContainer.clearAnimation();
+        stopSkeletonPulse();
         skeletonContainer.setVisibility(View.GONE);
         taskCardContainer.setVisibility(View.VISIBLE);
     }
 
-    private void loadActiveDeviceCount()
+    private void startSkeletonPulse()
     {
-        apiClient.listDevices(prefs.getAdminBase(), new SessionApiClient.JsonCallback()
-        {
-            @Override
-            public void onSuccess(JSONObject data)
-            {
-                int active = 0;
-                JSONArray items = data.optJSONArray("items");
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject row = items.optJSONObject(i);
-                        if (row == null) {
-                            continue;
-                        }
-                        if (row.optInt("is_online", 0) == 1) {
-                            active++;
-                        }
-                    }
-                }
-                final int finalActive = active;
-                runOnUiThread(() -> {
-                    if (textMetricActiveDevices != null) {
-                        textMetricActiveDevices.setText(String.valueOf(Math.max(0, finalActive)));
-                    }
-                });
-            }
+        if (skeletonContainer == null) {
+            return;
+        }
+        for (int i = 0; i < skeletonContainer.getChildCount(); i++) {
+            View child = skeletonContainer.getChildAt(i);
+            AlphaAnimation pulse = new AlphaAnimation(0.45f, 1f);
+            pulse.setDuration(900);
+            pulse.setRepeatMode(AlphaAnimation.REVERSE);
+            pulse.setRepeatCount(AlphaAnimation.INFINITE);
+            pulse.setStartOffset(i * 120L);
+            pulse.setInterpolator(new LinearInterpolator());
+            child.startAnimation(pulse);
+        }
+    }
 
-            @Override
-            public void onUnauthorized()
-            {
-            }
-
-            @Override
-            public void onError(String errorMessage)
-            {
-            }
-        });
+    private void stopSkeletonPulse()
+    {
+        if (skeletonContainer == null) {
+            return;
+        }
+        for (int i = 0; i < skeletonContainer.getChildCount(); i++) {
+            skeletonContainer.getChildAt(i).clearAnimation();
+        }
     }
 
     private View buildTaskCard(JSONObject row)
@@ -635,67 +802,94 @@ public class ModuleConsoleActivity extends AppCompatActivity
         String nickname = row.optString("nickname", "").trim();
         float gpm = (float) row.optDouble("quality_score", 0.0);
         View card = LayoutInflater.from(this).inflate(R.layout.item_task_card, taskCardContainer, false);
-        CircleImageView imgAvatar = card.findViewById(R.id.img_task_avatar);
-        TextView textAvatarLetter = card.findViewById(R.id.text_task_avatar_letter);
+        TextView textAvatarBox = card.findViewById(R.id.text_task_avatar_box);
         TextView textGpm = card.findViewById(R.id.text_task_gpm);
+        TextView textMeta = card.findViewById(R.id.text_task_meta);
         TextView textHandle = card.findViewById(R.id.text_task_handle);
-        TextView textCategory = card.findViewById(R.id.text_task_category);
         TextView textBadge = card.findViewById(R.id.text_task_status_badge);
-        Button btnNextStep = card.findViewById(R.id.btn_task_next_step);
+        View btnNextStep = card.findViewById(R.id.btn_task_next_step);
         View primaryArea = card.findViewById(R.id.layout_task_primary);
         View optionalActions = card.findViewById(R.id.layout_optional_actions);
         View actionZalo = card.findViewById(R.id.action_add_zalo);
-        View actionDm = card.findViewById(R.id.action_send_dm);
+        View actionNote = card.findViewById(R.id.action_write_note);
+        View actionBlacklist = card.findViewById(R.id.action_blacklist);
 
-        int avatarBgColor = avatarColor(handle, row.optString("avatar_url", "").trim());
-        imgAvatar.setImageDrawable(null);
-        imgAvatar.setCircleBackgroundColor(avatarBgColor);
-        textAvatarLetter.setText(avatarLetter(handle, nickname));
-        textGpm.setText(getString(R.string.console_gpm_format, formatGpm(gpm)));
+        applyAvatarRect(textAvatarBox, handle, nickname);
         if (handle.isEmpty()) {
             textHandle.setText(nickname.isEmpty() ? "-" : nickname);
         } else {
             textHandle.setText("@" + handle);
         }
-
         String categoryName = row.optString("category_name", "").trim();
         if (categoryName.isEmpty()) {
             categoryName = getString(R.string.console_category_default);
         }
-        if (!nickname.isEmpty()) {
-            textCategory.setText(categoryName + " | " + nickname);
-        } else {
-            textCategory.setText(categoryName);
-        }
+        String region = row.optString("region", "--");
+        textGpm.setText(getString(R.string.console_gpm_format, formatGpm(gpm)));
+        textMeta.setText(categoryName + " · " + region);
 
         applyCardStatusBadge(textBadge, row);
         textBadge.setOnClickListener(v -> showQuickStatusDialog(row));
         btnNextStep.setOnClickListener(v -> handleNextAction(row));
-        primaryArea.setOnClickListener(v ->
-                optionalActions.setVisibility(optionalActions.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
-        actionZalo.setOnClickListener(v -> handleContactAction(row));
-        actionDm.setOnClickListener(v -> handleDmAction(row, false));
-        card.setOnLongClickListener(v -> {
-            showTaskDetailDialog(row);
+        btnNextStep.setOnLongClickListener(v -> {
+            toggleOptionalActions(optionalActions);
             return true;
         });
+        primaryArea.setOnClickListener(v -> showTaskDetailDialog(row));
+        card.setOnLongClickListener(v -> {
+            toggleOptionalActions(optionalActions);
+            return true;
+        });
+        actionZalo.setOnClickListener(v -> handleContactAction(row));
+        actionNote.setOnClickListener(v -> showQuickNoteDialog(row));
+        actionBlacklist.setOnClickListener(v -> markInfluencerBlacklist(row));
+        applyTouchFeedback(btnNextStep);
+        applyTouchFeedback(textBadge);
+        applyTouchFeedback(actionZalo);
+        applyTouchFeedback(actionNote);
+        applyTouchFeedback(actionBlacklist);
         return card;
     }
 
-    private int avatarColor(String handle, String avatarUrl)
+    private void toggleOptionalActions(View optionalActions)
     {
-        if (!TextUtils.isEmpty(avatarUrl)) {
-            return Color.parseColor("#20A56A");
+        if (optionalActions == null) {
+            return;
         }
-        int hash = Math.abs((handle == null ? "" : handle).hashCode());
-        int[] palette = new int[]{
-                Color.parseColor("#4F7EF5"),
-                Color.parseColor("#6B5CF3"),
-                Color.parseColor("#16A34A"),
-                Color.parseColor("#E67E22"),
-                Color.parseColor("#C0392B")
-        };
-        return palette[hash % palette.length];
+        boolean show = optionalActions.getVisibility() != View.VISIBLE;
+        if (show) {
+            optionalActions.setVisibility(View.VISIBLE);
+            optionalActions.setAlpha(0f);
+            optionalActions.setTranslationY(dp(12));
+            optionalActions.animate().alpha(1f).translationY(0f).setDuration(180).start();
+            return;
+        }
+        optionalActions.animate().alpha(0f).translationY(dp(12)).setDuration(140)
+                .withEndAction(() -> {
+                    optionalActions.setVisibility(View.GONE);
+                    optionalActions.setAlpha(1f);
+                    optionalActions.setTranslationY(0f);
+                })
+                .start();
+    }
+
+    private void applyAvatarRect(TextView avatarView, String handle, String nickname)
+    {
+        if (avatarView == null) {
+            return;
+        }
+        int accent = avatarAccentColor(handle);
+        GradientDrawable avatarBg = new GradientDrawable();
+        avatarBg.setCornerRadius(dp(12));
+        avatarBg.setColor(withAlpha(accent, 20));
+        avatarView.setBackground(avatarBg);
+        avatarView.setText(avatarLetter(handle, nickname));
+        avatarView.setTextColor(accent);
+    }
+
+    private int avatarAccentColor(String handle)
+    {
+        return color(R.color.brand_primary);
     }
 
     private void applyCardStatusBadge(TextView textBadge, JSONObject row)
@@ -705,34 +899,37 @@ public class ModuleConsoleActivity extends AppCompatActivity
         String taskType = row.optString("task_type", "");
 
         String text = "";
-        int color = Color.parseColor("#4F7EF5");
+        int color = color(R.color.btn_neutral_bg);
+        int textColor = color(R.color.text_secondary);
+        int actionColor = color(R.color.brand_primary);
 
         if ("comment_warmup".equalsIgnoreCase(taskType) && (taskStatus == 0 || taskStatus == 1)) {
             text = getString(R.string.console_badge_wait_comment);
-            color = Color.parseColor("#2563EB");
+            color = withAlpha(actionColor, 20);
+            textColor = actionColor;
         } else if (influencerStatus == 4) {
             text = getString(R.string.console_badge_sampled);
-            color = Color.parseColor("#16A34A");
+            color = Color.parseColor("#EEF6FF");
         } else if (influencerStatus == 2) {
             text = getString(R.string.console_badge_replied);
-            color = Color.parseColor("#0EA5E9");
+            color = Color.parseColor("#EFF4FB");
         } else if (influencerStatus == 3) {
             text = getString(R.string.console_badge_wait_sample);
-            color = Color.parseColor("#F59E0B");
+            color = Color.parseColor("#F3F5F9");
         } else if (influencerStatus == 6) {
             text = getString(R.string.console_badge_blacklist);
-            color = Color.parseColor("#DC2626");
+            color = Color.parseColor("#F5F1F4");
         } else {
             text = taskStatusText(taskStatus);
-            color = statusBadgeColor(taskStatus);
+            color = Color.parseColor("#EEF2F7");
         }
 
         textBadge.setText(text);
         GradientDrawable badgeBg = new GradientDrawable();
-        badgeBg.setCornerRadius(dp(12));
+        badgeBg.setCornerRadius(dp(999));
         badgeBg.setColor(color);
         textBadge.setBackground(badgeBg);
-        textBadge.setTextColor(Color.WHITE);
+        textBadge.setTextColor(textColor);
     }
 
     private void showQuickStatusDialog(JSONObject row)
@@ -798,6 +995,79 @@ public class ModuleConsoleActivity extends AppCompatActivity
                     }
                 }
         );
+    }
+
+    private void showQuickNoteDialog(JSONObject row)
+    {
+        final EditText noteInput = new EditText(this);
+        noteInput.setHint(getString(R.string.console_note_hint));
+        noteInput.setMinLines(3);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.console_btn_write_note)
+                .setView(noteInput)
+                .setPositiveButton(R.string.common_ok, (dialog, which) -> {
+                    String note = noteInput.getText() == null ? "" : noteInput.getText().toString().trim();
+                    if (!note.isEmpty()) {
+                        toast(getString(R.string.console_note_saved));
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void markInfluencerBlacklist(JSONObject row)
+    {
+        if (row == null) {
+            return;
+        }
+        final int influencerId = row.optInt("influencer_id", 0);
+        final int taskId = row.optInt("id", 0);
+        if (influencerId <= 0) {
+            toast(getString(R.string.console_action_failed));
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.console_btn_blacklist)
+                .setMessage(R.string.console_blacklist_confirm)
+                .setPositiveButton(R.string.common_ok, (dialog, which) -> apiClient.updateInfluencerStatus(
+                        prefs.getAdminBase(),
+                        influencerId,
+                        6,
+                        new SessionApiClient.JsonCallback()
+                        {
+                            @Override
+                            public void onSuccess(JSONObject data)
+                            {
+                                if (taskId > 0) {
+                                    apiClient.updateTaskStatus(
+                                            prefs.getAdminBase(),
+                                            taskId,
+                                            "skip",
+                                            "skip",
+                                            preferredText(row),
+                                            emptyCallback()
+                                    );
+                                }
+                                runOnUiThread(() -> {
+                                    toast(getString(R.string.console_blacklist_done));
+                                    loadTaskDashboard(currentTaskPage);
+                                });
+                            }
+
+                            @Override
+                            public void onUnauthorized()
+                            {
+                                runOnUiThread(ModuleConsoleActivity.this::handleUnauthorized);
+                            }
+
+                            @Override
+                            public void onError(String errorMessage)
+                            {
+                                runOnUiThread(() -> toast(getString(R.string.console_action_failed) + ": " + errorMessage));
+                            }
+                        }))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void handleNextAction(JSONObject row)
@@ -940,134 +1210,216 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
     private void renderModuleBoard(JSONArray menus)
     {
-        if (moduleBoardContainer == null) {
+        if (moduleBoardRecycler == null) {
             return;
         }
-        moduleBoardContainer.removeAllViews();
-        if (menus == null || menus.length() == 0) {
+        setupModuleBoardRecycler();
+        if (moduleBoardAdapter == null) {
             return;
         }
-        List<JSONObject> linkItems = new ArrayList<>();
-        for (int i = 0; i < menus.length(); i++) {
-            JSONObject section = menus.optJSONObject(i);
-            if (section == null) {
-                continue;
-            }
-            JSONArray items = section.optJSONArray("items");
-            if (items == null || items.length() == 0) {
-                continue;
-            }
-            collectLinkItems(items, linkItems);
-        }
-        if (linkItems.isEmpty()) {
-            return;
-        }
-
-        for (int i = 0; i < linkItems.size(); i += 3) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            if (i > 0) {
-                rowParams.topMargin = dp(4);
-            }
-            row.setLayoutParams(rowParams);
-            for (int col = 0; col < 3; col++) {
-                int idx = i + col;
-                if (idx >= linkItems.size()) {
-                    View spacer = new View(this);
-                    spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
-                    row.addView(spacer);
+        moduleSections.clear();
+        if (menus != null && menus.length() > 0) {
+            for (int i = 0; i < menus.length(); i++) {
+                JSONObject section = menus.optJSONObject(i);
+                if (section == null) {
                     continue;
                 }
-                View tile = buildModuleTile(linkItems.get(idx));
-                LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(0,
-                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                tile.setLayoutParams(tileLp);
-                row.addView(tile);
+                JSONArray items = section.optJSONArray("items");
+                if (items == null || items.length() == 0) {
+                    continue;
+                }
+                List<JSONObject> links = new ArrayList<>();
+                collectLinkItems(items, links);
+                if (links.isEmpty()) {
+                    continue;
+                }
+                String sectionTitle = resolveMenuText(section, getString(R.string.console_module_section_default));
+                if (TextUtils.isEmpty(sectionTitle) || getString(R.string.console_module_section_default).equals(sectionTitle)) {
+                    JSONObject firstItem = items.optJSONObject(0);
+                    String fallbackFromItem = resolveMenuText(firstItem, sectionTitle);
+                    if (!TextUtils.isEmpty(fallbackFromItem)
+                            && !getString(R.string.console_module_section_default).equals(fallbackFromItem)) {
+                        sectionTitle = fallbackFromItem;
+                    }
+                }
+                moduleSections.add(new ModuleSection(sectionTitle, links));
             }
-            moduleBoardContainer.addView(row);
+        }
+
+        if (moduleSections.isEmpty()) {
+            if (moduleSectionContainer != null) {
+                moduleSectionContainer.removeAllViews();
+            }
+            moduleBoardRecycler.setVisibility(View.GONE);
+            moduleBoardAdapter.submit(new ArrayList<>());
+            return;
+        }
+
+        selectedModuleSectionIndex = Math.max(0, Math.min(selectedModuleSectionIndex, moduleSections.size() - 1));
+        if (moduleSections.get(selectedModuleSectionIndex).links.size() <= 1) {
+            for (int i = 0; i < moduleSections.size(); i++) {
+                if (moduleSections.get(i).links.size() > 1) {
+                    selectedModuleSectionIndex = i;
+                    break;
+                }
+            }
+        }
+        renderModuleSectionTabs();
+        renderSelectedModuleSection();
+    }
+
+    private void renderModuleSectionTabs()
+    {
+        if (moduleSectionContainer == null) {
+            return;
+        }
+        moduleSectionContainer.removeAllViews();
+        for (int i = 0; i < moduleSections.size(); i++) {
+            ModuleSection section = moduleSections.get(i);
+            TextView chip = new TextView(this);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(26)
+            );
+            if (i > 0) {
+                params.setMarginStart(dp(6));
+            }
+            chip.setLayoutParams(params);
+            chip.setPadding(dp(10), 0, dp(10), 0);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setText(section.title);
+            boolean active = i == selectedModuleSectionIndex;
+            chip.setTextSize(10f);
+            chip.setTextColor(active ? color(R.color.brand_primary) : color(R.color.text_secondary));
+            chip.setBackgroundResource(active
+                    ? R.drawable.bg_module_section_chip_active
+                    : R.drawable.bg_module_section_chip_inactive);
+            final int targetIndex = i;
+            chip.setOnClickListener(v -> {
+                if (selectedModuleSectionIndex == targetIndex) {
+                    return;
+                }
+                selectedModuleSectionIndex = targetIndex;
+                renderModuleSectionTabs();
+                renderSelectedModuleSection();
+            });
+            applyTouchFeedback(chip);
+            moduleSectionContainer.addView(chip);
         }
     }
 
-    private View buildModuleTile(JSONObject item)
+    private void renderSelectedModuleSection()
     {
-        View tile = LayoutInflater.from(this).inflate(R.layout.item_module_tile, moduleBoardContainer, false);
+        if (moduleBoardAdapter == null || moduleSections.isEmpty()) {
+            return;
+        }
+        int index = Math.max(0, Math.min(selectedModuleSectionIndex, moduleSections.size() - 1));
+        ModuleSection section = moduleSections.get(index);
+        List<JSONObject> visibleItems = new ArrayList<>();
+        for (int i = 0; i < section.links.size() && i < MODULE_GRID_MAX_ITEMS; i++) {
+            visibleItems.add(section.links.get(i));
+        }
+        moduleBoardRecycler.setVisibility(visibleItems.isEmpty() ? View.GONE : View.VISIBLE);
+        moduleBoardAdapter.submit(visibleItems);
+    }
+
+    private String resolveMenuText(JSONObject row, String fallback)
+    {
+        if (row == null) {
+            return fallback;
+        }
+        String key = row.optString("section_i18n", "").trim();
+        if (key.isEmpty()) {
+            key = row.optString("text_i18n", "").trim();
+        }
+        String rowText = row.optString("text", "").trim();
+        if (rowText.isEmpty()) {
+            rowText = row.optString("section", "").trim();
+        }
+        return MenuTextResolver.resolve(
+                this,
+                key,
+                rowText.isEmpty() ? fallback : rowText
+        );
+    }
+
+    private void bindModuleTile(View tile, JSONObject item)
+    {
         ImageView icon = tile.findViewById(R.id.img_module_icon);
+        View iconPlate = tile.findViewById(R.id.layout_module_icon);
         TextView title = tile.findViewById(R.id.text_module_title);
         if (item == null) {
-            return tile;
+            return;
         }
         String href = item.optString("href", "").trim();
-        String moduleTitle = MenuTextResolver.resolve(
-                this,
-                item.optString("text_i18n", ""),
-                getString(R.string.console_module_section_default)
-        );
-        String text = moduleTitle;
-        String badge = item.optString("badge", "").trim();
-        if (!badge.isEmpty() && !"0".equals(badge)) {
-            text = text + "\n" + badge;
-        }
-        title.setText(text);
-        icon.setImageResource(moduleIconForHref(href));
+        String moduleTitle = resolveMenuText(item, getString(R.string.console_module_section_default));
+        title.setText(moduleTitle);
+        ModuleVisualStyle visualStyle = moduleVisualForHref(href);
+        icon.setImageResource(visualStyle.iconRes);
+        icon.setColorFilter(visualStyle.iconColor);
+        GradientDrawable iconBg = new GradientDrawable();
+        iconBg.setShape(GradientDrawable.OVAL);
+        iconBg.setColor(withAlpha(visualStyle.iconColor, 13));
+        iconPlate.setBackground(iconBg);
         if (!href.isEmpty()) {
             tile.setOnClickListener(v -> openModule(moduleTitle, href));
+        } else {
+            tile.setOnClickListener(null);
         }
-        return tile;
+        applyTouchFeedback(tile);
     }
 
-    private int moduleIconForHref(String href)
+    private ModuleVisualStyle moduleVisualForHref(String href)
     {
         String path = href == null ? "" : href.trim().toLowerCase(Locale.ROOT);
+        int actionColor = color(R.color.brand_primary);
+        int neutralColor = color(R.color.text_secondary);
         if (path.contains("product_search")) {
-            return android.R.drawable.ic_menu_search;
+            return new ModuleVisualStyle(R.drawable.ic_module_search_line, actionColor);
         }
         if (path.contains("offline_order")) {
-            return android.R.drawable.ic_menu_agenda;
+            return new ModuleVisualStyle(R.drawable.ic_module_clipboard_line, actionColor);
         }
         if (path.contains("influencer")) {
-            return android.R.drawable.ic_menu_myplaces;
+            return new ModuleVisualStyle(R.drawable.ic_module_user_line, actionColor);
         }
         if (path.contains("outreach_workspace")) {
-            return android.R.drawable.ic_dialog_email;
+            return new ModuleVisualStyle(R.drawable.ic_module_chat_line, actionColor);
         }
         if (path.contains("message_template")) {
-            return android.R.drawable.ic_menu_edit;
+            return new ModuleVisualStyle(R.drawable.ic_module_chat_line, actionColor);
         }
         if (path.contains("sample")) {
-            return android.R.drawable.ic_menu_send;
+            return new ModuleVisualStyle(R.drawable.ic_module_clipboard_line, actionColor);
         }
         if (path.contains("category")) {
-            return android.R.drawable.ic_menu_sort_by_size;
+            return new ModuleVisualStyle(R.drawable.ic_module_settings_line, actionColor);
         }
         if (path.contains("industry_trend")) {
-            return android.R.drawable.ic_menu_today;
+            return new ModuleVisualStyle(R.drawable.ic_module_search_line, actionColor);
         }
         if (path.contains("competitor_analysis")) {
-            return android.R.drawable.ic_menu_info_details;
+            return new ModuleVisualStyle(R.drawable.ic_module_user_line, actionColor);
         }
         if (path.contains("ad_insight")) {
-            return android.R.drawable.ic_menu_view;
+            return new ModuleVisualStyle(R.drawable.ic_module_media_line, actionColor);
         }
         if (path.contains("data_import")) {
-            return android.R.drawable.stat_notify_sync;
+            return new ModuleVisualStyle(R.drawable.ic_module_clipboard_line, actionColor);
         }
         if (path.contains("video")) {
-            return android.R.drawable.ic_media_play;
+            return new ModuleVisualStyle(R.drawable.ic_module_media_line, actionColor);
         }
         if (path.contains("product")) {
-            return android.R.drawable.ic_menu_gallery;
+            return new ModuleVisualStyle(R.drawable.ic_module_media_line, actionColor);
         }
         if (path.contains("device")) {
-            return android.R.drawable.ic_menu_manage;
+            return new ModuleVisualStyle(R.drawable.ic_module_settings_line, neutralColor);
         }
         if (path.contains("ops_center")) {
-            return android.R.drawable.ic_menu_manage;
+            return new ModuleVisualStyle(R.drawable.ic_module_settings_line, neutralColor);
         }
-        return android.R.drawable.ic_menu_more;
+        return new ModuleVisualStyle(R.drawable.ic_module_settings_line, neutralColor);
     }
 
     private void collectLinkItems(JSONArray items, List<JSONObject> links)
@@ -1283,24 +1635,32 @@ public class ModuleConsoleActivity extends AppCompatActivity
         }
     }
 
-    private int statusBadgeColor(int status)
+    private int withAlpha(int color, int alpha)
     {
-        switch (status) {
-            case 1:
-                return Color.parseColor("#4F7EF5");
-            case 2:
-                return Color.parseColor("#21B57D");
-            case 3:
-                return Color.parseColor("#2FB170");
-            case 4:
-                return Color.parseColor("#E04D59");
-            case 5:
-                return Color.parseColor("#7A869A");
-            case 6:
-                return Color.parseColor("#4B5563");
-            default:
-                return Color.parseColor("#8B95A7");
+        int clamp = Math.max(0, Math.min(255, alpha));
+        return (color & 0x00FFFFFF) | (clamp << 24);
+    }
+
+    private int color(int resId)
+    {
+        return ContextCompat.getColor(this, resId);
+    }
+
+    private void applyTouchFeedback(View view)
+    {
+        if (view == null) {
+            return;
         }
+        view.setOnTouchListener((v, event) -> {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(80).start();
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(110).start();
+            }
+            return false;
+        });
     }
 
     private boolean isVietnamRegion(String region)
@@ -1382,6 +1742,108 @@ public class ModuleConsoleActivity extends AppCompatActivity
     {
         float density = getResources().getDisplayMetrics().density;
         return Math.round(value * density);
+    }
+
+    private static final class ModuleSection
+    {
+        private final String title;
+        private final List<JSONObject> links;
+
+        private ModuleSection(String title, List<JSONObject> links)
+        {
+            this.title = title;
+            this.links = links == null ? new ArrayList<>() : links;
+        }
+    }
+
+    private final class ModuleBoardAdapter extends RecyclerView.Adapter<ModuleBoardViewHolder>
+    {
+        private final List<JSONObject> items = new ArrayList<>();
+
+        void submit(List<JSONObject> nextItems)
+        {
+            items.clear();
+            if (nextItems != null && !nextItems.isEmpty()) {
+                items.addAll(nextItems);
+            }
+            notifyDataSetChanged();
+        }
+
+        @NonNull
+        @Override
+        public ModuleBoardViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType)
+        {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_module_tile, parent, false);
+            return new ModuleBoardViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ModuleBoardViewHolder holder, int position)
+        {
+            if (position < 0 || position >= items.size()) {
+                return;
+            }
+            bindModuleTile(holder.itemView, items.get(position));
+        }
+
+        @Override
+        public int getItemCount()
+        {
+            return items.size();
+        }
+    }
+
+    private static final class ModuleBoardViewHolder extends RecyclerView.ViewHolder
+    {
+        private ModuleBoardViewHolder(@NonNull View itemView)
+        {
+            super(itemView);
+        }
+    }
+
+    private static final class GridSpacingDecoration extends RecyclerView.ItemDecoration
+    {
+        private final int spanCount;
+        private final int spacing;
+
+        private GridSpacingDecoration(int spanCount, int spacing)
+        {
+            this.spanCount = Math.max(1, spanCount);
+            this.spacing = Math.max(0, spacing);
+        }
+
+        @Override
+        public void getItemOffsets(@NonNull Rect outRect, @NonNull View view,
+                                   @NonNull RecyclerView parent, @NonNull RecyclerView.State state)
+        {
+            int position = parent.getChildAdapterPosition(view);
+            if (position == RecyclerView.NO_POSITION) {
+                outRect.set(0, 0, 0, 0);
+                return;
+            }
+            int column = position % spanCount;
+            outRect.left = spacing - (column * spacing / spanCount);
+            outRect.right = ((column + 1) * spacing) / spanCount;
+            if (position < spanCount) {
+                outRect.top = spacing;
+            } else {
+                outRect.top = 0;
+            }
+            outRect.bottom = spacing;
+        }
+    }
+
+    private static final class ModuleVisualStyle
+    {
+        private final int iconRes;
+        private final int iconColor;
+
+        private ModuleVisualStyle(int iconRes, int iconColor)
+        {
+            this.iconRes = iconRes;
+            this.iconColor = iconColor;
+        }
     }
 
     private void toast(String msg)

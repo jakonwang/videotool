@@ -73,6 +73,15 @@ public class AgentTask {
             tiktokId = payload.optString("tiktok_id", "");
         }
 
+        String waUrl = taskObj.optString("wa_url", "");
+        if (waUrl.isEmpty()) {
+            waUrl = payload.optString("wa_url", channels.optString("wa_me", ""));
+        }
+        String zaloUrl = taskObj.optString("zalo_url", "");
+        if (zaloUrl.isEmpty()) {
+            zaloUrl = payload.optString("zalo_url", channels.optString("zalo_open", ""));
+        }
+
         return new AgentTask(
                 taskObj.optInt("id", 0),
                 taskObj.optString("task_type", payload.optString("task_type", "")),
@@ -84,8 +93,8 @@ public class AgentTask {
                 influencer.optString("nickname", payload.optString("nickname", "")),
                 channels.optString("whatsapp", ""),
                 channels.optString("zalo", ""),
-                channels.optString("wa_me", ""),
-                channels.optString("zalo_open", ""),
+                waUrl,
+                zaloUrl,
                 payload
         );
     }
@@ -175,7 +184,15 @@ public class AgentTask {
         return "comment_warmup".equalsIgnoreCase(taskType);
     }
 
+    public boolean isAutoDmTask() {
+        String value = taskType == null ? "" : taskType.trim().toLowerCase();
+        return "zalo_auto_dm".equals(value) || "wa_auto_dm".equals(value);
+    }
+
     public String getPreparedEvent() {
+        if (isAutoDmTask()) {
+            return "sending";
+        }
         if (isCommentTask()) {
             return "comment_prepared";
         }
@@ -186,10 +203,21 @@ public class AgentTask {
     }
 
     public String getDoneEvent() {
+        if (isAutoDmTask()) {
+            return "sent";
+        }
         if (isCommentTask()) {
             return "comment_sent";
         }
         return "done";
+    }
+
+    public String getAutoSendingEvent() {
+        return "sending";
+    }
+
+    public String getAutoDoneEvent() {
+        return "sent";
     }
 
     public String getBestText() {

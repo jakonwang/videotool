@@ -1,34 +1,49 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:foreground="?attr/selectableItemBackgroundBorderless"
-    android:gravity="center_horizontal"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:layout_height="96dp"
+    app:cardBackgroundColor="@color/card_surface"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="2dp"
+    app:cardUseCompatPadding="false">
 
-    <FrameLayout
-        android:id="@+id/layout_module_icon"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:background="@drawable/bg_glass_icon">
-
-        <ImageView
-            android:id="@+id/img_module_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:layout_gravity="center"
-            android:tint="#0052FF" />
-    </FrameLayout>
-
-    <TextView
-        android:id="@+id/text_module_title"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:ellipsize="end"
+        android:layout_height="match_parent"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
         android:gravity="center"
-        android:maxLines="2"
-        android:textColor="#6B7280"
-        android:textSize="12sp" />
-</LinearLayout>
+        android:orientation="vertical"
+        android:paddingLeft="4dp"
+        android:paddingTop="4dp"
+        android:paddingRight="4dp"
+        android:paddingBottom="4dp">
+
+        <FrameLayout
+            android:id="@+id/layout_module_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_glass_icon">
+
+            <ImageView
+                android:id="@+id/img_module_icon"
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:layout_gravity="center"
+                android:tint="@color/brand_primary" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/text_module_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:lineSpacingExtra="0dp"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="normal" />
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

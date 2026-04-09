@@ -49,6 +49,7 @@ public class MobileAgentService extends Service {
 
     private boolean running = false;
     private boolean polling = false;
+    private boolean autoMode = false;
     private AgentTask currentTask;
 
     private final Runnable pollRunnable = new Runnable() {
@@ -69,6 +70,7 @@ public class MobileAgentService extends Service {
         currentTask = prefs.loadCurrentTask();
         running = false;
         polling = false;
+        autoMode = config != null && config.isAutoMode();
     }
 
     @Override
@@ -126,6 +128,7 @@ public class MobileAgentService extends Service {
             stopSelf();
             return;
         }
+        autoMode = config.isAutoMode();
         running = true;
         prefs.setRunning(true);
         startForegroundCompat("Mobile Agent running");
@@ -168,7 +171,7 @@ public class MobileAgentService extends Service {
         polling = true;
         refreshNotification();
         emitState(manual ? "manual_pull" : "polling_queue");
-        apiClient.pullTask(config, new AgentApiClient.ApiCallback<AgentApiClient.PullResult>() {
+        AgentApiClient.ApiCallback<AgentApiClient.PullResult> pullCallback = new AgentApiClient.ApiCallback<AgentApiClient.PullResult>() {
             @Override
             public void onSuccess(final AgentApiClient.PullResult result) {
                 mainHandler.post(new Runnable() {
@@ -210,7 +213,12 @@ public class MobileAgentService extends Service {
                     }
                 });
             }
-        });
+        };
+        if (autoMode) {
+            apiClient.pullTaskAuto(config, pullCallback);
+        } else {
+            apiClient.pullTask(config, pullCallback);
+        }
     }
 
     private void executeCurrentTask() {
@@ -220,9 +228,8 @@ public class MobileAgentService extends Service {
         MobileTaskExecutor.ExecutionResult result = executor.prepareTask(currentTask);
         if (!result.ok) {
             final AgentTask failedTask = currentTask;
-            apiClient.report(
-                    config,
-                    failedTask.getId(),
+            reportTask(
+                    failedTask,
                     "failed",
                     failedTask.getBestText(),
                     "prepare_failed",
@@ -256,9 +263,72 @@ public class MobileAgentService extends Service {
         }
 
         final AgentTask preparedTask = currentTask;
-        apiClient.report(
-                config,
-                preparedTask.getId(),
+        if (autoMode && preparedTask.isAutoDmTask()) {
+            reportTask(
+                    preparedTask,
+                    preparedTask.getAutoSendingEvent(),
+                    preparedTask.getBestText(),
+                    "",
+                    "",
+                    "",
+                    new AgentApiClient.ApiCallback<AgentApiClient.ReportResult>() {
+                        @Override
+                        public void onSuccess(AgentApiClient.ReportResult reportResult) {
+                            mainHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    reportTask(
+                                            preparedTask,
+                                            preparedTask.getAutoDoneEvent(),
+                                            preparedTask.getBestText(),
+                                            "",
+                                            "",
+                                            "",
+                                            new AgentApiClient.ApiCallback<AgentApiClient.ReportResult>() {
+                                                @Override
+                                                public void onSuccess(AgentApiClient.ReportResult reportResult2) {
+                                                    mainHandler.post(new Runnable() {
+                                                        @Override
+                                                        public void run() {
+                                                            emitState("task_auto_sent_" + preparedTask.getId());
+                                                            clearCurrentTaskAndContinue();
+                                                        }
+                                                    });
+                                                }
+
+                                                @Override
+                                                public void onError(final String errorMessage) {
+                                                    mainHandler.post(new Runnable() {
+                                                        @Override
+                                                        public void run() {
+                                                            emitState("task_auto_sent_report_error_" + errorMessage);
+                                                            clearCurrentTaskAndContinue();
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                    );
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onError(final String errorMessage) {
+                            mainHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    emitState("task_auto_sending_report_error_" + errorMessage);
+                                    clearCurrentTaskAndContinue();
+                                }
+                            });
+                        }
+                    }
+            );
+            return;
+        }
+
+        reportTask(
+                preparedTask,
                 preparedTask.getPreparedEvent(),
                 preparedTask.getBestText(),
                 "",
@@ -296,9 +366,8 @@ public class MobileAgentService extends Service {
             return;
         }
         final AgentTask task = currentTask;
-        apiClient.report(
-                config,
-                task.getId(),
+        reportTask(
+                task,
                 event,
                 task.getBestText(),
                 errorCode,
@@ -384,12 +453,61 @@ public class MobileAgentService extends Service {
             return "Stopped";
         }
         if (polling) {
-            return "Polling queue";
+            return autoMode ? "Polling auto queue" : "Polling queue";
         }
         if (currentTask != null) {
+            if (autoMode && currentTask.isAutoDmTask()) {
+                return "Auto sending: #" + currentTask.getId();
+            }
             return "Awaiting manual send: #" + currentTask.getId();
         }
-        return "Running";
+        return autoMode ? "Running (Auto)" : "Running";
+    }
+
+    private void reportTask(
+            final AgentTask task,
+            final String event,
+            final String renderedText,
+            final String errorCode,
+            final String errorMessage,
+            final String screenshotPath,
+            final AgentApiClient.ApiCallback<AgentApiClient.ReportResult> callback
+    ) {
+        if (task == null) {
+            if (callback != null) {
+                callback.onError("task_null");
+            }
+            return;
+        }
+        if (config == null || !config.isValid()) {
+            if (callback != null) {
+                callback.onError("config_invalid");
+            }
+            return;
+        }
+        if (autoMode && task.isAutoDmTask()) {
+            apiClient.reportAuto(
+                    config,
+                    task.getId(),
+                    event,
+                    renderedText,
+                    errorCode,
+                    errorMessage,
+                    screenshotPath,
+                    callback
+            );
+            return;
+        }
+        apiClient.report(
+                config,
+                task.getId(),
+                event,
+                renderedText,
+                errorCode,
+                errorMessage,
+                screenshotPath,
+                callback
+        );
     }
 
     private void startForegroundCompat(String text) {
