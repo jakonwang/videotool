@@ -496,3 +496,256 @@
 - Device smoke:
   - `adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk`
   - `adb shell am start -W -n com.videotool/.MainActivity`
+## 16. Mobile UI Refinement V4 (2026-04-08)
+
+### 16.1 Visual System
+- Global page background unified to `#F8FAFC`.
+- Primary action style switched to deep-blue gradient (`#0052FF -> #0039B5`).
+- Card style normalized toward larger rounded corners and stronger floating depth.
+
+### 16.2 Module Console (ModuleConsoleActivity)
+- Header condensed and refocused to three KPI items:
+  - `Creators`
+  - `Today Outreach`
+  - `Waiting Sample`
+- Module entry area changed from 3-column to 2-column grid layout.
+- Added `To-do Reminders` block under modules (up to 3 urgent items, click-through to outreach workspace).
+
+### 16.3 Task Card (item_task_card.xml)
+- Task card rebuilt to action-first structure:
+  - Left: avatar + online activity dot
+  - Middle: handle + category chip + compact meta
+  - Right: circular arrow CTA for next-best action
+- Secondary actions now slide from bottom on long-press:
+  - `Add Zalo`
+  - `Write Note`
+  - `Blacklist`
+- Blacklist action calls backend influencer status update (`status=6`) and syncs task state to skipped.
+
+### 16.4 Agent Detail (AgentControlActivity)
+- Hero section upgraded with image + frosted overlay and centered handle focus.
+- Metric grid adjusted to:
+  - Fans
+  - GPM
+  - Region
+  - Cooperations
+- Sticky footer changed to two-action pattern:
+  - `Copy Zalo`
+  - `Contact Now`
+
+### 16.5 Backend support update
+- `app/controller/admin/MobileTask.php::buildDashboardSummary()` now returns:
+  - `influencer_total`
+  - `wait_sample_count`
+- Existing summary fields remain compatible.
+
+## 17. ModuleConsole Premium SaaS 样式重构（2026-04-08）
+
+### 17.1 设计基线（本轮落地）
+- 主页 `ModuleConsoleActivity` 视觉基线统一为 Premium SaaS：
+  - 页面背景：`#F8FAFC`
+  - 品牌主色：`#1E293B`
+  - 主动作渐变：`#0052FF -> #3B82F6`
+- 卡片体系统一：
+  - 圆角：`12dp`
+  - 浅阴影：`elevation=3dp`
+  - 去除细描边，统一为低对比纯卡面风格
+
+### 17.2 布局与层级优化
+- 文件：`android_app/app/src/main/res/layout/activity_module_console.xml`
+  - 头部统计卡、筛选卡、分页卡、空态卡、个人信息卡全部统一 `12dp + elevation=3dp`
+  - 组件间距收敛到 `16/24` 节奏，减少紧凑感
+  - 标题与分区标题保留加粗 + `letterSpacing`，提升信息层级
+- 文件：`android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+  - 模块入口两列网格行距改为 `16dp`
+  - 卡片之间横向间隔统一（左右各 `8dp`，总间隔 `16dp`）
+  - 状态 Badge 圆角统一为 `12dp`
+  - 次级动作展开动画位移统一为 `12dp`
+
+### 17.3 组件细节统一
+- 文件：`item_task_card.xml`、`item_task_skeleton.xml`、`item_module_tile.xml`
+  - 任务卡片/骨架屏/模块卡片统一卡面厚度与间距
+  - 任务卡内容内边距提升到 `16dp`，信息更易读
+- 文件：`bg_input.xml`、`bg_spinner.xml`
+  - 移除 1dp 描边，保持无边框卡面输入风格
+- 文件：`bg_bottom_nav.xml`、`bg_glass_icon.xml`
+  - 底部导航改为上圆角白卡面
+  - 模块图标底板改为更浅的冷色系
+- 文件：`values/styles.xml`
+  - 状态栏/导航栏背景色统一为 `#F8FAFC`
+
+### 17.4 使用与验证（Windows 开发）
+1. 编译：
+   - `cd android_app`
+   - `gradlew.bat :app:assembleDebug`
+2. 安装：
+   - `adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk`
+3. 启动：
+   - `adb shell am start -W -n com.videotool/.MainActivity`
+4. 验证点：
+   - 首页背景、卡片圆角、阴影和间距风格是否统一
+   - 模块卡与任务卡是否保持 16dp 网格节奏
+   - 输入框/下拉框是否已移除细边框
+
+## 18. Mobile Console UI V5（沉浸式 Header + 极简任务卡 + 交互动效）
+
+### 18.1 顶部区域重构（ModuleConsoleActivity）
+- 顶部改为沉浸式 Header：
+  - 高度 `150dp`
+  - 深蓝到近黑渐变背景（`#123B9B -> #0B1F55 -> #020617`）
+  - 底部增加弧形切割过渡（`bg_console_header_arc`）
+- 浮动统计卡片：
+  - Header 上覆盖白色横向统计卡（`达人总数 / 今日外联 / 待寄样`）
+  - 数值字体放大并加粗，标签使用淡灰小字，弱化视觉噪音
+
+### 18.2 功能矩阵图标风格（Duotone）
+- 动态菜单仍按 `mobile_console/bootstrap` 返回渲染；
+- 模块图标改为“双色线性”视觉：
+  - 图标使用深色主色
+  - 背景圆圈使用对应主色 10% 透明度
+- 按模块路由自动映射色系（如寻款紫系、达人蓝系、样品绿系、系统灰系）。
+
+### 18.3 任务卡重构（item_task_card）
+- 结构改为：
+  - 左：圆角矩形头像块（首字母占位，按达人生成主色）
+  - 中：`Handle + 细胶囊状态`、`GPM`、`分类·地区`
+  - 右：单一蓝色圆形操作图标（下一步动作）
+- 状态标签弱化：
+  - 胶囊更细、更浅底色、更深文字
+  - 位置靠近 Handle，不再占据右侧主视觉位
+
+### 18.4 动效增强
+- 列表入场动画：
+  - 新增 `res/anim/item_slide_up_fade.xml`
+  - 新增 `res/anim/layout_task_stagger_in.xml`
+  - 任务列表加载后按顺序由下向上滑入
+- 点击反馈：
+  - 按钮/操作控件按下缩放到 `0.95`
+  - 触发轻微触感反馈（haptic）
+- 骨架屏：
+  - 数据加载期显示灰色闪烁骨架块
+  - 采用分段错峰 Alpha Pulse（非空白、非旋转等待）
+
+### 18.5 关键文件
+- `android_app/app/src/main/res/layout/activity_module_console.xml`
+- `android_app/app/src/main/res/layout/item_task_card.xml`
+- `android_app/app/src/main/java/com/videotool/console/ModuleConsoleActivity.java`
+- `android_app/app/src/main/res/drawable/bg_console_header.xml`
+- `android_app/app/src/main/res/drawable/bg_console_header_arc.xml`
+- `android_app/app/src/main/res/drawable/bg_avatar_rect.xml`
+- `android_app/app/src/main/res/drawable/bg_task_status_soft.xml`
+- `android_app/app/src/main/res/drawable/bg_skeleton_block.xml`
+- `android_app/app/src/main/res/anim/item_slide_up_fade.xml`
+- `android_app/app/src/main/res/anim/layout_task_stagger_in.xml`
+
+## 19. Auto DM V1（站外 IM 无人值守发送）
+
+### 19.1 范围与目标
+- 新增“自动私信活动”域，支持在后台批量生成 Zalo / WhatsApp 自动私信任务。
+- 移动 Agent 增加自动模式，可拉取自动任务并回传状态，CRM 自动更新外联状态与日志。
+- 保留现有半自动任务链路（`comment_warmup / tiktok_dm`），不破坏旧流程。
+
+### 19.2 数据结构（新增/扩展）
+- 新迁移脚本：`database/run_migration_auto_dm_v1.php`
+- 扩展：
+  - `influencers`: `do_not_contact`, `last_auto_dm_at`, `auto_dm_fail_count`, `cooldown_until`
+  - `outreach_logs`: `action_type`
+- 新增表：
+  - `auto_dm_campaigns`
+  - `auto_dm_tasks`
+  - `auto_dm_events`
+  - `contact_policies`
+
+### 19.3 后端接口
+- 活动编排：
+  - `POST /admin.php/auto_dm/campaign/create`
+  - `GET /admin.php/auto_dm/campaign/list`
+  - `POST /admin.php/auto_dm/campaign/pause`
+  - `POST /admin.php/auto_dm/campaign/resume`
+- Agent 自动链路：
+  - `POST /admin.php/mobile_agent/pull_auto`
+  - `POST /admin.php/mobile_agent/report_auto`
+- 页面入口：
+  - `/admin.php/auto_dm`（达人运营菜单下“自动私信活动”）
+
+### 19.4 状态机与策略
+- 自动任务状态：`pending -> assigned -> sending -> sent -> failed -> blocked -> cooling`
+- 渠道策略：优先 `zalo`，其次 `wa`（可在活动中改为指定优先）
+- 拦截规则：
+  - 黑名单 / `do_not_contact`
+  - 冷却窗口（`cooldown_until`）
+  - 最小发送间隔（`min_interval_sec`）
+- 回传成功后自动联动：
+  - `influencers.last_contacted_at`
+  - `influencers.last_auto_dm_at`
+  - `influencers.status`（`0/1 -> 1`）
+  - `outreach_logs.action_type = auto_dm_sent`
+
+### 19.5 移动端 Agent（Android）
+- `AgentConfig` 新增 `auto_mode` 开关并持久化。
+- `AgentApiClient` 新增自动接口调用：
+  - `pullTaskAuto()` -> `/mobile_agent/pull_auto`
+  - `reportAuto()` -> `/mobile_agent/report_auto`
+- `MobileAgentService`：
+  - 自动模式下优先拉取 `zalo_auto_dm/wa_auto_dm`
+  - 自动任务执行后回传 `sending/sent` 事件
+  - 非自动任务仍保持原“准备后人工发送”流程
+- `AgentControlActivity` 新增“自动模式”勾选项，并在“测试拉取”时自动切换到 auto 接口。
+
+### 19.6 执行步骤（Windows 开发 / Linux 部署通用）
+1. 执行迁移：
+   - Windows: `php database\\run_migration_auto_dm_v1.php`
+   - Linux: `php database/run_migration_auto_dm_v1.php`
+2. 语法检查：
+   - `php -l app/controller/admin/AutoDm.php`
+   - `php -l app/controller/admin/MobileAgent.php`
+   - `php -l app/service/AutoDmService.php`
+   - `php -l app/middleware/AdminAuthMiddleware.php`
+3. Android 构建：
+   - `cd android_app`
+   - `gradlew.bat :app:assembleDebug`（Linux 用 `./gradlew :app:assembleDebug`）
+
+### 19.7 已知边界
+- 本期仅包含站外 IM（Zalo / WhatsApp）自动链路；TikTok 站内 DM 仍按半自动流程。
+- 若设备端 App 未登录、深链失败或网络异常，任务会回传 `failed/blocked/cooling`，不会静默吞错。
+
+## 20. 运维中心一键更新（数据表 + Git）
+
+### 20.1 新增目标
+- 在后台 `运维中心` 增加“部署维护”Tab，支持：
+  - 一键执行数据库迁移脚本（幂等，保留现有数据）
+  - 一键执行 `git pull --ff-only`
+- 目标是减少上线时对命令行的依赖。
+
+### 20.2 后端实现
+- 新增服务：`app/service/OpsMaintenanceService.php`
+  - 扫描并排序 `database/run_migration*.php`
+  - 自动维护迁移历史表 `ops_migration_history`（脚本名 + checksum + 状态 + 最后执行时间）
+  - 仅执行“未执行或脚本内容已变更”的迁移，已应用脚本自动跳过
+  - 汇总每个脚本的输出与退出码（含 `skipped` 标识）
+  - 读取 Git 状态（分支、提交、脏工作区）
+  - 执行 `git pull --ff-only`（可选允许 dirty）
+- 控制器扩展：`app/controller/admin/OpsCenter.php`
+  - `GET /admin.php/ops_center/status`
+  - `POST /admin.php/ops_center/runMigrations`
+  - `POST /admin.php/ops_center/gitPull`
+- 权限：仅 `super_admin` 可执行上述运维动作。
+
+### 20.3 前端实现
+- 页面：`view/admin/ops_center/index.html`
+  - 在原有发卡/版本/缓存/异常之外新增 `部署维护` Tab
+  - 展示运行环境状态（PHP 路径、Git 分支、未提交变更数、迁移脚本总数、已应用数、待执行数）
+  - 按钮：
+    - `刷新状态`
+    - `更新数据表`
+    - `Git 更新`
+  - 支持日志回显（迁移日志 / Git 日志）
+- i18n：
+  - `public/static/i18n/i18n.js` 补齐 `page.opsCenter.*` 三语键
+
+### 20.4 使用说明
+1. 后台进入：`系统设置 -> 运维中心 -> 部署维护`
+2. 点击 `刷新状态` 确认运行环境正常
+3. 点击 `更新数据表` 执行增量迁移（已执行且 checksum 未变化的脚本会自动跳过）
+4. 点击 `Git 更新` 拉取远端最新代码
+5. 若提示工作区有未提交变更，可先处理变更，或在确认风险后勾选“允许带本地修改执行 Pull”

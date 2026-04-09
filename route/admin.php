@@ -122,6 +122,9 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('client_version/delete/<id>', 'app\controller\admin\ClientVersion@delete');
     Route::get('client_version', 'app\controller\admin\ClientVersion@index');
     Route::get('ops_center', 'app\controller\admin\OpsCenter@index');
+    Route::get('ops_center/status', 'app\controller\admin\OpsCenter@status');
+    Route::post('ops_center/runMigrations', 'app\controller\admin\OpsCenter@runMigrations');
+    Route::post('ops_center/gitPull', 'app\controller\admin\OpsCenter@gitPull');
 
     // Product search
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
@@ -195,6 +198,14 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('outreach_workspace/action', 'app\controller\admin\OutreachWorkspace@action');
     Route::get('outreach_workspace', 'app\controller\admin\OutreachWorkspace@index');
 
+    // Auto DM campaigns (unattended external IM)
+    Route::post('auto_dm/campaign/create', 'app\controller\admin\AutoDm@create');
+    Route::get('auto_dm/campaign/list', 'app\controller\admin\AutoDm@list');
+    Route::get('auto_dm/campaign/listJson', 'app\controller\admin\AutoDm@list');
+    Route::post('auto_dm/campaign/pause', 'app\controller\admin\AutoDm@pause');
+    Route::post('auto_dm/campaign/resume', 'app\controller\admin\AutoDm@resume');
+    Route::get('auto_dm', 'app\controller\admin\AutoDm@index');
+
     // Mobile outreach tasking (Android + Appium agent)
     Route::get('mobile_task/list', 'app\controller\admin\MobileTask@listJson');
     Route::get('mobile_task/listJson', 'app\controller\admin\MobileTask@listJson');
@@ -211,6 +222,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     Route::post('mobile_agent/pull', 'app\controller\admin\MobileAgent@pull');
     Route::post('mobile_agent/report', 'app\controller\admin\MobileAgent@report');
+    Route::post('mobile_agent/pull_auto', 'app\controller\admin\MobileAgent@pullAuto');
+    Route::post('mobile_agent/report_auto', 'app\controller\admin\MobileAgent@reportAuto');
     Route::get('mobile_console/bootstrap', 'app\controller\admin\MobileConsole@bootstrap');
 
     // Sample management
