@@ -736,6 +736,7 @@
 - 页面：`view/admin/ops_center/index.html`
   - 在原有发卡/版本/缓存/异常之外新增 `部署维护` Tab
   - 展示运行环境状态（PHP 路径、Git 分支、未提交变更数、迁移脚本总数、已应用数、待执行数）
+  - 接口调用兼容两种路由模式：`/admin.php/ops_center/*` 与 `/admin.php?s=/ops_center/*`（自动回退）
   - 按钮：
     - `刷新状态`
     - `更新数据表`
