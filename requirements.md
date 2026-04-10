@@ -1074,3 +1074,19 @@
 - 本地验证命令（Windows）：
   - `cd android_app`
   - `gradlew.bat :app:compileDebugJavaWithJavac`
+
+### 22.8 Auto DM 线上热修复迁移（2026-04-10）
+- 新增脚本：`database/run_migration_auto_dm_hotfix.php`
+- 目的：
+  - 修复历史库中 `auto_dm` 迁移记录已存在但字段未落库的问题（重点是 `influencers.last_auto_dm_at`）。
+- 脚本会幂等补齐字段：
+  - `influencers.do_not_contact`
+  - `influencers.last_auto_dm_at`
+  - `influencers.auto_dm_fail_count`
+  - `influencers.cooldown_until`
+  - 及相关索引：`idx_last_auto_dm_at` / `idx_do_not_contact` / `idx_cooldown_until`
+- 执行方式：
+  - 后台运维中心一键迁移（`/admin.php/ops_center` -> 运行迁移）
+  - 或命令行：
+    - Windows: `php database\run_migration_auto_dm_hotfix.php`
+    - Linux: `php database/run_migration_auto_dm_hotfix.php`
