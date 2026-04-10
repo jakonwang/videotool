@@ -16,24 +16,49 @@ public class CommentAutomationBridge
     public static final String KEY_TASK_ID = "task_id";
     public static final String KEY_ADMIN_BASE = "admin_base";
     public static final String KEY_TEXT = "text";
+    public static final String KEY_MODE = "mode";
+    public static final String KEY_CHANNEL = "channel";
 
     public static final String ACTION_TRIGGER_AUTOMATION = "com.videotool.action.TRIGGER_AUTOMATION";
+    public static final String MODE_COMMENT = "comment";
+    public static final String MODE_IM_AUTO_SEND = "im_auto_send";
 
     public static class PendingData
     {
         public final int taskId;
         public final String adminBase;
         public final String text;
+        public final String mode;
+        public final String channel;
 
-        public PendingData(int taskId, String adminBase, String text)
+        public PendingData(int taskId, String adminBase, String text, String mode, String channel)
         {
             this.taskId = taskId;
             this.adminBase = adminBase == null ? "" : adminBase;
             this.text = text == null ? "" : text;
+            this.mode = mode == null ? MODE_COMMENT : mode;
+            this.channel = channel == null ? "" : channel;
         }
     }
 
     public static void savePending(Context context, int taskId, String adminBase, String text)
+    {
+        savePendingInternal(context, taskId, adminBase, text, MODE_COMMENT, "");
+    }
+
+    public static void saveImAutoPending(Context context, int taskId, String adminBase, String text, String channel)
+    {
+        savePendingInternal(context, taskId, adminBase, text, MODE_IM_AUTO_SEND, channel);
+    }
+
+    private static void savePendingInternal(
+            Context context,
+            int taskId,
+            String adminBase,
+            String text,
+            String mode,
+            String channel
+    )
     {
         if (context == null) {
             return;
@@ -43,6 +68,8 @@ public class CommentAutomationBridge
                 .putInt(KEY_TASK_ID, Math.max(0, taskId))
                 .putString(KEY_ADMIN_BASE, adminBase == null ? "" : adminBase)
                 .putString(KEY_TEXT, text == null ? "" : text)
+                .putString(KEY_MODE, mode == null ? MODE_COMMENT : mode)
+                .putString(KEY_CHANNEL, channel == null ? "" : channel)
                 .apply();
     }
 
@@ -54,10 +81,18 @@ public class CommentAutomationBridge
         int taskId = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getInt(KEY_TASK_ID, 0);
         String adminBase = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_ADMIN_BASE, "");
         String text = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_TEXT, "");
+        String mode = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_MODE, MODE_COMMENT);
+        String channel = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getString(KEY_CHANNEL, "");
         if (taskId <= 0) {
             return null;
         }
-        return new PendingData(taskId, adminBase == null ? "" : adminBase, text == null ? "" : text);
+        return new PendingData(
+                taskId,
+                adminBase == null ? "" : adminBase,
+                text == null ? "" : text,
+                mode == null ? MODE_COMMENT : mode,
+                channel == null ? "" : channel
+        );
     }
 
     public static void clearPending(Context context)
@@ -70,6 +105,8 @@ public class CommentAutomationBridge
                 .remove(KEY_TASK_ID)
                 .remove(KEY_ADMIN_BASE)
                 .remove(KEY_TEXT)
+                .remove(KEY_MODE)
+                .remove(KEY_CHANNEL)
                 .apply();
     }
 

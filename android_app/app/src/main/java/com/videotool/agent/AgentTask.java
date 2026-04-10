@@ -242,13 +242,22 @@ public class AgentTask {
     }
 
     public String resolveZaloUrl() {
-        if (!zaloUrl.trim().isEmpty()) {
-            return zaloUrl.trim();
+        String normalizedId = normalizeDigits(zaloId);
+        if (!normalizedId.isEmpty()) {
+            return "https://zalo.me/" + normalizedId;
         }
-        if (!zaloId.trim().isEmpty()) {
-            return "https://zalo.me/" + zaloId.trim();
+
+        String rawUrl = zaloUrl.trim();
+        if (rawUrl.isEmpty()) {
+            return "";
         }
-        return "";
+
+        String extracted = extractDigitsFromZaloUrl(rawUrl);
+        if (!extracted.isEmpty()) {
+            return "https://zalo.me/" + extracted;
+        }
+
+        return rawUrl;
     }
 
     public String resolveWaUrl(String text) {
@@ -316,5 +325,29 @@ public class AgentTask {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    private static String normalizeDigits(String value) {
+        return safe(value).replaceAll("[^0-9]", "");
+    }
+
+    private static String extractDigitsFromZaloUrl(String url) {
+        String raw = safe(url).trim();
+        if (raw.isEmpty()) {
+            return "";
+        }
+        int slash = raw.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < raw.length()) {
+            String tail = raw.substring(slash + 1);
+            int q = tail.indexOf('?');
+            if (q > 0) {
+                tail = tail.substring(0, q);
+            }
+            String digits = normalizeDigits(tail);
+            if (!digits.isEmpty()) {
+                return digits;
+            }
+        }
+        return normalizeDigits(raw);
     }
 }

@@ -1126,7 +1126,7 @@ public class ModuleConsoleActivity extends AppCompatActivity
 
         if (!zalo.isEmpty()) {
             copyText(text);
-            openUrl("zalo://conversation?uid=" + zalo, "https://zalo.me/" + zalo);
+            openUrl("https://zalo.me/" + zalo, "zalo://conversation?uid=" + zalo);
             apiClient.updateTaskStatus(prefs.getAdminBase(), row.optInt("id", 0), "im_prepared", "prepared", text, emptyCallback());
             return;
         }

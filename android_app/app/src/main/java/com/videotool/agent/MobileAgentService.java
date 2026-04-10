@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat;
 
 import com.videotool.AgentControlActivity;
 import com.videotool.R;
+import com.videotool.automation.CommentAutomationBridge;
 
 public class MobileAgentService extends Service {
     public static final String ACTION_START = "com.videotool.agent.action.START";
@@ -40,6 +41,7 @@ public class MobileAgentService extends Service {
 
     private static final String CHANNEL_ID = "mobile_agent_channel";
     private static final int NOTIFICATION_ID = 31012;
+    private static final long AUTO_SEND_TIMEOUT_MS = 45000L;
 
     private Handler mainHandler;
     private AgentPrefs prefs;
@@ -51,6 +53,7 @@ public class MobileAgentService extends Service {
     private boolean polling = false;
     private boolean autoMode = false;
     private AgentTask currentTask;
+    private Runnable autoSendTimeoutRunnable;
 
     private final Runnable pollRunnable = new Runnable() {
         @Override
@@ -145,6 +148,7 @@ public class MobileAgentService extends Service {
         running = false;
         polling = false;
         prefs.setRunning(false);
+        cancelAutoSendTimeout();
         mainHandler.removeCallbacksAndMessages(null);
         refreshNotification();
         emitState(logLine);
@@ -277,37 +281,8 @@ public class MobileAgentService extends Service {
                             mainHandler.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    reportTask(
-                                            preparedTask,
-                                            preparedTask.getAutoDoneEvent(),
-                                            preparedTask.getBestText(),
-                                            "",
-                                            "",
-                                            "",
-                                            new AgentApiClient.ApiCallback<AgentApiClient.ReportResult>() {
-                                                @Override
-                                                public void onSuccess(AgentApiClient.ReportResult reportResult2) {
-                                                    mainHandler.post(new Runnable() {
-                                                        @Override
-                                                        public void run() {
-                                                            emitState("task_auto_sent_" + preparedTask.getId());
-                                                            clearCurrentTaskAndContinue();
-                                                        }
-                                                    });
-                                                }
-
-                                                @Override
-                                                public void onError(final String errorMessage) {
-                                                    mainHandler.post(new Runnable() {
-                                                        @Override
-                                                        public void run() {
-                                                            emitState("task_auto_sent_report_error_" + errorMessage);
-                                                            clearCurrentTaskAndContinue();
-                                                        }
-                                                    });
-                                                }
-                                            }
-                                    );
+                                    emitState("task_auto_sending_" + preparedTask.getId());
+                                    dispatchAutoImSend(preparedTask);
                                 }
                             });
                         }
@@ -361,6 +336,7 @@ public class MobileAgentService extends Service {
     }
 
     private void markCurrentTask(final String event, final String errorCode, final String errorMessage) {
+        cancelAutoSendTimeout();
         if (currentTask == null) {
             emitState("no_active_task");
             return;
@@ -400,11 +376,55 @@ public class MobileAgentService extends Service {
     }
 
     private void clearCurrentTaskAndContinue() {
+        cancelAutoSendTimeout();
         currentTask = null;
         prefs.clearCurrentTask();
         refreshNotification();
         if (running) {
             scheduleNextPoll(500);
+        }
+    }
+
+    private void dispatchAutoImSend(final AgentTask task) {
+        if (task == null || currentTask == null || currentTask.getId() != task.getId()) {
+            return;
+        }
+        if (!CommentAutomationBridge.isAccessibilityEnabled(this)) {
+            emitState("auto_send_accessibility_missing");
+            markCurrentTask("failed", "accessibility_disabled", "accessibility_disabled");
+            return;
+        }
+        CommentAutomationBridge.saveImAutoPending(
+                this,
+                task.getId(),
+                config == null ? "" : config.getAdminBase(),
+                task.getBestText(),
+                task.getTargetChannel()
+        );
+        CommentAutomationBridge.triggerAutomation(this);
+        scheduleAutoSendTimeout(task.getId());
+        emitState("task_auto_dispatch_" + task.getId());
+    }
+
+    private void scheduleAutoSendTimeout(final int taskId) {
+        cancelAutoSendTimeout();
+        autoSendTimeoutRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!running || currentTask == null || currentTask.getId() != taskId || !currentTask.isAutoDmTask()) {
+                    return;
+                }
+                emitState("task_auto_timeout_" + taskId);
+                markCurrentTask("failed", "auto_send_timeout", "auto_send_timeout");
+            }
+        };
+        mainHandler.postDelayed(autoSendTimeoutRunnable, AUTO_SEND_TIMEOUT_MS);
+    }
+
+    private void cancelAutoSendTimeout() {
+        if (autoSendTimeoutRunnable != null) {
+            mainHandler.removeCallbacks(autoSendTimeoutRunnable);
+            autoSendTimeoutRunnable = null;
         }
     }
 

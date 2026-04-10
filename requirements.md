@@ -1052,3 +1052,25 @@
 2. Linux：
    - `php database/run_migration_auto_dm_v1.php`
    - `php database/run_migration_auto_dm_v2.php`
+
+### 22.7 Zalo 协议优先级与全自动发送闭环（2026-04-09）
+- Android 端 Zalo 打开策略统一为：`https://zalo.me/{id}` 优先。
+  - 适配位置：
+    - `AgentTask.resolveZaloUrl()`
+    - `ModuleConsoleActivity.handleContactAction()`
+- Mobile Agent 自动私信链路修正为“真实回执闭环”：
+  - 旧逻辑：`sending -> sent` 由服务端本地直接连发（未真实点击发送）。
+  - 新逻辑：
+    1. 任务准备成功后先上报 `sending`
+    2. 写入无障碍待执行上下文（`CommentAutomationBridge.saveImAutoPending`）
+    3. 触发 `ReachAccessibilityService` 自动执行：定位输入框 -> 填充文本 -> 点击发送
+    4. 成功回调 `ACTION_MARK_SENT`，失败回调 `ACTION_MARK_FAIL`
+    5. Mobile Agent 再向 `/admin.php/mobile_agent/report_auto` 上报最终态（`sent/failed`）
+- 增加自动发送超时保护：
+  - 自动任务在触发后 `45s` 未收到无障碍回执，自动上报 `failed`（`auto_send_timeout`），避免任务卡死。
+- 兼容边界：
+  - 仅对 `zalo_auto_dm / wa_auto_dm` 生效。
+  - `comment_warmup / tiktok_dm` 继续保留原半自动模式。
+- 本地验证命令（Windows）：
+  - `cd android_app`
+  - `gradlew.bat :app:compileDebugJavaWithJavac`
