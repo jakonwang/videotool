@@ -140,7 +140,6 @@
         store_id: '',
         account_name: '',
         account_code: '',
-        channel_type: 'video',
         account_currency: 'USD',
         default_gmv_currency: 'VND',
         status: 1,
@@ -298,12 +297,14 @@
 
       function openEntryCreate() {
         const firstStore = stores.value[0] || null;
-        const firstAccount = accounts.value[0] || null;
+        const firstAccount = firstStore
+          ? (accounts.value.find((a) => String(a.store_id) === String(firstStore.id)) || null)
+          : (accounts.value[0] || null);
         entryForm.id = 0;
         entryForm.entry_date = filters.date_from || today();
         entryForm.store_id = firstStore ? String(firstStore.id) : '';
         entryForm.account_id = firstAccount ? String(firstAccount.id) : '';
-        entryForm.channel_type = firstAccount ? String(firstAccount.channel_type || 'video') : 'video';
+        entryForm.channel_type = String(filters.channel_type || 'video');
         entryForm.sale_price_cny = Number(firstStore ? (firstStore.default_sale_price_cny || 0) : 0);
         entryForm.product_cost_cny = Number(firstStore ? (firstStore.default_product_cost_cny || 0) : 0);
         entryForm.cancel_rate = getStoreCancelRate(firstStore, entryForm.channel_type);
@@ -364,7 +365,7 @@
         }
         const storeId = store ? String(store.id) : (requestedStoreId || '');
         const accountId = account ? String(account.id) : (base.account_id ? String(base.account_id) : '');
-        const channelType = String(base.channel_type || (account ? (account.channel_type || 'video') : 'video'));
+        const channelType = String(base.channel_type || 'video');
         return {
           row_key: batchRowSeed.value++,
           entry_date: String(base.entry_date || filters.date_from || today()),
@@ -402,7 +403,6 @@
       function applyBatchAccountPreset(row) {
         const account = accounts.value.find((a) => String(a.id) === String(row.account_id));
         if (!account) return;
-        row.channel_type = String(account.channel_type || row.channel_type || 'video');
         row.ad_spend_currency = String(account.account_currency || row.ad_spend_currency || 'USD');
         row.gmv_currency = String(account.default_gmv_currency || row.gmv_currency || 'VND');
         if (String(row.store_id || '') !== String(account.store_id || '')) {
@@ -420,8 +420,10 @@
         }
       }
 
-      function onBatchAccountChange(row) {
-        applyBatchAccountPreset(row);
+      function batchAccountName(row) {
+        if (!row) return '--';
+        const account = accounts.value.find((a) => String(a.id) === String(row.account_id));
+        return account ? String(account.account_name || '--') : '--';
       }
 
       function addBatchRow(seed) {
@@ -651,7 +653,6 @@
         accountForm.store_id = String(row.store_id || '');
         accountForm.account_name = row.account_name || '';
         accountForm.account_code = row.account_code || '';
-        accountForm.channel_type = row.channel_type || 'video';
         accountForm.account_currency = row.account_currency || 'USD';
         accountForm.default_gmv_currency = row.default_gmv_currency || 'VND';
         accountForm.status = Number(row.status || 1);
@@ -659,7 +660,7 @@
       }
 
       function resetAccountForm() {
-        fillAccountForm({ id: 0, status: 1, channel_type: 'video', account_currency: 'USD', default_gmv_currency: 'VND' });
+        fillAccountForm({ id: 0, status: 1, account_currency: 'USD', default_gmv_currency: 'VND' });
       }
 
       async function saveAccount() {
@@ -803,7 +804,6 @@
       watch(() => entryForm.account_id, (v) => {
         const row = accounts.value.find((a) => String(a.id) === String(v));
         if (!row) return;
-        entryForm.channel_type = row.channel_type || entryForm.channel_type;
         entryForm.ad_spend_currency = row.account_currency || entryForm.ad_spend_currency;
         entryForm.gmv_currency = row.default_gmv_currency || entryForm.gmv_currency;
         if (entryForm.id <= 0) {
@@ -830,7 +830,7 @@
         accountForm, importDialogVisible, importLoading, importForm, importAccountOptions, fxDialogVisible,
         fxLoading, fxSyncing, fxRows, fxForm, formatMoney, formatRoi, fxStatusLabel, fxTagType, fxSourceLabel,
         fetchEntries, reloadAll, resetFilter, openEntryCreate, openBatchEntry, openEntryEdit, saveEntry, deleteEntry,
-        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, onBatchStoreChange, onBatchAccountChange, resetBatchDialog,
+        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, batchAccountName, onBatchStoreChange, resetBatchDialog,
         fillStoreForm, saveStore, deleteStore, resetStoreForm, fillAccountForm, saveAccount, deleteAccount,
         resetAccountForm, submitImport, fetchFxRates, syncFx, exportCsv, downloadTemplate,
         onImportFileChange: (e) => { importFile.value = e.target && e.target.files ? e.target.files[0] : null; }
@@ -951,9 +951,7 @@
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colAccount')" min-width="170">
             <template #default="{ row }">
-              <el-select v-model="row.account_id" style="width:100%;" filterable @change="onBatchAccountChange(row)">
-                <el-option v-for="a in batchAccountOptions(row)" :key="'ba'+a.id" :label="a.account_name" :value="String(a.id)" />
-              </el-select>
+              <span>{{ batchAccountName(row) }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colChannel')" width="120">
@@ -1025,7 +1023,7 @@
           <el-row :gutter="12">
             <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colDate')"><el-date-picker v-model="entryForm.entry_date" type="date" value-format="YYYY-MM-DD" style="width:100%;" /></el-form-item></el-col>
             <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="entryForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colAccount')"><el-select v-model="entryForm.account_id" style="width:100%;"><el-option v-for="a in entryAccountOptions" :key="a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colAccount')"><el-select v-model="entryForm.account_id" style="width:100%;" disabled><el-option v-for="a in entryAccountOptions" :key="a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item></el-col>
           </el-row>
           <el-row :gutter="12">
             <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colChannel')"><el-select v-model="entryForm.channel_type" style="width:100%;"><el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" /></el-select></el-form-item></el-col>
@@ -1086,10 +1084,10 @@
             <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right"><template #default="{row}"><el-button size="small" @click="fillAccountForm(row)">{{ tt('common.edit') }}</el-button><el-button size="small" type="danger" plain @click="deleteAccount(row)">{{ tt('common.delete') }}</el-button></template></el-table-column>
           </el-table>
           <el-form label-width="120px" size="small">
+            <el-alert :title="tt('page.profitCenter.accountAutoBindHint')" type="info" :closable="false" style="margin-bottom:8px;" />
             <el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="accountForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
             <el-form-item :label="tt('page.profitCenter.colAccount')"><el-input v-model="accountForm.account_name" /></el-form-item>
             <el-form-item :label="tt('page.profitCenter.accountCode')"><el-input v-model="accountForm.account_code" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.colChannel')"><el-select v-model="accountForm.channel_type" style="width:100%;"><el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" /></el-select></el-form-item>
             <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select v-model="accountForm.account_currency" style="width:100%;"><el-option v-for="c in currencyOptions" :key="'ac'+c" :label="c" :value="c" /></el-select></el-form-item>
             <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select v-model="accountForm.default_gmv_currency" style="width:100%;"><el-option v-for="c in currencyOptions" :key="'gc'+c" :label="c" :value="c" /></el-select></el-form-item>
             <el-form-item :label="tt('common.status')"><el-switch v-model="accountForm.status" :active-value="1" :inactive-value="0" /></el-form-item>

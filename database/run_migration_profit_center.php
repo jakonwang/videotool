@@ -137,6 +137,22 @@ if ($hasTable('growth_profit_accounts') && !$hasIndex('growth_profit_accounts', 
     $pdo->exec("ALTER TABLE `growth_profit_accounts` ADD INDEX `idx_tenant_channel` (`tenant_id`, `channel_type`)");
     echo "  - growth_profit_accounts.idx_tenant_channel added\n";
 }
+if ($hasTable('growth_profit_accounts') && !$hasIndex('growth_profit_accounts', 'uk_tenant_store_single')) {
+    $dupRows = (int) $pdo->query("
+        SELECT COUNT(*) FROM (
+            SELECT tenant_id, store_id, COUNT(*) AS c
+            FROM growth_profit_accounts
+            GROUP BY tenant_id, store_id
+            HAVING c > 1
+        ) t
+    ")->fetchColumn();
+    if ($dupRows === 0) {
+        $pdo->exec("ALTER TABLE `growth_profit_accounts` ADD UNIQUE KEY `uk_tenant_store_single` (`tenant_id`, `store_id`)");
+        echo "  - growth_profit_accounts.uk_tenant_store_single added\n";
+    } else {
+        echo "  - growth_profit_accounts.uk_tenant_store_single skipped (duplicate store accounts found)\n";
+    }
+}
 
 echo "[3/4] growth_profit_daily_entries ...\n";
 if (!$hasTable('growth_profit_daily_entries')) {

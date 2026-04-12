@@ -1130,7 +1130,9 @@
     'page.profitCenter.fxSourceErApi': { zh: 'ER API', en: 'ER API', vi: 'ER API' },
     'page.profitCenter.fxSourceFxRatesApi': { zh: 'FXRates API', en: 'FXRates API', vi: 'FXRates API' },
     'page.profitCenter.fxSourceFallbackLatest': { zh: '最近可用汇率回退', en: 'Fallback to latest available', vi: 'Dùng tỷ giá khả dụng gần nhất' },
-    'page.profitCenter.fxSourceUnknown': { zh: '未知来源', en: 'Unknown source', vi: 'Nguồn không xác định' }
+    'page.profitCenter.fxSourceUnknown': { zh: '未知来源', en: 'Unknown source', vi: 'Nguồn không xác định' },
+    'page.profitCenter.singleAccountPerStore': { zh: '每个店铺仅允许一个 GMV MAX 广告账户', en: 'Each store can bind only one GMV MAX ad account', vi: 'Mỗi cửa hàng chỉ được gắn 1 tài khoản GMV MAX' },
+    'page.profitCenter.accountAutoBindHint': { zh: '每个店铺仅绑定 1 个 GMV MAX 广告账户，直播和视频共用该账户。', en: 'Each store binds one GMV MAX ad account shared by live and video.', vi: 'Mỗi cửa hàng chỉ gắn 1 tài khoản GMV MAX dùng chung cho livestream và video.' }
   };
 
   Object.keys(hardMissing).forEach(function (key) {

@@ -1315,3 +1315,29 @@
   - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
   - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
   - 重复加载场景自测：按 `i18n.js -> i18n.ops2.js -> i18n.js` 顺序执行后，`page.user.addTitle/page.user.editTitle/page.user.createSuccess/page.user.passwordReset/common.cannotDisableSelf` 均可正确翻译。
+
+### 24.14 2026-04-12 利润中心账户模型调整（单店单 GMV MAX）
+- 背景：
+  - TikTok GMV MAX 场景下，单店铺仅绑定一个广告账户，且直播/视频共用该账户。
+- 规则调整：
+  - 账户管理不再配置渠道（`channel_type` 不再作为业务输入）。
+  - `growth_profit_accounts` 改为“每店仅 1 账户”约束：
+    - 应用层：`accountSave` 创建时若店铺已有账户，自动转更新该账户。
+    - 数据层：迁移脚本补充唯一索引 `uk_tenant_store_single (tenant_id, store_id)`；若历史重复数据存在则跳过并提示。
+  - 日录入保持渠道维度（`live/video/influencer`）独立输入，用于利润公式分支。
+  - `entrySave`/`entryBatchSave` 支持未传 `account_id` 时按店铺自动绑定主账户；若店铺无账户则返回 `store_account_required`。
+- 前端行为：
+  - 账户弹窗移除渠道选择，增加“单店单 GMV MAX，直播/视频共用”提示。
+  - 单条录入中账户下拉改为按店铺自动绑定（只读）。
+  - 批量录入按店铺自动带出账户，账户列仅展示名称，不再手动切换渠道来源。
+- 本轮验证（Windows）：
+  - `php -l app/controller/admin/ProfitCenter.php`
+  - `php -l database/run_migration_profit_center.php`
+  - `php -l view/admin/profit_center/index.html`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`（`used_keys=957`，缺失 0）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+  - 利润中心专项接口自测：
+    - 同店两次 `accountSave` 返回同一 `id`
+    - `accountListJson` 同店数量为 1
+    - `entrySave` 不传 `account_id` 可成功自动绑定到账户

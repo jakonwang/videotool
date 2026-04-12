@@ -488,7 +488,6 @@ class ProfitCenter extends BaseController
     {
         $storeId = (int) $this->request->param('store_id', 0);
         $status = trim((string) $this->request->param('status', ''));
-        $channelType = ProfitCalculatorService::normalizeChannelType((string) $this->request->param('channel_type', ''));
 
         $query = Db::name('growth_profit_accounts')->alias('a')
             ->leftJoin('growth_profit_stores s', 's.id=a.store_id')
@@ -501,9 +500,6 @@ class ProfitCenter extends BaseController
         if ($status !== '') {
             $query->where('a.status', (int) $status === 0 ? 0 : 1);
         }
-        if ($channelType !== '') {
-            $query->where('a.channel_type', $channelType);
-        }
         $rows = $query->select();
         $items = [];
         foreach ($rows as $row) {
@@ -514,8 +510,6 @@ class ProfitCenter extends BaseController
                 'store_name' => (string) ($r['store_name'] ?? ''),
                 'account_name' => (string) ($r['account_name'] ?? ''),
                 'account_code' => (string) ($r['account_code'] ?? ''),
-                'channel_type' => (string) ($r['channel_type'] ?? ''),
-                'channel_label' => $this->channelLabel((string) ($r['channel_type'] ?? '')),
                 'account_currency' => (string) ($r['account_currency'] ?? 'USD'),
                 'default_gmv_currency' => (string) ($r['default_gmv_currency'] ?? 'VND'),
                 'status' => (int) ($r['status'] ?? 1),
@@ -546,20 +540,38 @@ class ProfitCenter extends BaseController
             return $this->jsonErr('store_not_found', 1, null, 'common.notFound');
         }
 
-        $channelType = ProfitCalculatorService::normalizeChannelType((string) ($payload['channel_type'] ?? ''));
-        if ($channelType === '') {
-            $channelType = ProfitCalculatorService::CHANNEL_VIDEO;
-        }
+        $tenantId = $this->currentTenantId();
         $savePayload = [
             'store_id' => $storeId,
             'account_name' => mb_substr($accountName, 0, 128),
             'account_code' => $this->cleanNullableText($payload['account_code'] ?? null, 64),
-            'channel_type' => $channelType,
+            // GMV MAX account is shared by live/video channels; keep legacy column for compatibility.
+            'channel_type' => ProfitCalculatorService::CHANNEL_VIDEO,
             'account_currency' => FxRateService::normalizeCurrency((string) ($payload['account_currency'] ?? 'USD')),
             'default_gmv_currency' => FxRateService::normalizeCurrency((string) ($payload['default_gmv_currency'] ?? 'VND')),
             'status' => (int) ($payload['status'] ?? 1) === 0 ? 0 : 1,
             'notes' => $this->cleanNullableText($payload['notes'] ?? null, 255),
         ];
+
+        $sameStoreQuery = Db::name('growth_profit_accounts')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $storeId);
+        if ($id > 0) {
+            $sameStoreQuery->where('id', '<>', $id);
+        }
+        $sameStoreAccount = $sameStoreQuery->order('id', 'desc')->find();
+        if ($id > 0 && is_array($sameStoreAccount)) {
+            return $this->jsonErr(
+                'single_account_per_store',
+                1,
+                ['store_id' => $storeId, 'existing_account_id' => (int) ($sameStoreAccount['id'] ?? 0)],
+                'page.profitCenter.singleAccountPerStore'
+            );
+        }
+        if ($id <= 0 && is_array($sameStoreAccount)) {
+            // Create request on same store becomes update, ensuring "one store one GMV MAX account".
+            $id = (int) ($sameStoreAccount['id'] ?? 0);
+        }
 
         if ($id > 0) {
             $query = GrowthProfitAccountModel::where('id', $id);
@@ -962,7 +974,7 @@ class ProfitCenter extends BaseController
         }
         $storeId = (int) ($payload['store_id'] ?? 0);
         $accountId = (int) ($payload['account_id'] ?? 0);
-        if ($storeId <= 0 || $accountId <= 0) {
+        if ($storeId <= 0) {
             return ['ok' => false, 'message' => 'invalid_store_or_account'];
         }
 
@@ -972,6 +984,22 @@ class ProfitCenter extends BaseController
         if (!$store) {
             return ['ok' => false, 'message' => 'store_not_found'];
         }
+
+        if ($accountId <= 0) {
+            $primaryAccount = Db::name('growth_profit_accounts')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $storeId)
+                ->order('status', 'desc')
+                ->order('id', 'asc')
+                ->find();
+            if (is_array($primaryAccount)) {
+                $accountId = (int) ($primaryAccount['id'] ?? 0);
+            }
+        }
+        if ($accountId <= 0) {
+            return ['ok' => false, 'message' => 'store_account_required'];
+        }
+
         $accountQuery = GrowthProfitAccountModel::where('id', $accountId);
         $accountQuery = $this->scopeTenant($accountQuery, 'growth_profit_accounts');
         $account = $accountQuery->find();
@@ -982,7 +1010,7 @@ class ProfitCenter extends BaseController
             return ['ok' => false, 'message' => 'account_store_mismatch'];
         }
 
-        $channelType = ProfitCalculatorService::normalizeChannelType((string) ($payload['channel_type'] ?? (string) ($account->channel_type ?? '')));
+        $channelType = ProfitCalculatorService::normalizeChannelType((string) ($payload['channel_type'] ?? ''));
         if ($channelType === '') {
             return ['ok' => false, 'message' => 'invalid_channel_type'];
         }
