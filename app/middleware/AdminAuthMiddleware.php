@@ -99,6 +99,9 @@ class AdminAuthMiddleware
         if (preg_match('#^/data_import(/|$)#i', $path)) {
             return 'data_import';
         }
+        if (preg_match('#^/profit_center(/|$)#i', $path)) {
+            return 'profit_center';
+        }
         if (preg_match('#^/(influencer|outreach_workspace|sample|category|message_template|distribute|mobile_task|mobile_device|mobile_agent|auto_dm)(/|$)#i', $path)) {
             return 'creator_crm';
         }
@@ -143,7 +146,7 @@ class AdminAuthMiddleware
         if (preg_match('#/(list|listJson|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
             return true;
         }
-        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|stats|mobile_task|mobile_device|mobile_agent|auto_dm)/#i', $path)) {
+        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|profit_center|stats|mobile_task|mobile_device|mobile_agent|auto_dm)/#i', $path)) {
             return true;
         }
         if (preg_match('#^/(client_version|client_license)/(list|add|batchGenerate|update|toggle|delete|unbind|uploadPackage)#i', $path)) {

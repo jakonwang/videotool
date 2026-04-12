@@ -1,0 +1,1133 @@
+﻿{extend name="admin/common/layout" /}
+
+{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.profitCenter.title') : 'Profit Center' }}{/literal}{/block}
+{block name="page_title"}<span data-i18n="page.profitCenter.title">Profit Center</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.profitCenter.breadcrumb">Growth Hub / Profit Center</span>{/block}
+
+{block name="content"}
+<div id="profitCenterApp" class="admin-page-container"></div>
+{/block}
+
+{block name="script"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, reactive, ref, computed, onMounted, watch } = Vue;
+  const { ElMessage, ElMessageBox } = ElementPlus;
+  const i18n = window.AppI18n;
+  const lang = i18n ? i18n.getLang('zh') : 'zh';
+  const tt = (k, vars) => (i18n ? i18n.t(k, vars || null, lang) : k);
+  const headers = { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' };
+
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch (_) { return null; }
+  }
+
+  function resolveApiMessage(json, fallbackKey) {
+    if (i18n && typeof i18n.resolveApiMessage === 'function') {
+      return i18n.resolveApiMessage(json, fallbackKey || 'common.operationFailed', null, lang);
+    }
+    if (json && json.error_key) {
+      const key = String(json.error_key);
+      const translated = tt(key);
+      if (translated && translated !== key) return translated;
+    }
+    return tt(fallbackKey || 'common.operationFailed');
+  }
+
+  function translateMaybeText(raw, fallbackKey) {
+    if (i18n && typeof i18n.resolveApiMessage === 'function') {
+      return i18n.resolveApiMessage({ msg: raw }, fallbackKey || 'common.operationFailed', null, lang);
+    }
+    return String(raw || '');
+  }
+
+  function today() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  createApp({
+    setup() {
+      const loading = ref(false);
+      const summaryLoading = ref(false);
+      const stores = ref([]);
+      const accounts = ref([]);
+      const entries = ref([]);
+      const total = ref(0);
+      const page = ref(1);
+      const pageSize = ref(20);
+      const fallbackCount = ref(0);
+
+      const filters = reactive({
+        date_from: today(),
+        date_to: today(),
+        store_id: '',
+        account_id: '',
+        channel_type: ''
+      });
+
+      const summary = reactive({
+        kpi: { net_profit_cny: 0, ad_spend_cny: 0, gmv_cny: 0, order_count: 0, avg_roi: null, entry_count: 0 },
+        by_store: [],
+        by_channel: []
+      });
+
+      const entryDialogVisible = ref(false);
+      const entrySaving = ref(false);
+      const entryForm = reactive({
+        id: 0,
+        entry_date: today(),
+        store_id: '',
+        account_id: '',
+        channel_type: 'video',
+        sale_price_cny: 0,
+        product_cost_cny: 0,
+        cancel_rate: 0,
+        platform_fee_rate: 0,
+        influencer_commission_rate: 0,
+        live_hours: 0,
+        wage_hourly_cny: 0,
+        ad_spend_amount: 0,
+        ad_spend_currency: 'USD',
+        gmv_amount: 0,
+        gmv_currency: 'VND',
+        order_count: 0,
+        raw_metrics_json: ''
+      });
+
+      const batchDialogVisible = ref(false);
+      const batchSaving = ref(false);
+      const batchRowSeed = ref(1);
+      const batchRows = ref([]);
+      const batchResult = reactive({
+        total: 0,
+        saved_count: 0,
+        failed_count: 0,
+        failed_items: []
+      });
+
+      const storeDialogVisible = ref(false);
+      const storeLoading = ref(false);
+      const storeForm = reactive({
+        id: 0,
+        store_code: '',
+        store_name: '',
+        default_sale_price_cny: 0,
+        default_product_cost_cny: 0,
+        default_cancel_rate: 0,
+        default_cancel_rate_live: 0,
+        default_cancel_rate_video: 0,
+        default_cancel_rate_influencer: 0,
+        default_platform_fee_rate: 0,
+        default_influencer_commission_rate: 0,
+        default_live_wage_hourly_cny: 0,
+        default_timezone: 'Asia/Bangkok',
+        status: 1,
+        notes: ''
+      });
+
+      const accountDialogVisible = ref(false);
+      const accountLoading = ref(false);
+      const accountForm = reactive({
+        id: 0,
+        store_id: '',
+        account_name: '',
+        account_code: '',
+        channel_type: 'video',
+        account_currency: 'USD',
+        default_gmv_currency: 'VND',
+        status: 1,
+        notes: ''
+      });
+
+      const importDialogVisible = ref(false);
+      const importLoading = ref(false);
+      const importFile = ref(null);
+      const importForm = reactive({
+        store_id: '',
+        account_id: '',
+        ad_spend_currency: '',
+        gmv_currency: ''
+      });
+
+      const fxDialogVisible = ref(false);
+      const fxLoading = ref(false);
+      const fxSyncing = ref(false);
+      const fxRows = ref([]);
+      const fxForm = reactive({ rate_date: today(), currencies: ['USD', 'VND'] });
+
+      const channelOptions = computed(() => [
+        { value: 'live', label: tt('page.profitCenter.channelLive') },
+        { value: 'video', label: tt('page.profitCenter.channelVideo') },
+        { value: 'influencer', label: tt('page.profitCenter.channelInfluencer') }
+      ]);
+      const currencyOptions = computed(() => ['CNY', 'USD', 'VND']);
+
+      const entryAccountOptions = computed(() => {
+        if (!entryForm.store_id) return accounts.value;
+        return accounts.value.filter((a) => String(a.store_id) === String(entryForm.store_id));
+      });
+
+      const importAccountOptions = computed(() => {
+        if (!importForm.store_id) return accounts.value;
+        return accounts.value.filter((a) => String(a.store_id) === String(importForm.store_id));
+      });
+
+      const queryString = computed(() => {
+        const p = new URLSearchParams();
+        if (filters.date_from) p.set('date_from', filters.date_from);
+        if (filters.date_to) p.set('date_to', filters.date_to);
+        if (filters.store_id) p.set('store_id', String(filters.store_id));
+        if (filters.account_id) p.set('account_id', String(filters.account_id));
+        if (filters.channel_type) p.set('channel_type', String(filters.channel_type));
+        return p.toString();
+      });
+
+      function formatMoney(v) { return Number(v || 0).toFixed(2); }
+      function formatRoi(v) {
+        if (v == null || v === '') return '--';
+        const n = Number(v);
+        return Number.isFinite(n) ? n.toFixed(4) : '--';
+      }
+      function getStoreCancelRate(store, channel) {
+        if (!store) return 0;
+        const base = Number(store.default_cancel_rate || 0);
+        if (channel === 'live') return Number(store.default_cancel_rate_live ?? base);
+        if (channel === 'video') return Number(store.default_cancel_rate_video ?? base);
+        if (channel === 'influencer') return Number(store.default_cancel_rate_influencer ?? base);
+        return base;
+      }
+      function fxStatusLabel(status) {
+        const s = String(status || '');
+        if (s === 'fallback_latest') return tt('page.profitCenter.fxFallback');
+        if (s === 'missing') return tt('page.profitCenter.fxMissing');
+        if (s === 'identity') return tt('page.profitCenter.fxIdentity');
+        return tt('page.profitCenter.fxExact');
+      }
+      function fxTagType(status) {
+        const s = String(status || '');
+        if (s === 'fallback_latest') return 'warning';
+        if (s === 'missing') return 'danger';
+        if (s === 'identity') return 'info';
+        return 'success';
+      }
+      function fxSourceLabel(source) {
+        const s = String(source || '').toLowerCase();
+        if (!s) return tt('page.profitCenter.fxSourceUnknown');
+        if (s === 'manual_test' || s === 'manual') return tt('page.profitCenter.fxSourceManual');
+        if (s === 'currency_api_jsdelivr') return tt('page.profitCenter.fxSourceCurrencyApi');
+        if (s === 'open_er_api') return tt('page.profitCenter.fxSourceErApi');
+        if (s === 'fxratesapi_latest') return tt('page.profitCenter.fxSourceFxRatesApi');
+        if (s === 'fallback_latest') return tt('page.profitCenter.fxSourceFallbackLatest');
+        return translateMaybeText(source, 'page.profitCenter.fxSourceUnknown');
+      }
+
+      async function fetchStores() {
+        const res = await fetch('/admin.php/profit_center/storeListJson', { credentials: 'same-origin', headers });
+        const json = parseJson(await res.text());
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+        stores.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+      }
+
+      async function fetchAccounts() {
+        const res = await fetch('/admin.php/profit_center/accountListJson', { credentials: 'same-origin', headers });
+        const json = parseJson(await res.text());
+        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+        accounts.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+      }
+      async function fetchSummary() {
+        summaryLoading.value = true;
+        try {
+          const res = await fetch('/admin.php/profit_center/summaryJson?' + queryString.value, { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          const data = json.data || {};
+          summary.kpi = data.kpi || summary.kpi;
+          summary.by_store = Array.isArray(data.by_store) ? data.by_store : [];
+          summary.by_channel = Array.isArray(data.by_channel) ? data.by_channel : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          summaryLoading.value = false;
+        }
+      }
+
+      async function fetchEntries() {
+        loading.value = true;
+        try {
+          const p = new URLSearchParams(queryString.value);
+          p.set('page', String(page.value));
+          p.set('page_size', String(pageSize.value));
+          const res = await fetch('/admin.php/profit_center/entryListJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          entries.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          total.value = json.data ? Number(json.data.total || 0) : 0;
+          fallbackCount.value = entries.value.filter((x) => String(x.fx_status || '') === 'fallback_latest').length;
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      async function reloadAll() {
+        try {
+          await Promise.all([fetchSummary(), fetchEntries()]);
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      }
+
+      function resetFilter() {
+        filters.date_from = today();
+        filters.date_to = today();
+        filters.store_id = '';
+        filters.account_id = '';
+        filters.channel_type = '';
+        page.value = 1;
+        reloadAll();
+      }
+
+      function openEntryCreate() {
+        const firstStore = stores.value[0] || null;
+        const firstAccount = accounts.value[0] || null;
+        entryForm.id = 0;
+        entryForm.entry_date = filters.date_from || today();
+        entryForm.store_id = firstStore ? String(firstStore.id) : '';
+        entryForm.account_id = firstAccount ? String(firstAccount.id) : '';
+        entryForm.channel_type = firstAccount ? String(firstAccount.channel_type || 'video') : 'video';
+        entryForm.sale_price_cny = Number(firstStore ? (firstStore.default_sale_price_cny || 0) : 0);
+        entryForm.product_cost_cny = Number(firstStore ? (firstStore.default_product_cost_cny || 0) : 0);
+        entryForm.cancel_rate = getStoreCancelRate(firstStore, entryForm.channel_type);
+        entryForm.platform_fee_rate = Number(firstStore ? (firstStore.default_platform_fee_rate || 0) : 0);
+        entryForm.influencer_commission_rate = Number(firstStore ? (firstStore.default_influencer_commission_rate || 0) : 0);
+        entryForm.wage_hourly_cny = Number(firstStore ? (firstStore.default_live_wage_hourly_cny || 0) : 0);
+        entryForm.live_hours = 0;
+        entryForm.order_count = 0;
+        entryForm.ad_spend_amount = 0;
+        entryForm.gmv_amount = 0;
+        entryForm.ad_spend_currency = firstAccount ? String(firstAccount.account_currency || 'USD') : 'USD';
+        entryForm.gmv_currency = firstAccount ? String(firstAccount.default_gmv_currency || 'VND') : 'VND';
+        entryForm.raw_metrics_json = '';
+        entryDialogVisible.value = true;
+      }
+
+      function openEntryEdit(row) {
+        entryForm.id = Number(row.id || 0);
+        entryForm.entry_date = String(row.entry_date || today());
+        entryForm.store_id = String(row.store_id || '');
+        entryForm.account_id = String(row.account_id || '');
+        entryForm.channel_type = String(row.channel_type || 'video');
+        entryForm.sale_price_cny = Number(row.sale_price_cny || 0);
+        entryForm.product_cost_cny = Number(row.product_cost_cny || 0);
+        entryForm.cancel_rate = Number(row.cancel_rate || 0);
+        entryForm.platform_fee_rate = Number(row.platform_fee_rate || 0);
+        entryForm.influencer_commission_rate = Number(row.influencer_commission_rate || 0);
+        entryForm.live_hours = Number(row.live_hours || 0);
+        entryForm.wage_hourly_cny = Number(row.wage_hourly_cny || 0);
+        entryForm.ad_spend_amount = Number(row.ad_spend_amount || 0);
+        entryForm.ad_spend_currency = String(row.ad_spend_currency || 'USD');
+        entryForm.gmv_amount = Number(row.gmv_amount || 0);
+        entryForm.gmv_currency = String(row.gmv_currency || 'VND');
+        entryForm.order_count = Number(row.order_count || 0);
+        entryForm.raw_metrics_json = row.raw_metrics_json || '';
+        entryDialogVisible.value = true;
+      }
+
+      function createBatchRow(seed) {
+        const base = seed && typeof seed === 'object' ? seed : {};
+        const requestedStoreId = base.store_id ? String(base.store_id) : '';
+        const accountPool = requestedStoreId
+          ? accounts.value.filter((a) => String(a.store_id) === requestedStoreId)
+          : accounts.value.slice();
+        let account = null;
+        if (base.account_id) {
+          account = accountPool.find((a) => String(a.id) === String(base.account_id)) || null;
+        }
+        if (!account && accountPool.length > 0) {
+          account = accountPool[0];
+        }
+        let store = null;
+        if (requestedStoreId) {
+          store = stores.value.find((s) => String(s.id) === requestedStoreId) || null;
+        }
+        if (!store && account) {
+          store = stores.value.find((s) => String(s.id) === String(account.store_id)) || null;
+        }
+        const storeId = store ? String(store.id) : (requestedStoreId || '');
+        const accountId = account ? String(account.id) : (base.account_id ? String(base.account_id) : '');
+        const channelType = String(base.channel_type || (account ? (account.channel_type || 'video') : 'video'));
+        return {
+          row_key: batchRowSeed.value++,
+          entry_date: String(base.entry_date || filters.date_from || today()),
+          store_id: storeId,
+          account_id: accountId,
+          channel_type: channelType,
+          ad_spend_amount: Number(base.ad_spend_amount || 0),
+          ad_spend_currency: String(base.ad_spend_currency || (account ? (account.account_currency || 'USD') : 'USD')),
+          gmv_amount: Number(base.gmv_amount || 0),
+          gmv_currency: String(base.gmv_currency || (account ? (account.default_gmv_currency || 'VND') : 'VND')),
+          order_count: Number(base.order_count || 0),
+          live_hours: Number(base.live_hours || 0),
+          raw_metrics_json: String(base.raw_metrics_json || '')
+        };
+      }
+
+      function resetBatchDialog() {
+        batchResult.total = 0;
+        batchResult.saved_count = 0;
+        batchResult.failed_count = 0;
+        batchResult.failed_items = [];
+        batchRows.value = [createBatchRow()];
+      }
+
+      function openBatchEntry() {
+        resetBatchDialog();
+        batchDialogVisible.value = true;
+      }
+
+      function batchAccountOptions(row) {
+        if (!row || !row.store_id) return accounts.value;
+        return accounts.value.filter((a) => String(a.store_id) === String(row.store_id));
+      }
+
+      function applyBatchAccountPreset(row) {
+        const account = accounts.value.find((a) => String(a.id) === String(row.account_id));
+        if (!account) return;
+        row.channel_type = String(account.channel_type || row.channel_type || 'video');
+        row.ad_spend_currency = String(account.account_currency || row.ad_spend_currency || 'USD');
+        row.gmv_currency = String(account.default_gmv_currency || row.gmv_currency || 'VND');
+        if (String(row.store_id || '') !== String(account.store_id || '')) {
+          row.store_id = String(account.store_id || '');
+        }
+      }
+
+      function onBatchStoreChange(row) {
+        const opts = batchAccountOptions(row);
+        if (!opts.find((a) => String(a.id) === String(row.account_id))) {
+          row.account_id = opts.length > 0 ? String(opts[0].id) : '';
+        }
+        if (row.account_id) {
+          applyBatchAccountPreset(row);
+        }
+      }
+
+      function onBatchAccountChange(row) {
+        applyBatchAccountPreset(row);
+      }
+
+      function addBatchRow(seed) {
+        const base = seed && typeof seed === 'object'
+          ? seed
+          : (batchRows.value.length > 0 ? batchRows.value[batchRows.value.length - 1] : {});
+        batchRows.value.push(createBatchRow({
+          entry_date: base.entry_date || filters.date_from || today(),
+          store_id: base.store_id || '',
+          account_id: base.account_id || '',
+          channel_type: base.channel_type || 'video',
+          ad_spend_currency: base.ad_spend_currency || 'USD',
+          gmv_currency: base.gmv_currency || 'VND'
+        }));
+      }
+
+      function removeBatchRow(index) {
+        if (batchRows.value.length <= 1) {
+          batchRows.value = [createBatchRow()];
+          return;
+        }
+        batchRows.value.splice(index, 1);
+      }
+
+      async function submitBatchEntries() {
+        if (!Array.isArray(batchRows.value) || batchRows.value.length === 0) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        const items = [];
+        for (let i = 0; i < batchRows.value.length; i += 1) {
+          const row = batchRows.value[i];
+          if (!row.entry_date || !row.store_id || !row.account_id || !row.channel_type) {
+            ElMessage.warning(tt('page.profitCenter.batchInvalidRow', { index: i + 1 }));
+            return;
+          }
+          items.push({
+            entry_date: String(row.entry_date || ''),
+            store_id: Number(row.store_id || 0),
+            account_id: Number(row.account_id || 0),
+            channel_type: String(row.channel_type || ''),
+            ad_spend_amount: Number(row.ad_spend_amount || 0),
+            ad_spend_currency: String(row.ad_spend_currency || ''),
+            gmv_amount: Number(row.gmv_amount || 0),
+            gmv_currency: String(row.gmv_currency || ''),
+            order_count: Number(row.order_count || 0),
+            live_hours: Number(row.live_hours || 0),
+            raw_metrics_json: String(row.raw_metrics_json || '')
+          });
+        }
+
+        batchSaving.value = true;
+        try {
+          const res = await fetch('/admin.php/profit_center/entryBatchSave', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ items })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          const data = json.data || {};
+          batchResult.total = Number(data.total || 0);
+          batchResult.saved_count = Number(data.saved_count || 0);
+          batchResult.failed_count = Number(data.failed_count || 0);
+          batchResult.failed_items = Array.isArray(data.failed_items)
+            ? data.failed_items.map((item) => ({
+                ...item,
+                message: translateMaybeText(item && item.message ? item.message : '', 'common.operationFailed')
+              }))
+            : [];
+
+          if (batchResult.failed_count > 0) {
+            ElMessage.warning(tt('page.profitCenter.batchResultPartial', {
+              total: batchResult.total,
+              saved: batchResult.saved_count,
+              failed: batchResult.failed_count
+            }));
+          } else {
+            ElMessage.success(tt('page.profitCenter.batchResultSuccess', {
+              total: batchResult.total,
+              saved: batchResult.saved_count
+            }));
+            batchDialogVisible.value = false;
+          }
+          if (batchResult.saved_count > 0) {
+            await reloadAll();
+          }
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          batchSaving.value = false;
+        }
+      }
+
+      async function saveEntry() {
+        if (!entryForm.entry_date || !entryForm.store_id || !entryForm.account_id || !entryForm.channel_type) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        entrySaving.value = true;
+        try {
+          const payload = {
+            id: Number(entryForm.id || 0),
+            entry_date: entryForm.entry_date,
+            store_id: Number(entryForm.store_id || 0),
+            account_id: Number(entryForm.account_id || 0),
+            channel_type: entryForm.channel_type,
+            sale_price_cny: Number(entryForm.sale_price_cny || 0),
+            product_cost_cny: Number(entryForm.product_cost_cny || 0),
+            cancel_rate: Number(entryForm.cancel_rate || 0),
+            platform_fee_rate: Number(entryForm.platform_fee_rate || 0),
+            influencer_commission_rate: Number(entryForm.influencer_commission_rate || 0),
+            live_hours: Number(entryForm.live_hours || 0),
+            wage_hourly_cny: Number(entryForm.wage_hourly_cny || 0),
+            ad_spend_amount: Number(entryForm.ad_spend_amount || 0),
+            ad_spend_currency: entryForm.ad_spend_currency,
+            gmv_amount: Number(entryForm.gmv_amount || 0),
+            gmv_currency: entryForm.gmv_currency,
+            order_count: Number(entryForm.order_count || 0),
+            raw_metrics_json: entryForm.raw_metrics_json || ''
+          };
+          const res = await fetch('/admin.php/profit_center/entrySave', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(payload)
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          entryDialogVisible.value = false;
+          reloadAll();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          entrySaving.value = false;
+        }
+      }
+
+      async function deleteEntry(row) {
+        try {
+          await ElMessageBox.confirm(tt('common.confirmDelete'), tt('common.tip'), { type: 'warning' });
+          const res = await fetch('/admin.php/profit_center/entryDelete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ id: row.id })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.deleteFailed'));
+          ElMessage.success(tt('common.done'));
+          reloadAll();
+        } catch (e) {
+          if (e !== 'cancel') ElMessage.error(e.message || tt('common.deleteFailed'));
+        }
+      }
+      function fillStoreForm(row) {
+        storeForm.id = Number(row.id || 0);
+        storeForm.store_code = row.store_code || '';
+        storeForm.store_name = row.store_name || '';
+        storeForm.default_sale_price_cny = Number(row.default_sale_price_cny || 0);
+        storeForm.default_product_cost_cny = Number(row.default_product_cost_cny || 0);
+        storeForm.default_cancel_rate = Number(row.default_cancel_rate || 0);
+        const baseCancel = Number(row.default_cancel_rate || 0);
+        storeForm.default_cancel_rate_live = Number(row.default_cancel_rate_live != null ? row.default_cancel_rate_live : baseCancel);
+        storeForm.default_cancel_rate_video = Number(row.default_cancel_rate_video != null ? row.default_cancel_rate_video : baseCancel);
+        storeForm.default_cancel_rate_influencer = Number(row.default_cancel_rate_influencer != null ? row.default_cancel_rate_influencer : baseCancel);
+        storeForm.default_platform_fee_rate = Number(row.default_platform_fee_rate || 0);
+        storeForm.default_influencer_commission_rate = Number(row.default_influencer_commission_rate || 0);
+        storeForm.default_live_wage_hourly_cny = Number(row.default_live_wage_hourly_cny || 0);
+        storeForm.default_timezone = row.default_timezone || 'Asia/Bangkok';
+        storeForm.status = Number(row.status || 1);
+        storeForm.notes = row.notes || '';
+      }
+
+      function resetStoreForm() { fillStoreForm({ id: 0, status: 1, default_timezone: 'Asia/Bangkok' }); }
+
+      async function saveStore() {
+        if (!storeForm.store_name) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        storeLoading.value = true;
+        try {
+          const res = await fetch('/admin.php/profit_center/storeSave', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ ...storeForm, id: Number(storeForm.id || 0) })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          await fetchStores();
+          await fetchAccounts();
+          resetStoreForm();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          storeLoading.value = false;
+        }
+      }
+
+      async function deleteStore(row) {
+        try {
+          await ElMessageBox.confirm(tt('common.confirmDelete'), tt('common.tip'), { type: 'warning' });
+          const res = await fetch('/admin.php/profit_center/storeDelete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ id: row.id })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.deleteFailed'));
+          ElMessage.success(tt('common.done'));
+          await fetchStores();
+          await fetchAccounts();
+          resetStoreForm();
+        } catch (e) {
+          if (e !== 'cancel') ElMessage.error(e.message || tt('common.deleteFailed'));
+        }
+      }
+
+      function fillAccountForm(row) {
+        accountForm.id = Number(row.id || 0);
+        accountForm.store_id = String(row.store_id || '');
+        accountForm.account_name = row.account_name || '';
+        accountForm.account_code = row.account_code || '';
+        accountForm.channel_type = row.channel_type || 'video';
+        accountForm.account_currency = row.account_currency || 'USD';
+        accountForm.default_gmv_currency = row.default_gmv_currency || 'VND';
+        accountForm.status = Number(row.status || 1);
+        accountForm.notes = row.notes || '';
+      }
+
+      function resetAccountForm() {
+        fillAccountForm({ id: 0, status: 1, channel_type: 'video', account_currency: 'USD', default_gmv_currency: 'VND' });
+      }
+
+      async function saveAccount() {
+        if (!accountForm.store_id || !accountForm.account_name) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        accountLoading.value = true;
+        try {
+          const payload = { ...accountForm, id: Number(accountForm.id || 0), store_id: Number(accountForm.store_id || 0) };
+          const res = await fetch('/admin.php/profit_center/accountSave', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(payload)
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          ElMessage.success(tt('common.done'));
+          await fetchAccounts();
+          resetAccountForm();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          accountLoading.value = false;
+        }
+      }
+
+      async function deleteAccount(row) {
+        try {
+          await ElMessageBox.confirm(tt('common.confirmDelete'), tt('common.tip'), { type: 'warning' });
+          const res = await fetch('/admin.php/profit_center/accountDelete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ id: row.id })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.deleteFailed'));
+          ElMessage.success(tt('common.done'));
+          await fetchAccounts();
+          resetAccountForm();
+        } catch (e) {
+          if (e !== 'cancel') ElMessage.error(e.message || tt('common.deleteFailed'));
+        }
+      }
+
+      async function submitImport() {
+        if (!importForm.store_id || !importForm.account_id || !importFile.value) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        importLoading.value = true;
+        try {
+          const fd = new FormData();
+          fd.append('store_id', String(importForm.store_id));
+          fd.append('account_id', String(importForm.account_id));
+          if (importForm.ad_spend_currency) fd.append('ad_spend_currency', String(importForm.ad_spend_currency));
+          if (importForm.gmv_currency) fd.append('gmv_currency', String(importForm.gmv_currency));
+          fd.append('file', importFile.value);
+          const res = await fetch('/admin.php/profit_center/importXlsx', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers,
+            body: fd
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'page.dataImport.importFailed'));
+          const d = json.data || {};
+          ElMessage.success(tt('page.profitCenter.importResult', { imported: Number(d.imported || 0), skipped: Number(d.skipped || 0), errors: Number(d.error_count || 0) }));
+          importDialogVisible.value = false;
+          reloadAll();
+        } catch (e) {
+          ElMessage.error(e.message || tt('page.dataImport.importFailed'));
+        } finally {
+          importLoading.value = false;
+        }
+      }
+
+      async function fetchFxRates() {
+        fxLoading.value = true;
+        try {
+          const p = new URLSearchParams();
+          if (filters.date_from) p.set('date_from', filters.date_from);
+          if (filters.date_to) p.set('date_to', filters.date_to);
+          const res = await fetch('/admin.php/profit_center/fxRateListJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          fxRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          fxLoading.value = false;
+        }
+      }
+
+      async function syncFx() {
+        fxSyncing.value = true;
+        try {
+          const res = await fetch('/admin.php/profit_center/fxSync', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ rate_date: fxForm.rate_date, currencies: fxForm.currencies })
+          });
+          const json = parseJson(await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.operationFailed'));
+          ElMessage.success(tt('common.done'));
+          await fetchFxRates();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.operationFailed'));
+        } finally {
+          fxSyncing.value = false;
+        }
+      }
+
+      function exportCsv() {
+        const url = '/admin.php/profit_center/exportCsv' + (queryString.value ? ('?' + queryString.value) : '');
+        window.open(url, '_blank', 'noopener');
+      }
+      function downloadTemplate() {
+        window.open('/admin.php/profit_center/templateXlsx', '_blank', 'noopener');
+      }
+
+      watch(() => entryForm.store_id, (v) => {
+        const opts = accounts.value.filter((a) => String(a.store_id) === String(v));
+        if (!opts.find((a) => String(a.id) === String(entryForm.account_id))) {
+          entryForm.account_id = opts.length > 0 ? String(opts[0].id) : '';
+        }
+        if (entryForm.id <= 0) {
+          const store = stores.value.find((s) => String(s.id) === String(v));
+          entryForm.sale_price_cny = Number(store ? (store.default_sale_price_cny || 0) : 0);
+          entryForm.product_cost_cny = Number(store ? (store.default_product_cost_cny || 0) : 0);
+          entryForm.platform_fee_rate = Number(store ? (store.default_platform_fee_rate || 0) : 0);
+          entryForm.influencer_commission_rate = Number(store ? (store.default_influencer_commission_rate || 0) : 0);
+          entryForm.wage_hourly_cny = Number(store ? (store.default_live_wage_hourly_cny || 0) : 0);
+          entryForm.cancel_rate = getStoreCancelRate(store || null, entryForm.channel_type);
+        }
+      });
+
+      watch(() => entryForm.account_id, (v) => {
+        const row = accounts.value.find((a) => String(a.id) === String(v));
+        if (!row) return;
+        entryForm.channel_type = row.channel_type || entryForm.channel_type;
+        entryForm.ad_spend_currency = row.account_currency || entryForm.ad_spend_currency;
+        entryForm.gmv_currency = row.default_gmv_currency || entryForm.gmv_currency;
+        if (entryForm.id <= 0) {
+          const store = stores.value.find((s) => String(s.id) === String(entryForm.store_id));
+          entryForm.cancel_rate = getStoreCancelRate(store || null, entryForm.channel_type);
+        }
+      });
+
+      onMounted(async () => {
+        if (i18n) i18n.applyDom(document);
+        try {
+          await Promise.all([fetchStores(), fetchAccounts()]);
+          await reloadAll();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        }
+      });
+
+      return {
+        tt, filters, stores, accounts, entries, total, page, pageSize, loading, summaryLoading, summary,
+        fallbackCount, channelOptions, currencyOptions, entryDialogVisible, entrySaving, entryForm,
+        batchDialogVisible, batchSaving, batchRows, batchResult,
+        entryAccountOptions, storeDialogVisible, storeLoading, storeForm, accountDialogVisible, accountLoading,
+        accountForm, importDialogVisible, importLoading, importForm, importAccountOptions, fxDialogVisible,
+        fxLoading, fxSyncing, fxRows, fxForm, formatMoney, formatRoi, fxStatusLabel, fxTagType, fxSourceLabel,
+        fetchEntries, reloadAll, resetFilter, openEntryCreate, openBatchEntry, openEntryEdit, saveEntry, deleteEntry,
+        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, onBatchStoreChange, onBatchAccountChange, resetBatchDialog,
+        fillStoreForm, saveStore, deleteStore, resetStoreForm, fillAccountForm, saveAccount, deleteAccount,
+        resetAccountForm, submitImport, fetchFxRates, syncFx, exportCsv, downloadTemplate,
+        onImportFileChange: (e) => { importFile.value = e.target && e.target.files ? e.target.files[0] : null; }
+      };
+    },
+    template: `
+      <div class="admin-modern-card" style="margin-bottom:12px;">
+        <el-form :inline="true">
+          <el-form-item><el-date-picker v-model="filters.date_from" value-format="YYYY-MM-DD" type="date" :placeholder="tt('page.profitCenter.filterDateFrom')" style="width:150px;" /></el-form-item>
+          <el-form-item><el-date-picker v-model="filters.date_to" value-format="YYYY-MM-DD" type="date" :placeholder="tt('page.profitCenter.filterDateTo')" style="width:150px;" /></el-form-item>
+          <el-form-item>
+            <el-select v-model="filters.store_id" clearable :placeholder="tt('page.profitCenter.filterStore')" style="width:170px;">
+              <el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="filters.account_id" clearable :placeholder="tt('page.profitCenter.filterAccount')" style="width:170px;">
+              <el-option v-for="a in accounts" :key="a.id" :label="a.account_name" :value="String(a.id)" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="filters.channel_type" clearable :placeholder="tt('page.profitCenter.filterChannel')" style="width:130px;">
+              <el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="page=1;reloadAll()">{{ tt('common.search') }}</el-button>
+            <el-button @click="resetFilter">{{ tt('common.reset') }}</el-button>
+            <el-button @click="exportCsv">{{ tt('page.styleSearch.exportCsv') }}</el-button>
+          </el-form-item>
+          <el-form-item style="margin-left:auto;">
+            <el-button type="success" @click="openEntryCreate">{{ tt('page.profitCenter.actionNewEntry') }}</el-button>
+            <el-button type="warning" @click="openBatchEntry">{{ tt('page.profitCenter.actionBatchEntry') }}</el-button>
+            <el-button @click="importDialogVisible=true">{{ tt('page.profitCenter.actionImport') }}</el-button>
+            <el-button @click="fxDialogVisible=true;fetchFxRates()">{{ tt('page.profitCenter.actionFx') }}</el-button>
+            <el-button @click="storeDialogVisible=true">{{ tt('page.profitCenter.actionStoreManager') }}</el-button>
+            <el-button @click="accountDialogVisible=true">{{ tt('page.profitCenter.actionAccountManager') }}</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <el-alert v-if="fallbackCount>0" type="warning" :closable="false" :title="tt('page.profitCenter.warningFallback', {count: fallbackCount})" style="margin-bottom:12px;" />
+
+      <div v-loading="summaryLoading" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
+        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiNetProfit') }}</div><div style="font-size:24px;font-weight:700;">{{ formatMoney(summary.kpi.net_profit_cny) }}</div></div>
+        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiAdSpend') }}</div><div style="font-size:24px;font-weight:700;">{{ formatMoney(summary.kpi.ad_spend_cny) }}</div></div>
+        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiGmv') }}</div><div style="font-size:24px;font-weight:700;">{{ formatMoney(summary.kpi.gmv_cny) }}</div></div>
+        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiOrderCount') }}</div><div style="font-size:24px;font-weight:700;">{{ Number(summary.kpi.order_count || 0) }}</div></div>
+        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiAvgRoi') }}</div><div style="font-size:24px;font-weight:700;">{{ formatRoi(summary.kpi.avg_roi) }}</div></div>
+      </div>
+
+      <div class="admin-modern-card" style="margin-bottom:12px;">
+        <el-table :data="entries" stripe v-loading="loading">
+          <el-table-column prop="entry_date" :label="tt('page.profitCenter.colDate')" width="110" />
+          <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
+          <el-table-column prop="account_name" :label="tt('page.profitCenter.colAccount')" min-width="120" />
+          <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" width="90" />
+          <el-table-column :label="tt('page.profitCenter.colAdSpend')" min-width="180"><template #default="{row}">{{ formatMoney(row.ad_spend_amount) }} {{ row.ad_spend_currency }} / {{ formatMoney(row.ad_spend_cny) }} CNY</template></el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colGmv')" min-width="180"><template #default="{row}">{{ formatMoney(row.gmv_amount) }} {{ row.gmv_currency }} / {{ formatMoney(row.gmv_cny) }} CNY</template></el-table-column>
+          <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="90" />
+          <el-table-column :label="tt('page.profitCenter.colRoi')" width="90"><template #default="{row}">{{ formatRoi(row.roi) }}</template></el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colNetProfit')" width="120"><template #default="{row}">{{ formatMoney(row.net_profit_cny) }}</template></el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colFxStatus')" width="120"><template #default="{row}"><el-tag size="small" :type="fxTagType(row.fx_status)">{{ fxStatusLabel(row.fx_status) }}</el-tag></template></el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colActions')" width="150" fixed="right">
+            <template #default="{row}">
+              <el-button size="small" @click="openEntryEdit(row)">{{ tt('common.edit') }}</el-button>
+              <el-button size="small" type="danger" plain @click="deleteEntry(row)">{{ tt('common.delete') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <el-pagination v-model:current-page="page" v-model:page-size="pageSize" layout="total, prev, pager, next" :total="total" @update:current-page="fetchEntries" @update:page-size="() => { page=1; fetchEntries(); }" />
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px;">
+        <div class="admin-modern-card">
+          <div style="font-weight:600;margin-bottom:8px;">{{ tt('page.profitCenter.byStore') }}</div>
+          <el-table :data="summary.by_store" size="small" max-height="260">
+            <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
+            <el-table-column prop="net_profit_cny" :label="tt('page.profitCenter.colNetProfit')" width="120" />
+            <el-table-column prop="ad_spend_cny" :label="tt('page.profitCenter.kpiAdSpend')" width="120" />
+            <el-table-column prop="gmv_cny" :label="tt('page.profitCenter.kpiGmv')" width="120" />
+          </el-table>
+        </div>
+        <div class="admin-modern-card">
+          <div style="font-weight:600;margin-bottom:8px;">{{ tt('page.profitCenter.byChannel') }}</div>
+          <el-table :data="summary.by_channel" size="small" max-height="260">
+            <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" min-width="120" />
+            <el-table-column prop="net_profit_cny" :label="tt('page.profitCenter.colNetProfit')" width="120" />
+            <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="100" />
+            <el-table-column prop="avg_roi" :label="tt('page.profitCenter.kpiAvgRoi')" width="120" />
+          </el-table>
+        </div>
+      </div>
+
+      <el-dialog v-model="batchDialogVisible" :title="tt('page.profitCenter.batchDialogTitle')" width="1240px" @closed="resetBatchDialog">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="color:#909399;">{{ tt('page.profitCenter.batchDialogTip') }}</div>
+          <div style="display:flex;gap:8px;">
+            <el-button size="small" @click="addBatchRow()">{{ tt('page.profitCenter.batchAddRow') }}</el-button>
+            <el-button size="small" @click="resetBatchDialog">{{ tt('common.reset') }}</el-button>
+          </div>
+        </div>
+        <el-table :data="batchRows" :row-key="(row) => row.row_key" border size="small" max-height="430">
+          <el-table-column width="64" align="center" label="#"><template #default="{ $index }">{{ $index + 1 }}</template></el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colDate')" width="140">
+            <template #default="{ row }">
+              <el-date-picker v-model="row.entry_date" type="date" value-format="YYYY-MM-DD" style="width:126px;" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colStore')" min-width="160">
+            <template #default="{ row }">
+              <el-select v-model="row.store_id" style="width:100%;" filterable @change="onBatchStoreChange(row)">
+                <el-option v-for="s in stores" :key="'bs'+s.id" :label="s.store_name" :value="String(s.id)" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colAccount')" min-width="170">
+            <template #default="{ row }">
+              <el-select v-model="row.account_id" style="width:100%;" filterable @change="onBatchAccountChange(row)">
+                <el-option v-for="a in batchAccountOptions(row)" :key="'ba'+a.id" :label="a.account_name" :value="String(a.id)" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colChannel')" width="120">
+            <template #default="{ row }">
+              <el-select v-model="row.channel_type" style="width:100%;">
+                <el-option v-for="c in channelOptions" :key="'bc'+c.value" :label="c.label" :value="c.value" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colAdSpend')" min-width="220">
+            <template #default="{ row }">
+              <div style="display:flex;gap:6px;">
+                <el-input-number v-model="row.ad_spend_amount" :precision="2" :min="0" style="flex:1;min-width:120px;" />
+                <el-select v-model="row.ad_spend_currency" style="width:82px;">
+                  <el-option v-for="c in currencyOptions" :key="'bac'+c" :label="c" :value="c" />
+                </el-select>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colGmv')" min-width="220">
+            <template #default="{ row }">
+              <div style="display:flex;gap:6px;">
+                <el-input-number v-model="row.gmv_amount" :precision="2" :min="0" style="flex:1;min-width:120px;" />
+                <el-select v-model="row.gmv_currency" style="width:82px;">
+                  <el-option v-for="c in currencyOptions" :key="'bgc'+c" :label="c" :value="c" />
+                </el-select>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colOrders')" width="110">
+            <template #default="{ row }">
+              <el-input-number v-model="row.order_count" :precision="0" :min="0" style="width:100%;" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.liveHours')" width="120">
+            <template #default="{ row }">
+              <el-input-number v-model="row.live_hours" :precision="2" :min="0" style="width:100%;" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colActions')" width="110" fixed="right">
+            <template #default="{ $index, row }">
+              <el-button type="danger" link @click="removeBatchRow($index)">{{ tt('page.profitCenter.batchRemoveRow') }}</el-button>
+              <el-button type="primary" link @click="addBatchRow(row)">{{ tt('page.profitCenter.batchCloneRow') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div v-if="batchResult.total > 0" style="margin-top:10px;">
+          <el-alert
+            :type="batchResult.failed_count > 0 ? 'warning' : 'success'"
+            :closable="false"
+            :title="batchResult.failed_count > 0
+              ? tt('page.profitCenter.batchResultPartial', { total: batchResult.total, saved: batchResult.saved_count, failed: batchResult.failed_count })
+              : tt('page.profitCenter.batchResultSuccess', { total: batchResult.total, saved: batchResult.saved_count })"
+          />
+        </div>
+        <el-table v-if="batchResult.failed_count > 0" :data="batchResult.failed_items" size="small" max-height="180" style="margin-top:8px;">
+          <el-table-column prop="index" width="72" label="#" />
+          <el-table-column prop="message" :label="tt('page.profitCenter.batchFailReason')" min-width="180" />
+        </el-table>
+        <template #footer>
+          <el-button @click="batchDialogVisible=false">{{ tt('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="batchSaving" @click="submitBatchEntries">{{ tt('page.profitCenter.batchSubmit') }}</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="entryDialogVisible" :title="tt('page.profitCenter.entryDialogTitle')" width="920px">
+        <el-form label-width="120px">
+          <el-row :gutter="12">
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colDate')"><el-date-picker v-model="entryForm.entry_date" type="date" value-format="YYYY-MM-DD" style="width:100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="entryForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colAccount')"><el-select v-model="entryForm.account_id" style="width:100%;"><el-option v-for="a in entryAccountOptions" :key="a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colChannel')"><el-select v-model="entryForm.channel_type" style="width:100%;"><el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" /></el-select></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.salePrice')"><el-input-number v-model="entryForm.sale_price_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.productCost')"><el-input-number v-model="entryForm.product_cost_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.cancelRate')"><el-input-number v-model="entryForm.cancel_rate" :precision="4" :step="0.01" :min="0" :max="1" style="width:100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number v-model="entryForm.platform_fee_rate" :precision="4" :step="0.01" :min="0" :max="1" style="width:100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number v-model="entryForm.influencer_commission_rate" :precision="4" :step="0.01" :min="0" :max="1" style="width:100%;" /></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.liveHours')"><el-input-number v-model="entryForm.live_hours" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.wageHourly')"><el-input-number v-model="entryForm.wage_hourly_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
+            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colOrders')"><el-input-number v-model="entryForm.order_count" :precision="0" :min="0" style="width:100%;" /></el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colAdSpend')"><div style="display:flex;gap:8px;width:100%;"><el-input-number v-model="entryForm.ad_spend_amount" :precision="2" :min="0" style="flex:1;" /><el-select v-model="entryForm.ad_spend_currency" style="width:90px;"><el-option v-for="c in currencyOptions" :key="'ad'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
+            <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colGmv')"><div style="display:flex;gap:8px;width:100%;"><el-input-number v-model="entryForm.gmv_amount" :precision="2" :min="0" style="flex:1;" /><el-select v-model="entryForm.gmv_currency" style="width:90px;"><el-option v-for="c in currencyOptions" :key="'gmv'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
+          </el-row>
+          <el-form-item :label="tt('page.profitCenter.rawMetrics')"><el-input v-model="entryForm.raw_metrics_json" type="textarea" :rows="2" /></el-form-item>
+        </el-form>
+        <template #footer><el-button @click="entryDialogVisible=false">{{ tt('common.cancel') }}</el-button><el-button type="primary" :loading="entrySaving" @click="saveEntry">{{ tt('common.save') }}</el-button></template>
+      </el-dialog>
+
+      <el-dialog v-model="storeDialogVisible" :title="tt('page.profitCenter.actionStoreManager')" width="980px">
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;">
+          <el-table :data="stores" height="360" size="small">
+            <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="140" />
+            <el-table-column prop="store_code" :label="tt('page.profitCenter.storeCode')" width="120" />
+            <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right"><template #default="{row}"><el-button size="small" @click="fillStoreForm(row)">{{ tt('common.edit') }}</el-button><el-button size="small" type="danger" plain @click="deleteStore(row)">{{ tt('common.delete') }}</el-button></template></el-table-column>
+          </el-table>
+          <el-form label-width="120px" size="small">
+            <el-form-item :label="tt('page.profitCenter.storeCode')"><el-input v-model="storeForm.store_code" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colStore')"><el-input v-model="storeForm.store_name" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.salePrice')"><el-input-number v-model="storeForm.default_sale_price_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.productCost')"><el-input-number v-model="storeForm.default_product_cost_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.wageHourly')"><el-input-number v-model="storeForm.default_live_wage_hourly_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.cancelRate')"><el-input-number v-model="storeForm.default_cancel_rate" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.cancelRateLive')"><el-input-number v-model="storeForm.default_cancel_rate_live" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.cancelRateVideo')"><el-input-number v-model="storeForm.default_cancel_rate_video" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.cancelRateInfluencer')"><el-input-number v-model="storeForm.default_cancel_rate_influencer" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number v-model="storeForm.default_platform_fee_rate" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number v-model="storeForm.default_influencer_commission_rate" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
+            <el-form-item :label="tt('common.status')"><el-switch v-model="storeForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
+            <el-form-item><el-button @click="resetStoreForm">{{ tt('common.reset') }}</el-button><el-button type="primary" :loading="storeLoading" @click="saveStore">{{ tt('common.save') }}</el-button></el-form-item>
+          </el-form>
+        </div>
+      </el-dialog>
+
+      <el-dialog v-model="accountDialogVisible" :title="tt('page.profitCenter.actionAccountManager')" width="980px">
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;">
+          <el-table :data="accounts" height="360" size="small">
+            <el-table-column prop="account_name" :label="tt('page.profitCenter.colAccount')" min-width="140" />
+            <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" width="140" />
+            <el-table-column prop="account_currency" :label="tt('page.profitCenter.colAdCurrency')" width="110" />
+            <el-table-column prop="default_gmv_currency" :label="tt('page.profitCenter.colGmvCurrency')" width="110" />
+            <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right"><template #default="{row}"><el-button size="small" @click="fillAccountForm(row)">{{ tt('common.edit') }}</el-button><el-button size="small" type="danger" plain @click="deleteAccount(row)">{{ tt('common.delete') }}</el-button></template></el-table-column>
+          </el-table>
+          <el-form label-width="120px" size="small">
+            <el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="accountForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colAccount')"><el-input v-model="accountForm.account_name" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.accountCode')"><el-input v-model="accountForm.account_code" /></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colChannel')"><el-select v-model="accountForm.channel_type" style="width:100%;"><el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" /></el-select></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select v-model="accountForm.account_currency" style="width:100%;"><el-option v-for="c in currencyOptions" :key="'ac'+c" :label="c" :value="c" /></el-select></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select v-model="accountForm.default_gmv_currency" style="width:100%;"><el-option v-for="c in currencyOptions" :key="'gc'+c" :label="c" :value="c" /></el-select></el-form-item>
+            <el-form-item :label="tt('common.status')"><el-switch v-model="accountForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
+            <el-form-item><el-button @click="resetAccountForm">{{ tt('common.reset') }}</el-button><el-button type="primary" :loading="accountLoading" @click="saveAccount">{{ tt('common.save') }}</el-button></el-form-item>
+          </el-form>
+        </div>
+      </el-dialog>
+
+      <el-dialog v-model="importDialogVisible" :title="tt('page.profitCenter.actionImport')" width="560px">
+        <el-form label-width="120px">
+          <el-form-item :label="tt('page.profitCenter.downloadTemplate')"><el-button type="primary" plain @click="downloadTemplate">{{ tt('page.profitCenter.downloadTemplate') }}</el-button></el-form-item>
+          <el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="importForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
+          <el-form-item :label="tt('page.profitCenter.colAccount')"><el-select v-model="importForm.account_id" style="width:100%;"><el-option v-for="a in importAccountOptions" :key="a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item>
+          <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select v-model="importForm.ad_spend_currency" clearable style="width:100%;"><el-option v-for="c in currencyOptions" :key="'iad'+c" :label="c" :value="c" /></el-select></el-form-item>
+          <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select v-model="importForm.gmv_currency" clearable style="width:100%;"><el-option v-for="c in currencyOptions" :key="'igmv'+c" :label="c" :value="c" /></el-select></el-form-item>
+          <el-form-item :label="tt('common.file')"><input type="file" accept=".xlsx,.xls,.xlsm" @change="onImportFileChange" /></el-form-item>
+        </el-form>
+        <template #footer><el-button @click="importDialogVisible=false">{{ tt('common.cancel') }}</el-button><el-button type="primary" :loading="importLoading" @click="submitImport">{{ tt('common.upload') }}</el-button></template>
+      </el-dialog>
+
+      <el-dialog v-model="fxDialogVisible" :title="tt('page.profitCenter.actionFx')" width="760px">
+        <el-form :inline="true" style="margin-bottom:10px;">
+          <el-form-item><el-date-picker v-model="fxForm.rate_date" type="date" value-format="YYYY-MM-DD" style="width:150px;" /></el-form-item>
+          <el-form-item><el-checkbox-group v-model="fxForm.currencies"><el-checkbox label="USD" /><el-checkbox label="VND" /></el-checkbox-group></el-form-item>
+          <el-form-item><el-button type="primary" :loading="fxSyncing" @click="syncFx">{{ tt('common.sync') }}</el-button><el-button @click="fetchFxRates">{{ tt('common.refresh') }}</el-button></el-form-item>
+        </el-form>
+        <el-table :data="fxRows" v-loading="fxLoading" size="small" max-height="360">
+          <el-table-column prop="rate_date" :label="tt('page.profitCenter.colDate')" width="110" />
+          <el-table-column prop="from_currency" :label="tt('page.profitCenter.colFromCurrency')" width="120" />
+          <el-table-column prop="to_currency" :label="tt('page.profitCenter.colToCurrency')" width="120" />
+          <el-table-column prop="rate" :label="tt('page.profitCenter.colRate')" min-width="120" />
+          <el-table-column :label="tt('page.profitCenter.colSource')" min-width="140"><template #default="{row}">{{ fxSourceLabel(row.source) }}</template></el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colFallback')" width="110"><template #default="{row}"><el-tag :type="Number(row.is_fallback||0)===1?'warning':'success'" size="small">{{ Number(row.is_fallback||0)===1?tt('common.yes'):tt('common.no') }}</el-tag></template></el-table-column>
+        </el-table>
+      </el-dialog>
+    `
+  }).use(ElementPlus).mount('#profitCenterApp');
+})();
+{/literal}
+</script>
+{/block}

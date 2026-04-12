@@ -2,465 +2,429 @@
 
 {block name="title"}TikStar OPS · 仪表盘{/block}
 {block name="page_title"}<span data-i18n="page.dashboard.title">仪表盘</span>{/block}
+
 {block name="style"}
 <style>
-    /* SaaS Dashboard（更专业：层级清晰、可读性强）——仅作用于仪表盘 */
     :root {
-        --ds-bg: #F8FAFC;
-        --ds-card: #FFFFFF;
-        --ds-shadow: 0 4px 20px rgba(0,0,0,0.06);
-        --ds-shadow-hover: 0 10px 28px rgba(0,0,0,0.08);
-        --ds-text: #0F172A;
-        --ds-muted: #94A3B8;
-        --ds-primary: #6366F1;
-        --ds-success: #22C55E;
-        --ds-warning: #F59E0B;
-        --ds-danger: #EF4444;
+        --db-bg: #f5f7f9;
+        --db-card: #fff;
+        --db-soft: #f8fafc;
+        --db-line: rgba(15, 23, 42, 0.08);
+        --db-title: #0f172a;
+        --db-text: #334155;
+        --db-muted: #64748b;
+        --db-primary: #0052d0;
+        --db-primary-soft: #799dff;
+        --db-success: #16a34a;
+        --db-warning: #f59e0b;
+        --db-danger: #ef4444;
+        --db-radius: 16px;
+        --db-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
     }
-    body.dark-dashboard { background: var(--ds-bg) !important; }
+
+    body.dark-dashboard {
+        background:
+            radial-gradient(circle at 0% 0%, rgba(0, 82, 208, 0.08), transparent 36%),
+            radial-gradient(circle at 100% 0%, rgba(121, 157, 255, 0.08), transparent 32%),
+            var(--db-bg) !important;
+    }
     body.dark-dashboard::before { display: none !important; }
     .content-wrapper { background: transparent !important; }
 
-    .dashboard-container { max-width: 1200px; margin: 0 auto; }
+    .dashboard-shell { max-width: 1320px; margin: 0 auto 28px; }
+    .dashboard-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .dashboard-top h2 { margin: 0; font-size: 1.9rem; color: var(--db-title); font-weight: 800; }
+    .dashboard-top-meta { margin: 6px 0 0; color: var(--db-muted); font-size: 13px; }
+    .dashboard-top-meta .sep { opacity: .5; margin: 0 6px; }
+    .dashboard-top-meta .ok { color: var(--db-success); font-weight: 700; }
+    .dashboard-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .dashboard-actions .btn { border-radius: 10px; font-weight: 700; font-size: 12px; padding: 7px 14px; }
+    .dashboard-actions .btn i[data-lucide] { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; }
+    .dashboard-actions .btn-primary { border: none !important; background: linear-gradient(130deg, var(--db-primary), var(--db-primary-soft)) !important; }
 
-    .kpi-grid-hero {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
-        margin-bottom: 12px;
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .grid-main { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .span-2 { grid-column: span 2; }
+
+    .db-card {
+        background: var(--db-card);
+        border: 1px solid transparent;
+        border-radius: var(--db-radius);
+        box-shadow: var(--db-shadow);
+        padding: 16px;
     }
-    .kpi-grid-mini {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
-        margin-bottom: 18px;
+    .db-card:hover { transform: translateY(-2px); transition: .18s ease; }
+
+    .kpi-focus { background: linear-gradient(150deg, #0052d0, #2f74ea); color: #fff; box-shadow: 0 12px 24px rgba(0, 82, 208, .24); }
+    .kpi-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .kpi-left { display: flex; gap: 10px; min-width: 0; }
+    .kpi-icon {
+        width: 40px; height: 40px; border-radius: 12px; background: rgba(0, 82, 208, 0.12);
+        display: inline-flex; align-items: center; justify-content: center; color: var(--db-primary); flex: 0 0 auto;
     }
-    .kpi-grid-modules {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        margin-bottom: 18px;
+    .kpi-icon i[data-lucide] { width: 18px; height: 18px; }
+    .kpi-focus .kpi-icon { color: #fff; background: rgba(255, 255, 255, 0.18); }
+    .kpi-title { margin: 0; font-size: 12px; color: var(--db-muted); font-weight: 700; }
+    .kpi-focus .kpi-title { color: rgba(255,255,255,.88); }
+    .kpi-value { margin: 5px 0 0; font-size: 34px; line-height: 1; color: var(--db-title); font-weight: 800; }
+    .kpi-small .kpi-value { font-size: 28px; }
+    .kpi-focus .kpi-value { color: #fff; }
+    .kpi-meta { margin-top: 8px; font-size: 12px; color: var(--db-muted); min-height: 18px; }
+    .kpi-focus .kpi-meta { color: rgba(255,255,255,.88); }
+    .kpi-action { color: var(--db-muted); text-decoration: none !important; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .kpi-action:hover { color: var(--db-primary); }
+    .kpi-delta { margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--db-muted); }
+    .kpi-delta.up { color: var(--db-success); }
+    .kpi-delta.down { color: var(--db-danger); }
+
+    .module-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .module-title { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--db-title); font-weight: 700; }
+    .module-tag { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+    .module-tag i[data-lucide] { width: 16px; height: 16px; }
+    .tag-search { background: #ec4899; }
+    .tag-influencer { background: #4f46e5; }
+    .tag-link { background: #0d9488; }
+    .module-val { font-size: 30px; font-weight: 800; color: var(--db-title); line-height: 1; }
+    .module-sub { margin-top: 7px; font-size: 12px; color: var(--db-muted); }
+
+    .summary-card {
+        background: rgba(255,255,255,.82);
+        border: 1px solid rgba(255,255,255,.72);
+        border-radius: var(--db-radius);
+        box-shadow: var(--db-shadow);
+        padding: 16px;
+        margin-bottom: 14px;
+        backdrop-filter: blur(5px);
     }
-    @media (max-width: 992px) {
-        .kpi-grid-hero, .kpi-grid-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .kpi-grid-modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .summary-title { margin: 0 0 10px; font-size: 14px; color: var(--db-title); font-weight: 800; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .summary-label { color: var(--db-muted); font-size: 12px; margin-bottom: 4px; }
+    .summary-text { color: var(--db-text); font-size: 13px; line-height: 1.45; font-weight: 600; }
+    .summary-text strong { color: var(--db-title); font-weight: 800; }
+    .summary-suggest { color: var(--db-primary); font-weight: 700; }
+
+    .panel {
+        background: var(--db-card);
+        border: 1px solid var(--db-line);
+        border-radius: var(--db-radius);
+        box-shadow: var(--db-shadow);
+        padding: 14px;
     }
-    @media (max-width: 576px) {
-        .kpi-grid-hero, .kpi-grid-mini { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-        .kpi-grid-modules { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .panel-title { margin: 0; color: var(--db-title); font-size: 14px; font-weight: 800; }
+    .range-switch { display: inline-flex; gap: 2px; background: #f1f5f9; border-radius: 10px; padding: 2px; }
+    .range-switch button { border: none; background: transparent; border-radius: 8px; padding: 4px 10px; color: var(--db-muted); font-size: 12px; font-weight: 700; }
+    .range-switch button.is-active { background: var(--db-primary); color: #fff; }
+    .chart-box { position: relative; }
+    .chart-canvas { width: 100%; height: 300px; }
+    .chart-lg { height: 320px; }
+    .chart-empty {
+        position: absolute; inset: 0; border-radius: 12px; border: 1px dashed rgba(100,116,139,.3);
+        display: flex; align-items: center; justify-content: center; color: var(--db-muted); font-size: 12px; background: var(--db-soft);
     }
 
-    .kpi-card {
-        --kpi-c: var(--ds-primary);
-        background: var(--ds-card);
-        border-radius: 12px;
-        box-shadow: var(--ds-shadow);
-        padding: 16px 18px;
-        transition: transform .18s ease, box-shadow .18s ease;
-        position: relative;
-        overflow: hidden;
-    }
-    .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--ds-shadow-hover); }
+    .platform-list { display: grid; gap: 10px; }
+    .platform-item { border-radius: 12px; padding: 10px; background: var(--db-soft); }
+    .platform-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; font-size: 12px; font-weight: 700; color: var(--db-text); }
+    .platform-bar { height: 7px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .platform-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(120deg, var(--db-primary), var(--db-primary-soft)); }
+    .platform-meta { margin-top: 6px; color: var(--db-muted); font-size: 11px; }
 
-    /* 核心 KPI（大卡） */
-    .kpi-card.kpi-card--hero { padding: 18px 20px; min-height: 110px; }
-    .kpi-card.kpi-card--highlight {
-        border: 1px solid rgba(99,102,241,0.22);
-        box-shadow: 0 10px 30px rgba(99,102,241,0.14);
-    }
-    .kpi-card.kpi-card--highlight::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at 20% 20%, rgba(99,102,241,0.12), transparent 55%);
-        pointer-events: none;
-    }
+    .alert-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .alert-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; background: rgba(239,68,68,.12); color: #b91c1c; font-size: 11px; font-weight: 800; }
+    .alert-list { display: grid; gap: 10px; }
+    .alert-item { border-left: 3px solid #f59e0b; border-radius: 12px; background: #fff7ed; padding: 10px 12px; }
+    .alert-item strong { display: block; margin-bottom: 3px; font-size: 13px; color: var(--db-title); }
+    .alert-item p { margin: 0; font-size: 12px; color: var(--db-muted); line-height: 1.35; }
+    .empty-state { border: 1px dashed rgba(100,116,139,.3); border-radius: 12px; padding: 18px 12px; text-align: center; color: var(--db-muted); font-size: 12px; background: var(--db-soft); }
 
-    .kpi-row {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 10px;
-        position: relative;
-        z-index: 1;
-    }
-    .kpi-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
-    .kpi-ico {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        background: rgba(99,102,241,0.10);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--kpi-c);
-        flex: 0 0 auto;
-    }
-    .kpi-ico svg { width: 18px; height: 18px; }
-    .kpi-card.kpi-card--mini .kpi-ico { width: 32px; height: 32px; border-radius: 10px; }
-    .kpi-card.kpi-card--mini .kpi-ico svg { width: 16px; height: 16px; }
+    .storage-grid { display: grid; gap: 10px; }
+    .storage-item { border-radius: 12px; background: var(--db-soft); border: 1px solid var(--db-line); padding: 12px; }
+    .storage-label { margin: 0; font-size: 12px; color: var(--db-muted); font-weight: 700; }
+    .storage-value { margin: 5px 0 2px; font-size: 22px; line-height: 1.1; color: var(--db-title); font-weight: 800; }
+    .storage-sub { margin: 0; font-size: 12px; color: var(--db-muted); }
 
-    .kpi-title { font-size: 12px; color: var(--ds-muted); margin: 0; font-weight: 600; }
-    .kpi-value { font-size: 34px; font-weight: 800; color: var(--ds-text); margin: 6px 0 0; line-height: 1.05; }
-    .kpi-card.kpi-card--mini .kpi-value { font-size: 28px; margin-top: 4px; }
-
-    .kpi-trend {
-        margin-top: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--ds-muted);
-        white-space: nowrap;
+    @media (max-width: 1200px) {
+        .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-main { grid-template-columns: 1fr; }
+        .span-2 { grid-column: auto; }
+        .summary-grid { grid-template-columns: 1fr; }
     }
-    .kpi-trend.up { color: var(--ds-success); }
-    .kpi-trend.down { color: var(--ds-danger); }
-
-    .kpi-link {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--ds-muted);
-        text-decoration: none;
-        white-space: nowrap;
-        margin-left: auto;
-    }
-    .kpi-link:hover { color: var(--kpi-c); }
-
-    /* 图表卡片统一 */
-    .dark-dashboard .card {
-        background: var(--ds-card) !important;
-        border-radius: 12px !important;
-        box-shadow: var(--ds-shadow) !important;
-        border: none !important;
-    }
-    .dark-dashboard .card-header {
-        background: transparent !important;
-        border-bottom: 1px solid rgba(15,23,42,0.06) !important;
-    }
-    .dark-dashboard .card-header .font-weight-semibold { color: var(--ds-text) !important; font-weight: 700 !important; }
-    .dark-dashboard .btn-outline-secondary {
-        border-color: rgba(15,23,42,0.10) !important;
-        color: rgba(15,23,42,0.68) !important;
-    }
-    .dark-dashboard .btn-outline-secondary:hover {
-        background: rgba(99,102,241,0.08) !important;
-        border-color: rgba(99,102,241,0.16) !important;
-        color: var(--ds-text) !important;
-    }
-    .dark-dashboard .btn-primary { background: var(--ds-primary) !important; border: none !important; box-shadow: none !important; }
-
-    /* 平台分布：进度条列表 */
-    .plat-list { display: grid; gap: 10px; }
-    .plat-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
-    .plat-name { font-size: 13px; color: var(--ds-text); font-weight: 600; }
-    .plat-pct { font-size: 12px; color: var(--ds-muted); font-weight: 600; }
-    .plat-bar { height: 8px; border-radius: 999px; background: rgba(15,23,42,0.06); overflow: hidden; }
-    .plat-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--ds-primary); width: 0%; transition: width .2s ease; }
-    .plat-sub { font-size: 12px; color: var(--ds-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .ops-card {
-        background: var(--ds-card);
-        border-radius: 12px;
-        box-shadow: var(--ds-shadow);
-        padding: 16px 18px;
-        margin-bottom: 18px;
-    }
-    .ops-title { font-size: 13px; font-weight: 800; color: var(--ds-text); margin: 0 0 8px; }
-    .ops-text { font-size: 13px; color: rgba(15,23,42,0.72); margin: 0; }
-    .ops-hint { margin-top: 8px; font-size: 12px; color: var(--ds-muted); }
-
-    @media (prefers-reduced-motion: reduce) {
-        .kpi-card, .plat-bar > span { transition: none !important; }
+    @media (max-width: 768px) {
+        .dashboard-top { flex-direction: column; align-items: flex-start; }
+        .dashboard-actions { width: 100%; }
+        .dashboard-actions .btn { flex: 1; }
     }
 </style>
 {/block}
+
 {block name="content"}
-<div class="dashboard-container">
-<div class="kpi-grid-hero">
-    <div class="kpi-card kpi-card--hero kpi-card--warning" style="--kpi-c: var(--ds-warning);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(245,158,11,0.10);"><i data-lucide="video"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.videosTotal">视频总数</p>
-                    <p class="kpi-value">{$video_total}</p>
-                    <div class="kpi-trend">
-                        <span data-i18n="dashboard.kpi.downloaded">已下载</span> {$d_downloaded}
-                        · <span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$d_undownloaded}
+<div class="dashboard-shell">
+    <section class="dashboard-top">
+        <div>
+            <h2 data-i18n="dashboard.hero.commandCenter">系统指挥中心</h2>
+            <p class="dashboard-top-meta">
+                <span data-i18n="dashboard.hero.syncRateLabel">当前数据同步频率</span>: <strong data-i18n="dashboard.hero.syncRateValue">10s</strong>
+                <span class="sep">|</span>
+                <span data-i18n="dashboard.hero.nodeStatusLabel">节点状态</span>: <span class="ok" data-i18n="dashboard.hero.nodeStatusGood">极佳</span>
+            </p>
+        </div>
+        <div class="dashboard-actions">
+            <button type="button" class="btn btn-outline-secondary">
+                <i data-lucide="calendar-days"></i><span data-i18n="dashboard.hero.range24h">最近24小时</span>
+            </button>
+            <button type="button" id="btnExportReport" class="btn btn-primary">
+                <i data-lucide="download"></i><span data-i18n="dashboard.hero.export">生成报表</span>
+            </button>
+        </div>
+    </section>
+
+    <section class="grid-4">
+        <article class="db-card">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon" style="background:rgba(245,158,11,.14);color:var(--db-warning)"><i data-lucide="video"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.videosTotal">视频总数</p>
+                        <p class="kpi-value">{$video_total}</p>
                     </div>
                 </div>
+                <a href="/admin.php/video" class="kpi-action" data-i18n="dashboard.action.view">查看</a>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-warning);" href="/admin.php/video" data-i18n="dashboard.action.view">查看</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--hero kpi-card--success" style="--kpi-c: var(--ds-success);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(34,197,94,0.10);"><i data-lucide="badge-check"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.downloaded">已下载</p>
-                    <p class="kpi-value">{$d_downloaded}</p>
-                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.downloadRate">下载率（重点）</span> {$d_download_rate}%</div>
-                </div>
+            <div class="kpi-meta">
+                <span data-i18n="dashboard.kpi.downloaded">已下载</span> <strong>{$d_downloaded}</strong> ·
+                <span data-i18n="dashboard.kpi.undownloaded">未下载</span> <strong>{$d_undownloaded}</strong>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/video?is_downloaded=1" data-i18n="dashboard.action.filter">筛选</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--hero kpi-card--highlight" style="--kpi-c: var(--ds-primary);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico"><i data-lucide="trending-up"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.downloadRate">下载率（重点）</p>
-                    <p class="kpi-value">{$d_download_rate}%</p>
-                    <div class="kpi-trend">
-                        <span data-i18n="dashboard.kpi.asof" data-i18n-title="dashboard.kpi.asof">截至 {$asof_display}</span>
-                        · <span data-i18n="dashboard.kpi.target">目标 100%</span>
+        </article>
+
+        <article class="db-card">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon" style="background:rgba(22,163,74,.12);color:var(--db-success)"><i data-lucide="badge-check"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.downloaded">已下载</p>
+                        <p class="kpi-value">{$d_downloaded}</p>
                     </div>
                 </div>
+                <a href="/admin.php/video?is_downloaded=1" class="kpi-action" data-i18n="dashboard.action.filter">筛选</a>
             </div>
-            <a class="kpi-link" href="/admin.php/video?is_downloaded=1" data-i18n="dashboard.action.view">查看</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--hero kpi-card--danger" style="--kpi-c: var(--ds-danger);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(239,68,68,0.10);"><i data-lucide="hourglass"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.pending">待下载</p>
-                    <p class="kpi-value">{$d_undownloaded}</p>
-                    <div class="kpi-trend"><span data-i18n="dashboard.kpi.undownloaded">未下载</span> {$d_undownload_rate}%</div>
-                </div>
-            </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-danger);" href="/admin.php/video?is_downloaded=0" data-i18n="dashboard.action.handle">处理</a>
-        </div>
-    </div>
-</div>
+            <div class="kpi-meta"><span data-i18n="dashboard.kpi.downloadRate">下载率（重点）</span> <strong>{$d_download_rate}%</strong></div>
+        </article>
 
-<div class="kpi-grid-mini">
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-primary);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico"><i data-lucide="layers"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.platforms">平台数量</p>
-                    <p class="kpi-value">{$d_platforms}</p>
-                    <div class="kpi-trend" data-i18n="dashboard.kpi.overview">总览</div>
+        <article class="db-card kpi-focus">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon"><i data-lucide="trending-up"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.downloadRate">下载率（重点）</p>
+                        <p class="kpi-value">{$d_download_rate}%</p>
+                    </div>
                 </div>
+                <a href="/admin.php/video?is_downloaded=1" class="kpi-action" data-i18n="dashboard.action.view">查看</a>
             </div>
-            <a class="kpi-link" href="/admin.php/platform" data-i18n="dashboard.action.view">查看</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-success);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(34,197,94,0.10);"><i data-lucide="smartphone"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.devices">设备数量</p>
-                    <p class="kpi-value">{$d_devices}</p>
-                    <div class="kpi-trend" data-i18n="dashboard.kpi.overview">总览</div>
-                </div>
+            <div class="kpi-meta">
+                <span data-i18n="dashboard.kpi.asof">截至 {date}</span> {$asof_display} · <span data-i18n="dashboard.kpi.target">目标 {pct}%</span>
             </div>
-            <a class="kpi-link" style="--kpi-c: var(--ds-success);" href="/admin.php/device" data-i18n="dashboard.action.view">查看</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-primary);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico"><i data-lucide="cloud-upload"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.todayUpload">今日上传</p>
-                    <p class="kpi-value">{$d_today_uploaded}</p>
-                    {if $d_has_upload_delta}
-                        <div class="kpi-trend {if $d_today_uploaded_delta_pct >= 0}up{else /}down{/if}">
-                            {if $d_today_uploaded_delta_pct >= 0}↑ +{else /}↓ {/if}{$d_today_uploaded_delta_pct}%
-                            <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$d_avg7_uploaded}</span>
-                        </div>
-                    {else /}
-                        <div class="kpi-trend">
-                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$d_yesterday_uploaded}
-                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_uploaded}
-                        </div>
-                    {/if}
-                </div>
-            </div>
-            <a class="kpi-link" href="/admin.php/video" data-i18n="dashboard.action.list">列表</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: var(--ds-primary);">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico"><i data-lucide="download"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.todayDownload">今日下载</p>
-                    <p class="kpi-value">{$d_today_downloaded}</p>
-                    {if $d_has_download_delta}
-                        <div class="kpi-trend {if $d_today_downloaded_delta_pct >= 0}up{else /}down{/if}">
-                            {if $d_today_downloaded_delta_pct >= 0}↑ +{else /}↓ {/if}{$d_today_downloaded_delta_pct}%
-                            <span style="color: var(--ds-muted); font-weight: 600;"> · 7日均值 {$d_avg7_downloaded}</span>
-                        </div>
-                    {else /}
-                        <div class="kpi-trend">
-                            <span data-i18n="dashboard.kpi.yesterday">昨日</span> {$d_yesterday_downloaded}
-                            · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_downloaded}
-                        </div>
-                    {/if}
-                </div>
-            </div>
-            <a class="kpi-link" href="/admin.php/downloadLog" data-i18n="dashboard.action.errors">异常</a>
-        </div>
-    </div>
-</div>
+        </article>
 
-<div class="kpi-grid-mini kpi-grid-modules">
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: #8b5cf6;">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(139,92,246,0.10);"><i data-lucide="camera"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.styleIndex">寻款索引</p>
-                    <p class="kpi-value">{$d_style_index_total}</p>
-                    <div class="kpi-trend" data-i18n="dashboard.kpi.styleIndexSub">有效款式条目</div>
+        <article class="db-card">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon" style="background:rgba(239,68,68,.12);color:var(--db-danger)"><i data-lucide="hourglass"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.pending">待下载</p>
+                        <p class="kpi-value">{$d_undownloaded}</p>
+                    </div>
+                </div>
+                <a href="/admin.php/video?is_downloaded=0" class="kpi-action" data-i18n="dashboard.action.handle">处理</a>
+            </div>
+            <div class="kpi-meta"><span data-i18n="dashboard.kpi.pendingRate">待完成率</span> <strong>{$d_undownload_rate}%</strong></div>
+        </article>
+    </section>
+
+    <section class="grid-4">
+        <article class="db-card kpi-small">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon"><i data-lucide="layers"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.platforms">平台数量</p>
+                        <p class="kpi-value">{$d_platforms}</p>
+                    </div>
+                </div>
+                <a href="/admin.php/platform" class="kpi-action" data-i18n="dashboard.action.view">查看</a>
+            </div>
+            <div class="kpi-meta" data-i18n="dashboard.kpi.overview">总览</div>
+        </article>
+
+        <article class="db-card kpi-small">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon"><i data-lucide="smartphone"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.devices">设备数量</p>
+                        <p class="kpi-value">{$d_devices}</p>
+                    </div>
+                </div>
+                <a href="/admin.php/device" class="kpi-action" data-i18n="dashboard.action.view">查看</a>
+            </div>
+            <div class="kpi-meta" data-i18n="dashboard.kpi.overview">总览</div>
+        </article>
+
+        <article class="db-card kpi-small">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon"><i data-lucide="cloud-upload"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.todayUpload">今日上传</p>
+                        <p class="kpi-value">{$d_today_uploaded}</p>
+                    </div>
+                </div>
+                <a href="/admin.php/video" class="kpi-action" data-i18n="dashboard.action.list">列表</a>
+            </div>
+            {if $d_has_upload_delta}
+            <div class="kpi-delta {if $d_today_uploaded_delta_pct >= 0}up{else /}down{/if}">
+                {if $d_today_uploaded_delta_pct >= 0}+{/if}{$d_today_uploaded_delta_pct}% · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_uploaded}
+            </div>
+            {else /}
+            <div class="kpi-meta"><span data-i18n="dashboard.kpi.yesterday">昨日</span> {$d_yesterday_uploaded} · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_uploaded}</div>
+            {/if}
+        </article>
+
+        <article class="db-card kpi-small">
+            <div class="kpi-row">
+                <div class="kpi-left">
+                    <span class="kpi-icon"><i data-lucide="download"></i></span>
+                    <div>
+                        <p class="kpi-title" data-i18n="dashboard.kpi.todayDownload">今日下载</p>
+                        <p class="kpi-value">{$d_today_downloaded}</p>
+                    </div>
+                </div>
+                <a href="/admin.php/downloadLog" class="kpi-action" data-i18n="dashboard.action.errors">异常</a>
+            </div>
+            {if $d_has_download_delta}
+            <div class="kpi-delta {if $d_today_downloaded_delta_pct >= 0}up{else /}down{/if}">
+                {if $d_today_downloaded_delta_pct >= 0}+{/if}{$d_today_downloaded_delta_pct}% · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_downloaded}
+            </div>
+            {else /}
+            <div class="kpi-meta"><span data-i18n="dashboard.kpi.yesterday">昨日</span> {$d_yesterday_downloaded} · <span data-i18n="dashboard.kpi.avg7Label">7日均值</span> {$d_avg7_downloaded}</div>
+            {/if}
+        </article>
+    </section>
+
+    <section class="grid-3">
+        <article class="db-card">
+            <div class="module-head">
+                <span class="module-title"><span class="module-tag tag-search"><i data-lucide="search"></i></span><span data-i18n="dashboard.kpi.styleIndex">寻款索引</span></span>
+                <a href="/admin.php/product_search" class="kpi-action" data-i18n="dashboard.action.manage">管理</a>
+            </div>
+            <div class="module-val">{$d_style_index_total}</div>
+            <div class="module-sub" data-i18n="dashboard.kpi.styleIndexSub">有效款式条目</div>
+        </article>
+        <article class="db-card">
+            <div class="module-head">
+                <span class="module-title"><span class="module-tag tag-influencer"><i data-lucide="users"></i></span><span data-i18n="dashboard.kpi.influencers">达人名录</span></span>
+                <a href="/admin.php/influencer" class="kpi-action" data-i18n="dashboard.action.manage">管理</a>
+            </div>
+            <div class="module-val">{$d_influencers_total}</div>
+            <div class="module-sub" data-i18n="dashboard.kpi.influencersSub">TikTok @handle</div>
+        </article>
+        <article class="db-card">
+            <div class="module-head">
+                <span class="module-title"><span class="module-tag tag-link"><i data-lucide="link"></i></span><span data-i18n="dashboard.kpi.creatorLinks">达人链</span></span>
+                <a href="/admin.php/distribute" class="kpi-action" data-i18n="dashboard.action.manage">管理</a>
+            </div>
+            <div class="module-val">{$d_creator_links_total}</div>
+            <div class="module-sub" data-i18n="dashboard.kpi.creatorLinksSub">分发链接数</div>
+        </article>
+    </section>
+
+    <section class="summary-card">
+        <h3 class="summary-title" data-i18n="dashboard.ops.title">今日数据总结</h3>
+        <div class="summary-grid">
+            <div>
+                <div class="summary-label" data-i18n="dashboard.summary.core">核心转化</div>
+                <div class="summary-text"><span data-i18n="dashboard.ops.todayUpload">今日上传</span> <strong>{$d_today_uploaded}</strong>，<span data-i18n="dashboard.ops.pending">待处理</span> <strong>{$d_undownloaded}</strong>，<span data-i18n="dashboard.ops.downloadRate">下载率</span> <strong>{$d_download_rate}%</strong></div>
+            </div>
+            <div>
+                <div class="summary-label" data-i18n="dashboard.ops.bizHead">业务概览</div>
+                <div class="summary-text"><span data-i18n="dashboard.kpi.styleIndex">寻款索引</span> <strong>{$d_style_index_total}</strong> · <span data-i18n="dashboard.kpi.influencers">达人名录</span> <strong>{$d_influencers_total}</strong> · <span data-i18n="dashboard.kpi.creatorLinks">达人链</span> <strong>{$d_creator_links_total}</strong></div>
+            </div>
+            <div>
+                <div class="summary-label" data-i18n="dashboard.summary.suggestionLabel">建议</div>
+                <div class="summary-text summary-suggest" data-i18n="dashboard.ops.hint">建议：优先处理未下载素材，提高下载率。</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="grid-main">
+        <article class="panel span-2">
+            <div class="panel-head">
+                <h3 class="panel-title" data-i18n="dashboard.chart.trendsTitle30">近30天趋势（上传柱状 + 下载折线）</h3>
+                <div class="range-switch">
+                    <button class="js-range" data-days="7" type="button" data-i18n="dashboard.chart.days7">7天</button>
+                    <button class="js-range is-active" data-days="30" type="button" data-i18n="dashboard.chart.days30">30天</button>
                 </div>
             </div>
-            <a class="kpi-link" style="--kpi-c: #8b5cf6;" href="/admin.php/product_search" data-i18n="dashboard.action.manage">管理</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: #0ea5e9;">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(14,165,233,0.10);"><i data-lucide="users"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.influencers">达人名录</p>
-                    <p class="kpi-value">{$d_influencers_total}</p>
-                    <div class="kpi-trend" data-i18n="dashboard.kpi.influencersSub">TikTok @handle</div>
-                </div>
+            <div class="chart-box">
+                <div id="chartTrends" class="chart-canvas chart-lg"></div>
+                <div id="chartTrendsEmpty" class="chart-empty" style="display:none;" data-i18n="dashboard.chart.trendsEmpty30">近30天暂无明显数据变化</div>
             </div>
-            <a class="kpi-link" style="--kpi-c: #0ea5e9;" href="/admin.php/influencer" data-i18n="dashboard.action.manage">管理</a>
-        </div>
-    </div>
-    <div class="kpi-card kpi-card--mini" style="--kpi-c: #10b981;">
-        <div class="kpi-row">
-            <div class="kpi-left">
-                <div class="kpi-ico" style="background: rgba(16,185,129,0.10);"><i data-lucide="link-2"></i></div>
-                <div>
-                    <p class="kpi-title" data-i18n="dashboard.kpi.creatorLinks">达人链</p>
-                    <p class="kpi-value">{$d_creator_links_total}</p>
-                    <div class="kpi-trend" data-i18n="dashboard.kpi.creatorLinksSub">分发链接数</div>
-                </div>
+        </article>
+        <article class="panel">
+            <div class="panel-head"><h3 class="panel-title" data-i18n="dashboard.chart.platformDist">平台分布</h3></div>
+            <div id="platformList" class="platform-list"></div>
+            <div class="mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100"><span data-i18n="dashboard.chart.platformNode">活跃节点</span>: <strong data-i18n="dashboard.chart.platformNodeValue">North America Node A</strong></button>
             </div>
-            <a class="kpi-link" style="--kpi-c: #10b981;" href="/admin.php/distribute" data-i18n="dashboard.action.manage">管理</a>
-        </div>
-    </div>
-</div>
+        </article>
+    </section>
 
-<div class="ops-card">
-    <div class="ops-title" data-i18n="dashboard.ops.title">今日数据总结</div>
-    <p class="ops-text">
-        <span data-i18n="dashboard.ops.todayUpload">今日上传</span> <strong>{$d_today_uploaded}</strong> 条，
-        <span data-i18n="dashboard.ops.pending">待处理</span> <strong>{$d_undownloaded}</strong> 条，
-        <span data-i18n="dashboard.ops.downloadRate">下载率</span> <strong>{$d_download_rate}%</strong>。
-    </p>
-    <p class="ops-text ops-text--biz" style="margin-top:10px;font-size:13px;color:#475569;">
-        <span data-i18n="dashboard.ops.bizHead">业务概览</span>：
-        <span data-i18n="dashboard.kpi.styleIndex">寻款索引</span> <strong>{$d_style_index_total}</strong>
-        ·
-        <span data-i18n="dashboard.kpi.influencers">达人名录</span> <strong>{$d_influencers_total}</strong>
-        ·
-        <span data-i18n="dashboard.kpi.creatorLinks">达人链</span> <strong>{$d_creator_links_total}</strong>
-    </p>
-    <div class="ops-hint" data-i18n="dashboard.ops.hint">建议：优先处理未下载素材，提高下载率。</div>
-</div>
-
-<!-- 后续图表区域也限定最大宽度 -->
-
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-                <span class="font-weight-semibold" data-i18n="dashboard.chart.trendsTitle30">近30天趋势（上传柱状 + 下载折线）</span>
-                <div>
-                    <button class="btn btn-sm btn-outline-secondary js-range" data-days="7" data-i18n="dashboard.chart.days7">7天</button>
-                    <button class="btn btn-sm btn-outline-secondary js-range" data-days="30" data-i18n="dashboard.chart.days30">30天</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="chartTrends" style="height:320px;"></div>
-                <div id="chartTrendsEmpty" class="text-muted small" style="display:none;" data-i18n="dashboard.chart.trendsEmpty30">近30天暂无明显数据变化</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <span class="font-weight-semibold" data-i18n="dashboard.chart.platformDist">平台分布</span>
-            </div>
-            <div class="card-body">
-                <div id="platformList" class="plat-list"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-                <span class="font-weight-semibold" data-i18n="dashboard.chart.errorsTrend">近7天下载异常趋势</span>
+    <section class="grid-main">
+        <article class="panel span-2">
+            <div class="panel-head">
+                <h3 class="panel-title" data-i18n="dashboard.chart.errorsTrend">近7天下载异常趋势</h3>
                 <a href="/admin.php/downloadLog" class="btn btn-sm btn-outline-secondary" data-i18n="dashboard.chart.openErrors">打开异常</a>
             </div>
-            <div class="card-body">
-                <div id="chartErrors" style="height:300px;"></div>
+            <div id="chartErrors" class="chart-canvas"></div>
+        </article>
+        <article class="panel">
+            <div class="alert-head">
+                <h3 class="panel-title" data-i18n="dashboard.alert.title">实时预警消息</h3>
+                <span class="alert-badge"><span id="errorBadgeCount">0</span> <span data-i18n="dashboard.alert.pending">待处理</span></span>
             </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <span class="font-weight-semibold" data-i18n="dashboard.chart.topErrors">Top异常</span>
-            </div>
-            <div class="card-body">
-                <div id="errorTopList" class="small text-muted" data-i18n="common.loading">加载中…</div>
-            </div>
-        </div>
-    </div>
-</div>
+            <div id="errorTopList" class="alert-list"><div class="empty-state" data-i18n="common.loading">加载中…</div></div>
+            <div class="mt-2"><button id="btnOpenErrors" type="button" class="btn btn-outline-secondary btn-sm w-100" data-i18n="dashboard.alert.viewAll">查看全部通知</button></div>
+        </article>
+    </section>
 
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-                <span class="font-weight-semibold" data-i18n="dashboard.chart.productStockTop">商品库存（Top12）</span>
+    <section class="grid-main">
+        <article class="panel span-2">
+            <div class="panel-head">
+                <h3 class="panel-title" data-i18n="dashboard.chart.productStockTop">商品库存（Top12）</h3>
                 <a href="/admin.php/product" class="btn btn-sm btn-outline-secondary" data-i18n="dashboard.chart.manageProduct">管理商品</a>
             </div>
-            <div class="card-body">
-                <div id="chartProduct" style="height:320px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <span class="font-weight-semibold" data-i18n="dashboard.chart.capacity">容量</span>
-            </div>
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="text-muted small">uploads</div>
-                    <div class="font-weight-bold" id="uploadsSize">—</div>
+            <div id="chartProduct" class="chart-canvas chart-lg"></div>
+        </article>
+        <article class="panel">
+            <div class="panel-head"><h3 class="panel-title" data-i18n="dashboard.chart.capacity">容量</h3></div>
+            <div class="storage-grid">
+                <div class="storage-item">
+                    <p class="storage-label">uploads</p>
+                    <p class="storage-value" id="uploadsSize">--</p>
+                    <p class="storage-sub" id="uploadsFiles">--</p>
                 </div>
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="text-muted small" data-i18n="dashboard.storage.uploadsFiles">uploads 文件数</div>
-                    <div class="font-weight-bold" id="uploadsFiles">—</div>
-                </div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="text-muted small">runtime/cache</div>
-                    <div class="font-weight-bold" id="cacheSize">—</div>
-                </div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="text-muted small" data-i18n="dashboard.storage.cacheFiles">cache 文件数</div>
-                    <div class="font-weight-bold" id="cacheFiles">—</div>
+                <div class="storage-item">
+                    <p class="storage-label">runtime/cache</p>
+                    <p class="storage-value" id="cacheSize">--</p>
+                    <p class="storage-sub" id="cacheFiles">--</p>
                 </div>
             </div>
-        </div>
-    </div>
+        </article>
+    </section>
 </div>
- </div>
 {/block}
 
 {block name="script"}
@@ -468,71 +432,105 @@
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
 <script>
     $(function () {
-        const _t = function (key, vars) {
-            try { return (window.AppI18n && window.AppI18n.t) ? window.AppI18n.t(key, vars) : key; } catch (e) { return key; }
-        };
-        try { document.title = _t('page.dashboard.title'); } catch (e) {}
-        try {
-            if (window.lucide) {
-                window.lucide.createIcons();
+        var _t = function (key, vars) {
+            try {
+                return (window.AppI18n && window.AppI18n.t) ? window.AppI18n.t(key, vars) : key;
+            } catch (e) {
+                return key;
             }
-        } catch (e) {}
-        const $trends = $('#chartTrends');
-        const $trendsEmpty = $('#chartTrendsEmpty');
-        const $platformList = $('#platformList');
-        const $errors = $('#chartErrors');
-        const $product = $('#chartProduct');
-        const chartTrends = echarts.init($trends[0]);
-        const chartErrors = echarts.init($errors[0]);
-        const chartProduct = echarts.init($product[0]);
+        };
 
-        function techColors() {
+        function escapeHtml(text) {
+            return $('<div>').text(String(text || '')).html();
+        }
+
+        function initIcons() {
+            try {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            } catch (e) {}
+        }
+
+        function palette() {
             return {
-                blue: '#5570ff',
-                teal: '#39d4c4',
-                grid: 'rgba(29,36,78,0.08)',
-                text: '#1d244e',
-                muted: '#7a84a8'
+                primary: '#0052d0',
+                primarySoft: '#799dff',
+                success: '#16a34a',
+                warning: '#f59e0b',
+                danger: '#ef4444',
+                muted: '#64748b',
+                grid: 'rgba(100,116,139,0.16)'
             };
         }
 
+        function setRangeActive(days) {
+            $('.js-range').removeClass('is-active');
+            $('.js-range[data-days="' + String(days) + '"]').addClass('is-active');
+        }
+
+        var trendsEl = document.getElementById('chartTrends');
+        var errorsEl = document.getElementById('chartErrors');
+        var productEl = document.getElementById('chartProduct');
+        if (!trendsEl || !errorsEl || !productEl || !window.echarts) {
+            initIcons();
+            return;
+        }
+
+        var chartTrends = echarts.init(trendsEl);
+        var chartErrors = echarts.init(errorsEl);
+        var chartProduct = echarts.init(productEl);
+
+        var $trends = $('#chartTrends');
+        var $trendsEmpty = $('#chartTrendsEmpty');
+        var $platformList = $('#platformList');
+        var $errorTopList = $('#errorTopList');
+        var $errorBadgeCount = $('#errorBadgeCount');
+
         function renderTrends(data) {
-            const c = techColors();
-            const labels = data.labels || [];
-            const uploaded = data.uploaded || [];
-            const downloaded = data.downloaded || [];
-            const total = uploaded.reduce(function (s, v) { return s + (parseInt(v || 0, 10) || 0); }, 0) +
-                downloaded.reduce(function (s, v) { return s + (parseInt(v || 0, 10) || 0); }, 0);
-            const noData = !labels.length || total === 0;
-            if (noData) {
+            var c = palette();
+            var labels = data.labels || [];
+            var uploaded = data.uploaded || [];
+            var downloaded = data.downloaded || [];
+            var total = 0;
+            for (var i = 0; i < uploaded.length; i++) total += parseInt(uploaded[i] || 0, 10) || 0;
+            for (var j = 0; j < downloaded.length; j++) total += parseInt(downloaded[j] || 0, 10) || 0;
+
+            if (!labels.length || total === 0) {
                 $trends.hide();
                 $trendsEmpty.show();
                 return;
             }
+
             $trends.show();
             $trendsEmpty.hide();
+
             chartTrends.setOption({
-                tooltip: {trigger: 'axis'},
-                legend: {data: [_t('dashboard.legend.upload'), _t('dashboard.legend.download')], textStyle: {color: c.muted}},
-                grid: {left: 40, right: 18, top: 40, bottom: 30},
+                color: [c.primarySoft, c.primary],
+                tooltip: { trigger: 'axis' },
+                legend: {
+                    data: [_t('dashboard.legend.upload'), _t('dashboard.legend.download')],
+                    textStyle: { color: c.muted }
+                },
+                grid: { left: 42, right: 18, top: 42, bottom: 28 },
                 xAxis: {
                     type: 'category',
                     data: labels,
-                    axisLabel: {color: c.muted},
-                    axisLine: {lineStyle: {color: c.grid}},
-                    axisTick: {show: false}
+                    axisLabel: { color: c.muted, fontSize: 11 },
+                    axisLine: { lineStyle: { color: c.grid } },
+                    axisTick: { show: false }
                 },
                 yAxis: {
                     type: 'value',
-                    axisLabel: {color: c.muted},
-                    splitLine: {lineStyle: {color: c.grid}}
+                    axisLabel: { color: c.muted, fontSize: 11 },
+                    splitLine: { lineStyle: { color: c.grid } }
                 },
                 series: [
                     {
                         name: _t('dashboard.legend.upload'),
                         type: 'bar',
                         barWidth: 14,
-                        itemStyle: {borderRadius: [8, 8, 2, 2], color: 'rgba(85,112,255,0.75)'},
+                        itemStyle: { borderRadius: [7, 7, 2, 2], color: 'rgba(121,157,255,0.78)' },
                         data: uploaded
                     },
                     {
@@ -541,87 +539,184 @@
                         smooth: true,
                         symbol: 'circle',
                         symbolSize: 6,
-                        lineStyle: {width: 3, color: c.teal},
+                        lineStyle: { width: 2.5, color: c.primary },
+                        itemStyle: { color: c.primary },
                         data: downloaded
                     }
                 ]
             }, true);
         }
 
-        function escapeHtml(s) {
-            return $('<div>').text(String(s || '')).html();
-        }
-
         function renderPlatformList(data) {
-            const labels = data.labels || [];
-            const totals = data.total || [];
-            const downloaded = data.downloaded || [];
-            const undownloaded = data.undownloaded || [];
-            const sumTotal = totals.reduce(function (s, v) { return s + (parseInt(v || 0, 10) || 0); }, 0);
+            var labels = data.labels || [];
+            var totals = data.total || [];
+            var downloaded = data.downloaded || [];
+            var undownloaded = data.undownloaded || [];
+            var sum = 0;
+            for (var i = 0; i < totals.length; i++) sum += parseInt(totals[i] || 0, 10) || 0;
 
-            if (!labels.length || sumTotal === 0) {
-                $platformList.html('<div class="text-muted small">' + escapeHtml(_t('dashboard.platform.noData')) + '</div>');
+            if (!labels.length || sum === 0) {
+                $platformList.html('<div class="empty-state">' + escapeHtml(_t('dashboard.platform.noData')) + '</div>');
                 return;
             }
 
-            const rows = labels.map(function (name, i) {
-                const t = parseInt(totals[i] || 0, 10) || 0;
-                const d = parseInt(downloaded[i] || 0, 10) || 0;
-                const u = parseInt(undownloaded[i] || 0, 10) || 0;
-                const pct = sumTotal ? (t * 100 / sumTotal) : 0;
-                return {name: name, total: t, downloaded: d, undownloaded: u, pct: pct};
-            }).sort(function (a, b) { return b.pct - a.pct; });
+            var rows = [];
+            for (var j = 0; j < labels.length; j++) {
+                var total = parseInt(totals[j] || 0, 10) || 0;
+                rows.push({
+                    name: labels[j],
+                    total: total,
+                    downloaded: parseInt(downloaded[j] || 0, 10) || 0,
+                    undownloaded: parseInt(undownloaded[j] || 0, 10) || 0,
+                    pct: sum > 0 ? total * 100 / sum : 0
+                });
+            }
+            rows.sort(function (a, b) { return b.pct - a.pct; });
 
-            const html = rows.map(function (r) {
-                const pctText = (Math.round(r.pct * 10) / 10).toFixed(1) + '%';
-                const safeName = escapeHtml(r.name);
-                return '' +
-                    '<div>' +
-                    '  <div class="plat-row">' +
-                    '    <div class="plat-name">' + safeName + '</div>' +
-                    '    <div class="plat-pct">' + pctText + '</div>' +
-                    '  </div>' +
-                    '  <div class="plat-bar"><span style="width:' + r.pct + '%"></span></div>' +
-                    '  <div class="plat-sub">' + escapeHtml(_t('dashboard.platform.sub', {total: r.total, downloaded: r.downloaded, undownloaded: r.undownloaded})) + '</div>' +
-                    '</div>';
-            }).join('');
+            var html = '';
+            for (var k = 0; k < rows.length; k++) {
+                var item = rows[k];
+                var pctText = (Math.round(item.pct * 10) / 10).toFixed(1) + '%';
+                html += ''
+                    + '<div class="platform-item">'
+                    + '  <div class="platform-head"><span>' + escapeHtml(item.name) + '</span><span>' + pctText + '</span></div>'
+                    + '  <div class="platform-bar"><span style="width:' + item.pct + '%"></span></div>'
+                    + '  <div class="platform-meta">' + escapeHtml(_t('dashboard.platform.sub', { total: item.total, downloaded: item.downloaded, undownloaded: item.undownloaded })) + '</div>'
+                    + '</div>';
+            }
             $platformList.html(html);
         }
 
         function renderErrors(data) {
-            const c = techColors();
+            var c = palette();
             chartErrors.setOption({
-                tooltip: {trigger: 'axis'},
-                legend: {data: [_t('dashboard.errors.download'), _t('dashboard.errors.cache'), _t('dashboard.errors.other')], textStyle: {color: c.muted}},
-                grid: {left: 40, right: 18, top: 40, bottom: 30},
-                xAxis: {type: 'category', data: data.labels || [], axisLabel: {color: c.muted}, axisLine: {lineStyle: {color: c.grid}}, axisTick: {show: false}},
-                yAxis: {type: 'value', axisLabel: {color: c.muted}, splitLine: {lineStyle: {color: c.grid}}},
+                tooltip: { trigger: 'axis' },
+                legend: {
+                    data: [_t('dashboard.errors.download'), _t('dashboard.errors.cache'), _t('dashboard.errors.other')],
+                    textStyle: { color: c.muted }
+                },
+                grid: { left: 42, right: 18, top: 38, bottom: 30 },
+                xAxis: {
+                    type: 'category',
+                    data: data.labels || [],
+                    axisLabel: { color: c.muted, fontSize: 11 },
+                    axisLine: { lineStyle: { color: c.grid } },
+                    axisTick: { show: false }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: { color: c.muted, fontSize: 11 },
+                    splitLine: { lineStyle: { color: c.grid } }
+                },
                 series: [
-                    {name: _t('dashboard.errors.download'), type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(255,107,142,0.75)'}, data: data.download || []},
-                    {name: _t('dashboard.errors.cache'), type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(85,112,255,0.65)'}, data: data.cache || []},
-                    {name: _t('dashboard.errors.other'), type: 'bar', stack: 'e', barWidth: 14, itemStyle: {color: 'rgba(255,186,73,0.65)'}, data: data.other || []}
+                    {
+                        name: _t('dashboard.errors.download'),
+                        type: 'bar',
+                        stack: 'e',
+                        barWidth: 12,
+                        itemStyle: { color: 'rgba(239,68,68,0.7)' },
+                        data: data.download || []
+                    },
+                    {
+                        name: _t('dashboard.errors.cache'),
+                        type: 'bar',
+                        stack: 'e',
+                        barWidth: 12,
+                        itemStyle: { color: 'rgba(245,158,11,0.7)' },
+                        data: data.cache || []
+                    },
+                    {
+                        name: _t('dashboard.errors.other'),
+                        type: 'bar',
+                        stack: 'e',
+                        barWidth: 12,
+                        itemStyle: { color: 'rgba(121,157,255,0.72)' },
+                        data: data.other || []
+                    }
                 ]
             }, true);
         }
 
         function renderProduct(data) {
-            const c = techColors();
+            var c = palette();
             chartProduct.setOption({
-                tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
-                legend: {data: [_t('dashboard.kpi.undownloaded'), _t('dashboard.kpi.downloaded')], textStyle: {color: c.muted}},
-                grid: {left: 12, right: 12, top: 30, bottom: 10, containLabel: true},
-                xAxis: {type: 'value', axisLabel: {color: c.muted}, splitLine: {lineStyle: {color: c.grid}}},
-                yAxis: {type: 'category', data: (data.labels || []).slice().reverse(), axisLabel: {color: c.muted}, axisLine: {lineStyle: {color: c.grid}}, axisTick: {show: false}},
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: {
+                    data: [_t('dashboard.kpi.undownloaded'), _t('dashboard.kpi.downloaded')],
+                    textStyle: { color: c.muted }
+                },
+                grid: { left: 14, right: 14, top: 32, bottom: 10, containLabel: true },
+                xAxis: {
+                    type: 'value',
+                    axisLabel: { color: c.muted, fontSize: 11 },
+                    splitLine: { lineStyle: { color: c.grid } }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: (data.labels || []).slice().reverse(),
+                    axisLabel: { color: c.muted, fontSize: 11 },
+                    axisLine: { lineStyle: { color: c.grid } },
+                    axisTick: { show: false }
+                },
                 series: [
-                    {name: _t('dashboard.kpi.undownloaded'), type: 'bar', stack: 'p', barWidth: 14, itemStyle: {borderRadius: [8,0,0,8], color: 'rgba(85,112,255,0.75)'}, data: (data.undownloaded || []).slice().reverse()},
-                    {name: _t('dashboard.kpi.downloaded'), type: 'bar', stack: 'p', barWidth: 14, itemStyle: {borderRadius: [0,8,8,0], color: 'rgba(57,212,196,0.75)'}, data: (data.downloaded || []).slice().reverse()}
+                    {
+                        name: _t('dashboard.kpi.undownloaded'),
+                        type: 'bar',
+                        stack: 'p',
+                        barWidth: 12,
+                        itemStyle: { borderRadius: [6, 0, 0, 6], color: 'rgba(121,157,255,0.78)' },
+                        data: (data.undownloaded || []).slice().reverse()
+                    },
+                    {
+                        name: _t('dashboard.kpi.downloaded'),
+                        type: 'bar',
+                        stack: 'p',
+                        barWidth: 12,
+                        itemStyle: { borderRadius: [0, 6, 6, 0], color: 'rgba(22,163,74,0.78)' },
+                        data: (data.downloaded || []).slice().reverse()
+                    }
                 ]
             }, true);
         }
 
+        function renderErrorTop(items) {
+            if (!items || !items.length) {
+                $errorBadgeCount.text('0');
+                $errorTopList.html('<div class="empty-state">' + escapeHtml(_t('dashboard.alert.noData')) + '</div>');
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < items.length; i++) {
+                var row = items[i];
+                var label = escapeHtml(row.label || '');
+                var count = parseInt(row.count || 0, 10) || 0;
+                html += ''
+                    + '<div class="alert-item">'
+                    + '  <strong>' + label + '</strong>'
+                    + '  <p>' + escapeHtml(_t('dashboard.alert.countText', { count: count })) + '</p>'
+                    + '</div>';
+            }
+            $errorBadgeCount.text(String(items.length));
+            $errorTopList.html(html);
+        }
+
+        function formatBytes(bytes) {
+            var b = parseInt(bytes || 0, 10);
+            if (!b) return '0 B';
+            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var i = 0;
+            var val = b;
+            while (val >= 1024 && i < units.length - 1) {
+                val /= 1024;
+                i++;
+            }
+            return val.toFixed(i === 0 ? 0 : 2) + ' ' + units[i];
+        }
+
         function loadTrends(days) {
-            chartTrends.showLoading({text: _t('common.loading')});
-            $.get('/admin.php/stats/trends', {days: days || 30}).done(function (res) {
+            chartTrends.showLoading({ text: _t('common.loading') });
+            $.get('/admin.php/stats/trends', { days: days || 30 }).done(function (res) {
                 if (res && res.code === 0) {
                     renderTrends(res.data || {});
                 } else {
@@ -635,7 +730,7 @@
         }
 
         function loadPlatform() {
-            $platformList.html('<div class="text-muted small">' + escapeHtml(_t('common.loading')) + '</div>');
+            $platformList.html('<div class="empty-state">' + escapeHtml(_t('common.loading')) + '</div>');
             $.get('/admin.php/stats/platformDistribution').done(function (res) {
                 if (res && res.code === 0) {
                     renderPlatformList(res.data || {});
@@ -644,13 +739,12 @@
                 }
             }).fail(function () {
                 AdminUI.showToast('error', _t('dashboard.loadFail.platform'));
-            }).always(function () {
             });
         }
 
         function loadErrors() {
-            chartErrors.showLoading({text: _t('common.loading')});
-            $.get('/admin.php/stats/downloadErrorTrends', {days: 7}).done(function (res) {
+            chartErrors.showLoading({ text: _t('common.loading') });
+            $.get('/admin.php/stats/downloadErrorTrends', { days: 7 }).done(function (res) {
                 if (res && res.code === 0) {
                     renderErrors(res.data || {});
                 } else {
@@ -664,34 +758,22 @@
         }
 
         function loadErrorTop() {
-            $('#errorTopList').text(_t('common.loading'));
-            $.get('/admin.php/stats/downloadErrorTop', {days: 7, limit: 8}).done(function (res) {
+            $errorTopList.html('<div class="empty-state">' + escapeHtml(_t('common.loading')) + '</div>');
+            $.get('/admin.php/stats/downloadErrorTop', { days: 7, limit: 6 }).done(function (res) {
                 if (res && res.code === 0) {
-                    const items = (res.data && res.data.items) ? res.data.items : [];
-                    if (!items.length) {
-                        $('#errorTopList').text(_t('common.noData'));
-                        return;
-                    }
-                    const html = items.map(function (it) {
-                        const label = String(it.label || '');
-                        const cnt = parseInt(it.count || 0, 10);
-                        return '<div class="d-flex align-items-start justify-content-between mb-2">' +
-                            '<div class="pr-2" style="max-width:78%;word-break:break-all;">' + $('<div>').text(label).html() + '</div>' +
-                            '<span class="badge badge-light">' + cnt + '</span>' +
-                            '</div>';
-                    }).join('');
-                    $('#errorTopList').html(html);
+                    var items = (res.data && res.data.items) ? res.data.items : [];
+                    renderErrorTop(items);
                 } else {
-                    $('#errorTopList').text(_t('common.loadingFailed'));
+                    renderErrorTop([]);
                 }
             }).fail(function () {
-                $('#errorTopList').text(_t('common.loadingFailed'));
+                renderErrorTop([]);
             });
         }
 
         function loadProduct() {
-            chartProduct.showLoading({text: _t('common.loading')});
-            $.get('/admin.php/stats/productDistribution', {limit: 12}).done(function (res) {
+            chartProduct.showLoading({ text: _t('common.loading') });
+            $.get('/admin.php/stats/productDistribution', { limit: 12 }).done(function (res) {
                 if (res && res.code === 0) {
                     renderProduct(res.data || {});
                 } else {
@@ -704,26 +786,30 @@
             });
         }
 
-        function formatBytes(bytes) {
-            const b = parseInt(bytes || 0, 10);
-            if (!b) return '0 B';
-            const u = ['B','KB','MB','GB','TB'];
-            let i = 0, v = b;
-            while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
-            return v.toFixed(i === 0 ? 0 : 2) + ' ' + u[i];
-        }
         function loadStorage() {
             $.get('/admin.php/stats/storageUsage').done(function (res) {
                 if (res && res.code === 0 && res.data) {
-                    const up = res.data.uploads || {};
-                    const ca = res.data.runtime_cache || {};
+                    var up = res.data.uploads || {};
+                    var cache = res.data.runtime_cache || {};
                     $('#uploadsSize').text(formatBytes(up.bytes));
                     $('#uploadsFiles').text((up.files || 0) + ' ' + _t('dashboard.unit.count'));
-                    $('#cacheSize').text(formatBytes(ca.bytes));
-                    $('#cacheFiles').text((ca.files || 0) + ' ' + _t('dashboard.unit.count'));
+                    $('#cacheSize').text(formatBytes(cache.bytes));
+                    $('#cacheFiles').text((cache.files || 0) + ' ' + _t('dashboard.unit.count'));
                 }
             });
         }
+
+        $('#btnExportReport').on('click', function () {
+            window.print();
+        });
+        $('#btnOpenErrors').on('click', function () {
+            window.location.href = '/admin.php/downloadLog';
+        });
+        $('.js-range').on('click', function () {
+            var days = parseInt($(this).data('days') || 30, 10);
+            setRangeActive(days);
+            loadTrends(days);
+        });
 
         loadTrends(30);
         loadPlatform();
@@ -731,14 +817,8 @@
         loadErrorTop();
         loadProduct();
         loadStorage();
-
-        $('.js-range').on('click', function () {
-            const days = parseInt($(this).data('days') || '30', 10);
-            $('.js-range').removeClass('btn-primary').addClass('btn-outline-secondary');
-            $(this).removeClass('btn-outline-secondary').addClass('btn-primary');
-            loadTrends(days);
-        });
-        $('.js-range[data-days=\"30\"]').removeClass('btn-outline-secondary').addClass('btn-primary');
+        setRangeActive(30);
+        initIcons();
 
         $(window).on('resize', function () {
             chartTrends.resize();

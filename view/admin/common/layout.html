@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260408_mobile_agent1"></script>
-    <script src="/static/i18n/i18n.ops2.js?v=20260408_mobile_agent1"></script>
+    <script src="/static/i18n/i18n.js?v=20260412_i18nfix3"></script>
+    <script src="/static/i18n/i18n.ops2.js?v=20260412_i18nfix3"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -835,7 +835,22 @@
             const confirmModal = $('#confirmModal');
             const confirmMessage = $('#confirmMessage');
             const confirmOkBtn = $('#confirmOkBtn');
+            const i18n = window.AppI18n || null;
             let confirmCallback = null;
+
+            function tt(key, vars) {
+                if (!i18n || typeof i18n.t !== 'function') return key;
+                return i18n.t(key, vars || null, i18n.getLang('zh'));
+            }
+
+            function normalizeText(raw, fallbackKey) {
+                const text = raw == null ? '' : String(raw);
+                if (!text) return tt(fallbackKey || 'common.operationFailed');
+                if (i18n && typeof i18n.resolveApiMessage === 'function') {
+                    return i18n.resolveApiMessage({ msg: text }, fallbackKey || 'common.operationFailed');
+                }
+                return text;
+            }
 
             confirmOkBtn.on('click', function () {
                 confirmModal.modal('hide');
@@ -846,23 +861,99 @@
 
             return {
                 showToast(type, message, title) {
+                    const defaultTitleKeyMap = {
+                        success: 'common.done',
+                        error: 'common.operationFailed',
+                        warning: 'common.tip',
+                        info: 'common.tip'
+                    };
+                    const resolvedTitle = title
+                        ? normalizeText(title, defaultTitleKeyMap[type] || 'common.tip')
+                        : tt(defaultTitleKeyMap[type] || 'common.tip');
                     const typeMap = {
-                        success: {icon: 'fa-check-circle', title: title || 'Success'},
-                        error: {icon: 'fa-times-circle', title: title || 'Error'},
-                        warning: {icon: 'fa-exclamation-triangle', title: title || 'Warning'},
-                        info: {icon: 'fa-info-circle', title: title || 'Info'}
+                        success: {icon: 'fa-check-circle', title: resolvedTitle || 'Success'},
+                        error: {icon: 'fa-times-circle', title: resolvedTitle || 'Error'},
+                        warning: {icon: 'fa-exclamation-triangle', title: resolvedTitle || 'Warning'},
+                        info: {icon: 'fa-info-circle', title: resolvedTitle || 'Info'}
                     };
                     const meta = typeMap[type] || typeMap.info;
                     toastTitle.html(`<i class="fas ${meta.icon} mr-1"></i>${meta.title}`);
-                    toastBody.text(message);
+                    toastBody.text(normalizeText(message, 'common.operationFailed'));
                     toastEl.toast('show');
                 },
                 confirm(message, onOk) {
-                    confirmMessage.text(message || 'Are you sure?');
+                    confirmMessage.text(normalizeText(message, 'common.confirmDelete') || 'Are you sure?');
                     confirmCallback = onOk;
                     confirmModal.modal('show');
                 }
             };
+        })();
+    </script>
+    <script>
+        (function () {
+            function normalizeMessage(raw, fallbackKey) {
+                const i18n = window.AppI18n;
+                if (i18n && typeof i18n.resolveApiMessage === 'function') {
+                    return i18n.resolveApiMessage({ msg: raw }, fallbackKey || 'common.operationFailed');
+                }
+                return raw == null ? '' : String(raw);
+            }
+
+            function wrapElMessage(ep) {
+                if (!ep || !ep.ElMessage || ep.__i18nMessageWrapped) return ep;
+                const original = ep.ElMessage;
+
+                function normalizeArg(message) {
+                    if (typeof message === 'string' || typeof message === 'number') {
+                        return normalizeMessage(String(message), 'common.operationFailed');
+                    }
+                    if (message && typeof message === 'object') {
+                        const next = Object.assign({}, message);
+                        if (Object.prototype.hasOwnProperty.call(next, 'message')) {
+                            next.message = normalizeMessage(next.message, 'common.operationFailed');
+                        }
+                        return next;
+                    }
+                    return message;
+                }
+
+                function wrapped(arg) {
+                    return original(normalizeArg(arg));
+                }
+
+                ['success', 'warning', 'info', 'error'].forEach(function (type) {
+                    if (typeof original[type] === 'function') {
+                        wrapped[type] = function (arg) {
+                            return original[type](normalizeArg(arg));
+                        };
+                    }
+                });
+
+                if (typeof original.closeAll === 'function') {
+                    wrapped.closeAll = original.closeAll.bind(original);
+                }
+
+                ep.ElMessage = wrapped;
+                ep.__i18nMessageWrapped = true;
+                return ep;
+            }
+
+            try {
+                const desc = Object.getOwnPropertyDescriptor(window, 'ElementPlus');
+                if (!desc || desc.configurable) {
+                    let current = wrapElMessage(window.ElementPlus);
+                    Object.defineProperty(window, 'ElementPlus', {
+                        configurable: true,
+                        enumerable: true,
+                        get: function () { return current; },
+                        set: function (next) { current = wrapElMessage(next); }
+                    });
+                } else {
+                    wrapElMessage(window.ElementPlus);
+                }
+            } catch (e) {
+                wrapElMessage(window.ElementPlus);
+            }
         })();
     </script>
     <script>

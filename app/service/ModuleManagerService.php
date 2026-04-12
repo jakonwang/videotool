@@ -83,6 +83,15 @@ class ModuleManagerService
                 'dependencies' => ['growth_hub'],
                 'min_role' => self::ROLE_OPERATOR,
             ],
+            'profit_center' => [
+                'name' => 'profit_center',
+                'title' => 'Profit Center',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
             'creator_crm' => [
                 'name' => 'creator_crm',
                 'title' => 'Creator CRM',
@@ -950,6 +959,7 @@ class ModuleManagerService
             'competitor_total' => self::safeCount('growth_competitors'),
             'ad_total' => self::safeCount('growth_ad_creatives'),
             'import_running' => self::safeCount('import_jobs', ['status' => 1]),
+            'profit_entry_total' => self::safeCount('growth_profit_daily_entries'),
             'video_total' => self::safeCount('videos'),
             'product_total' => self::safeCount('products'),
             'ops_error_total' => self::safeCount('download_logs'),
@@ -1000,6 +1010,7 @@ class ModuleManagerService
         $competitorEnabled = $growthEnabled && $isEnabled('competitor_analysis', 1);
         $adInsightEnabled = $growthEnabled && $isEnabled('ad_insight', 1);
         $dataImportEnabled = $growthEnabled && $isEnabled('data_import', 1);
+        $profitCenterEnabled = $growthEnabled && $isEnabled('profit_center', 1);
 
         $creatorEnabled = $isEnabled('creator_crm');
         $creatorCategoryEnabled = $creatorEnabled && $isEnabled('category', 1);
@@ -1104,6 +1115,16 @@ class ModuleManagerService
                     'text_i18n' => 'admin.menu.dataImport',
                     'active' => self::controllerIs($currentController, 'dataimport', 'data_import'),
                     'badge' => ($badges['import_running'] ?? 0) > 0 ? (string) $badges['import_running'] : '',
+                ];
+            }
+            if ($profitCenterEnabled) {
+                $growthChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/profit_center',
+                    'icon' => 'wallet',
+                    'text_i18n' => 'admin.menu.profitCenter',
+                    'active' => self::controllerIs($currentController, 'profitcenter', 'profit_center'),
+                    'badge' => ($badges['profit_entry_total'] ?? 0) > 0 ? (string) $badges['profit_entry_total'] : '',
                 ];
             }
 

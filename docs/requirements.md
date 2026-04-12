@@ -1090,3 +1090,228 @@
   - 或命令行：
     - Windows: `php database\run_migration_auto_dm_hotfix.php`
     - Linux: `php database/run_migration_auto_dm_hotfix.php`
+
+## 23. 2026-04-12 仪表盘页面（Stitch 对齐）重构
+
+### 23.1 改动范围
+- 页面模板：`view/admin/index/index.html`
+- 多语言：`public/static/i18n/i18n.js`
+- 文档：`docs/requirements.md`、`requirements.md`
+
+### 23.2 页面结构（按 Stitch 仪表盘分区重写）
+- 顶部区改为「系统指挥中心」样式，包含同步频率、节点状态、时间范围按钮、报表导出按钮。
+- KPI 区分为两行：
+  - 第一行 4 张核心卡（视频总数、已下载、下载率重点卡、待下载）。
+  - 第二行 4 张运营卡（平台数、设备数、今日上传、今日下载，含环比/7日均值信息）。
+- 增加 3 张业务模块卡（寻款索引、达人名录、达人链）。
+- 保留并重排数据面板：趋势图、平台分布、异常趋势、实时预警、商品库存、容量统计。
+- 所有展示文本统一走 `AppI18n.t`，新增 Dashboard 相关 key（zh/en/vi）。
+
+### 23.3 低耦合实现说明
+- 未新增后端接口，继续复用现有统计 API：
+  - `/admin.php/stats/trends`
+  - `/admin.php/stats/platformDistribution`
+  - `/admin.php/stats/downloadErrorTrends`
+  - `/admin.php/stats/downloadErrorTop`
+  - `/admin.php/stats/productDistribution`
+  - `/admin.php/stats/storageUsage`
+- 仅调整前端布局与渲染，不影响 `StatsService` 数据聚合逻辑。
+- ECharts 渲染逻辑保持模块化函数拆分（`renderTrends/renderPlatformList/renderErrors/renderProduct`）。
+
+### 23.4 使用说明
+1. 进入后台首页 `/admin.php` 即可看到新版仪表盘。
+2. 通过「7天/30天」切换趋势范围。
+3. 点击「生成报表」触发浏览器打印导出。
+4. 点击「查看全部通知」跳转下载异常列表页。
+
+### 23.5 验证命令（Windows / Linux 通用）
+- Windows：
+  - `php -l app\controller\admin\Index.php`
+  - `php -l app\controller\admin\Stats.php`
+- Linux：
+  - `php -l app/controller/admin/Index.php`
+  - `php -l app/controller/admin/Stats.php`
+
+## 24. 2026-04-12 利润中心（多店铺 + 多账户 + 多币种）
+
+### 24.1 模块目标
+- 入口：`/admin.php/profit_center`
+- 基于店铺 + 账户 + 渠道 + 日期进行利润录入与汇总。
+- 统一以 `CNY` 为记账基准，支持 `USD/VND/CNY` 自动换算。
+- 支持 TikTok 多店铺场景：同日多账户、多渠道并行录入并汇总。
+
+### 24.2 数据结构
+- 新增表：
+  - `growth_profit_stores`：店铺与默认参数（售价/成本/取消率[直播/视频/达人三套默认值]/平台扣点/达人佣金/时薪/时区）。
+  - `growth_profit_accounts`：广告账户（归属店铺、渠道、广告币种、默认 GMV 币种）。
+  - `growth_profit_daily_entries`：日录入（`tenant + date + store + account + channel` 唯一）。
+  - `growth_fx_rates`：汇率缓存（含来源与回退标记）。
+- 所有表均带 `tenant_id`，支持 SaaS 租户隔离。
+
+### 24.3 计算口径
+- 渠道：`live`（直播）/`video`（视频）/`influencer`（达人）。
+- ROI：`gmv_cny / ad_spend_cny`
+- 直播/视频保本 ROI：
+  - `break_even_roi = (sale*(1-cancel)) / (sale*(1-cancel)*(1-platform) - cost)`
+- 达人保本 ROI（含佣金修正）：
+  - `break_even_roi = (sale*(1-cancel)) / (sale*(1-cancel)*(1-platform-commission) - cost)`
+- 直播/视频录入校验：`ad_spend_cny > 0 && gmv_cny > 0 && order_count > 0`
+- 参数币种锁定：售价/成本/时薪使用 `CNY`。
+
+### 24.4 汇率策略
+- 服务：`app/service/FxRateService.php`
+- 优先按日期拉取并缓存；失败时回退最近可用汇率，状态标记 `fallback_latest`。
+- 支持 provider：
+  - `currency-api@jsdelivr`（优先）
+  - `open.er-api`（兜底 latest）
+  - `fxratesapi`（二级兜底 latest）
+- 兼容策略：
+  - 优先 Guzzle 请求；若 Windows 环境 cURL 证书链异常（SSL error 60），自动回退 `file_get_contents` 流式抓取，不阻断汇率同步。
+- 前端对回退汇率做 warning 提示，不阻塞保存。
+
+### 24.5 接口清单
+- 查询：
+  - `GET /admin.php/profit_center/summaryJson`
+  - `GET /admin.php/profit_center/entryListJson`
+  - `GET /admin.php/profit_center/fxRateListJson`
+- 录入与管理：
+  - `POST /admin.php/profit_center/entrySave`
+  - `POST /admin.php/profit_center/entryBatchSave`
+  - `POST /admin.php/profit_center/entryDelete`
+  - `GET/POST /admin.php/profit_center/storeListJson|storeSave|storeDelete`
+  - `GET/POST /admin.php/profit_center/accountListJson|accountSave|accountDelete`
+- 汇率与导入导出：
+  - `POST /admin.php/profit_center/fxSync`
+  - `POST /admin.php/profit_center/importXlsx`
+  - `GET /admin.php/profit_center/exportCsv`
+
+### 24.6 Excel 导入兼容
+- 支持三 sheet：
+  - `直播GMV利润表` -> `live`
+  - `视频GMV利润表` -> `video`
+  - `达人GMV利润表` -> `influencer`
+- 支持模板下载：`GET /admin.php/profit_center/templateXlsx`
+- 模板下载兼容低版本 PhpSpreadsheet（使用 `Coordinate` 列坐标写入），避免线上/本地版本差异导致下载失败。
+- 仅读取输入列，忽略公式结果列。
+- Excel 日期序列按 `Asia/Bangkok(GMT+7)` 转 `YYYY-MM-DD`。
+- 旧模板不含店铺/账户/币种时，导入弹窗先选择目标店铺和账户，币种可覆盖。
+
+### 24.7 前端实现
+- 页面：`view/admin/profit_center/index.html`
+- 技术栈：AdminLTE + Vue3 + Element Plus（仅调用 JSON API，前后端分离）。
+- 页面区块：
+  - 顶部筛选（日期/店铺/账户/渠道）
+  - KPI（净利润/广告费/GMV/订单/ROI）
+  - 录入明细表（编辑/删除）
+  - 批量录入弹窗（同日多店铺 + 多广告账户多行录入，逐行返回成功/失败）
+  - 店铺管理（支持直播/视频/达人三套取消率默认值）、账户管理、汇率状态、Excel 导入弹窗
+
+### 24.8 迁移与执行
+- 新增迁移脚本：`database/run_migration_profit_center.php`（幂等）
+- 已接入运维中心迁移列表：`app/service/OpsMaintenanceService.php`
+- 执行命令：
+  - Windows：`php database\\run_migration_profit_center.php`
+  - Linux：`php database/run_migration_profit_center.php`
+
+### 24.9 验证命令（Windows / Linux 通用）
+- Windows：
+  - `php -l app\\controller\\admin\\ProfitCenter.php`
+  - `php -l route\\admin.php`
+  - `php -l app\\service\\FxRateService.php`
+  - `php -l app\\service\\ProfitCalculatorService.php`
+  - `php -l database\\run_migration_profit_center.php`
+  - `node --check public\\static\\i18n\\i18n.ops2.js`
+- Linux：
+  - `php -l app/controller/admin/ProfitCenter.php`
+  - `php -l route/admin.php`
+  - `php -l app/service/FxRateService.php`
+  - `php -l app/service/ProfitCalculatorService.php`
+  - `php -l database/run_migration_profit_center.php`
+  - `node --check public/static/i18n/i18n.ops2.js`
+
+### 24.10 2026-04-12 批量录入（多店铺 + 多广告账户）
+- 新增后端接口：`POST /admin.php/profit_center/entryBatchSave`
+  - 入参：`items[]`（每行至少包含 `entry_date/store_id/account_id/channel_type/ad_spend_amount/ad_spend_currency/gmv_amount/gmv_currency/order_count`，直播可传 `live_hours`）。
+  - 行级处理：逐行复用 `upsertEntry`，单行失败不影响其他行。
+  - 出参：`total/saved_count/failed_count/saved_items/failed_items`。
+- 新增前端能力：
+  - 顶部新增「批量录入」按钮。
+  - 弹窗支持一次维护多行，按店铺过滤账户，并可自动带出账户渠道与默认币种。
+  - 提交后显示批量结果；若部分失败，保留失败行原因便于修正后重提。
+- 自测记录（Windows 本地）：
+  - 已执行 `entryBatchSave` 成功场景：2 行保存成功（多店铺 + 多账户）。
+  - 已执行 `entryBatchSave` 部分失败场景：1 行成功 + 1 行失败，接口返回行号与错误码，验证“失败不阻断”。
+
+### 24.11 2026-04-12 全模块自动化测试与 i18n 全量校验
+- 自动化测试执行（Windows）：
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - 模块 API 冒烟（登录后批量调用 22 个列表/汇总接口，覆盖平台、设备、用户、素材、寻款、CRM、增长中台、利润中心、运维状态）
+- 修复项：
+  - 路由匹配修复：`/admin.php/ops_center/status` 路由提前于 `ops_center` 注册，避免被页面路由吞掉导致返回 HTML。
+  - i18n 缺失键修复：
+    - 三语缺失键补齐：65 个（`zh/en/vi`）。
+    - 仅越南语缺失键回填：80 个（优先取 `en`，其次 `zh`）。
+  - 汇率与模板链路修复（本轮回归确认）：
+    - 模板下载修复为 `Coordinate` 写列，避免 PhpSpreadsheet 版本差异报错。
+    - 汇率抓取增加 Windows 证书链异常回退与二级 provider，`fxSync` 可稳定返回有效汇率。
+- 回归结果：
+  - `ops2_smoke.ps1`：`PASS (21 checks)`。
+  - `check_i18n_keys --scope=all`：`passed`（`used_keys=946`，缺失 0）。
+  - 模块 API 冒烟：`MODULE_PASS=22`，`MODULE_FAIL=0`。
+  - 利润中心专项：模板下载 `200 + xlsx`，`fxSync` 返回 `USD/VND` 非零汇率。
+
+### 24.12 2026-04-12 参数码直显治理（消息归一化 + 利润中心补齐翻译）
+- 问题背景：
+  - 部分页面会直接显示后端返回的 `msg` 参数码（如 `ok/save_failed/invalid_params`），导致用户看到参数而非文案。
+  - 利润中心存在少量硬编码文案（如 `Ad CCY/GMV CCY/Y/N`）与汇率来源代码直显。
+- 本轮修复：
+  - 全局 i18n 新增消息归一化能力（`public/static/i18n/i18n.js`）：
+    - 新增 `AppI18n.translateMaybeKey()` 与 `AppI18n.resolveApiMessage()`。
+    - 支持将常见后端消息码自动映射到 i18n 文案（`ok/save_failed/invalid_params/not_found/...`）。
+    - 对未翻译的“疑似 key”消息不再原样直显，回退到业务 fallback 文案。
+  - 全局 Element Plus 消息拦截（`view/admin/common/layout.html`）：
+    - 在 `ElementPlus.ElMessage` 层统一做消息归一化，避免各页面重复写转换逻辑。
+    - 覆盖 `success/warning/info/error` 入口，兼容字符串与对象参数。
+  - 利润中心翻译补齐（`view/admin/profit_center/index.html` + `public/static/i18n/i18n.ops2.js`）：
+    - `Ad CCY/GMV CCY` 改为 i18n 键。
+    - `Y/N` 改为 `common.yes/common.no`。
+    - 汇率来源 `source` 改为可读文案（Manual/Currency API/ER API/FXRates API/Fallback/Unknown）。
+    - 批量录入失败行 `message` 支持参数码自动翻译后展示。
+- 新增 i18n 键（zh/en/vi）：
+  - `common.yes`、`common.no`
+  - `page.profitCenter.colAdCurrency`、`page.profitCenter.colGmvCurrency`
+  - `page.profitCenter.fxSourceManual`、`page.profitCenter.fxSourceCurrencyApi`、`page.profitCenter.fxSourceErApi`、`page.profitCenter.fxSourceFxRatesApi`、`page.profitCenter.fxSourceFallbackLatest`、`page.profitCenter.fxSourceUnknown`
+- 本轮验证（Windows）：
+  - `node --check public/static/i18n/i18n.js`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`（`used_keys=956`，缺失 0）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+  - 模块 API 冒烟（25 接口）：`MODULE_PASS=25`，`MODULE_FAIL=0`
+  - 参数码翻译自测：`ok/save_failed/invalid_params/page.profitCenter.fxSourceFallbackLatest` 均返回翻译文案。
+
+### 24.13 2026-04-12 User 页面键值未翻译修复
+- 问题现象：
+  - `用户管理` 页面仍出现 i18n key 直显（如 `page.user.addTitle`、`page.user.passwordReset` 等）。
+- 根因分析：
+  - 页面 `view/admin/user/index.html` 里重复加载了旧参数版本 `i18n.js`，导致布局中已加载并扩展好的 `i18n.ops2.js` 字典被覆盖。
+  - 页面使用了 `page.user.createSuccess` / `page.user.passwordReset`，但字典缺失这两个 key。
+- 修复内容：
+  - 移除用户页内重复的 `i18n.js` 引用，统一使用布局层加载的 i18n 资源。
+  - 用户页 `respMsg()` 接入 `AppI18n.resolveApiMessage()`，避免参数码直显。
+  - 在 `public/static/i18n/i18n.ops2.js` 补齐：
+    - `page.user.createSuccess`
+    - `page.user.passwordReset`
+  - 在 `public/static/i18n/i18n.js` 增加“重复加载保护”：
+    - 若 `window.AppI18n._dict` 已存在，则在重新加载 `i18n.js` 时先合并旧字典，保留 `i18n.ops2` 扩展键，避免被覆盖。
+- 涉及文件：
+  - `view/admin/user/index.html`
+  - `public/static/i18n/i18n.js`
+  - `public/static/i18n/i18n.ops2.js`
+- 本轮验证（Windows）：
+  - `php -l view/admin/user/index.html`
+  - `node --check public/static/i18n/i18n.js`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+  - 重复加载场景自测：按 `i18n.js -> i18n.ops2.js -> i18n.js` 顺序执行后，`page.user.addTitle/page.user.editTitle/page.user.createSuccess/page.user.passwordReset/common.cannotDisableSelf` 均可正确翻译。

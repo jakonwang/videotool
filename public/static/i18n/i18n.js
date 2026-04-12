@@ -76,6 +76,27 @@
     });
   }
 
+  var BACKEND_MSG_KEY_MAP = {
+    'ok': 'common.done',
+    'done': 'common.done',
+    'success': 'common.done',
+    'saved': 'common.saved',
+    'updated': 'common.updated',
+    'deleted': 'common.deleted',
+    'save_failed': 'common.saveFailed',
+    'delete_failed': 'common.deleteFailed',
+    'loading_failed': 'common.loadingFailed',
+    'invalid_params': 'common.invalidParams',
+    'not_found': 'common.notFound',
+    'only_post': 'common.onlyPost',
+    'file_required': 'common.pickFile',
+    'invalid_action': 'common.invalidAction',
+    'forbidden': 'common.forbidden',
+    'unauthorized': 'common.sessionExpired',
+    'session_expired': 'common.sessionExpired',
+    'csv_only': 'page.dataImport.csvOnly'
+  };
+
   var DICT = {
     zh: {
       // common
@@ -786,6 +807,13 @@
       'page.category.deleteTitle': '删除确认',
       // dashboard
       'page.dashboard.title': '仪表盘',
+      'dashboard.hero.commandCenter': '系统指挥中心',
+      'dashboard.hero.syncRateLabel': '当前数据同步频率',
+      'dashboard.hero.syncRateValue': '10s',
+      'dashboard.hero.nodeStatusLabel': '节点状态',
+      'dashboard.hero.nodeStatusGood': '极佳',
+      'dashboard.hero.range24h': '最近24小时',
+      'dashboard.hero.export': '生成报表',
       'dashboard.kpi.videosTotal': '视频总数',
       'dashboard.kpi.downloaded': '已下载',
       'dashboard.kpi.undownloaded': '未下载',
@@ -793,6 +821,7 @@
       'dashboard.kpi.asof': '截至 {date}',
       'dashboard.kpi.target': '目标 {pct}%',
       'dashboard.kpi.pending': '待下载',
+      'dashboard.kpi.pendingRate': '待完成率',
       'dashboard.kpi.platforms': '平台数量',
       'dashboard.kpi.devices': '设备数量',
       'dashboard.kpi.todayUpload': '今日上传',
@@ -818,17 +847,26 @@
       'dashboard.ops.downloadRate': '下载率',
       'dashboard.ops.hint': '建议：优先处理未下载素材，提高下载率。',
       'dashboard.ops.bizHead': '业务概览',
+      'dashboard.summary.core': '核心转化',
+      'dashboard.summary.suggestionLabel': '建议',
       'dashboard.chart.trendsTitle30': '近30天趋势（上传柱状 + 下载折线）',
       'dashboard.chart.days7': '7天',
       'dashboard.chart.days30': '30天',
       'dashboard.chart.trendsEmpty30': '近30天暂无明显数据变化',
       'dashboard.chart.platformDist': '平台分布',
+      'dashboard.chart.platformNode': '活跃节点',
+      'dashboard.chart.platformNodeValue': 'North America Node A',
       'dashboard.chart.errorsTrend': '近7天下载异常趋势',
       'dashboard.chart.openErrors': '打开异常',
       'dashboard.chart.topErrors': 'Top异常',
       'dashboard.chart.productStockTop': '商品库存（Top12）',
       'dashboard.chart.manageProduct': '管理商品',
       'dashboard.chart.capacity': '容量',
+      'dashboard.alert.title': '实时预警消息',
+      'dashboard.alert.pending': '待处理',
+      'dashboard.alert.viewAll': '查看全部通知',
+      'dashboard.alert.noData': '暂无预警',
+      'dashboard.alert.countText': '近7天命中 {count} 次',
       'dashboard.storage.uploadsFiles': 'uploads 文件数',
       'dashboard.storage.cacheFiles': 'cache 文件数',
       'dashboard.legend.upload': '上传',
@@ -1548,6 +1586,13 @@
       'page.category.deleteTitle': 'Delete confirmation',
       // dashboard
       'page.dashboard.title': 'Dashboard',
+      'dashboard.hero.commandCenter': 'System Command Center',
+      'dashboard.hero.syncRateLabel': 'Current sync rate',
+      'dashboard.hero.syncRateValue': '10s',
+      'dashboard.hero.nodeStatusLabel': 'Node status',
+      'dashboard.hero.nodeStatusGood': 'Excellent',
+      'dashboard.hero.range24h': 'Last 24 hours',
+      'dashboard.hero.export': 'Generate report',
       'dashboard.kpi.videosTotal': 'Total videos',
       'dashboard.kpi.downloaded': 'Downloaded',
       'dashboard.kpi.undownloaded': 'Undownloaded',
@@ -1555,6 +1600,7 @@
       'dashboard.kpi.asof': 'As of {date}',
       'dashboard.kpi.target': 'Target {pct}%',
       'dashboard.kpi.pending': 'Pending',
+      'dashboard.kpi.pendingRate': 'Pending ratio',
       'dashboard.kpi.platforms': 'Platforms',
       'dashboard.kpi.devices': 'Devices',
       'dashboard.kpi.todayUpload': 'Today uploads',
@@ -1580,17 +1626,26 @@
       'dashboard.ops.downloadRate': 'Download rate',
       'dashboard.ops.hint': 'Suggestion: prioritize undownloaded materials to improve download rate.',
       'dashboard.ops.bizHead': 'Business snapshot',
+      'dashboard.summary.core': 'Core conversion',
+      'dashboard.summary.suggestionLabel': 'Suggestion',
       'dashboard.chart.trendsTitle30': 'Last 30 days trend (uploads bar + downloads line)',
       'dashboard.chart.days7': '7d',
       'dashboard.chart.days30': '30d',
       'dashboard.chart.trendsEmpty30': 'No significant data changes in last 30 days',
       'dashboard.chart.platformDist': 'Platform distribution',
+      'dashboard.chart.platformNode': 'Active node',
+      'dashboard.chart.platformNodeValue': 'North America Node A',
       'dashboard.chart.errorsTrend': 'Download errors (last 7 days)',
       'dashboard.chart.openErrors': 'Open errors',
       'dashboard.chart.topErrors': 'Top errors',
       'dashboard.chart.productStockTop': 'Product stock (Top12)',
       'dashboard.chart.manageProduct': 'Manage products',
       'dashboard.chart.capacity': 'Storage',
+      'dashboard.alert.title': 'Realtime alerts',
+      'dashboard.alert.pending': 'Pending',
+      'dashboard.alert.viewAll': 'View all alerts',
+      'dashboard.alert.noData': 'No alerts',
+      'dashboard.alert.countText': 'Matched {count} times in last 7 days',
       'dashboard.storage.uploadsFiles': 'uploads files',
       'dashboard.storage.cacheFiles': 'cache files',
       'dashboard.legend.upload': 'Uploads',
@@ -2225,9 +2280,41 @@
       'page.category.typeInfluencer': 'Creator',
       'page.category.deleteConfirm': 'Xóa phân loại này?',
       'page.category.deleteTitle': 'Xác nhận xóa',
+      'page.dashboard.title': 'Bảng điều khiển',
+      'dashboard.hero.commandCenter': 'Trung tâm điều hành hệ thống',
+      'dashboard.hero.syncRateLabel': 'Tần suất đồng bộ dữ liệu',
+      'dashboard.hero.syncRateValue': '10s',
+      'dashboard.hero.nodeStatusLabel': 'Trạng thái nút',
+      'dashboard.hero.nodeStatusGood': 'Tốt',
+      'dashboard.hero.range24h': '24 giờ gần nhất',
+      'dashboard.hero.export': 'Xuất báo cáo',
+      'dashboard.kpi.pendingRate': 'Tỷ lệ chờ xử lý',
+      'dashboard.summary.core': 'Chuyển đổi cốt lõi',
+      'dashboard.summary.suggestionLabel': 'Gợi ý',
+      'dashboard.chart.platformNode': 'Nút hoạt động',
+      'dashboard.chart.platformNodeValue': 'North America Node A',
+      'dashboard.alert.title': 'Cảnh báo thời gian thực',
+      'dashboard.alert.pending': 'Chờ xử lý',
+      'dashboard.alert.viewAll': 'Xem tất cả thông báo',
+      'dashboard.alert.noData': 'Không có cảnh báo',
+      'dashboard.alert.countText': 'Phát sinh {count} lần trong 7 ngày gần nhất',
       'dashboard.ops.bizHead': 'Tổng quan vận hành'
     }
   };
+
+  // Preserve previously-extended dictionaries (e.g. i18n.ops2.js) when i18n.js is loaded again on a child page.
+  var prevDict = (window.AppI18n && window.AppI18n._dict) ? window.AppI18n._dict : null;
+  if (prevDict && typeof prevDict === 'object') {
+    Object.keys(prevDict).forEach(function (langKey) {
+      if (!DICT[langKey]) {
+        DICT[langKey] = {};
+      }
+      var row = prevDict[langKey] || {};
+      Object.keys(row).forEach(function (k) {
+        DICT[langKey][k] = row[k];
+      });
+    });
+  }
 
   function t(key, vars, optLang) {
     var lang = normalizeLang(optLang) || getLang('zh');
@@ -2239,6 +2326,72 @@
       val = (DICT.zh && DICT.zh[key] !== undefined) ? DICT.zh[key] : key;
     }
     return fmt(val, vars);
+  }
+
+  function isLikelyI18nKey(raw) {
+    var s = String(raw || '').trim();
+    if (!s) return false;
+    return /^[a-z0-9]+(?:[._-][a-z0-9]+)+$/i.test(s);
+  }
+
+  function translateMaybeKey(raw, vars, optLang) {
+    var s = String(raw == null ? '' : raw).trim();
+    if (!s) return '';
+
+    var direct = t(s, vars || null, optLang);
+    if (direct !== s) {
+      return direct;
+    }
+
+    var alias = BACKEND_MSG_KEY_MAP[s.toLowerCase()];
+    if (alias) {
+      var mapped = t(alias, vars || null, optLang);
+      if (mapped !== alias) {
+        return mapped;
+      }
+    }
+
+    return s;
+  }
+
+  function resolveApiMessage(payload, fallbackKey, vars, optLang) {
+    var fbKey = fallbackKey || 'common.operationFailed';
+    var fallbackText = translateMaybeKey(fbKey, vars || null, optLang);
+    if (!fallbackText) fallbackText = fbKey;
+
+    if (payload == null) {
+      return fallbackText;
+    }
+
+    if (typeof payload === 'string') {
+      var plainText = translateMaybeKey(payload, vars || null, optLang);
+      if (plainText !== payload || !isLikelyI18nKey(payload)) {
+        return plainText;
+      }
+      return fallbackText;
+    }
+
+    if (payload.error_key != null) {
+      var errorKey = String(payload.error_key).trim();
+      if (errorKey) {
+        var errorText = translateMaybeKey(errorKey, vars || null, optLang);
+        if (errorText !== errorKey || !isLikelyI18nKey(errorKey)) {
+          return errorText;
+        }
+      }
+    }
+
+    if (payload.msg != null) {
+      var msgTextRaw = String(payload.msg).trim();
+      if (msgTextRaw) {
+        var msgText = translateMaybeKey(msgTextRaw, vars || null, optLang);
+        if (msgText !== msgTextRaw || !isLikelyI18nKey(msgTextRaw)) {
+          return msgText;
+        }
+      }
+    }
+
+    return fallbackText;
   }
 
   // Minimal DOM i18n helper for SSR templates
@@ -2274,6 +2427,8 @@
     getLang: getLang,
     setLang: setLang,
     t: t,
+    translateMaybeKey: translateMaybeKey,
+    resolveApiMessage: resolveApiMessage,
     applyDom: applyDom,
     applyHtmlLang: applyHtmlLang,
     _dict: DICT

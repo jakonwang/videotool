@@ -121,10 +121,10 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('client_version/toggle/<id>', 'app\controller\admin\ClientVersion@toggle');
     Route::post('client_version/delete/<id>', 'app\controller\admin\ClientVersion@delete');
     Route::get('client_version', 'app\controller\admin\ClientVersion@index');
-    Route::get('ops_center', 'app\controller\admin\OpsCenter@index');
     Route::get('ops_center/status', 'app\controller\admin\OpsCenter@status');
     Route::post('ops_center/runMigrations', 'app\controller\admin\OpsCenter@runMigrations');
     Route::post('ops_center/gitPull', 'app\controller\admin\OpsCenter@gitPull');
+    Route::get('ops_center', 'app\controller\admin\OpsCenter@index');
 
     // Product search
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
@@ -259,6 +259,30 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('ad_insight/importCsv', 'app\controller\admin\AdInsight@importCsv');
     Route::get('ad_insight/exportCsv', 'app\controller\admin\AdInsight@exportCsv');
     Route::get('ad_insight', 'app\controller\admin\AdInsight@index');
+
+    // Profit center (multi-store multi-currency)
+    Route::get('profit_center/summary', 'app\controller\admin\ProfitCenter@summaryJson');
+    Route::get('profit_center/summaryJson', 'app\controller\admin\ProfitCenter@summaryJson');
+    Route::get('profit_center/entryList', 'app\controller\admin\ProfitCenter@entryListJson');
+    Route::get('profit_center/entryListJson', 'app\controller\admin\ProfitCenter@entryListJson');
+    Route::post('profit_center/entrySave', 'app\controller\admin\ProfitCenter@entrySave');
+    Route::post('profit_center/entryBatchSave', 'app\controller\admin\ProfitCenter@entryBatchSave');
+    Route::post('profit_center/entryDelete', 'app\controller\admin\ProfitCenter@entryDelete');
+    Route::get('profit_center/storeList', 'app\controller\admin\ProfitCenter@storeListJson');
+    Route::get('profit_center/storeListJson', 'app\controller\admin\ProfitCenter@storeListJson');
+    Route::post('profit_center/storeSave', 'app\controller\admin\ProfitCenter@storeSave');
+    Route::post('profit_center/storeDelete', 'app\controller\admin\ProfitCenter@storeDelete');
+    Route::get('profit_center/accountList', 'app\controller\admin\ProfitCenter@accountListJson');
+    Route::get('profit_center/accountListJson', 'app\controller\admin\ProfitCenter@accountListJson');
+    Route::post('profit_center/accountSave', 'app\controller\admin\ProfitCenter@accountSave');
+    Route::post('profit_center/accountDelete', 'app\controller\admin\ProfitCenter@accountDelete');
+    Route::get('profit_center/fxRateList', 'app\controller\admin\ProfitCenter@fxRateListJson');
+    Route::get('profit_center/fxRateListJson', 'app\controller\admin\ProfitCenter@fxRateListJson');
+    Route::post('profit_center/fxSync', 'app\controller\admin\ProfitCenter@fxSync');
+    Route::get('profit_center/templateXlsx', 'app\controller\admin\ProfitCenter@templateXlsx');
+    Route::post('profit_center/importXlsx', 'app\controller\admin\ProfitCenter@importXlsx');
+    Route::get('profit_center/exportCsv', 'app\controller\admin\ProfitCenter@exportCsv');
+    Route::get('profit_center', 'app\controller\admin\ProfitCenter@index');
 
     // Data import center
     Route::get('data_import/sourceList', 'app\controller\admin\DataImport@sourceListJson');
