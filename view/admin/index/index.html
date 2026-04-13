@@ -40,7 +40,11 @@
     .dashboard-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .dashboard-actions .btn { border-radius: 10px; font-weight: 700; font-size: 12px; padding: 7px 14px; }
     .dashboard-actions .btn i[data-lucide] { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; }
-    .dashboard-actions .btn-primary { border: none !important; background: linear-gradient(130deg, var(--db-primary), var(--db-primary-soft)) !important; }
+    .dashboard-actions .btn-primary {
+        border: 1px solid var(--dash-btn-primary) !important;
+        background: var(--dash-btn-primary) !important;
+        box-shadow: var(--dash-btn-primary-shadow);
+    }
 
     .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }

@@ -11,6 +11,31 @@
     .skeleton { animation: pulse 1.2s ease-in-out infinite; background: linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%); background-size: 200% 100%; }
     @keyframes pulse { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
     .code-xl { font-size: clamp(1.75rem, 6vw, 2.25rem); font-weight: 800; letter-spacing: 0.02em; line-height: 1.2; }
+    .btn-primary {
+      background: #1677ff;
+      color: #fff;
+      border: 0;
+      box-shadow: 0 8px 18px rgba(22, 119, 255, 0.24);
+      transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn-primary:hover { background: #0f6fe8; transform: translateY(-1px); box-shadow: 0 10px 20px rgba(22, 119, 255, 0.3); }
+    .btn-primary:active { background: #0c5fca; transform: translateY(0); }
+    .btn-ghost {
+      background: #f7faff;
+      color: #1d4f9f;
+      border: 1px solid #cdddf7;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .btn-ghost:hover { background: #eef4ff; border-color: #b7cff4; transform: translateY(-1px); }
+    .btn-ghost:active { transform: translateY(0); }
+    .btn-overlay {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(4px);
+      transition: background 0.2s ease;
+    }
+    .btn-overlay:hover { background: rgba(255, 255, 255, 0.28); }
   </style>
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
@@ -25,14 +50,14 @@
       <label class="block text-sm font-medium text-slate-700 mb-2">手动输入编号（模糊）</label>
       <div class="flex gap-2">
         <input v-model="manualQ" type="text" placeholder="例如 EH001" class="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-base focus:ring-2 focus:ring-indigo-500 outline-none" @keyup.enter="searchByCode" />
-        <button type="button" @click="searchByCode" class="shrink-0 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-semibold">查询</button>
+        <button type="button" @click="searchByCode" class="btn-primary shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold">查询</button>
       </div>
     </section>
 
     <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
       <p class="text-sm font-medium text-slate-700 mb-3">拍照 / 相册</p>
       <div class="grid grid-cols-2 gap-3">
-        <button type="button" @click="openCamera" class="rounded-xl bg-indigo-600 text-white py-3 text-sm font-semibold shadow">打开相机</button>
+        <button type="button" @click="openCamera" class="btn-primary rounded-xl py-3 text-sm font-semibold">打开相机</button>
         <label class="rounded-xl border-2 border-dashed border-slate-300 py-3 text-center text-sm font-semibold text-slate-700 cursor-pointer">
           选图文件
           <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFile" />
@@ -40,8 +65,8 @@
       </div>
       <video ref="videoEl" playsinline autoplay muted class="w-full rounded-xl mt-3 bg-black max-h-56 object-cover" v-show="cameraOn"></video>
       <div class="flex gap-2 mt-3" v-if="cameraOn">
-        <button type="button" @click="capture" class="flex-1 rounded-xl bg-emerald-600 text-white py-2.5 text-sm font-semibold">拍照搜索</button>
-        <button type="button" @click="stopCamera" class="rounded-xl bg-slate-200 px-4 py-2.5 text-sm">关闭</button>
+        <button type="button" @click="capture" class="btn-primary flex-1 rounded-xl py-2.5 text-sm font-semibold">拍照搜索</button>
+        <button type="button" @click="stopCamera" class="btn-ghost rounded-xl px-4 py-2.5 text-sm">关闭</button>
       </div>
       <canvas ref="canvasEl" class="hidden"></canvas>
     </section>
@@ -121,7 +146,7 @@
   >
     <button
       type="button"
-      class="absolute top-4 right-4 rounded-lg bg-white/20 text-white px-3 py-1.5 text-sm"
+      class="btn-overlay absolute top-4 right-4 rounded-lg px-3 py-1.5 text-sm"
       @click="closePreview"
     >Close</button>
     <img :src="previewImage" class="max-w-full max-h-[88vh] rounded-xl shadow-2xl object-contain" alt="preview" />

@@ -12,9 +12,11 @@
       --sub: #64748b;
       --line: #dbe3ef;
       --card: #ffffff;
-      --brand: #0ea5e9;
-      --brand-ink: #0369a1;
-      --ok: #16a34a;
+      --brand: #1677ff;
+      --brand-hover: #0f6fe8;
+      --brand-active: #0c5fca;
+      --brand-ink: #0f6fe8;
+      --ok: #1677ff;
       --danger: #dc2626;
     }
     * { box-sizing: border-box; }
@@ -62,7 +64,7 @@
       background: #fff;
       outline: none;
     }
-    .control:focus { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+    .control:focus { border-color: #85b6ff; box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.16); }
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .btn {
       border: 0;
@@ -71,8 +73,12 @@
       font-size: 14px;
       font-weight: 700;
     }
-    .btn-primary { background: var(--brand); color: #fff; }
-    .btn-ghost { background: #e9f4fb; color: var(--brand-ink); }
+    .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 8px 18px rgba(22, 119, 255, 0.22); transition: background 0.2s ease, transform 0.2s ease; }
+    .btn-primary:hover { background: var(--brand-hover); transform: translateY(-1px); }
+    .btn-primary:active { background: var(--brand-active); transform: translateY(0); }
+    .btn-ghost { background: #f7faff; color: var(--brand-ink); border: 1px solid #cdddf7; transition: background 0.2s ease, transform 0.2s ease; }
+    .btn-ghost:hover { background: #eef4ff; transform: translateY(-1px); }
+    .btn-ghost:active { transform: translateY(0); }
     .summary { font-size: 12px; color: var(--sub); }
 
     .loading, .empty, .error-box {
@@ -157,12 +163,14 @@
       width: 100%;
       border: 0;
       border-radius: 9px;
-      background: #0f766e;
+      background: var(--brand);
       color: #fff;
       font-size: 13px;
       font-weight: 700;
       padding: 8px 10px;
     }
+    .add-btn:hover { background: var(--brand-hover); }
+    .add-btn:active { background: var(--brand-active); }
     .load-more-wrap { margin-top: 6px; }
     .load-more {
       width: 100%;
@@ -185,12 +193,14 @@
       height: 56px;
       border-radius: 50%;
       border: 0;
-      background: var(--ok);
+      background: var(--brand);
       color: #fff;
-      box-shadow: 0 14px 24px rgba(22, 163, 74, 0.35);
+      box-shadow: 0 14px 24px rgba(22, 119, 255, 0.34);
       font-size: 26px;
       line-height: 1;
     }
+    .fab:hover { background: var(--brand-hover); }
+    .fab:active { background: var(--brand-active); }
     .fab-badge {
       position: absolute;
       top: -4px;
@@ -245,6 +255,7 @@
       font-weight: 700;
       padding: 4px 6px;
     }
+    .text-btn-danger { color: var(--danger); }
     .sheet-body {
       overflow: auto;
       padding: 10px 12px;
@@ -294,12 +305,14 @@
       width: 100%;
       border: 0;
       border-radius: 10px;
-      background: var(--ok);
+      background: var(--brand);
       color: #fff;
       font-size: 14px;
       font-weight: 700;
       padding: 10px 12px;
     }
+    .submit-btn:hover { background: var(--brand-hover); }
+    .submit-btn:active { background: var(--brand-active); }
     .submit-btn:disabled { opacity: 0.6; }
 
     .dialog-mask {
@@ -486,7 +499,7 @@
                 <input type="number" class="qty-input" :value="item.qty" min="1" @change="onCartQtyChange(item, $event)" />
                 <button type="button" class="qty-btn" @click="increaseCartQty(item)">+</button>
               </div>
-              <button type="button" class="text-btn" style="color:#dc2626;" @click="removeFromCart(item.style_id)">{{ tt('catalog.remove') }}</button>
+              <button type="button" class="text-btn text-btn-danger" @click="removeFromCart(item.style_id)">{{ tt('catalog.remove') }}</button>
             </div>
           </div>
         </div>

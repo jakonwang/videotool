@@ -1315,3 +1315,438 @@
   - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
   - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
   - 重复加载场景自测：按 `i18n.js -> i18n.ops2.js -> i18n.js` 顺序执行后，`page.user.addTitle/page.user.editTitle/page.user.createSuccess/page.user.passwordReset/common.cannotDisableSelf` 均可正确翻译。
+
+### 24.14 2026-04-12 利润中心账户模型调整（单店单 GMV MAX）
+- 背景：
+  - TikTok GMV MAX 场景下，单店铺仅绑定一个广告账户，且直播/视频共用该账户。
+- 规则调整：
+  - 账户管理不再配置渠道（`channel_type` 不再作为业务输入）。
+  - `growth_profit_accounts` 改为“每店仅 1 账户”约束：
+    - 应用层：`accountSave` 创建时若店铺已有账户，自动转更新该账户。
+    - 数据层：迁移脚本补充唯一索引 `uk_tenant_store_single (tenant_id, store_id)`；若历史重复数据存在则跳过并提示。
+  - 日录入保持渠道维度（`live/video/influencer`）独立输入，用于利润公式分支。
+  - `entrySave`/`entryBatchSave` 支持未传 `account_id` 时按店铺自动绑定主账户；若店铺无账户则返回 `store_account_required`。
+- 前端行为：
+  - 账户弹窗移除渠道选择，增加“单店单 GMV MAX，直播/视频共用”提示。
+  - 单条录入中账户下拉改为按店铺自动绑定（只读）。
+  - 批量录入按店铺自动带出账户，账户列仅展示名称，不再手动切换渠道来源。
+- 本轮验证（Windows）：
+  - `php -l app/controller/admin/ProfitCenter.php`
+  - `php -l database/run_migration_profit_center.php`
+  - `php -l view/admin/profit_center/index.html`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`（`used_keys=957`，缺失 0）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+  - 利润中心专项接口自测：
+    - 同店两次 `accountSave` 返回同一 `id`
+    - `accountListJson` 同店数量为 1
+    - `entrySave` 不传 `account_id` 可成功自动绑定到账户
+
+### 24.15 2026-04-12 广告赔付字段（多币种 + 自动折算 + 并入利润）
+- 背景：
+  - 广告 ROI 低于目标阈值时会产生平台赔付，且赔付并非每天都有，需要按日记录并参与利润核算。
+- 字段设计（`growth_profit_daily_entries`）：
+  - `ad_compensation_amount`：赔付原币金额
+  - `ad_compensation_currency`：赔付币种（支持 `CNY/USD/VND`）
+  - `ad_compensation_cny`：赔付折算为 CNY 后金额
+- 录入与默认规则：
+  - 单条录入与批量录入均新增“广告赔付（金额 + 币种）”输入。
+  - 默认赔付币种跟随广告账户币种（`account_currency`）。
+  - 未填写时按 `0` 处理，不影响原有录入流程。
+- 计算与汇总规则：
+  - 赔付金额按录入日期汇率折算到 CNY（与广告费/GMV 同一汇率服务）。
+  - 日净利润改为：`原公式净利润 + ad_compensation_cny`。
+  - ROI 口径保持不变（仍为 `gmv_cny / ad_spend_cny`）。
+  - 汇总接口 `summaryJson` 增加 `ad_compensation_cny` 聚合，并在 KPI 展示“总广告赔付(CNY)”。
+- 导出与兼容：
+  - `exportCsv` 新增赔付三列（原币金额/币种/CNY）。
+  - 迁移脚本 `run_migration_profit_center.php` 幂等补齐上述三字段，兼容历史库。
+
+### 24.16 2026-04-13 利润中心界面分区重构（导入 Excel / 店铺添加 / 新增录入）
+- 目标：
+  - 对齐 Stitch 利润中心交互思路，突出三个高频操作区：`导入 Excel`、`店铺添加`、`新增录入`。
+  - 保持前后端分离与低耦合：只重构前端模板与文案，不改接口契约。
+- 页面改造（`view/admin/profit_center/index.html`）：
+  - 新增顶部 Hero 区和「核心操作区」三卡片，分别承载：
+    - 模板下载 + 导入入口
+    - 店铺/账户管理入口
+    - 单条录入 + 批量录入入口
+  - 筛选区重排为左右分区（筛选条件/报表动作），KPI 区统一卡片化样式。
+  - 新增录入弹窗重构为四分区：
+    - 基础信息
+    - 利润参数
+    - 金额与币种
+    - 扩展指标
+  - 店铺管理弹窗增加引导提示，并将表单分为「基础参数/费率参数」。
+  - 导入弹窗增加引导提示与文件上传说明区，降低模板映射出错率。
+- i18n 补齐（`public/static/i18n/i18n.ops2.js`）：
+  - 新增利润中心页面键：
+    - `page.profitCenter.heroDesc`
+    - `page.profitCenter.workspaceTitle`
+    - `page.profitCenter.workspaceDesc`
+    - `page.profitCenter.panelImportDesc`
+    - `page.profitCenter.panelStoreDesc`
+    - `page.profitCenter.panelEntryDesc`
+    - `page.profitCenter.importDialogTip`
+    - `page.profitCenter.fileSelectHint`
+    - `page.profitCenter.entrySectionBase`
+    - `page.profitCenter.entrySectionParam`
+    - `page.profitCenter.entrySectionAmount`
+    - `page.profitCenter.entrySectionExtra`
+    - `page.profitCenter.storeDialogTip`
+    - `page.profitCenter.storeSectionBasic`
+    - `page.profitCenter.storeSectionRates`
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.17 2026-04-13 利润中心弹窗居中与像素对齐
+- 目标：
+  - 将利润中心 6 个主弹窗统一为遮罩层居中 + 弹窗垂直居中，避免不同分辨率下出现偏移。
+  - 保持桌面端与移动端一致的边距、标题栏、内容区、底部操作区视觉对齐。
+- 页面实现（`view/admin/profit_center/index.html`）：
+  - 新增统一弹窗样式：
+    - `.pc-dialog-overlay`：遮罩层 `flex` 居中布局，统一内边距。
+    - `.pc-dialog`：`max-width/max-height` 限制，保证小屏不溢出。
+    - `.el-dialog__header/body/footer`：统一上下边界与间距，减少不同弹窗视觉跳动。
+  - 6 个弹窗统一增加：
+    - `class="pc-dialog"`
+    - `modal-class="pc-dialog-overlay"`
+    - `align-center`
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.18 2026-04-13 利润中心弹窗居中修正（Overlay 容器）
+- 问题：
+  - 已开启 `align-center` 后，部分环境下弹窗仍出现“视觉偏上”。
+- 根因：
+  - Element Plus 实际控制定位的是 `.el-overlay-dialog` 容器，仅设置遮罩层 class 不足以稳定垂直居中。
+- 修复：
+  - 在 `view/admin/profit_center/index.html` 增加：
+    - `.pc-dialog-overlay .el-overlay-dialog { display:flex; align-items:center; justify-content:center; }`
+    - `.pc-dialog-overlay .el-dialog { margin:0; top:0; }`
+  - 保留原有 `class="pc-dialog"` 与 `align-center`，形成双保险，兼容不同浏览器/缩放比例。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.19 2026-04-13 利润中心视觉对齐（Stitch 风格 Token 同步）
+- 背景：
+  - 用户反馈页面与设计稿存在明显视觉差异（层级、间距、按钮、卡片风格）。
+- 实施范围（仅前端样式，不改接口）：
+  - 文件：`view/admin/profit_center/index.html`
+  - 同步 Stitch 风格 Token：
+    - 页面背景、卡片圆角、边框、阴影、文本层级、按钮主色梯度。
+    - KPI、工作台卡片、筛选区、表格头部视觉统一。
+    - 弹窗遮罩与主体阴影统一，保留居中双保险（`align-center` + `overlay dialog flex center`）。
+  - 交互层级调整：
+    - 顶部与“新增录入”卡片按钮由 `success/warning` 调整为主次按钮层级（主按钮 `primary`，次按钮默认态）。
+- 兼容性说明：
+  - 仅新增/覆盖页面内 scoped 样式，未改后端接口与数据结构。
+  - Windows 开发与 Linux 部署无差异（纯模板/CSS 调整）。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.20 2026-04-13 利润中心稳定性补丁（模板下载/汇率回退/i18n 键值）
+- 导入模板修复（`app/controller/admin/ProfitCenter.php`）：
+  - 修复模板下载与导入链路中的编码异常，恢复三 sheet 模板输出与导入识别。
+  - 模板新增“广告赔付金额”列（直播/视频/达人），导入时自动读取并参与利润计算。
+  - 导入兼容策略改为“标题 + 列结构”双重识别，避免旧模板标题编码差异导致跳过。
+- 汇率服务增强（`app/service/FxRateService.php`）：
+  - 新增多层请求回退：`Guzzle(严格 TLS) -> Guzzle(宽松 TLS) -> Stream(严格 TLS) -> Stream(宽松 TLS)`。
+  - 解决 Windows 本地证书链缺失场景下汇率获取失败问题，同时保留失败状态打标。
+- i18n 键值补齐（`public/static/i18n/i18n.js` + `public/static/i18n/i18n.ops2.js`）：
+  - 增加利润中心后端错误码映射，避免界面出现 `invalid_entry_date` / `store_account_required` 等原始参数键值。
+  - 新增多语种错误文案：
+    - `page.profitCenter.msg.batchTooLarge`
+    - `page.profitCenter.msg.invalidItem`
+    - `page.profitCenter.msg.invalidEntryDate`
+    - `page.profitCenter.msg.invalidStoreOrAccount`
+    - `page.profitCenter.msg.storeNotFound`
+    - `page.profitCenter.msg.storeAccountRequired`
+    - `page.profitCenter.msg.accountNotFound`
+    - `page.profitCenter.msg.accountStoreMismatch`
+    - `page.profitCenter.msg.invalidChannelType`
+    - `page.profitCenter.msg.calcFailed`
+    - `page.profitCenter.msg.xlsxOnly`
+    - `page.profitCenter.msg.fileUnreadable`
+    - `page.profitCenter.msg.importFailed`
+    - `page.profitCenter.msg.exportFailed`
+    - `page.profitCenter.msg.storeHasAccounts`
+    - `page.profitCenter.msg.storeHasEntries`
+    - `page.profitCenter.msg.accountHasEntries`
+  - 前端缓存版本号升级：`view/admin/common/layout.html` 中 i18n 资源版本更新为 `20260413_i18nfix4`。
+- 自动化测试补充：
+  - 新增利润中心专项冒烟脚本：`scripts/profit_center_smoke.ps1`
+  - 覆盖范围：登录、店铺/账户创建、单条录入、批量录入、汇总、汇率同步、模板下载、单店单账户约束、数据清理。
+- 本轮验证（Windows）：
+  - `php -l app/controller/admin/ProfitCenter.php`
+  - `php -l app/service/FxRateService.php`
+  - `node --check public/static/i18n/i18n.js`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+## 15. 2026-04-13 Profit Center UI Sync (Stitch)
+
+### 15.1 Scope
+- Synced `view/admin/profit_center/index.html` to Stitch project `3897242182509863659` visual structure for:
+  - Profit Center main screen (`2b3ab685fe244efb8fdfa5aa0ad012db`)
+  - New Entry modal (`1b5ca6d49d6d499da79c3d7d5c5129d3`)
+  - Import Excel modal (`fae2232fd8af4727bbe9b40bf5b57035`)
+  - Store Manage modal region (`1a344bdc1e7e42eb94ed64db04624534`)
+
+### 15.2 UI/UX updates
+- Rebuilt layout with Stitch-like KPI cards, filter toolbar, action button cluster, and data table panel.
+- Unified modal centering via overlay class `pc-modal-overlay` + `align-center` for all Profit Center dialogs.
+- New Entry modal switched to two-column layout with right-side realtime preview (store/account/ROI/wage/cancel rate).
+- Import modal switched to 3-step flow (template download, file pick/drop area, store/account/currency mapping).
+- Store Manage modal switched to card-list + editor split layout with rate metrics preview.
+
+### 15.3 Validation (Windows dev)
+- `node scripts/check_i18n_keys.js --scope=all` => pass
+- `php -l app/controller/admin/ProfitCenter.php` => pass
+- `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1` => pass (21 checks)
+- Profit Center endpoint smoke (local php -S):
+  - `/admin.php/profit_center/storeListJson` pass
+  - `/admin.php/profit_center/accountListJson` pass
+  - `/admin.php/profit_center/summaryJson` pass
+  - `/admin.php/profit_center/entryListJson` pass
+  - `/admin.php/profit_center/fxRateListJson` pass
+  - `/admin.php/profit_center/templateXlsx` pass (download length > 0)
+
+### 15.4 Pixel-level visual alignment (2026-04-13)
+- Fine-tuned to screenshot parity for spacing/size/iconography in Profit Center:
+  - toolbar title/button density
+  - KPI cards with top-right icons
+  - filter area sizing and action row spacing
+  - table column widths and row action button styles
+  - batch dialog action column (delete/clone inline) and link-button style fix
+  - entry dialog label wrapping fix and metric section readability
+- Validation:
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - inline JS parse check for `view/admin/profit_center/index.html`
+  - Profit endpoint smoke: `/admin.php/profit_center/entryListJson`
+- Follow-up hotfix: reverted oversized typography/button scale to normal desktop density (title/KPI/table/buttons/filter fields).
+
+### 15.5 2026-04-13 利润中心 UI 深度重构（统一字号/按钮/弹窗栅格）
+- 重构文件：
+  - `view/admin/profit_center/index.html`
+- 本轮关键调整：
+  - 移除利润中心页面全部内联样式（`style=""` 归零），统一改为 class 驱动。
+  - 按钮体系统一：
+    - 大按钮 `40px`、中按钮 `32px`、小按钮 `24px`。
+    - 全局高优操作保留实心主按钮，行内“编辑/删除”统一降噪为文字链接风格。
+  - 字号体系收敛为财务后台密度：
+    - 主要标题/卡片数字/区块标题控制在 `16px` 以内，正文 `14px`，次要信息 `12px`。
+    - 修复“字体过大”问题，避免 KPI 与弹窗视觉失衡。
+  - 弹窗布局规范化：
+    - 头/体/尾分割线保留，表单 label 右对齐，非 inline 表单统一 `20px` gutter 与行间距。
+    - 金额输入（数值 + 币种）统一横向组样式，控件等高对齐。
+  - 表格与间距规范：
+    - 所有表格单元格统一 `padding: 12px 16px`。
+    - 页面关键 spacing 使用 4 的倍数（8/12/16/20）统一节奏。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `node` 内联脚本语法解析（`JS_PARSE_OK`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 15.6 2026-04-13 利润录入弹窗数字输入错位修复
+- 问题现象：
+  - 新增录入弹窗中数值字段（订单数/直播时长/金额与币种/利润参数）在部分分辨率下出现输入框挤压、错位、对齐不齐。
+- 修复范围：
+  - 文件：`view/admin/profit_center/index.html`
+- 修复内容：
+  - 新增录入弹窗左侧表单从“窄三列”调整为“稳定两列”（`span 8 -> span 12`），减少固定 `label-width` 对输入区的挤压。
+  - 调整录入弹窗主布局比例：`1.4fr / 1fr` -> `1.8fr / 1fr`，提升主录入区可用宽度。
+  - 统一补充输入控件宽度约束：
+    - `pc-full` 作用于 `el-input-number/el-select/el-date-picker` 时强制 `width:100%`。
+    - 表单内容区 `min-width:0`，避免 flex 场景下内容溢出导致视觉错位。
+  - 将移动/窄屏下录入弹窗纵向堆叠断点放宽到 `1360px`，降低中等分辨率错位概率。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+
+### 15.7 2026-04-13 利润中心可读性修复（字体/关键列/数字框）
+- 问题现象：
+  - 页面存在“字体过小”“数字选择框错位”“主表重要信息需横向滚动后才可见”问题。
+- 修复范围：
+  - 文件：`view/admin/profit_center/index.html`
+- 修复内容：
+  - 字体可读性回调（避免过小）：
+    - 页面主标题、KPI 数值、表格标题、表头与次级文字整体上调到更可读密度（保持统一风格）。
+  - 数字输入框对齐修复：
+    - 统一 `el-input-number` 宽度策略与加减按钮区域宽度，避免数值区被压缩导致错位。
+    - 金额录入“数字 + 币种”组合中，数字框最小宽度与币种下拉宽度统一，减少视觉跳动。
+  - 主表关键信息前置：
+    - 将 `订单数/ROI/净利润` 前移。
+    - `日期/店铺/净利润` 固定在左侧，确保不横向滚动也能先看到关键经营指标。
+    - 店铺/账户列开启 `show-overflow-tooltip`，在压缩列宽下保持可读且不破版。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 15.8 2026-04-13 利润中心视觉强化（大字号 + 彩色图标）
+- 问题现象：
+  - 顶部标题与 KPI 区视觉存在“字体偏小、图标无色、缺少设计层次”的反馈。
+- 修复范围：
+  - 文件：`view/admin/profit_center/index.html`
+- 修复内容：
+  - 标题与副标题增强：
+    - 页面主标题提升至大标题层级（Manrope 粗体），副标题同步提高可读性。
+  - KPI 模块视觉强化：
+    - KPI 卡片内边距与最小高度提升，数值字号放大至高对比展示。
+    - 图标由单一灰色改为分卡片配色（利润/广告费/成交额/订单/ROI 各自色板），提升信息识别速度。
+  - 顶部动作按钮图标配色：
+    - 工具按钮图标增加彩色底片风格，主按钮与深色按钮自动切换白色图标体系，提升主次层级。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+
+### 15.9 2026-04-13 视觉回调（防过大）+ 批量录入数字框错位修复
+- 问题现象：
+  - 视觉强化后顶部与 KPI 字号偏大；
+  - 批量录入弹窗中“订单数/直播时长”数字输入框在窄列下出现挤压显示异常。
+- 修复范围：
+  - 文件：`view/admin/profit_center/index.html`
+- 修复内容：
+  - 字号回调到中档：
+    - 主标题、副标题、KPI 数值和 KPI 辅助文案整体下调一档，保持“有层级但不过大”。
+  - 批量录入表格输入框修复：
+    - 批量表格单元格横向内边距收敛，释放内容宽度。
+    - `订单数` 列宽提升到 `152`，`直播时长` 列宽提升到 `160`，保证 `el-input-number` 完整显示。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+
+### 15.10 2026-04-13 汇总区字体可读性修复（按店铺/按渠道）
+- 问题现象：
+  - 底部“按店铺汇总 / 按渠道汇总”卡片标题与表格字号偏小，阅读成本高。
+- 修复范围：
+  - 文件：`view/admin/profit_center/index.html`
+- 修复内容：
+  - 汇总卡片标题字体由小号提升到可读层级（18px）。
+  - 两张汇总表从 `size=small` 调整为 `size=default`，并增加专用样式类 `pc-summary-table`：
+    - 表头字号提升（15px）
+    - 数据行字号提升（16px）
+    - 单元格内边距增加，改善阅读节奏
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+
+### 15.11 2026-04-13 标题直出修复 + KPI 降噪 + 批量录入稳定性
+- 问题现象：
+  - 页面标题出现模板表达式直出（`{{ AppI18n... }}`）；
+  - KPI 图标色彩过于跳跃；
+  - 批量录入“订单数/直播时长”列在部分分辨率下仍可能挤压。
+- 修复范围：
+  - 文件：`view/admin/profit_center/index.html`
+- 修复内容：
+  - 标题块改为稳定服务端文本，杜绝模板表达式在浏览器中原样显示。
+  - KPI 图标从多彩混搭调整为统一主色系（蓝灰层级），保留盈亏数值红绿提示作为唯一强语义颜色。
+  - 批量录入表格输入稳定性增强：
+    - 输入框最小宽度约束补齐；
+    - `订单数`/`直播时长`列宽扩大到 `176`；
+    - 批量表格单元格 padding 收敛，释放列内可用宽度。
+  - 视觉回调：标题/KPI 字号从“过大”回调到中间档位。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`（`passed`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+
+### 15.12 2026-04-13 Sidebar 视觉与交互一致性优化
+- 需求目标：
+  - 统一侧边菜单选中态、间距、字体与图标尺度，增强收起模式可用性与整体动效一致性。
+- 修复范围：
+  - 文件：`view/admin/common/layout.html`
+- 修复内容：
+  - 去除选中项左侧竖条，统一改为圆角背景高亮（8px）：
+    - 基于品牌色透明层实现选中/悬停背景（`rgba(var(--primary-rgb), alpha)`）。
+  - 菜单项间距与字形统一：
+    - 顶级菜单左右内边距统一为 `12px`，图标与文字间距调整为 `16px`。
+    - 菜单文字统一 `Manrope`、`14px`，图标统一 `18px`，保证视觉重心对齐。
+  - Mini 收起模式增强：
+    - 收起后图标强制水平居中。
+    - 为菜单项自动生成 `data-tooltip/title`，悬停显示 tooltip，避免收起后不可识别。
+  - 动画统一：
+    - 菜单背景切换、折叠展开、侧栏宽度/主区域联动过渡统一为 `0.3s ease-in-out`。
+- 本轮验证（Windows）：
+  - `php -l view/admin/common/layout.html`
+
+### 15.13 2026-04-13 Sidebar 像素级微调（第二轮）
+- 修复范围：
+  - 文件：`view/admin/common/layout.html`
+- 微调内容：
+  - 新增侧栏节奏变量（项高/间距/圆角/tooltip 色板），统一顶级与子级菜单的垂直节奏。
+  - 顶级菜单与子菜单补齐 `min-height` 与 `box-sizing`，修复不同内容长度下点击区不一致问题。
+  - 收起模式改为固定命中区尺寸（与菜单项高度一致），确保图标在水平与垂直方向均精确居中。
+  - tooltip 改为“基础态隐藏 + hover 渐显”机制，增加淡入与轻位移动画，阴影与对比度按设计稿收敛。
+  - 选中态背景保留品牌色透明高亮，并补充轻边框，降低高亮突兀感。
+- 本轮验证（Windows）：
+  - `php -l view/admin/common/layout.html`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 15.14 2026-04-13 全系统按钮颜色风格统一
+- 目标：
+  - 统一后台系统按钮主色、次级按钮、危险按钮的视觉风格，减少页面间色彩漂移。
+- 修复范围：
+  - `view/admin/common/layout.html`
+  - `view/admin/index/index.html`
+  - `view/admin/profit_center/index.html`
+- 实现内容：
+  - 在全局布局新增按钮色板变量（primary/default/danger 及 hover/active/shadow）。
+  - Bootstrap 按钮统一：
+    - `btn-primary` 统一为品牌蓝实色体系；
+    - `btn-outline-secondary`/`btn-secondary` 统一为中性浅底风格；
+    - `btn-danger` 统一为红色语义风格。
+  - Element Plus 按钮统一：
+    - 在 `body.dark-dashboard` 下统一 `--el-color-primary` 与 `--el-color-danger` 系列变量。
+    - 覆盖 `el-button--primary/default/danger` 的背景、边框、hover、active 与阴影，使其与 Bootstrap 同源。
+  - 模块级收敛：
+    - 仪表盘 `dashboard-actions` 去除独立渐变主按钮，改为全局主色。
+    - 利润中心去除多彩工具按钮图标色板和深色特例按钮，统一到品牌蓝主按钮体系；链接按钮同步主色。
+- 本轮验证（Windows）：
+  - `php -l view/admin/common/layout.html`
+  - `php -l view/admin/index/index.html`
+  - `php -l view/admin/profit_center/index.html`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 15.15 2026-04-13 前台按钮色板统一（用户端页面）
+- 目标：
+  - 将用户端页面按钮风格与后台统一到同一品牌色体系，减少页面间颜色割裂。
+- 修复范围：
+  - `view/index/index.html`
+  - `view/index/platforms.html`
+  - `view/index/influencer.html`
+  - `view/index/search_by_image.html`
+  - `view/index/style_catalog.html`
+  - `view/index/download.html`
+- 实现内容：
+  - 统一主按钮为品牌蓝：`#1677ff`（hover `#0f6fe8` / active `#0c5fca`）。
+  - 统一次按钮为浅蓝灰底 + 细边框风格，危险操作统一红色语义。
+  - 清理用户端页面按钮内联色值，改为 class 驱动（例如重试按钮、购物车删除按钮）。
+  - 替换搜索/拍照/下载等场景的分散色值（黑/绿/靛蓝）为统一色板，保持交互态（hover/active/阴影）一致。
+- 兼容性说明：
+  - 仅修改模板与 CSS，不改接口，不影响 Windows 开发与 Linux 部署行为。
+- 本轮验证（Windows）：
+  - `php -l view/index/index.html`
+  - `php -l view/index/platforms.html`
+  - `php -l view/index/influencer.html`
+  - `php -l view/index/search_by_image.html`
+  - `php -l view/index/style_catalog.html`
+  - `php -l view/index/download.html`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`

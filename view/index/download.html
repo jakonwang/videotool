@@ -16,6 +16,31 @@
         }
       }
     </script>
+    <style>
+      .download-btn-primary {
+        background: #1677ff;
+        color: #fff;
+        box-shadow: 0 10px 24px rgba(22, 119, 255, 0.24);
+        transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .download-btn-primary:hover {
+        background: #0f6fe8;
+        transform: translateY(-1px);
+        box-shadow: 0 12px 26px rgba(22, 119, 255, 0.3);
+      }
+      .download-btn-primary:active {
+        background: #0c5fca;
+        transform: translateY(0);
+      }
+      .download-link-primary {
+        color: #1677ff;
+        text-decoration-color: rgba(22, 119, 255, 0.35);
+      }
+      .download-link-primary:hover {
+        color: #0f6fe8;
+        text-decoration-color: rgba(15, 111, 232, 0.55);
+      }
+    </style>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800 antialiased">
     <header class="border-b border-slate-200/80 bg-white/90 backdrop-blur">
@@ -39,7 +64,7 @@
                     <div class="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{$latest.release_notes|default=''}</div>
                 </div>
                 <div class="shrink-0">
-                    <a href="{$latest.download_url}" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-md transition hover:bg-slate-800">
+                    <a href="{$latest.download_url}" class="download-btn-primary inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium">
                         下载安装包
                     </a>
                 </div>
@@ -65,7 +90,7 @@
                     {/if}
                 </div>
                 <p class="mt-2 max-w-2xl whitespace-pre-wrap text-sm text-slate-600">{$v.release_notes|default=''}</p>
-                <a href="{$v.download_url}" class="mt-3 inline-block text-sm font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-600">下载</a>
+                <a href="{$v.download_url}" class="download-link-primary mt-3 inline-block text-sm font-medium underline underline-offset-4">下载</a>
             </li>
             {/volist}
         </ol>

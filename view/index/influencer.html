@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Creator Download</title>
-    <meta name="theme-color" content="#111827">
+    <meta name="theme-color" content="#1677ff">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
     <style>
         :root{
@@ -14,7 +14,13 @@
             --muted: #6B7280;
             --line: #E5E7EB;
             --soft: #F9FAFB;
-            --brand: #059669;
+            --brand: #1677ff;
+            --brand-hover: #0f6fe8;
+            --brand-active: #0c5fca;
+            --btn-default-bg: #f7faff;
+            --btn-default-hover: #eef4ff;
+            --btn-default-border: #cdddf7;
+            --btn-default-text: #1d4f9f;
             --shadow: 0 10px 40px rgba(0,0,0,0.08);
         }
         *{ margin:0; padding:0; box-sizing:border-box; }
@@ -179,9 +185,32 @@
             transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
         }
         .btnPrimary{
-            box-shadow: 0 10px 24px rgba(5,150,105,0.22);
+            background: var(--brand) !important;
+            border-color: var(--brand) !important;
+            color: #fff !important;
+            box-shadow: 0 10px 24px rgba(22, 119, 255, 0.24);
+        }
+        .btnPrimary:hover{
+            background: var(--brand-hover) !important;
+            border-color: var(--brand-hover) !important;
+            color: #fff !important;
+        }
+        .btnPrimary:active{
+            background: var(--brand-active) !important;
+            border-color: var(--brand-active) !important;
+        }
+        .btnSecondary{
+            background: var(--btn-default-bg) !important;
+            border-color: var(--btn-default-border) !important;
+            color: var(--btn-default-text) !important;
+        }
+        .btnSecondary:hover{
+            background: var(--btn-default-hover) !important;
+            border-color: var(--btn-default-border) !important;
+            color: var(--btn-default-text) !important;
         }
         .btnPrimary:active, .btnSecondary:active{ transform: translateY(0px) scale(0.99); opacity: .96; }
+        .btnPrimaryRow{ margin-top: 12px; }
         .footHint{
             margin-top: 2px;
             font-size: 12px;
@@ -499,7 +528,7 @@
                               </el-button>
                             </div>
 
-                            <el-button class="btnPrimary" type="success" :icon="Download" style="margin-top:12px;" @click="download('video')" :loading="busy.video">
+                            <el-button class="btnPrimary btnPrimaryRow" type="primary" :icon="Download" @click="download('video')" :loading="busy.video">
                               {{ t('influencer.downloadVideo') }}
                             </el-button>
 
@@ -516,4 +545,3 @@
     </script>
 </body>
 </html>
-

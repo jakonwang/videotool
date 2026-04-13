@@ -1,8 +1,1033 @@
 ﻿{extend name="admin/common/layout" /}
 
-{block name="title"}{literal}{{ AppI18n && AppI18n.t ? AppI18n.t('page.profitCenter.title') : 'Profit Center' }}{/literal}{/block}
+{block name="title"}利润中心{/block}
 {block name="page_title"}<span data-i18n="page.profitCenter.title">Profit Center</span>{/block}
 {block name="breadcrumb"}<span data-i18n="page.profitCenter.breadcrumb">Growth Hub / Profit Center</span>{/block}
+
+{block name="style"}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+  :root {
+    --pc-bg: #f8fafc;
+    --pc-card: #ffffff;
+    --pc-muted: #64748b;
+    --pc-line: #e2e8f0;
+    --pc-soft: #f1f5f9;
+    --pc-primary: var(--dash-btn-primary, #1677ff);
+    --pc-primary-dim: var(--dash-btn-primary-hover, #0f6fe8);
+    --pc-primary-active: var(--dash-btn-primary-active, #0c5fca);
+    --pc-btn-shadow: var(--dash-btn-primary-shadow, 0 8px 18px rgba(22, 119, 255, .22));
+    --pc-text: #0f172a;
+    --pc-success: #16a34a;
+    --pc-danger: #dc2626;
+    --pc-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+    --pc-radius: 12px;
+    --pc-label-width: 120px;
+  }
+
+  .content-wrapper {
+    background: var(--pc-bg) !important;
+  }
+
+  .content-header {
+    display: none;
+  }
+
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined', sans-serif;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+    vertical-align: middle;
+  }
+
+  .pc-page {
+    max-width: 1540px;
+    margin: 0 auto 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    color: var(--pc-text);
+    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .pc-panel {
+    border: 1px solid var(--pc-line);
+    border-radius: var(--pc-radius);
+    background: var(--pc-card);
+    box-shadow: var(--pc-shadow);
+    padding: 16px;
+  }
+
+  .pc-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 0 2px;
+    flex-wrap: wrap;
+  }
+
+  .pc-toolbar-title {
+    font-size: 26px;
+    line-height: 1.12;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    font-family: Manrope, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .pc-toolbar-subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--pc-muted);
+    line-height: 1.55;
+  }
+
+  .pc-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+    padding-top: 8px;
+  }
+
+  .pc-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .pc-kpi-card {
+    border: 1px solid #eef2f6;
+    border-radius: var(--pc-radius);
+    padding: 18px 16px;
+    background: #fff;
+    min-height: 132px;
+    position: relative;
+  }
+
+  .pc-kpi-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pc-kpi-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: #e8f0ff;
+    color: #1f5eea;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .14);
+  }
+
+  .pc-kpi-label {
+    font-size: 13px;
+    letter-spacing: 0;
+    font-weight: 700;
+    color: #778296;
+  }
+
+  .pc-kpi-value {
+    margin-top: 10px;
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0;
+    font-family: Manrope, "Helvetica Neue", Arial, sans-serif;
+    color: #171b22;
+  }
+
+  .pc-kpi-foot {
+    margin-top: 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #6f7c90;
+  }
+
+  .pc-kpi-card:nth-child(1) .pc-kpi-icon {
+    background: linear-gradient(145deg, #eff6ff, #dbeafe);
+    color: #1d4ed8;
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, .25);
+  }
+
+  .pc-kpi-card:nth-child(2) .pc-kpi-icon {
+    background: linear-gradient(145deg, #edf4ff, #dbeafe);
+    color: #2563eb;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .24);
+  }
+
+  .pc-kpi-card:nth-child(3) .pc-kpi-icon {
+    background: linear-gradient(145deg, #e8f0ff, #d7e5ff);
+    color: #1e40af;
+    box-shadow: inset 0 0 0 1px rgba(30, 64, 175, .22);
+  }
+
+  .pc-kpi-card:nth-child(4) .pc-kpi-icon {
+    background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
+    color: #334155;
+    box-shadow: inset 0 0 0 1px rgba(71, 85, 105, .2);
+  }
+
+  .pc-kpi-card:nth-child(5) .pc-kpi-icon {
+    background: linear-gradient(145deg, #ecf2ff, #dbeafe);
+    color: #1d4ed8;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .24);
+  }
+
+  .pc-kpi-foot.up {
+    color: var(--pc-success);
+  }
+
+  .pc-kpi-foot.down {
+    color: var(--pc-danger);
+  }
+
+  .pc-filter-panel {
+    padding: 16px;
+  }
+
+  .pc-filter-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+  }
+
+  .pc-filter-item > label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: #6e7b90;
+  }
+
+  .pc-filter-item {
+    min-width: 220px;
+    flex: 1 1 220px;
+  }
+
+  .pc-filter-item.is-channel {
+    max-width: 260px;
+  }
+
+  .pc-filter-item .el-input__wrapper,
+  .pc-filter-item .el-select__wrapper,
+  .pc-filter-item .el-date-editor.el-input {
+    border-radius: 8px;
+    min-height: 40px;
+    border: 1px solid transparent;
+    background: #f4f6f8;
+    box-shadow: none !important;
+  }
+
+  .pc-filter-item .el-input__wrapper.is-focus,
+  .pc-filter-item .el-select__wrapper.is-focused {
+    background: #fff;
+    border-color: #d2dbec;
+  }
+
+  .pc-filter-actions {
+    padding-top: 16px;
+    border-top: 1px solid #edf1f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .pc-action-left,
+  .pc-action-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .pc-page .el-button {
+    border-radius: 8px;
+    font-weight: 700;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .pc-toolbar-actions .el-button {
+    height: 40px;
+    min-height: 40px;
+    padding: 0 16px;
+  }
+
+  .pc-btn-lg.el-button {
+    height: 40px;
+    min-height: 40px;
+    padding: 0 16px;
+  }
+
+  .pc-btn-md.el-button {
+    height: 32px;
+    min-height: 32px;
+    padding: 0 12px;
+  }
+
+  .pc-btn-sm.el-button {
+    height: 24px;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .pc-btn-ghost.el-button {
+    border-color: var(--pc-line);
+    color: var(--pc-text);
+    background: #fff;
+  }
+  .pc-btn-ghost.el-button:hover,
+  .pc-btn-ghost.el-button:focus {
+    border-color: rgba(22, 119, 255, .28);
+    color: var(--pc-primary);
+    background: #f5f9ff;
+  }
+
+  .pc-btn-icon {
+    font-size: 17px;
+    margin-right: 6px;
+    color: var(--pc-primary);
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: #eaf3ff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pc-toolbar-actions .pc-btn-dark .pc-btn-icon,
+  .pc-toolbar-actions .el-button--primary .pc-btn-icon {
+    color: #fff;
+    background: rgba(255, 255, 255, .16);
+  }
+
+  .pc-page .el-button--primary {
+    border-color: var(--pc-primary) !important;
+    background: var(--pc-primary) !important;
+    box-shadow: var(--pc-btn-shadow);
+  }
+
+  .pc-btn-dark.el-button {
+    border: 1px solid var(--pc-primary) !important;
+    background: var(--pc-primary) !important;
+    color: #fff !important;
+    box-shadow: var(--pc-btn-shadow) !important;
+  }
+
+  .pc-btn-dark.el-button:hover {
+    border-color: var(--pc-primary-dim) !important;
+    background: var(--pc-primary-dim) !important;
+    box-shadow: 0 6px 14px rgba(22, 119, 255, .22) !important;
+  }
+
+  .pc-table-panel {
+    padding: 16px;
+  }
+
+  .pc-table-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .pc-table-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #4a576e;
+    letter-spacing: 0;
+  }
+
+  .pc-table-sub {
+    color: #7b8598;
+    font-size: 13px;
+  }
+
+  .pc-main-table.el-table {
+    border-radius: 12px;
+    overflow: hidden;
+    --el-table-header-bg-color: #f5f7fa;
+    --el-table-row-hover-bg-color: #f6f9ff;
+  }
+
+  .pc-page .el-table .el-table__cell {
+    border-bottom-color: #edf1f6 !important;
+    padding: 12px 16px !important;
+  }
+
+  .pc-main-table th.el-table__cell {
+    color: #556279;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .pc-money-main {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1f2b40;
+  }
+
+  .pc-money-sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #8692a7;
+  }
+
+  .pc-channel-tag.el-tag {
+    border-radius: 8px;
+    padding: 2px 9px;
+    font-size: 12px;
+    line-height: 1.2;
+    background: #fff;
+    border-color: #9bc0ff;
+    color: #2d76df;
+  }
+
+  .pc-row-btn.el-button {
+    min-height: auto;
+    height: auto;
+    padding: 0;
+    font-size: 14px;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    color: var(--pc-primary);
+    box-shadow: none !important;
+  }
+
+  .pc-row-btn-danger.el-button {
+    color: #dc2626;
+  }
+
+  .pc-value-positive {
+    color: var(--pc-success);
+  }
+
+  .pc-value-negative {
+    color: var(--pc-danger);
+  }
+
+  .pc-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .pc-summary-card {
+    border: 1px solid #edf1f6;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .pc-summary-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #53617a;
+    margin-bottom: 12px;
+  }
+
+  .pc-summary-table .el-table__cell {
+    padding: 14px 16px !important;
+  }
+
+  .pc-summary-table th.el-table__cell {
+    font-size: 15px;
+    font-weight: 700;
+    color: #4f5f7b;
+  }
+
+  .pc-summary-table td.el-table__cell {
+    font-size: 16px;
+    color: #1f2b40;
+  }
+
+  .pc-summary-table .cell {
+    line-height: 1.5;
+  }
+
+  .pc-modal-overlay {
+    background: rgba(13, 20, 32, .45) !important;
+    backdrop-filter: blur(3px);
+  }
+
+  .pc-modal-overlay .el-overlay-dialog {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+    box-sizing: border-box;
+    overflow: auto;
+  }
+
+  .pc-dialog.el-dialog {
+    margin: 0 !important;
+    top: 0 !important;
+    max-width: calc(100vw - 28px);
+    max-height: calc(100vh - 28px);
+    border-radius: var(--pc-radius);
+    overflow: hidden;
+    box-shadow: 0 20px 56px rgba(9, 16, 26, .26);
+  }
+
+  .pc-dialog .el-dialog__header {
+    margin-right: 0;
+    border-bottom: 1px solid #f0f3f7;
+    padding: 16px;
+  }
+
+  .pc-dialog .el-dialog__body {
+    padding: 16px;
+    max-height: calc(100vh - 160px);
+    overflow: auto;
+    background: #fff;
+  }
+
+  .pc-dialog .el-dialog__footer {
+    border-top: 1px solid #f0f3f7;
+    padding: 16px;
+    background: #fff;
+  }
+
+  .pc-form-card {
+    border: 1px solid #edf1f6;
+    border-radius: 8px;
+    background: #fff;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .pc-form-card h4 {
+    margin: 0 0 8px;
+    color: #445571;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .pc-entry-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr);
+    gap: 20px;
+  }
+
+  .pc-entry-side-card {
+    border: 1px solid #edf1f6;
+    border-radius: 8px;
+    background: #f8fafd;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .pc-entry-side-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #5a6880;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  .pc-entry-side-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+    color: #52607a;
+    padding: 4px 0;
+  }
+
+  .pc-entry-side-row strong {
+    color: #101a2c;
+  }
+
+  .pc-entry-layout .el-form-item__label {
+    white-space: nowrap;
+    font-size: 14px;
+    color: #4f5f7b;
+    font-weight: 700;
+    width: var(--pc-label-width);
+    justify-content: flex-end;
+    text-align: right;
+    padding-right: 12px;
+  }
+
+  .pc-dialog .el-form:not(.el-form--inline) .el-form-item__label {
+    font-size: 14px;
+    color: #4f5f7b;
+    font-weight: 600;
+    justify-content: flex-end;
+    text-align: right;
+    padding-right: 12px;
+  }
+
+  .pc-dialog .el-form:not(.el-form--inline) .el-form-item {
+    margin-bottom: 20px;
+  }
+
+  .pc-dialog .el-form:not(.el-form--inline) .el-form-item__content {
+    min-width: 0;
+  }
+
+  .pc-dialog .el-input__wrapper,
+  .pc-dialog .el-select__wrapper,
+  .pc-dialog .el-date-editor.el-input,
+  .pc-dialog .el-input-number {
+    min-height: 32px;
+  }
+
+  .pc-dialog .el-input-number {
+    width: 100%;
+  }
+
+  .pc-dialog .el-input-number .el-input-number__decrease,
+  .pc-dialog .el-input-number .el-input-number__increase {
+    width: 32px;
+  }
+
+  .pc-entry-layout .el-form-item {
+    margin-bottom: 20px;
+  }
+
+  .pc-entry-layout .el-input-number,
+  .pc-entry-layout .el-select,
+  .pc-entry-layout .el-date-editor.el-input {
+    width: 100%;
+  }
+
+  .pc-entry-layout .el-col {
+    min-width: 0;
+  }
+
+  .pc-store-layout {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 20px;
+  }
+
+  .pc-store-list {
+    max-height: 560px;
+    overflow: auto;
+    padding-right: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pc-store-card {
+    border: 1px solid #edf1f6;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+  }
+
+  .pc-store-card.is-active {
+    border-color: rgba(0, 82, 208, .38);
+    box-shadow: 0 0 0 1px rgba(0, 82, 208, .12);
+  }
+
+  .pc-store-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pc-store-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1d2739;
+  }
+
+  .pc-store-code {
+    margin-top: 2px;
+    color: #7d899d;
+    font-size: 11px;
+  }
+
+  .pc-store-metrics {
+    margin-top: 8px;
+    background: #f6f8fb;
+    border-radius: 8px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .pc-store-metric-item {
+    text-align: center;
+  }
+
+  .pc-store-metric-label {
+    font-size: 12px;
+    color: #8a95a8;
+    margin-bottom: 2px;
+  }
+
+  .pc-store-metric-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1c2434;
+  }
+
+  .pc-store-actions {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .pc-import-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pc-import-step {
+    border: 1px solid #edf1f6;
+    border-radius: 8px;
+    background: #fff;
+    padding: 16px;
+  }
+
+  .pc-import-step-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .pc-step-index {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e9efff;
+    color: var(--pc-primary);
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pc-import-drop {
+    border: 1px dashed #cad5e5;
+    border-radius: 8px;
+    background: #f8fafd;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .pc-import-drop strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #1d2739;
+  }
+
+  .pc-import-drop span {
+    display: block;
+    margin-top: 4px;
+    color: #7f8ba0;
+    font-size: 11px;
+  }
+
+  .pc-batch-table .el-input-number,
+  .pc-batch-table .el-select {
+    width: 100%;
+  }
+
+  .pc-batch-table .el-input-number {
+    min-width: 124px;
+  }
+
+  .pc-batch-short-input.el-input-number {
+    min-width: 136px;
+  }
+
+  .pc-batch-table .el-table__cell {
+    padding: 8px 8px !important;
+  }
+
+  .pc-page .el-button.is-link {
+    min-height: auto;
+    height: auto;
+    padding: 0;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0;
+    font-size: 14px;
+  }
+
+  .pc-page .el-button--primary.is-link {
+    color: var(--pc-primary) !important;
+  }
+
+  .pc-page .el-button--danger.is-link {
+    color: #dc2626 !important;
+  }
+
+  .pc-pagination-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .pc-batch-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .pc-batch-tip {
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .pc-batch-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pc-inline-flex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pc-inline-flex .el-input-number {
+    min-width: 164px;
+  }
+
+  .pc-grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pc-currency {
+    width: 96px;
+  }
+
+  .pc-full {
+    width: 100%;
+  }
+
+  .pc-full.el-input-number,
+  .pc-full.el-select,
+  .pc-full.el-date-editor.el-input {
+    width: 100% !important;
+  }
+
+  .pc-mt-8 {
+    margin-top: 8px;
+  }
+
+  .pc-mt-16 {
+    margin-top: 16px;
+  }
+
+  .pc-store-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .pc-store-stat-card {
+    margin-bottom: 0;
+  }
+
+  .pc-store-stat-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1f2b40;
+  }
+
+  .pc-store-stat-value.primary {
+    color: var(--pc-primary);
+  }
+
+  .pc-alert-gap {
+    margin-bottom: 12px;
+  }
+
+  .pc-account-layout {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 20px;
+  }
+
+  .pc-import-template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .pc-hidden-file {
+    display: none;
+  }
+
+  .pc-fx-form {
+    margin-bottom: 12px;
+  }
+
+  .pc-fx-date {
+    width: 160px;
+  }
+
+  .pc-inline-flex-tight {
+    gap: 4px;
+  }
+
+  .pc-batch-date {
+    width: 128px;
+  }
+
+  .pc-side-note {
+    font-size: 12px;
+    color: #637188;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 1360px) {
+    .pc-kpi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .pc-entry-layout,
+    .pc-store-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .pc-filter-item {
+      min-width: calc(50% - 8px);
+      flex-basis: calc(50% - 8px);
+    }
+
+    .pc-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pc-page {
+      gap: 8px;
+    }
+
+    .pc-toolbar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .pc-toolbar-title {
+      font-size: 20px;
+    }
+
+    .pc-toolbar-subtitle {
+      font-size: 13px;
+    }
+
+    .pc-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pc-kpi-value {
+      font-size: 22px;
+    }
+
+    .pc-kpi-label {
+      font-size: 12px;
+    }
+
+    .pc-kpi-foot {
+      font-size: 11px;
+    }
+
+    .pc-main-table th.el-table__cell {
+      font-size: 13px;
+    }
+
+    .pc-money-main {
+      font-size: 14px;
+    }
+
+    .pc-money-sub {
+      font-size: 12px;
+    }
+
+    .pc-page .el-button,
+    .pc-row-btn.el-button,
+    .pc-page .el-button.is-link {
+      font-size: 14px;
+    }
+
+    .pc-toolbar-actions .el-button {
+      min-height: 40px;
+      height: 40px;
+      padding: 0 12px;
+    }
+
+    .pc-filter-item {
+      min-width: 100%;
+      flex-basis: 100%;
+    }
+
+    .pc-store-stat-grid,
+    .pc-import-template-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .pc-account-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{/block}
 
 {block name="content"}
 <div id="profitCenterApp" class="admin-page-container"></div>
@@ -74,9 +1099,10 @@
       });
 
       const summary = reactive({
-        kpi: { net_profit_cny: 0, ad_spend_cny: 0, gmv_cny: 0, order_count: 0, avg_roi: null, entry_count: 0 },
+        kpi: { net_profit_cny: 0, ad_spend_cny: 0, ad_compensation_cny: 0, gmv_cny: 0, order_count: 0, avg_roi: null, entry_count: 0 },
         by_store: [],
-        by_channel: []
+        by_channel: [],
+        by_day: []
       });
 
       const entryDialogVisible = ref(false);
@@ -96,6 +1122,8 @@
         wage_hourly_cny: 0,
         ad_spend_amount: 0,
         ad_spend_currency: 'USD',
+        ad_compensation_amount: 0,
+        ad_compensation_currency: 'USD',
         gmv_amount: 0,
         gmv_currency: 'VND',
         order_count: 0,
@@ -140,7 +1168,6 @@
         store_id: '',
         account_name: '',
         account_code: '',
-        channel_type: 'video',
         account_currency: 'USD',
         default_gmv_currency: 'VND',
         status: 1,
@@ -179,6 +1206,17 @@
         if (!importForm.store_id) return accounts.value;
         return accounts.value.filter((a) => String(a.store_id) === String(importForm.store_id));
       });
+      const importFileName = computed(() => (importFile.value && importFile.value.name ? String(importFile.value.name) : ''));
+      const selectedEntryStore = computed(() => stores.value.find((s) => String(s.id) === String(entryForm.store_id)) || null);
+      const selectedEntryAccount = computed(() => accounts.value.find((a) => String(a.id) === String(entryForm.account_id)) || null);
+      const entryRoiPreview = computed(() => {
+        const ad = Number(entryForm.ad_spend_amount || 0);
+        const gmv = Number(entryForm.gmv_amount || 0);
+        if (ad <= 0) return null;
+        return gmv / ad;
+      });
+      const entryWageCostPreview = computed(() => Number(entryForm.live_hours || 0) * Number(entryForm.wage_hourly_cny || 0));
+      const activeStoreCount = computed(() => stores.value.filter((s) => Number(s.status || 0) === 1).length);
 
       const queryString = computed(() => {
         const p = new URLSearchParams();
@@ -189,12 +1227,49 @@
         if (filters.channel_type) p.set('channel_type', String(filters.channel_type));
         return p.toString();
       });
+      const kpiTrends = computed(() => {
+        const rows = Array.isArray(summary.by_day) ? summary.by_day.slice() : [];
+        if (rows.length < 2) {
+          return {
+            net_profit_cny: { text: '--', up: null },
+            ad_spend_cny: { text: '--', up: null },
+            gmv_cny: { text: '--', up: null },
+            order_count: { text: '--', up: null },
+            avg_roi: { text: '--', up: null }
+          };
+        }
+        rows.sort((a, b) => String(a.entry_date || '').localeCompare(String(b.entry_date || '')));
+        const prev = rows[rows.length - 2] || {};
+        const curr = rows[rows.length - 1] || {};
+        const calc = (key) => {
+          const p = Number(prev[key] || 0);
+          const c = Number(curr[key] || 0);
+          if (!Number.isFinite(p) || !Number.isFinite(c) || p === 0) return { text: '--', up: null };
+          const pct = ((c - p) / Math.abs(p)) * 100;
+          return {
+            text: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%',
+            up: pct >= 0
+          };
+        };
+        return {
+          net_profit_cny: calc('net_profit_cny'),
+          ad_spend_cny: calc('ad_spend_cny'),
+          gmv_cny: calc('gmv_cny'),
+          order_count: calc('order_count'),
+          avg_roi: calc('avg_roi')
+        };
+      });
 
       function formatMoney(v) { return Number(v || 0).toFixed(2); }
       function formatRoi(v) {
         if (v == null || v === '') return '--';
         const n = Number(v);
         return Number.isFinite(n) ? n.toFixed(4) : '--';
+      }
+      function formatPercent(v) {
+        const n = Number(v || 0);
+        if (!Number.isFinite(n)) return '--';
+        return (n * 100).toFixed(2) + '%';
       }
       function getStoreCancelRate(store, channel) {
         if (!store) return 0;
@@ -228,6 +1303,13 @@
         if (s === 'fallback_latest') return tt('page.profitCenter.fxSourceFallbackLatest');
         return translateMaybeText(source, 'page.profitCenter.fxSourceUnknown');
       }
+      function channelLabelByType(type) {
+        const t = String(type || '');
+        if (t === 'live') return tt('page.profitCenter.channelLive');
+        if (t === 'video') return tt('page.profitCenter.channelVideo');
+        if (t === 'influencer') return tt('page.profitCenter.channelInfluencer');
+        return t || '--';
+      }
 
       async function fetchStores() {
         const res = await fetch('/admin.php/profit_center/storeListJson', { credentials: 'same-origin', headers });
@@ -251,7 +1333,10 @@
           const data = json.data || {};
           summary.kpi = data.kpi || summary.kpi;
           summary.by_store = Array.isArray(data.by_store) ? data.by_store : [];
-          summary.by_channel = Array.isArray(data.by_channel) ? data.by_channel : [];
+          summary.by_channel = Array.isArray(data.by_channel)
+            ? data.by_channel.map((row) => ({ ...row, channel_label: channelLabelByType(row.channel_type) }))
+            : [];
+          summary.by_day = Array.isArray(data.by_day) ? data.by_day : [];
         } catch (e) {
           ElMessage.error(e.message || tt('common.loadingFailed'));
         } finally {
@@ -268,7 +1353,9 @@
           const res = await fetch('/admin.php/profit_center/entryListJson?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
-          entries.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+          entries.value = json.data && Array.isArray(json.data.items)
+            ? json.data.items.map((row) => ({ ...row, channel_label: channelLabelByType(row.channel_type) }))
+            : [];
           total.value = json.data ? Number(json.data.total || 0) : 0;
           fallbackCount.value = entries.value.filter((x) => String(x.fx_status || '') === 'fallback_latest').length;
         } catch (e) {
@@ -298,12 +1385,14 @@
 
       function openEntryCreate() {
         const firstStore = stores.value[0] || null;
-        const firstAccount = accounts.value[0] || null;
+        const firstAccount = firstStore
+          ? (accounts.value.find((a) => String(a.store_id) === String(firstStore.id)) || null)
+          : (accounts.value[0] || null);
         entryForm.id = 0;
         entryForm.entry_date = filters.date_from || today();
         entryForm.store_id = firstStore ? String(firstStore.id) : '';
         entryForm.account_id = firstAccount ? String(firstAccount.id) : '';
-        entryForm.channel_type = firstAccount ? String(firstAccount.channel_type || 'video') : 'video';
+        entryForm.channel_type = String(filters.channel_type || 'video');
         entryForm.sale_price_cny = Number(firstStore ? (firstStore.default_sale_price_cny || 0) : 0);
         entryForm.product_cost_cny = Number(firstStore ? (firstStore.default_product_cost_cny || 0) : 0);
         entryForm.cancel_rate = getStoreCancelRate(firstStore, entryForm.channel_type);
@@ -313,8 +1402,10 @@
         entryForm.live_hours = 0;
         entryForm.order_count = 0;
         entryForm.ad_spend_amount = 0;
+        entryForm.ad_compensation_amount = 0;
         entryForm.gmv_amount = 0;
         entryForm.ad_spend_currency = firstAccount ? String(firstAccount.account_currency || 'USD') : 'USD';
+        entryForm.ad_compensation_currency = firstAccount ? String(firstAccount.account_currency || 'USD') : 'USD';
         entryForm.gmv_currency = firstAccount ? String(firstAccount.default_gmv_currency || 'VND') : 'VND';
         entryForm.raw_metrics_json = '';
         entryDialogVisible.value = true;
@@ -335,6 +1426,8 @@
         entryForm.wage_hourly_cny = Number(row.wage_hourly_cny || 0);
         entryForm.ad_spend_amount = Number(row.ad_spend_amount || 0);
         entryForm.ad_spend_currency = String(row.ad_spend_currency || 'USD');
+        entryForm.ad_compensation_amount = Number(row.ad_compensation_amount || 0);
+        entryForm.ad_compensation_currency = String(row.ad_compensation_currency || 'USD');
         entryForm.gmv_amount = Number(row.gmv_amount || 0);
         entryForm.gmv_currency = String(row.gmv_currency || 'VND');
         entryForm.order_count = Number(row.order_count || 0);
@@ -364,7 +1457,7 @@
         }
         const storeId = store ? String(store.id) : (requestedStoreId || '');
         const accountId = account ? String(account.id) : (base.account_id ? String(base.account_id) : '');
-        const channelType = String(base.channel_type || (account ? (account.channel_type || 'video') : 'video'));
+        const channelType = String(base.channel_type || 'video');
         return {
           row_key: batchRowSeed.value++,
           entry_date: String(base.entry_date || filters.date_from || today()),
@@ -373,6 +1466,8 @@
           channel_type: channelType,
           ad_spend_amount: Number(base.ad_spend_amount || 0),
           ad_spend_currency: String(base.ad_spend_currency || (account ? (account.account_currency || 'USD') : 'USD')),
+          ad_compensation_amount: Number(base.ad_compensation_amount || 0),
+          ad_compensation_currency: String(base.ad_compensation_currency || (account ? (account.account_currency || 'USD') : 'USD')),
           gmv_amount: Number(base.gmv_amount || 0),
           gmv_currency: String(base.gmv_currency || (account ? (account.default_gmv_currency || 'VND') : 'VND')),
           order_count: Number(base.order_count || 0),
@@ -402,8 +1497,8 @@
       function applyBatchAccountPreset(row) {
         const account = accounts.value.find((a) => String(a.id) === String(row.account_id));
         if (!account) return;
-        row.channel_type = String(account.channel_type || row.channel_type || 'video');
         row.ad_spend_currency = String(account.account_currency || row.ad_spend_currency || 'USD');
+        row.ad_compensation_currency = String(account.account_currency || row.ad_compensation_currency || 'USD');
         row.gmv_currency = String(account.default_gmv_currency || row.gmv_currency || 'VND');
         if (String(row.store_id || '') !== String(account.store_id || '')) {
           row.store_id = String(account.store_id || '');
@@ -420,8 +1515,10 @@
         }
       }
 
-      function onBatchAccountChange(row) {
-        applyBatchAccountPreset(row);
+      function batchAccountName(row) {
+        if (!row) return '--';
+        const account = accounts.value.find((a) => String(a.id) === String(row.account_id));
+        return account ? String(account.account_name || '--') : '--';
       }
 
       function addBatchRow(seed) {
@@ -434,6 +1531,7 @@
           account_id: base.account_id || '',
           channel_type: base.channel_type || 'video',
           ad_spend_currency: base.ad_spend_currency || 'USD',
+          ad_compensation_currency: base.ad_compensation_currency || 'USD',
           gmv_currency: base.gmv_currency || 'VND'
         }));
       }
@@ -465,6 +1563,8 @@
             channel_type: String(row.channel_type || ''),
             ad_spend_amount: Number(row.ad_spend_amount || 0),
             ad_spend_currency: String(row.ad_spend_currency || ''),
+            ad_compensation_amount: Number(row.ad_compensation_amount || 0),
+            ad_compensation_currency: String(row.ad_compensation_currency || ''),
             gmv_amount: Number(row.gmv_amount || 0),
             gmv_currency: String(row.gmv_currency || ''),
             order_count: Number(row.order_count || 0),
@@ -539,6 +1639,8 @@
             wage_hourly_cny: Number(entryForm.wage_hourly_cny || 0),
             ad_spend_amount: Number(entryForm.ad_spend_amount || 0),
             ad_spend_currency: entryForm.ad_spend_currency,
+            ad_compensation_amount: Number(entryForm.ad_compensation_amount || 0),
+            ad_compensation_currency: entryForm.ad_compensation_currency,
             gmv_amount: Number(entryForm.gmv_amount || 0),
             gmv_currency: entryForm.gmv_currency,
             order_count: Number(entryForm.order_count || 0),
@@ -651,7 +1753,6 @@
         accountForm.store_id = String(row.store_id || '');
         accountForm.account_name = row.account_name || '';
         accountForm.account_code = row.account_code || '';
-        accountForm.channel_type = row.channel_type || 'video';
         accountForm.account_currency = row.account_currency || 'USD';
         accountForm.default_gmv_currency = row.default_gmv_currency || 'VND';
         accountForm.status = Number(row.status || 1);
@@ -659,7 +1760,7 @@
       }
 
       function resetAccountForm() {
-        fillAccountForm({ id: 0, status: 1, channel_type: 'video', account_currency: 'USD', default_gmv_currency: 'VND' });
+        fillAccountForm({ id: 0, status: 1, account_currency: 'USD', default_gmv_currency: 'VND' });
       }
 
       async function saveAccount() {
@@ -803,12 +1904,25 @@
       watch(() => entryForm.account_id, (v) => {
         const row = accounts.value.find((a) => String(a.id) === String(v));
         if (!row) return;
-        entryForm.channel_type = row.channel_type || entryForm.channel_type;
         entryForm.ad_spend_currency = row.account_currency || entryForm.ad_spend_currency;
         entryForm.gmv_currency = row.default_gmv_currency || entryForm.gmv_currency;
         if (entryForm.id <= 0) {
+          entryForm.ad_compensation_currency = row.account_currency || entryForm.ad_compensation_currency;
+        }
+        if (entryForm.id <= 0) {
           const store = stores.value.find((s) => String(s.id) === String(entryForm.store_id));
           entryForm.cancel_rate = getStoreCancelRate(store || null, entryForm.channel_type);
+        }
+      });
+      watch(() => entryForm.channel_type, (v) => {
+        if (entryForm.id > 0) return;
+        const store = stores.value.find((s) => String(s.id) === String(entryForm.store_id));
+        entryForm.cancel_rate = getStoreCancelRate(store || null, String(v || ''));
+      });
+      watch(() => importForm.store_id, (v) => {
+        const opts = accounts.value.filter((a) => String(a.store_id) === String(v));
+        if (!opts.find((a) => String(a.id) === String(importForm.account_id))) {
+          importForm.account_id = opts.length > 0 ? String(opts[0].id) : '';
         }
       });
 
@@ -828,146 +1942,269 @@
         batchDialogVisible, batchSaving, batchRows, batchResult,
         entryAccountOptions, storeDialogVisible, storeLoading, storeForm, accountDialogVisible, accountLoading,
         accountForm, importDialogVisible, importLoading, importForm, importAccountOptions, fxDialogVisible,
-        fxLoading, fxSyncing, fxRows, fxForm, formatMoney, formatRoi, fxStatusLabel, fxTagType, fxSourceLabel,
+        fxLoading, fxSyncing, fxRows, fxForm, formatMoney, formatRoi, formatPercent, fxStatusLabel, fxTagType, fxSourceLabel,
+        kpiTrends,
+        importFileName, selectedEntryStore, selectedEntryAccount, entryRoiPreview, entryWageCostPreview, activeStoreCount,
         fetchEntries, reloadAll, resetFilter, openEntryCreate, openBatchEntry, openEntryEdit, saveEntry, deleteEntry,
-        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, onBatchStoreChange, onBatchAccountChange, resetBatchDialog,
+        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, batchAccountName, onBatchStoreChange, resetBatchDialog,
         fillStoreForm, saveStore, deleteStore, resetStoreForm, fillAccountForm, saveAccount, deleteAccount,
         resetAccountForm, submitImport, fetchFxRates, syncFx, exportCsv, downloadTemplate,
         onImportFileChange: (e) => { importFile.value = e.target && e.target.files ? e.target.files[0] : null; }
       };
     },
     template: `
-      <div class="admin-modern-card" style="margin-bottom:12px;">
-        <el-form :inline="true">
-          <el-form-item><el-date-picker v-model="filters.date_from" value-format="YYYY-MM-DD" type="date" :placeholder="tt('page.profitCenter.filterDateFrom')" style="width:150px;" /></el-form-item>
-          <el-form-item><el-date-picker v-model="filters.date_to" value-format="YYYY-MM-DD" type="date" :placeholder="tt('page.profitCenter.filterDateTo')" style="width:150px;" /></el-form-item>
-          <el-form-item>
-            <el-select v-model="filters.store_id" clearable :placeholder="tt('page.profitCenter.filterStore')" style="width:170px;">
-              <el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-select v-model="filters.account_id" clearable :placeholder="tt('page.profitCenter.filterAccount')" style="width:170px;">
-              <el-option v-for="a in accounts" :key="a.id" :label="a.account_name" :value="String(a.id)" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-select v-model="filters.channel_type" clearable :placeholder="tt('page.profitCenter.filterChannel')" style="width:130px;">
-              <el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="page=1;reloadAll()">{{ tt('common.search') }}</el-button>
-            <el-button @click="resetFilter">{{ tt('common.reset') }}</el-button>
-            <el-button @click="exportCsv">{{ tt('page.styleSearch.exportCsv') }}</el-button>
-          </el-form-item>
-          <el-form-item style="margin-left:auto;">
-            <el-button type="success" @click="openEntryCreate">{{ tt('page.profitCenter.actionNewEntry') }}</el-button>
-            <el-button type="warning" @click="openBatchEntry">{{ tt('page.profitCenter.actionBatchEntry') }}</el-button>
-            <el-button @click="importDialogVisible=true">{{ tt('page.profitCenter.actionImport') }}</el-button>
-            <el-button @click="fxDialogVisible=true;fetchFxRates()">{{ tt('page.profitCenter.actionFx') }}</el-button>
-            <el-button @click="storeDialogVisible=true">{{ tt('page.profitCenter.actionStoreManager') }}</el-button>
-            <el-button @click="accountDialogVisible=true">{{ tt('page.profitCenter.actionAccountManager') }}</el-button>
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <el-alert v-if="fallbackCount>0" type="warning" :closable="false" :title="tt('page.profitCenter.warningFallback', {count: fallbackCount})" style="margin-bottom:12px;" />
-
-      <div v-loading="summaryLoading" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px;">
-        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiNetProfit') }}</div><div style="font-size:24px;font-weight:700;">{{ formatMoney(summary.kpi.net_profit_cny) }}</div></div>
-        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiAdSpend') }}</div><div style="font-size:24px;font-weight:700;">{{ formatMoney(summary.kpi.ad_spend_cny) }}</div></div>
-        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiGmv') }}</div><div style="font-size:24px;font-weight:700;">{{ formatMoney(summary.kpi.gmv_cny) }}</div></div>
-        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiOrderCount') }}</div><div style="font-size:24px;font-weight:700;">{{ Number(summary.kpi.order_count || 0) }}</div></div>
-        <div class="admin-modern-card" style="margin:0;"><div style="font-size:12px;color:#909399;">{{ tt('page.profitCenter.kpiAvgRoi') }}</div><div style="font-size:24px;font-weight:700;">{{ formatRoi(summary.kpi.avg_roi) }}</div></div>
-      </div>
-
-      <div class="admin-modern-card" style="margin-bottom:12px;">
-        <el-table :data="entries" stripe v-loading="loading">
-          <el-table-column prop="entry_date" :label="tt('page.profitCenter.colDate')" width="110" />
-          <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
-          <el-table-column prop="account_name" :label="tt('page.profitCenter.colAccount')" min-width="120" />
-          <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" width="90" />
-          <el-table-column :label="tt('page.profitCenter.colAdSpend')" min-width="180"><template #default="{row}">{{ formatMoney(row.ad_spend_amount) }} {{ row.ad_spend_currency }} / {{ formatMoney(row.ad_spend_cny) }} CNY</template></el-table-column>
-          <el-table-column :label="tt('page.profitCenter.colGmv')" min-width="180"><template #default="{row}">{{ formatMoney(row.gmv_amount) }} {{ row.gmv_currency }} / {{ formatMoney(row.gmv_cny) }} CNY</template></el-table-column>
-          <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="90" />
-          <el-table-column :label="tt('page.profitCenter.colRoi')" width="90"><template #default="{row}">{{ formatRoi(row.roi) }}</template></el-table-column>
-          <el-table-column :label="tt('page.profitCenter.colNetProfit')" width="120"><template #default="{row}">{{ formatMoney(row.net_profit_cny) }}</template></el-table-column>
-          <el-table-column :label="tt('page.profitCenter.colFxStatus')" width="120"><template #default="{row}"><el-tag size="small" :type="fxTagType(row.fx_status)">{{ fxStatusLabel(row.fx_status) }}</el-tag></template></el-table-column>
-          <el-table-column :label="tt('page.profitCenter.colActions')" width="150" fixed="right">
-            <template #default="{row}">
-              <el-button size="small" @click="openEntryEdit(row)">{{ tt('common.edit') }}</el-button>
-              <el-button size="small" type="danger" plain @click="deleteEntry(row)">{{ tt('common.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
-          <el-pagination v-model:current-page="page" v-model:page-size="pageSize" layout="total, prev, pager, next" :total="total" @update:current-page="fetchEntries" @update:page-size="() => { page=1; fetchEntries(); }" />
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px;">
-        <div class="admin-modern-card">
-          <div style="font-weight:600;margin-bottom:8px;">{{ tt('page.profitCenter.byStore') }}</div>
-          <el-table :data="summary.by_store" size="small" max-height="260">
-            <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
-            <el-table-column prop="net_profit_cny" :label="tt('page.profitCenter.colNetProfit')" width="120" />
-            <el-table-column prop="ad_spend_cny" :label="tt('page.profitCenter.kpiAdSpend')" width="120" />
-            <el-table-column prop="gmv_cny" :label="tt('page.profitCenter.kpiGmv')" width="120" />
-          </el-table>
-        </div>
-        <div class="admin-modern-card">
-          <div style="font-weight:600;margin-bottom:8px;">{{ tt('page.profitCenter.byChannel') }}</div>
-          <el-table :data="summary.by_channel" size="small" max-height="260">
-            <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" min-width="120" />
-            <el-table-column prop="net_profit_cny" :label="tt('page.profitCenter.colNetProfit')" width="120" />
-            <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="100" />
-            <el-table-column prop="avg_roi" :label="tt('page.profitCenter.kpiAvgRoi')" width="120" />
-          </el-table>
-        </div>
-      </div>
-
-      <el-dialog v-model="batchDialogVisible" :title="tt('page.profitCenter.batchDialogTitle')" width="1240px" @closed="resetBatchDialog">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <div style="color:#909399;">{{ tt('page.profitCenter.batchDialogTip') }}</div>
-          <div style="display:flex;gap:8px;">
-            <el-button size="small" @click="addBatchRow()">{{ tt('page.profitCenter.batchAddRow') }}</el-button>
-            <el-button size="small" @click="resetBatchDialog">{{ tt('common.reset') }}</el-button>
+      <div class="pc-page">
+        <div class="pc-toolbar">
+          <div>
+            <div class="pc-toolbar-title">{{ tt('page.profitCenter.title') }}</div>
+            <div class="pc-toolbar-subtitle">{{ tt('page.profitCenter.heroDesc') }}</div>
+          </div>
+          <div class="pc-toolbar-actions">
+            <el-button class="pc-btn-lg pc-btn-ghost" @click="downloadTemplate"><span class="material-symbols-outlined pc-btn-icon">file_download</span>{{ tt('page.profitCenter.downloadTemplate') }}</el-button>
+            <el-button class="pc-btn-lg pc-btn-ghost" @click="importDialogVisible=true"><span class="material-symbols-outlined pc-btn-icon">upload_file</span>{{ tt('page.profitCenter.actionImport') }}</el-button>
+            <el-button class="pc-btn-lg pc-btn-ghost" @click="storeDialogVisible=true"><span class="material-symbols-outlined pc-btn-icon">storefront</span>{{ tt('page.profitCenter.actionStoreManager') }}</el-button>
+            <el-button class="pc-btn-lg pc-btn-ghost" @click="accountDialogVisible=true"><span class="material-symbols-outlined pc-btn-icon">manage_accounts</span>{{ tt('page.profitCenter.actionAccountManager') }}</el-button>
+            <el-button class="pc-btn-lg pc-btn-dark" @click="openBatchEntry"><span class="material-symbols-outlined pc-btn-icon">view_list</span>{{ tt('page.profitCenter.actionBatchEntry') }}</el-button>
+            <el-button class="pc-btn-lg" type="primary" @click="openEntryCreate"><span class="material-symbols-outlined pc-btn-icon">add</span>{{ tt('page.profitCenter.actionNewEntry') }}</el-button>
           </div>
         </div>
-        <el-table :data="batchRows" :row-key="(row) => row.row_key" border size="small" max-height="430">
+
+        <div class="pc-panel" v-loading="summaryLoading">
+          <div class="pc-kpi-grid">
+            <div class="pc-kpi-card">
+              <div class="pc-kpi-head">
+                <div class="pc-kpi-label">{{ tt('page.profitCenter.kpiNetProfit') }}</div>
+                <span class="material-symbols-outlined pc-kpi-icon">trending_up</span>
+              </div>
+              <div class="pc-kpi-value" :class="Number(summary.kpi.net_profit_cny || 0) >= 0 ? 'pc-value-positive' : 'pc-value-negative'">¥{{ formatMoney(summary.kpi.net_profit_cny) }}</div>
+              <div class="pc-kpi-foot" :class="kpiTrends.net_profit_cny.up === null ? '' : (kpiTrends.net_profit_cny.up ? 'up' : 'down')">
+                {{ kpiTrends.net_profit_cny.up === null ? '—' : (kpiTrends.net_profit_cny.up ? '▲' : '▼') }} {{ kpiTrends.net_profit_cny.text }}
+              </div>
+            </div>
+            <div class="pc-kpi-card">
+              <div class="pc-kpi-head">
+                <div class="pc-kpi-label">{{ tt('page.profitCenter.kpiAdSpend') }}</div>
+                <span class="material-symbols-outlined pc-kpi-icon">ads_click</span>
+              </div>
+              <div class="pc-kpi-value">¥{{ formatMoney(summary.kpi.ad_spend_cny) }}</div>
+              <div class="pc-kpi-foot" :class="kpiTrends.ad_spend_cny.up === null ? '' : (kpiTrends.ad_spend_cny.up ? 'up' : 'down')">
+                {{ kpiTrends.ad_spend_cny.up === null ? '—' : (kpiTrends.ad_spend_cny.up ? '▲' : '▼') }} {{ kpiTrends.ad_spend_cny.text }}
+              </div>
+            </div>
+            <div class="pc-kpi-card">
+              <div class="pc-kpi-head">
+                <div class="pc-kpi-label">{{ tt('page.profitCenter.kpiGmv') }}</div>
+                <span class="material-symbols-outlined pc-kpi-icon">payments</span>
+              </div>
+              <div class="pc-kpi-value">¥{{ formatMoney(summary.kpi.gmv_cny) }}</div>
+              <div class="pc-kpi-foot" :class="kpiTrends.gmv_cny.up === null ? '' : (kpiTrends.gmv_cny.up ? 'up' : 'down')">
+                {{ kpiTrends.gmv_cny.up === null ? '—' : (kpiTrends.gmv_cny.up ? '▲' : '▼') }} {{ kpiTrends.gmv_cny.text }}
+              </div>
+            </div>
+            <div class="pc-kpi-card">
+              <div class="pc-kpi-head">
+                <div class="pc-kpi-label">{{ tt('page.profitCenter.kpiOrderCount') }}</div>
+                <span class="material-symbols-outlined pc-kpi-icon">shopping_cart</span>
+              </div>
+              <div class="pc-kpi-value">{{ Number(summary.kpi.order_count || 0) }}</div>
+              <div class="pc-kpi-foot" :class="kpiTrends.order_count.up === null ? '' : (kpiTrends.order_count.up ? 'up' : 'down')">
+                {{ kpiTrends.order_count.up === null ? '—' : (kpiTrends.order_count.up ? '▲' : '▼') }} {{ kpiTrends.order_count.text }}
+              </div>
+            </div>
+            <div class="pc-kpi-card">
+              <div class="pc-kpi-head">
+                <div class="pc-kpi-label">{{ tt('page.profitCenter.kpiAvgRoi') }}</div>
+                <span class="material-symbols-outlined pc-kpi-icon">analytics</span>
+              </div>
+              <div class="pc-kpi-value">{{ formatRoi(summary.kpi.avg_roi) }}</div>
+              <div class="pc-kpi-foot" :class="kpiTrends.avg_roi.up === null ? '' : (kpiTrends.avg_roi.up ? 'up' : 'down')">
+                {{ kpiTrends.avg_roi.up === null ? '—' : (kpiTrends.avg_roi.up ? '▲' : '▼') }} {{ kpiTrends.avg_roi.text }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pc-panel pc-filter-panel">
+          <div class="pc-filter-grid">
+            <div class="pc-filter-item">
+              <label>{{ tt('page.profitCenter.filterDateFrom') }}</label>
+              <el-date-picker v-model="filters.date_from" value-format="YYYY-MM-DD" type="date" :placeholder="tt('page.profitCenter.filterDateFrom')" />
+            </div>
+            <div class="pc-filter-item">
+              <label>{{ tt('page.profitCenter.filterDateTo') }}</label>
+              <el-date-picker v-model="filters.date_to" value-format="YYYY-MM-DD" type="date" :placeholder="tt('page.profitCenter.filterDateTo')" />
+            </div>
+            <div class="pc-filter-item">
+              <label>{{ tt('page.profitCenter.filterStore') }}</label>
+              <el-select v-model="filters.store_id" clearable :placeholder="tt('page.profitCenter.filterStore')">
+                <el-option v-for="s in stores" :key="'fs'+s.id" :label="s.store_name" :value="String(s.id)" />
+              </el-select>
+            </div>
+            <div class="pc-filter-item">
+              <label>{{ tt('page.profitCenter.filterAccount') }}</label>
+              <el-select v-model="filters.account_id" clearable :placeholder="tt('page.profitCenter.filterAccount')">
+                <el-option v-for="a in accounts" :key="'fa'+a.id" :label="a.account_name" :value="String(a.id)" />
+              </el-select>
+            </div>
+            <div class="pc-filter-item is-channel">
+              <label>{{ tt('page.profitCenter.filterChannel') }}</label>
+              <el-select v-model="filters.channel_type" clearable :placeholder="tt('page.profitCenter.filterChannel')">
+                <el-option v-for="c in channelOptions" :key="'fc'+c.value" :label="c.label" :value="c.value" />
+              </el-select>
+            </div>
+          </div>
+          <div class="pc-filter-actions">
+            <div class="pc-action-left">
+              <el-button class="pc-btn-md" type="primary" @click="page=1;reloadAll()">{{ tt('common.search') }}</el-button>
+              <el-button class="pc-btn-md pc-btn-ghost" @click="resetFilter">{{ tt('common.reset') }}</el-button>
+              <el-button class="pc-btn-md pc-btn-ghost" @click="exportCsv">{{ tt('page.styleSearch.exportCsv') }}</el-button>
+              <el-button class="pc-btn-md pc-btn-ghost" @click="fxDialogVisible=true;fetchFxRates()">{{ tt('page.profitCenter.actionFx') }}</el-button>
+            </div>
+            <div class="pc-action-right">
+              <span class="pc-table-sub">{{ tt('page.profitCenter.colStore') }} {{ stores.length }} / {{ tt('page.profitCenter.colAccount') }} {{ accounts.length }}</span>
+            </div>
+          </div>
+        </div>
+
+        <el-alert v-if="fallbackCount > 0" type="warning" :closable="false" :title="tt('page.profitCenter.warningFallback', {count: fallbackCount})" />
+
+        <div class="pc-panel pc-table-panel">
+          <div class="pc-table-head">
+            <div class="pc-table-title">{{ tt('page.profitCenter.title') }}</div>
+            <div class="pc-table-sub">{{ tt('page.profitCenter.kpiAdCompensation') }} ¥{{ formatMoney(summary.kpi.ad_compensation_cny) }}</div>
+          </div>
+          <el-table class="pc-main-table" :data="entries" stripe v-loading="loading">
+            <el-table-column prop="entry_date" fixed="left" :label="tt('page.profitCenter.colDate')" width="120" />
+            <el-table-column prop="store_name" fixed="left" :label="tt('page.profitCenter.colStore')" min-width="150" show-overflow-tooltip />
+            <el-table-column :label="tt('page.profitCenter.colChannel')" width="96">
+              <template #default="{row}">
+                <el-tag size="small" effect="plain" class="pc-channel-tag">{{ row.channel_label }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="84" />
+            <el-table-column :label="tt('page.profitCenter.colRoi')" width="84">
+              <template #default="{row}">{{ formatRoi(row.roi) }}</template>
+            </el-table-column>
+            <el-table-column fixed="left" :label="tt('page.profitCenter.colNetProfit')" width="128">
+              <template #default="{row}">
+                <span class="pc-money-main" :class="Number(row.net_profit_cny || 0) >= 0 ? 'pc-value-positive' : 'pc-value-negative'">¥{{ formatMoney(row.net_profit_cny) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.profitCenter.colAdSpend')" min-width="150">
+              <template #default="{row}">
+                <div class="pc-money-main">{{ formatMoney(row.ad_spend_amount) }} {{ row.ad_spend_currency }}</div>
+                <div class="pc-money-sub">CNY {{ formatMoney(row.ad_spend_cny) }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.profitCenter.colGmv')" min-width="150">
+              <template #default="{row}">
+                <div class="pc-money-main">{{ formatMoney(row.gmv_amount) }} {{ row.gmv_currency }}</div>
+                <div class="pc-money-sub">CNY {{ formatMoney(row.gmv_cny) }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.profitCenter.colAdCompensation')" min-width="150">
+              <template #default="{row}">
+                <div class="pc-money-main">{{ formatMoney(row.ad_compensation_amount) }} {{ row.ad_compensation_currency }}</div>
+                <div class="pc-money-sub">CNY {{ formatMoney(row.ad_compensation_cny) }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="account_name" :label="tt('page.profitCenter.colAccount')" min-width="150" show-overflow-tooltip />
+            <el-table-column :label="tt('page.profitCenter.colFxStatus')" width="110">
+              <template #default="{row}">
+                <el-tag size="small" :type="fxTagType(row.fx_status)">{{ fxStatusLabel(row.fx_status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.profitCenter.colActions')" width="120" fixed="right">
+              <template #default="{row}">
+                <div class="pc-inline-flex">
+                  <el-button size="small" class="pc-row-btn" @click="openEntryEdit(row)">{{ tt('common.edit') }}</el-button>
+                  <el-button size="small" class="pc-row-btn pc-row-btn-danger" @click="deleteEntry(row)">{{ tt('common.delete') }}</el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="pc-pagination-wrap">
+            <el-pagination
+              v-model:current-page="page"
+              v-model:page-size="pageSize"
+              layout="total, prev, pager, next"
+              :total="total"
+              @update:current-page="fetchEntries"
+              @update:page-size="() => { page=1; fetchEntries(); }"
+            />
+          </div>
+        </div>
+
+        <div class="pc-summary-grid">
+          <div class="pc-summary-card">
+            <div class="pc-summary-title">{{ tt('page.profitCenter.byStore') }}</div>
+            <el-table class="pc-summary-table" :data="summary.by_store" size="default" max-height="260">
+              <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
+              <el-table-column :label="tt('page.profitCenter.colNetProfit')" width="120">
+                <template #default="{row}">¥{{ formatMoney(row.net_profit_cny) }}</template>
+              </el-table-column>
+              <el-table-column :label="tt('page.profitCenter.kpiAdSpend')" width="120">
+                <template #default="{row}">¥{{ formatMoney(row.ad_spend_cny) }}</template>
+              </el-table-column>
+              <el-table-column :label="tt('page.profitCenter.kpiGmv')" width="120">
+                <template #default="{row}">¥{{ formatMoney(row.gmv_cny) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <div class="pc-summary-card">
+            <div class="pc-summary-title">{{ tt('page.profitCenter.byChannel') }}</div>
+            <el-table class="pc-summary-table" :data="summary.by_channel" size="default" max-height="260">
+              <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" min-width="120" />
+              <el-table-column :label="tt('page.profitCenter.colNetProfit')" width="120">
+                <template #default="{row}">¥{{ formatMoney(row.net_profit_cny) }}</template>
+              </el-table-column>
+              <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="96" />
+              <el-table-column :label="tt('page.profitCenter.kpiAvgRoi')" width="120">
+                <template #default="{row}">{{ formatRoi(row.avg_roi) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+
+      <el-dialog v-model="batchDialogVisible" :title="tt('page.profitCenter.batchDialogTitle')" width="1520px" class="pc-dialog" modal-class="pc-modal-overlay" align-center @closed="resetBatchDialog">
+        <div class="pc-batch-head">
+          <div class="pc-batch-tip">{{ tt('page.profitCenter.batchDialogTip') }}</div>
+          <div class="pc-batch-tools">
+            <el-button class="pc-btn-sm pc-btn-ghost" @click="addBatchRow()">{{ tt('page.profitCenter.batchAddRow') }}</el-button>
+            <el-button class="pc-btn-sm pc-btn-ghost" @click="resetBatchDialog">{{ tt('common.reset') }}</el-button>
+          </div>
+        </div>
+        <el-table class="pc-batch-table" :data="batchRows" :row-key="(row) => row.row_key" border size="small" max-height="430">
           <el-table-column width="64" align="center" label="#"><template #default="{ $index }">{{ $index + 1 }}</template></el-table-column>
           <el-table-column :label="tt('page.profitCenter.colDate')" width="140">
             <template #default="{ row }">
-              <el-date-picker v-model="row.entry_date" type="date" value-format="YYYY-MM-DD" style="width:126px;" />
+              <el-date-picker class="pc-batch-date" v-model="row.entry_date" type="date" value-format="YYYY-MM-DD" />
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colStore')" min-width="160">
             <template #default="{ row }">
-              <el-select v-model="row.store_id" style="width:100%;" filterable @change="onBatchStoreChange(row)">
+              <el-select class="pc-full" v-model="row.store_id" filterable @change="onBatchStoreChange(row)">
                 <el-option v-for="s in stores" :key="'bs'+s.id" :label="s.store_name" :value="String(s.id)" />
               </el-select>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colAccount')" min-width="170">
             <template #default="{ row }">
-              <el-select v-model="row.account_id" style="width:100%;" filterable @change="onBatchAccountChange(row)">
-                <el-option v-for="a in batchAccountOptions(row)" :key="'ba'+a.id" :label="a.account_name" :value="String(a.id)" />
-              </el-select>
+              <span>{{ batchAccountName(row) }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colChannel')" width="120">
             <template #default="{ row }">
-              <el-select v-model="row.channel_type" style="width:100%;">
+              <el-select class="pc-full" v-model="row.channel_type">
                 <el-option v-for="c in channelOptions" :key="'bc'+c.value" :label="c.label" :value="c.value" />
               </el-select>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colAdSpend')" min-width="220">
             <template #default="{ row }">
-              <div style="display:flex;gap:6px;">
-                <el-input-number v-model="row.ad_spend_amount" :precision="2" :min="0" style="flex:1;min-width:120px;" />
-                <el-select v-model="row.ad_spend_currency" style="width:82px;">
+              <div class="pc-inline-flex pc-inline-flex-tight">
+                <el-input-number class="pc-grow" v-model="row.ad_spend_amount" :precision="2" :min="0" />
+                <el-select class="pc-currency" v-model="row.ad_spend_currency">
                   <el-option v-for="c in currencyOptions" :key="'bac'+c" :label="c" :value="c" />
                 </el-select>
               </div>
@@ -975,33 +2212,45 @@
           </el-table-column>
           <el-table-column :label="tt('page.profitCenter.colGmv')" min-width="220">
             <template #default="{ row }">
-              <div style="display:flex;gap:6px;">
-                <el-input-number v-model="row.gmv_amount" :precision="2" :min="0" style="flex:1;min-width:120px;" />
-                <el-select v-model="row.gmv_currency" style="width:82px;">
+              <div class="pc-inline-flex pc-inline-flex-tight">
+                <el-input-number class="pc-grow" v-model="row.gmv_amount" :precision="2" :min="0" />
+                <el-select class="pc-currency" v-model="row.gmv_currency">
                   <el-option v-for="c in currencyOptions" :key="'bgc'+c" :label="c" :value="c" />
                 </el-select>
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('page.profitCenter.colOrders')" width="110">
+          <el-table-column :label="tt('page.profitCenter.colAdCompensation')" min-width="220">
             <template #default="{ row }">
-              <el-input-number v-model="row.order_count" :precision="0" :min="0" style="width:100%;" />
+              <div class="pc-inline-flex pc-inline-flex-tight">
+                <el-input-number class="pc-grow" v-model="row.ad_compensation_amount" :precision="2" :min="0" />
+                <el-select class="pc-currency" v-model="row.ad_compensation_currency">
+                  <el-option v-for="c in currencyOptions" :key="'bcomp'+c" :label="c" :value="c" />
+                </el-select>
+              </div>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('page.profitCenter.liveHours')" width="120">
+          <el-table-column :label="tt('page.profitCenter.colOrders')" width="176">
             <template #default="{ row }">
-              <el-input-number v-model="row.live_hours" :precision="2" :min="0" style="width:100%;" />
+              <el-input-number class="pc-full pc-batch-short-input" v-model="row.order_count" :precision="0" :min="0" />
             </template>
           </el-table-column>
-          <el-table-column :label="tt('page.profitCenter.colActions')" width="110" fixed="right">
+          <el-table-column :label="tt('page.profitCenter.liveHours')" width="176">
+            <template #default="{ row }">
+              <el-input-number class="pc-full pc-batch-short-input" v-model="row.live_hours" :precision="2" :min="0" />
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right">
             <template #default="{ $index, row }">
-              <el-button type="danger" link @click="removeBatchRow($index)">{{ tt('page.profitCenter.batchRemoveRow') }}</el-button>
-              <el-button type="primary" link @click="addBatchRow(row)">{{ tt('page.profitCenter.batchCloneRow') }}</el-button>
+              <div class="pc-inline-flex">
+                <el-button type="danger" link @click="removeBatchRow($index)">{{ tt('page.profitCenter.batchRemoveRow') }}</el-button>
+                <el-button type="primary" link @click="addBatchRow(row)">{{ tt('page.profitCenter.batchCloneRow') }}</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
 
-        <div v-if="batchResult.total > 0" style="margin-top:10px;">
+        <div v-if="batchResult.total > 0" class="pc-mt-8">
           <el-alert
             :type="batchResult.failed_count > 0 ? 'warning' : 'success'"
             :closable="false"
@@ -1010,111 +2259,242 @@
               : tt('page.profitCenter.batchResultSuccess', { total: batchResult.total, saved: batchResult.saved_count })"
           />
         </div>
-        <el-table v-if="batchResult.failed_count > 0" :data="batchResult.failed_items" size="small" max-height="180" style="margin-top:8px;">
+        <el-table v-if="batchResult.failed_count > 0" class="pc-mt-8" :data="batchResult.failed_items" size="small" max-height="180">
           <el-table-column prop="index" width="72" label="#" />
           <el-table-column prop="message" :label="tt('page.profitCenter.batchFailReason')" min-width="180" />
         </el-table>
         <template #footer>
-          <el-button @click="batchDialogVisible=false">{{ tt('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="batchSaving" @click="submitBatchEntries">{{ tt('page.profitCenter.batchSubmit') }}</el-button>
+          <el-button class="pc-btn-md pc-btn-ghost" @click="batchDialogVisible=false">{{ tt('common.cancel') }}</el-button>
+          <el-button class="pc-btn-md" type="primary" :loading="batchSaving" @click="submitBatchEntries">{{ tt('page.profitCenter.batchSubmit') }}</el-button>
         </template>
       </el-dialog>
 
-      <el-dialog v-model="entryDialogVisible" :title="tt('page.profitCenter.entryDialogTitle')" width="920px">
-        <el-form label-width="120px">
-          <el-row :gutter="12">
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colDate')"><el-date-picker v-model="entryForm.entry_date" type="date" value-format="YYYY-MM-DD" style="width:100%;" /></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="entryForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colAccount')"><el-select v-model="entryForm.account_id" style="width:100%;"><el-option v-for="a in entryAccountOptions" :key="a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item></el-col>
-          </el-row>
-          <el-row :gutter="12">
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colChannel')"><el-select v-model="entryForm.channel_type" style="width:100%;"><el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" /></el-select></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.salePrice')"><el-input-number v-model="entryForm.sale_price_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.productCost')"><el-input-number v-model="entryForm.product_cost_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
-          </el-row>
-          <el-row :gutter="12">
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.cancelRate')"><el-input-number v-model="entryForm.cancel_rate" :precision="4" :step="0.01" :min="0" :max="1" style="width:100%;" /></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number v-model="entryForm.platform_fee_rate" :precision="4" :step="0.01" :min="0" :max="1" style="width:100%;" /></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number v-model="entryForm.influencer_commission_rate" :precision="4" :step="0.01" :min="0" :max="1" style="width:100%;" /></el-form-item></el-col>
-          </el-row>
-          <el-row :gutter="12">
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.liveHours')"><el-input-number v-model="entryForm.live_hours" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.wageHourly')"><el-input-number v-model="entryForm.wage_hourly_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item></el-col>
-            <el-col :span="8"><el-form-item :label="tt('page.profitCenter.colOrders')"><el-input-number v-model="entryForm.order_count" :precision="0" :min="0" style="width:100%;" /></el-form-item></el-col>
-          </el-row>
-          <el-row :gutter="12">
-            <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colAdSpend')"><div style="display:flex;gap:8px;width:100%;"><el-input-number v-model="entryForm.ad_spend_amount" :precision="2" :min="0" style="flex:1;" /><el-select v-model="entryForm.ad_spend_currency" style="width:90px;"><el-option v-for="c in currencyOptions" :key="'ad'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
-            <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colGmv')"><div style="display:flex;gap:8px;width:100%;"><el-input-number v-model="entryForm.gmv_amount" :precision="2" :min="0" style="flex:1;" /><el-select v-model="entryForm.gmv_currency" style="width:90px;"><el-option v-for="c in currencyOptions" :key="'gmv'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
-          </el-row>
-          <el-form-item :label="tt('page.profitCenter.rawMetrics')"><el-input v-model="entryForm.raw_metrics_json" type="textarea" :rows="2" /></el-form-item>
-        </el-form>
-        <template #footer><el-button @click="entryDialogVisible=false">{{ tt('common.cancel') }}</el-button><el-button type="primary" :loading="entrySaving" @click="saveEntry">{{ tt('common.save') }}</el-button></template>
+      <el-dialog v-model="entryDialogVisible" :title="tt('page.profitCenter.entryDialogTitle')" width="1020px" class="pc-dialog" modal-class="pc-modal-overlay" align-center>
+        <div class="pc-entry-layout">
+          <div>
+            <el-form label-width="112px">
+              <div class="pc-form-card">
+                <h4>{{ tt('page.profitCenter.entrySectionBase') }}</h4>
+                <el-row :gutter="20">
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colDate')"><el-date-picker class="pc-full" v-model="entryForm.entry_date" type="date" value-format="YYYY-MM-DD" /></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colStore')"><el-select class="pc-full" v-model="entryForm.store_id"><el-option v-for="s in stores" :key="'es'+s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colAccount')"><el-select class="pc-full" v-model="entryForm.account_id" disabled><el-option v-for="a in entryAccountOptions" :key="'ea'+a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item></el-col>
+                </el-row>
+                <el-row :gutter="20">
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colChannel')"><el-select class="pc-full" v-model="entryForm.channel_type"><el-option v-for="c in channelOptions" :key="'ec'+c.value" :label="c.label" :value="c.value" /></el-select></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colOrders')"><el-input-number class="pc-full" v-model="entryForm.order_count" :precision="0" :min="0" /></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.liveHours')"><el-input-number class="pc-full" v-model="entryForm.live_hours" :precision="2" :min="0" /></el-form-item></el-col>
+                </el-row>
+              </div>
+
+              <div class="pc-form-card">
+                <h4>{{ tt('page.profitCenter.entrySectionAmount') }}</h4>
+                <el-row :gutter="20">
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colAdSpend')"><div class="pc-inline-flex pc-full"><el-input-number class="pc-grow" v-model="entryForm.ad_spend_amount" :precision="2" :min="0" /><el-select class="pc-currency" v-model="entryForm.ad_spend_currency"><el-option v-for="c in currencyOptions" :key="'cad'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colGmv')"><div class="pc-inline-flex pc-full"><el-input-number class="pc-grow" v-model="entryForm.gmv_amount" :precision="2" :min="0" /><el-select class="pc-currency" v-model="entryForm.gmv_currency"><el-option v-for="c in currencyOptions" :key="'cgmv'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
+                </el-row>
+                <el-row :gutter="20">
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.colAdCompensation')"><div class="pc-inline-flex pc-full"><el-input-number class="pc-grow" v-model="entryForm.ad_compensation_amount" :precision="2" :min="0" /><el-select class="pc-currency" v-model="entryForm.ad_compensation_currency"><el-option v-for="c in currencyOptions" :key="'ccmp'+c" :label="c" :value="c" /></el-select></div></el-form-item></el-col>
+                </el-row>
+              </div>
+
+              <div class="pc-form-card">
+                <h4>{{ tt('page.profitCenter.entrySectionParam') }}</h4>
+                <el-row :gutter="20">
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.salePrice')"><el-input-number class="pc-full" v-model="entryForm.sale_price_cny" :precision="2" :min="0" /></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.productCost')"><el-input-number class="pc-full" v-model="entryForm.product_cost_cny" :precision="2" :min="0" /></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.wageHourly')"><el-input-number class="pc-full" v-model="entryForm.wage_hourly_cny" :precision="2" :min="0" /></el-form-item></el-col>
+                </el-row>
+                <el-row :gutter="20">
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.cancelRate')"><el-input-number class="pc-full" v-model="entryForm.cancel_rate" :precision="4" :step="0.01" :min="0" :max="1" /></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number class="pc-full" v-model="entryForm.platform_fee_rate" :precision="4" :step="0.01" :min="0" :max="1" /></el-form-item></el-col>
+                  <el-col :span="12"><el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number class="pc-full" v-model="entryForm.influencer_commission_rate" :precision="4" :step="0.01" :min="0" :max="1" /></el-form-item></el-col>
+                </el-row>
+              </div>
+
+              <div class="pc-form-card">
+                <h4>{{ tt('page.profitCenter.entrySectionExtra') }}</h4>
+                <el-form-item :label="tt('page.profitCenter.rawMetrics')"><el-input v-model="entryForm.raw_metrics_json" type="textarea" :rows="2" /></el-form-item>
+              </div>
+            </el-form>
+          </div>
+          <div>
+            <div class="pc-entry-side-card">
+              <div class="pc-entry-side-title">{{ tt('page.profitCenter.entrySectionBase') }}</div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.colStore') }}</span><strong>{{ selectedEntryStore ? selectedEntryStore.store_name : '--' }}</strong></div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.colAccount') }}</span><strong>{{ selectedEntryAccount ? selectedEntryAccount.account_name : '--' }}</strong></div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.colChannel') }}</span><strong>{{ (channelOptions.find((c) => c.value === entryForm.channel_type) || {}).label || '--' }}</strong></div>
+            </div>
+            <div class="pc-entry-side-card">
+              <div class="pc-entry-side-title">{{ tt('page.profitCenter.entrySectionAmount') }}</div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.colRoi') }}</span><strong>{{ entryRoiPreview == null ? '--' : formatRoi(entryRoiPreview) }}</strong></div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.liveHours') }}</span><strong>{{ Number(entryForm.live_hours || 0) }}</strong></div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.wageHourly') }}</span><strong>¥{{ formatMoney(entryWageCostPreview) }}</strong></div>
+              <div class="pc-entry-side-row"><span>{{ tt('page.profitCenter.cancelRate') }}</span><strong>{{ formatPercent(entryForm.cancel_rate) }}</strong></div>
+            </div>
+            <div class="pc-entry-side-card">
+              <div class="pc-entry-side-title">{{ tt('page.profitCenter.batchDialogTip') }}</div>
+              <div class="pc-side-note">
+                {{ tt('page.profitCenter.singleAccountPerStore') }}<br>
+                {{ tt('page.profitCenter.accountAutoBindHint') }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <template #footer><el-button class="pc-btn-md pc-btn-ghost" @click="entryDialogVisible=false">{{ tt('common.cancel') }}</el-button><el-button class="pc-btn-md" type="primary" :loading="entrySaving" @click="saveEntry">{{ tt('common.save') }}</el-button></template>
       </el-dialog>
 
-      <el-dialog v-model="storeDialogVisible" :title="tt('page.profitCenter.actionStoreManager')" width="980px">
-        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;">
-          <el-table :data="stores" height="360" size="small">
-            <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="140" />
-            <el-table-column prop="store_code" :label="tt('page.profitCenter.storeCode')" width="120" />
-            <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right"><template #default="{row}"><el-button size="small" @click="fillStoreForm(row)">{{ tt('common.edit') }}</el-button><el-button size="small" type="danger" plain @click="deleteStore(row)">{{ tt('common.delete') }}</el-button></template></el-table-column>
-          </el-table>
-          <el-form label-width="120px" size="small">
-            <el-form-item :label="tt('page.profitCenter.storeCode')"><el-input v-model="storeForm.store_code" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.colStore')"><el-input v-model="storeForm.store_name" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.salePrice')"><el-input-number v-model="storeForm.default_sale_price_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.productCost')"><el-input-number v-model="storeForm.default_product_cost_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.wageHourly')"><el-input-number v-model="storeForm.default_live_wage_hourly_cny" :precision="2" :min="0" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.cancelRate')"><el-input-number v-model="storeForm.default_cancel_rate" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.cancelRateLive')"><el-input-number v-model="storeForm.default_cancel_rate_live" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.cancelRateVideo')"><el-input-number v-model="storeForm.default_cancel_rate_video" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.cancelRateInfluencer')"><el-input-number v-model="storeForm.default_cancel_rate_influencer" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number v-model="storeForm.default_platform_fee_rate" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number v-model="storeForm.default_influencer_commission_rate" :precision="4" :min="0" :max="1" style="width:100%;" /></el-form-item>
-            <el-form-item :label="tt('common.status')"><el-switch v-model="storeForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
-            <el-form-item><el-button @click="resetStoreForm">{{ tt('common.reset') }}</el-button><el-button type="primary" :loading="storeLoading" @click="saveStore">{{ tt('common.save') }}</el-button></el-form-item>
+      <el-dialog v-model="storeDialogVisible" :title="tt('page.profitCenter.actionStoreManager')" width="1180px" class="pc-dialog" modal-class="pc-modal-overlay" align-center>
+        <div class="pc-store-stat-grid">
+          <div class="pc-form-card pc-store-stat-card">
+            <h4>{{ tt('page.profitCenter.colStore') }}</h4>
+            <div class="pc-store-stat-value">{{ stores.length }}</div>
+          </div>
+          <div class="pc-form-card pc-store-stat-card">
+            <h4>{{ tt('common.statusEnabled') }}</h4>
+            <div class="pc-store-stat-value primary">{{ activeStoreCount }}</div>
+          </div>
+          <div class="pc-form-card pc-store-stat-card">
+            <h4>{{ tt('page.profitCenter.colAccount') }}</h4>
+            <div class="pc-store-stat-value">{{ accounts.length }}</div>
+          </div>
+        </div>
+        <el-alert class="pc-alert-gap" :title="tt('page.profitCenter.storeDialogTip')" type="info" :closable="false" />
+        <div class="pc-store-layout">
+          <div class="pc-store-list">
+            <div
+              v-for="s in stores"
+              :key="'store-card-'+s.id"
+              class="pc-store-card"
+              :class="{ 'is-active': Number(storeForm.id || 0) === Number(s.id || 0) }"
+            >
+              <div class="pc-store-head">
+                <div>
+                  <div class="pc-store-name">{{ s.store_name }}</div>
+                  <div class="pc-store-code">{{ tt('page.profitCenter.storeCode') }}: {{ s.store_code || '--' }}</div>
+                </div>
+                <el-tag size="small" :type="Number(s.status || 0) === 1 ? 'success' : 'info'">
+                  {{ Number(s.status || 0) === 1 ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
+                </el-tag>
+              </div>
+              <div class="pc-store-metrics">
+                <div class="pc-store-metric-item">
+                  <div class="pc-store-metric-label">{{ tt('page.profitCenter.cancelRateLive') }}</div>
+                  <div class="pc-store-metric-value">{{ formatPercent(s.default_cancel_rate_live != null ? s.default_cancel_rate_live : s.default_cancel_rate) }}</div>
+                </div>
+                <div class="pc-store-metric-item">
+                  <div class="pc-store-metric-label">{{ tt('page.profitCenter.cancelRateVideo') }}</div>
+                  <div class="pc-store-metric-value">{{ formatPercent(s.default_cancel_rate_video != null ? s.default_cancel_rate_video : s.default_cancel_rate) }}</div>
+                </div>
+                <div class="pc-store-metric-item">
+                  <div class="pc-store-metric-label">{{ tt('page.profitCenter.cancelRateInfluencer') }}</div>
+                  <div class="pc-store-metric-value">{{ formatPercent(s.default_cancel_rate_influencer != null ? s.default_cancel_rate_influencer : s.default_cancel_rate) }}</div>
+                </div>
+              </div>
+              <div class="pc-store-actions">
+                <el-button class="pc-row-btn" @click="fillStoreForm(s)">{{ tt('common.edit') }}</el-button>
+                <el-button class="pc-row-btn pc-row-btn-danger" @click="deleteStore(s)">{{ tt('common.delete') }}</el-button>
+              </div>
+            </div>
+          </div>
+          <el-form label-width="126px" size="small">
+            <div class="pc-form-card">
+              <h4>{{ tt('page.profitCenter.storeSectionBasic') }}</h4>
+              <el-form-item :label="tt('page.profitCenter.storeCode')"><el-input v-model="storeForm.store_code" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.colStore')"><el-input v-model="storeForm.store_name" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.salePrice')"><el-input-number class="pc-full" v-model="storeForm.default_sale_price_cny" :precision="2" :min="0" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.productCost')"><el-input-number class="pc-full" v-model="storeForm.default_product_cost_cny" :precision="2" :min="0" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.wageHourly')"><el-input-number class="pc-full" v-model="storeForm.default_live_wage_hourly_cny" :precision="2" :min="0" /></el-form-item>
+            </div>
+
+            <div class="pc-form-card">
+              <h4>{{ tt('page.profitCenter.storeSectionRates') }}</h4>
+              <el-form-item :label="tt('page.profitCenter.cancelRate')"><el-input-number class="pc-full" v-model="storeForm.default_cancel_rate" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.cancelRateLive')"><el-input-number class="pc-full" v-model="storeForm.default_cancel_rate_live" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.cancelRateVideo')"><el-input-number class="pc-full" v-model="storeForm.default_cancel_rate_video" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.cancelRateInfluencer')"><el-input-number class="pc-full" v-model="storeForm.default_cancel_rate_influencer" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number class="pc-full" v-model="storeForm.default_platform_fee_rate" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number class="pc-full" v-model="storeForm.default_influencer_commission_rate" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('common.status')"><el-switch v-model="storeForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
+            </div>
+            <el-form-item>
+              <el-button class="pc-btn-md pc-btn-ghost" @click="resetStoreForm">{{ tt('common.add') }}</el-button>
+              <el-button class="pc-btn-md" type="primary" :loading="storeLoading" @click="saveStore">{{ tt('common.save') }}</el-button>
+            </el-form-item>
           </el-form>
         </div>
       </el-dialog>
 
-      <el-dialog v-model="accountDialogVisible" :title="tt('page.profitCenter.actionAccountManager')" width="980px">
-        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;">
+      <el-dialog v-model="accountDialogVisible" :title="tt('page.profitCenter.actionAccountManager')" width="980px" class="pc-dialog" modal-class="pc-modal-overlay" align-center>
+        <div class="pc-account-layout">
           <el-table :data="accounts" height="360" size="small">
             <el-table-column prop="account_name" :label="tt('page.profitCenter.colAccount')" min-width="140" />
             <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" width="140" />
             <el-table-column prop="account_currency" :label="tt('page.profitCenter.colAdCurrency')" width="110" />
             <el-table-column prop="default_gmv_currency" :label="tt('page.profitCenter.colGmvCurrency')" width="110" />
-            <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right"><template #default="{row}"><el-button size="small" @click="fillAccountForm(row)">{{ tt('common.edit') }}</el-button><el-button size="small" type="danger" plain @click="deleteAccount(row)">{{ tt('common.delete') }}</el-button></template></el-table-column>
+            <el-table-column :label="tt('page.profitCenter.colActions')" width="140" fixed="right"><template #default="{row}"><el-button class="pc-row-btn" @click="fillAccountForm(row)">{{ tt('common.edit') }}</el-button><el-button class="pc-row-btn pc-row-btn-danger" @click="deleteAccount(row)">{{ tt('common.delete') }}</el-button></template></el-table-column>
           </el-table>
           <el-form label-width="120px" size="small">
-            <el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="accountForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
+            <el-alert class="pc-alert-gap" :title="tt('page.profitCenter.accountAutoBindHint')" type="info" :closable="false" />
+            <el-form-item :label="tt('page.profitCenter.colStore')"><el-select class="pc-full" v-model="accountForm.store_id"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
             <el-form-item :label="tt('page.profitCenter.colAccount')"><el-input v-model="accountForm.account_name" /></el-form-item>
             <el-form-item :label="tt('page.profitCenter.accountCode')"><el-input v-model="accountForm.account_code" /></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.colChannel')"><el-select v-model="accountForm.channel_type" style="width:100%;"><el-option v-for="c in channelOptions" :key="c.value" :label="c.label" :value="c.value" /></el-select></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select v-model="accountForm.account_currency" style="width:100%;"><el-option v-for="c in currencyOptions" :key="'ac'+c" :label="c" :value="c" /></el-select></el-form-item>
-            <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select v-model="accountForm.default_gmv_currency" style="width:100%;"><el-option v-for="c in currencyOptions" :key="'gc'+c" :label="c" :value="c" /></el-select></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select class="pc-full" v-model="accountForm.account_currency"><el-option v-for="c in currencyOptions" :key="'ac'+c" :label="c" :value="c" /></el-select></el-form-item>
+            <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select class="pc-full" v-model="accountForm.default_gmv_currency"><el-option v-for="c in currencyOptions" :key="'gc'+c" :label="c" :value="c" /></el-select></el-form-item>
             <el-form-item :label="tt('common.status')"><el-switch v-model="accountForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
-            <el-form-item><el-button @click="resetAccountForm">{{ tt('common.reset') }}</el-button><el-button type="primary" :loading="accountLoading" @click="saveAccount">{{ tt('common.save') }}</el-button></el-form-item>
+            <el-form-item><el-button class="pc-btn-md pc-btn-ghost" @click="resetAccountForm">{{ tt('common.reset') }}</el-button><el-button class="pc-btn-md" type="primary" :loading="accountLoading" @click="saveAccount">{{ tt('common.save') }}</el-button></el-form-item>
           </el-form>
         </div>
       </el-dialog>
 
-      <el-dialog v-model="importDialogVisible" :title="tt('page.profitCenter.actionImport')" width="560px">
-        <el-form label-width="120px">
-          <el-form-item :label="tt('page.profitCenter.downloadTemplate')"><el-button type="primary" plain @click="downloadTemplate">{{ tt('page.profitCenter.downloadTemplate') }}</el-button></el-form-item>
-          <el-form-item :label="tt('page.profitCenter.colStore')"><el-select v-model="importForm.store_id" style="width:100%;"><el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
-          <el-form-item :label="tt('page.profitCenter.colAccount')"><el-select v-model="importForm.account_id" style="width:100%;"><el-option v-for="a in importAccountOptions" :key="a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item>
-          <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select v-model="importForm.ad_spend_currency" clearable style="width:100%;"><el-option v-for="c in currencyOptions" :key="'iad'+c" :label="c" :value="c" /></el-select></el-form-item>
-          <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select v-model="importForm.gmv_currency" clearable style="width:100%;"><el-option v-for="c in currencyOptions" :key="'igmv'+c" :label="c" :value="c" /></el-select></el-form-item>
-          <el-form-item :label="tt('common.file')"><input type="file" accept=".xlsx,.xls,.xlsm" @change="onImportFileChange" /></el-form-item>
-        </el-form>
-        <template #footer><el-button @click="importDialogVisible=false">{{ tt('common.cancel') }}</el-button><el-button type="primary" :loading="importLoading" @click="submitImport">{{ tt('common.upload') }}</el-button></template>
+      <el-dialog v-model="importDialogVisible" :title="tt('page.profitCenter.actionImport')" width="760px" class="pc-dialog" modal-class="pc-modal-overlay" align-center>
+        <el-alert class="pc-alert-gap" :title="tt('page.profitCenter.importDialogTip')" type="info" :closable="false" />
+        <div class="pc-import-steps">
+          <div class="pc-import-step">
+            <div class="pc-import-step-head">
+              <span class="pc-step-index">1</span>
+              <strong>{{ tt('page.profitCenter.downloadTemplate') }}</strong>
+            </div>
+            <div class="pc-import-template-grid">
+              <el-button class="pc-btn-md pc-btn-ghost" @click="downloadTemplate">{{ tt('page.profitCenter.channelLive') }}</el-button>
+              <el-button class="pc-btn-md pc-btn-ghost" @click="downloadTemplate">{{ tt('page.profitCenter.channelVideo') }}</el-button>
+              <el-button class="pc-btn-md pc-btn-ghost" @click="downloadTemplate">{{ tt('page.profitCenter.channelInfluencer') }}</el-button>
+            </div>
+          </div>
+
+          <div class="pc-import-step">
+            <div class="pc-import-step-head">
+              <span class="pc-step-index">2</span>
+              <strong>{{ tt('common.file') }}</strong>
+            </div>
+            <label class="pc-import-drop" for="pcImportFileInput">
+              <strong>{{ importFileName || tt('common.pickFile') }}</strong>
+              <span>{{ tt('page.profitCenter.fileSelectHint') }}</span>
+            </label>
+            <input id="pcImportFileInput" class="pc-hidden-file" type="file" accept=".xlsx,.xls,.xlsm" @change="onImportFileChange" />
+          </div>
+
+          <div class="pc-import-step">
+            <div class="pc-import-step-head">
+              <span class="pc-step-index">3</span>
+              <strong>{{ tt('page.profitCenter.entrySectionBase') }}</strong>
+            </div>
+            <el-form label-width="120px">
+              <el-form-item :label="tt('page.profitCenter.colStore')"><el-select class="pc-full" v-model="importForm.store_id"><el-option v-for="s in stores" :key="'is'+s.id" :label="s.store_name" :value="String(s.id)" /></el-select></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.colAccount')"><el-select class="pc-full" v-model="importForm.account_id"><el-option v-for="a in importAccountOptions" :key="'ia'+a.id" :label="a.account_name" :value="String(a.id)" /></el-select></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.colAdCurrency')"><el-select class="pc-full" v-model="importForm.ad_spend_currency" clearable><el-option v-for="c in currencyOptions" :key="'iad'+c" :label="c" :value="c" /></el-select></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.colGmvCurrency')"><el-select class="pc-full" v-model="importForm.gmv_currency" clearable><el-option v-for="c in currencyOptions" :key="'igmv'+c" :label="c" :value="c" /></el-select></el-form-item>
+            </el-form>
+          </div>
+        </div>
+        <template #footer><el-button class="pc-btn-md pc-btn-ghost" @click="importDialogVisible=false">{{ tt('common.cancel') }}</el-button><el-button class="pc-btn-md" type="primary" :loading="importLoading" @click="submitImport">{{ tt('common.upload') }}</el-button></template>
       </el-dialog>
 
-      <el-dialog v-model="fxDialogVisible" :title="tt('page.profitCenter.actionFx')" width="760px">
-        <el-form :inline="true" style="margin-bottom:10px;">
-          <el-form-item><el-date-picker v-model="fxForm.rate_date" type="date" value-format="YYYY-MM-DD" style="width:150px;" /></el-form-item>
+      <el-dialog v-model="fxDialogVisible" :title="tt('page.profitCenter.actionFx')" width="760px" class="pc-dialog" modal-class="pc-modal-overlay" align-center>
+        <el-form class="pc-fx-form" :inline="true">
+          <el-form-item><el-date-picker class="pc-fx-date" v-model="fxForm.rate_date" type="date" value-format="YYYY-MM-DD" /></el-form-item>
           <el-form-item><el-checkbox-group v-model="fxForm.currencies"><el-checkbox label="USD" /><el-checkbox label="VND" /></el-checkbox-group></el-form-item>
-          <el-form-item><el-button type="primary" :loading="fxSyncing" @click="syncFx">{{ tt('common.sync') }}</el-button><el-button @click="fetchFxRates">{{ tt('common.refresh') }}</el-button></el-form-item>
+          <el-form-item><el-button class="pc-btn-md" type="primary" :loading="fxSyncing" @click="syncFx">{{ tt('common.sync') }}</el-button><el-button class="pc-btn-md pc-btn-ghost" @click="fetchFxRates">{{ tt('common.refresh') }}</el-button></el-form-item>
         </el-form>
         <el-table :data="fxRows" v-loading="fxLoading" size="small" max-height="360">
           <el-table-column prop="rate_date" :label="tt('page.profitCenter.colDate')" width="110" />
@@ -1125,6 +2505,7 @@
           <el-table-column :label="tt('page.profitCenter.colFallback')" width="110"><template #default="{row}"><el-tag :type="Number(row.is_fallback||0)===1?'warning':'success'" size="small">{{ Number(row.is_fallback||0)===1?tt('common.yes'):tt('common.no') }}</el-tag></template></el-table-column>
         </el-table>
       </el-dialog>
+      </div>
     `
   }).use(ElementPlus).mount('#profitCenterApp');
 })();
