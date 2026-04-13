@@ -65,11 +65,13 @@ class ProfitCenter extends BaseController
             COUNT(*) as entry_count,
             COALESCE(SUM(e.net_profit_cny),0) as net_profit_cny,
             COALESCE(SUM(e.ad_spend_cny),0) as ad_spend_cny,
+            COALESCE(SUM(e.ad_compensation_cny),0) as ad_compensation_cny,
             COALESCE(SUM(e.gmv_cny),0) as gmv_cny,
             COALESCE(SUM(e.order_count),0) as order_count
         ')->find();
         $total = is_array($totalRow) ? $totalRow : [];
         $totalAd = (float) ($total['ad_spend_cny'] ?? 0);
+        $totalCompensation = (float) ($total['ad_compensation_cny'] ?? 0);
         $totalGmv = (float) ($total['gmv_cny'] ?? 0);
 
         $storeRows = (clone $base)->fieldRaw('
@@ -78,6 +80,7 @@ class ProfitCenter extends BaseController
             COUNT(*) as entry_count,
             COALESCE(SUM(e.net_profit_cny),0) as net_profit_cny,
             COALESCE(SUM(e.ad_spend_cny),0) as ad_spend_cny,
+            COALESCE(SUM(e.ad_compensation_cny),0) as ad_compensation_cny,
             COALESCE(SUM(e.gmv_cny),0) as gmv_cny,
             COALESCE(SUM(e.order_count),0) as order_count
         ')->group('e.store_id,s.store_name')->order('net_profit_cny', 'desc')->select()->toArray();
@@ -87,6 +90,7 @@ class ProfitCenter extends BaseController
             COUNT(*) as entry_count,
             COALESCE(SUM(e.net_profit_cny),0) as net_profit_cny,
             COALESCE(SUM(e.ad_spend_cny),0) as ad_spend_cny,
+            COALESCE(SUM(e.ad_compensation_cny),0) as ad_compensation_cny,
             COALESCE(SUM(e.gmv_cny),0) as gmv_cny,
             COALESCE(SUM(e.order_count),0) as order_count
         ')->group('e.channel_type')->select()->toArray();
@@ -96,6 +100,7 @@ class ProfitCenter extends BaseController
             COUNT(*) as entry_count,
             COALESCE(SUM(e.net_profit_cny),0) as net_profit_cny,
             COALESCE(SUM(e.ad_spend_cny),0) as ad_spend_cny,
+            COALESCE(SUM(e.ad_compensation_cny),0) as ad_compensation_cny,
             COALESCE(SUM(e.gmv_cny),0) as gmv_cny,
             COALESCE(SUM(e.order_count),0) as order_count
         ')->group('e.entry_date')->order('e.entry_date', 'asc')->select()->toArray();
@@ -110,6 +115,7 @@ class ProfitCenter extends BaseController
                 'entry_count' => (int) ($row['entry_count'] ?? 0),
                 'net_profit_cny' => round((float) ($row['net_profit_cny'] ?? 0), 2),
                 'ad_spend_cny' => round($ad, 2),
+                'ad_compensation_cny' => round((float) ($row['ad_compensation_cny'] ?? 0), 2),
                 'gmv_cny' => round($gmv, 2),
                 'order_count' => (int) ($row['order_count'] ?? 0),
                 'avg_roi' => $ad > 0 ? round($gmv / $ad, 6) : null,
@@ -127,6 +133,7 @@ class ProfitCenter extends BaseController
                 'entry_count' => (int) ($row['entry_count'] ?? 0),
                 'net_profit_cny' => round((float) ($row['net_profit_cny'] ?? 0), 2),
                 'ad_spend_cny' => round($ad, 2),
+                'ad_compensation_cny' => round((float) ($row['ad_compensation_cny'] ?? 0), 2),
                 'gmv_cny' => round($gmv, 2),
                 'order_count' => (int) ($row['order_count'] ?? 0),
                 'avg_roi' => $ad > 0 ? round($gmv / $ad, 6) : null,
@@ -142,6 +149,7 @@ class ProfitCenter extends BaseController
                 'entry_count' => (int) ($row['entry_count'] ?? 0),
                 'net_profit_cny' => round((float) ($row['net_profit_cny'] ?? 0), 2),
                 'ad_spend_cny' => round($ad, 2),
+                'ad_compensation_cny' => round((float) ($row['ad_compensation_cny'] ?? 0), 2),
                 'gmv_cny' => round($gmv, 2),
                 'order_count' => (int) ($row['order_count'] ?? 0),
                 'avg_roi' => $ad > 0 ? round($gmv / $ad, 6) : null,
@@ -157,6 +165,7 @@ class ProfitCenter extends BaseController
                 'entry_count' => (int) ($total['entry_count'] ?? 0),
                 'net_profit_cny' => round((float) ($total['net_profit_cny'] ?? 0), 2),
                 'ad_spend_cny' => round($totalAd, 2),
+                'ad_compensation_cny' => round($totalCompensation, 2),
                 'gmv_cny' => round($totalGmv, 2),
                 'order_count' => (int) ($total['order_count'] ?? 0),
                 'avg_roi' => $totalAd > 0 ? round($totalGmv / $totalAd, 6) : null,
@@ -246,6 +255,9 @@ class ProfitCenter extends BaseController
                 'ad_spend_amount' => round((float) ($arr['ad_spend_amount'] ?? 0), 2),
                 'ad_spend_currency' => (string) ($arr['ad_spend_currency'] ?? 'CNY'),
                 'ad_spend_cny' => round((float) ($arr['ad_spend_cny'] ?? 0), 2),
+                'ad_compensation_amount' => round((float) ($arr['ad_compensation_amount'] ?? 0), 2),
+                'ad_compensation_currency' => (string) ($arr['ad_compensation_currency'] ?? 'CNY'),
+                'ad_compensation_cny' => round((float) ($arr['ad_compensation_cny'] ?? 0), 2),
                 'gmv_amount' => round((float) ($arr['gmv_amount'] ?? 0), 2),
                 'gmv_currency' => (string) ($arr['gmv_currency'] ?? 'CNY'),
                 'gmv_cny' => round((float) ($arr['gmv_cny'] ?? 0), 2),
@@ -676,15 +688,15 @@ class ProfitCenter extends BaseController
         $sheets = [
             [
                 'title' => '直播GMV利润表',
-                'headers' => ['日期', '售价(CNY)', '产品成本(CNY)', '取消率', '平台扣点', '广告花费', '成交金额', '预留列', '订单数量', '直播时长', '人员工资'],
+                'headers' => ['日期', '售价(CNY)', '产品成本(CNY)', '取消率', '平台扣点', '广告花费', '成交金额', '广告赔付金额', '订单数量', '直播时长', '人员工资'],
             ],
             [
                 'title' => '视频GMV利润表',
-                'headers' => ['日期', '售价(CNY)', '产品成本(CNY)', '取消率', '平台扣点', '广告花费', '成交金额', '预留列', '订单数量'],
+                'headers' => ['日期', '售价(CNY)', '产品成本(CNY)', '取消率', '平台扣点', '广告花费', '成交金额', '广告赔付金额', '订单数量'],
             ],
             [
                 'title' => '达人GMV利润表',
-                'headers' => ['日期', '售价(CNY)', '产品成本(CNY)', '取消率', '平台扣点', '达人佣金率', '订单数量'],
+                'headers' => ['日期', '售价(CNY)', '产品成本(CNY)', '取消率', '平台扣点', '达人佣金率', '广告赔付金额', '订单数量'],
             ],
         ];
 
@@ -776,20 +788,19 @@ class ProfitCenter extends BaseController
             return $this->jsonErr('import_failed', 1, ['message' => $e->getMessage()], 'page.dataImport.importFailed');
         }
 
-        $sheetMapping = [
-            '直播GMV利润表' => ProfitCalculatorService::CHANNEL_LIVE,
-            '视频GMV利润表' => ProfitCalculatorService::CHANNEL_VIDEO,
-            '达人GMV利润表' => ProfitCalculatorService::CHANNEL_INFLUENCER,
-        ];
         $imported = 0;
         $skipped = 0;
         $errors = [];
         foreach ($spreadsheet->getWorksheetIterator() as $sheet) {
             $title = trim((string) $sheet->getTitle());
-            $channel = $sheetMapping[$title] ?? '';
+            $channel = $this->resolveImportSheetChannel($sheet);
             if ($channel === '') {
                 continue;
             }
+
+            $colCount = Coordinate::columnIndexFromString((string) $sheet->getHighestColumn());
+            $liveVideoHasComp = $colCount >= 8;
+            $influencerHasComp = $colCount >= 8;
 
             $highestRow = (int) $sheet->getHighestRow();
             for ($r = 2; $r <= $highestRow; $r++) {
@@ -809,6 +820,7 @@ class ProfitCenter extends BaseController
                     'cancel_rate' => $this->parseRate($sheet->getCell('D' . $r)->getValue(), 0),
                     'platform_fee_rate' => $this->parseRate($sheet->getCell('E' . $r)->getValue(), 0),
                     'ad_spend_amount' => 0,
+                    'ad_compensation_amount' => 0,
                     'gmv_amount' => 0,
                     'order_count' => 0,
                     'live_hours' => 0,
@@ -819,16 +831,27 @@ class ProfitCenter extends BaseController
                 if ($channel === ProfitCalculatorService::CHANNEL_LIVE) {
                     $payload['ad_spend_amount'] = $this->parseDecimal($sheet->getCell('F' . $r)->getValue(), 0);
                     $payload['gmv_amount'] = $this->parseDecimal($sheet->getCell('G' . $r)->getValue(), 0);
+                    $payload['ad_compensation_amount'] = $liveVideoHasComp
+                        ? $this->parseDecimal($sheet->getCell('H' . $r)->getValue(), 0)
+                        : 0.0;
                     $payload['order_count'] = $this->parseInt($sheet->getCell('I' . $r)->getValue(), 0);
                     $payload['live_hours'] = $this->parseDecimal($sheet->getCell('J' . $r)->getValue(), 0);
                     $payload['wage_hourly_cny'] = $this->parseDecimal($sheet->getCell('K' . $r)->getValue(), 0);
                 } elseif ($channel === ProfitCalculatorService::CHANNEL_VIDEO) {
                     $payload['ad_spend_amount'] = $this->parseDecimal($sheet->getCell('F' . $r)->getValue(), 0);
                     $payload['gmv_amount'] = $this->parseDecimal($sheet->getCell('G' . $r)->getValue(), 0);
+                    $payload['ad_compensation_amount'] = $liveVideoHasComp
+                        ? $this->parseDecimal($sheet->getCell('H' . $r)->getValue(), 0)
+                        : 0.0;
                     $payload['order_count'] = $this->parseInt($sheet->getCell('I' . $r)->getValue(), 0);
                 } else {
                     $payload['influencer_commission_rate'] = $this->parseRate($sheet->getCell('F' . $r)->getValue(), 0);
-                    $payload['order_count'] = $this->parseInt($sheet->getCell('G' . $r)->getValue(), 0);
+                    if ($influencerHasComp) {
+                        $payload['ad_compensation_amount'] = $this->parseDecimal($sheet->getCell('G' . $r)->getValue(), 0);
+                        $payload['order_count'] = $this->parseInt($sheet->getCell('H' . $r)->getValue(), 0);
+                    } else {
+                        $payload['order_count'] = $this->parseInt($sheet->getCell('G' . $r)->getValue(), 0);
+                    }
                 }
 
                 if ($channel === ProfitCalculatorService::CHANNEL_INFLUENCER) {
@@ -920,7 +943,9 @@ class ProfitCenter extends BaseController
             fputcsv($out, [
                 'entry_date', 'store_name', 'account_name', 'channel_type', 'sale_price_cny', 'product_cost_cny',
                 'cancel_rate', 'platform_fee_rate', 'influencer_commission_rate', 'live_hours', 'wage_hourly_cny',
-                'ad_spend_amount', 'ad_spend_currency', 'ad_spend_cny', 'gmv_amount', 'gmv_currency', 'gmv_cny',
+                'ad_spend_amount', 'ad_spend_currency', 'ad_spend_cny',
+                'ad_compensation_amount', 'ad_compensation_currency', 'ad_compensation_cny',
+                'gmv_amount', 'gmv_currency', 'gmv_cny',
                 'order_count', 'roi', 'net_profit_cny', 'break_even_roi', 'per_order_profit_cny', 'fx_status', 'updated_at',
             ]);
             foreach ($rows as $row) {
@@ -939,6 +964,9 @@ class ProfitCenter extends BaseController
                     (float) ($row['ad_spend_amount'] ?? 0),
                     (string) ($row['ad_spend_currency'] ?? ''),
                     (float) ($row['ad_spend_cny'] ?? 0),
+                    (float) ($row['ad_compensation_amount'] ?? 0),
+                    (string) ($row['ad_compensation_currency'] ?? ''),
+                    (float) ($row['ad_compensation_cny'] ?? 0),
                     (float) ($row['gmv_amount'] ?? 0),
                     (string) ($row['gmv_currency'] ?? ''),
                     (float) ($row['gmv_cny'] ?? 0),
@@ -1042,15 +1070,33 @@ class ProfitCenter extends BaseController
             (float) ($store->default_live_wage_hourly_cny ?? 0)
         ), 2);
         $adSpendAmount = round($this->parseDecimal($payload['ad_spend_amount'] ?? 0, 0), 2);
+        $adCompensationAmount = round($this->parseDecimal($payload['ad_compensation_amount'] ?? 0, 0), 2);
         $gmvAmount = round($this->parseDecimal($payload['gmv_amount'] ?? 0, 0), 2);
         $orderCount = $this->parseInt($payload['order_count'] ?? 0, 0);
 
         $adSpendCurrency = FxRateService::normalizeCurrency((string) ($payload['ad_spend_currency'] ?? ($account->account_currency ?? 'CNY')));
+        $adCompensationCurrency = FxRateService::normalizeCurrency((string) ($payload['ad_compensation_currency'] ?? ($account->account_currency ?? 'CNY')));
         $gmvCurrency = FxRateService::normalizeCurrency((string) ($payload['gmv_currency'] ?? ($account->default_gmv_currency ?? 'CNY')));
 
         $adFx = FxRateService::convertToCny($adSpendAmount, $adSpendCurrency, $entryDate, $tenantId);
+        $adCompensationFx = $adCompensationAmount > 0
+            ? FxRateService::convertToCny($adCompensationAmount, $adCompensationCurrency, $entryDate, $tenantId)
+            : [
+                'amount' => round($adCompensationAmount, 2),
+                'currency' => $adCompensationCurrency,
+                'rate_date' => $entryDate,
+                'rate' => 1.0,
+                'amount_cny' => 0.0,
+                'source' => 'zero_amount',
+                'status' => FxRateService::STATUS_IDENTITY,
+                'is_fallback' => 0,
+            ];
         $gmvFx = FxRateService::convertToCny($gmvAmount, $gmvCurrency, $entryDate, $tenantId);
-        $fxStatus = $this->mergeFxStatus((string) ($adFx['status'] ?? ''), (string) ($gmvFx['status'] ?? ''));
+        $fxStatus = $this->mergeFxStatus(
+            (string) ($adFx['status'] ?? ''),
+            (string) ($adCompensationFx['status'] ?? ''),
+            (string) ($gmvFx['status'] ?? '')
+        );
 
         $calc = ProfitCalculatorService::calculate([
             'channel_type' => $channelType,
@@ -1062,6 +1108,7 @@ class ProfitCenter extends BaseController
             'live_hours' => $liveHours,
             'wage_hourly_cny' => $wageHourly,
             'ad_spend_cny' => (float) ($adFx['amount_cny'] ?? 0),
+            'ad_compensation_cny' => (float) ($adCompensationFx['amount_cny'] ?? 0),
             'gmv_cny' => (float) ($gmvFx['amount_cny'] ?? 0),
             'order_count' => $orderCount,
         ]);
@@ -1077,6 +1124,7 @@ class ProfitCenter extends BaseController
         $fxSnapshot = [
             'base_currency' => 'CNY',
             'ad' => $adFx,
+            'ad_compensation' => $adCompensationFx,
             'gmv' => $gmvFx,
         ];
         $savePayload = [
@@ -1096,6 +1144,9 @@ class ProfitCenter extends BaseController
             'ad_spend_amount' => $adSpendAmount,
             'ad_spend_currency' => $adSpendCurrency,
             'ad_spend_cny' => round((float) ($adFx['amount_cny'] ?? 0), 2),
+            'ad_compensation_amount' => $adCompensationAmount,
+            'ad_compensation_currency' => $adCompensationCurrency,
+            'ad_compensation_cny' => round((float) ($adCompensationFx['amount_cny'] ?? 0), 2),
             'gmv_amount' => $gmvAmount,
             'gmv_currency' => $gmvCurrency,
             'gmv_cny' => round((float) ($gmvFx['amount_cny'] ?? 0), 2),
@@ -1261,13 +1312,13 @@ class ProfitCenter extends BaseController
     {
         $channel = ProfitCalculatorService::normalizeChannelType($channelType);
         if ($channel === ProfitCalculatorService::CHANNEL_LIVE) {
-            return '直播';
+            return 'Live';
         }
         if ($channel === ProfitCalculatorService::CHANNEL_VIDEO) {
-            return '视频';
+            return 'Video';
         }
         if ($channel === ProfitCalculatorService::CHANNEL_INFLUENCER) {
-            return '达人';
+            return 'Influencer';
         }
         return '';
     }
@@ -1315,17 +1366,67 @@ class ProfitCenter extends BaseController
         return $items;
     }
 
-    private function mergeFxStatus(string $adStatus, string $gmvStatus): string
+
+    private function resolveImportSheetChannel($sheet): string
     {
-        $ad = trim($adStatus);
-        $gmv = trim($gmvStatus);
-        if ($ad === FxRateService::STATUS_MISSING || $gmv === FxRateService::STATUS_MISSING) {
+        $title = '';
+        try {
+            $title = trim((string) $sheet->getTitle());
+        } catch (\Throwable $e) {
+            $title = '';
+        }
+        $lower = strtolower($title);
+        if (str_contains($lower, 'live')) {
+            return ProfitCalculatorService::CHANNEL_LIVE;
+        }
+        if (str_contains($lower, 'video')) {
+            return ProfitCalculatorService::CHANNEL_VIDEO;
+        }
+        if (str_contains($lower, 'influencer') || str_contains($lower, 'creator')) {
+            return ProfitCalculatorService::CHANNEL_INFLUENCER;
+        }
+
+        $colCount = 0;
+        try {
+            $colCount = Coordinate::columnIndexFromString((string) $sheet->getHighestColumn());
+        } catch (\Throwable $e) {
+            $colCount = 0;
+        }
+        if ($colCount >= 10) {
+            return ProfitCalculatorService::CHANNEL_LIVE;
+        }
+        if ($colCount >= 9) {
+            return ProfitCalculatorService::CHANNEL_VIDEO;
+        }
+        if ($colCount >= 7) {
+            return ProfitCalculatorService::CHANNEL_INFLUENCER;
+        }
+
+        return '';
+    }
+
+    private function mergeFxStatus(string ...$statuses): string
+    {
+        $normalized = array_values(array_filter(array_map('trim', $statuses), static function ($v) {
+            return $v !== '';
+        }));
+        if ($normalized === []) {
+            return FxRateService::STATUS_EXACT;
+        }
+        if (in_array(FxRateService::STATUS_MISSING, $normalized, true)) {
             return FxRateService::STATUS_MISSING;
         }
-        if ($ad === FxRateService::STATUS_FALLBACK_LATEST || $gmv === FxRateService::STATUS_FALLBACK_LATEST) {
+        if (in_array(FxRateService::STATUS_FALLBACK_LATEST, $normalized, true)) {
             return FxRateService::STATUS_FALLBACK_LATEST;
         }
-        if ($ad === FxRateService::STATUS_IDENTITY && $gmv === FxRateService::STATUS_IDENTITY) {
+        $allIdentity = true;
+        foreach ($normalized as $status) {
+            if ($status !== FxRateService::STATUS_IDENTITY) {
+                $allIdentity = false;
+                break;
+            }
+        }
+        if ($allIdentity) {
             return FxRateService::STATUS_IDENTITY;
         }
         return FxRateService::STATUS_EXACT;

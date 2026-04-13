@@ -1341,3 +1341,155 @@
     - 同店两次 `accountSave` 返回同一 `id`
     - `accountListJson` 同店数量为 1
     - `entrySave` 不传 `account_id` 可成功自动绑定到账户
+
+### 24.15 2026-04-12 广告赔付字段（多币种 + 自动折算 + 并入利润）
+- 背景：
+  - 广告 ROI 低于目标阈值时会产生平台赔付，且赔付并非每天都有，需要按日记录并参与利润核算。
+- 字段设计（`growth_profit_daily_entries`）：
+  - `ad_compensation_amount`：赔付原币金额
+  - `ad_compensation_currency`：赔付币种（支持 `CNY/USD/VND`）
+  - `ad_compensation_cny`：赔付折算为 CNY 后金额
+- 录入与默认规则：
+  - 单条录入与批量录入均新增“广告赔付（金额 + 币种）”输入。
+  - 默认赔付币种跟随广告账户币种（`account_currency`）。
+  - 未填写时按 `0` 处理，不影响原有录入流程。
+- 计算与汇总规则：
+  - 赔付金额按录入日期汇率折算到 CNY（与广告费/GMV 同一汇率服务）。
+  - 日净利润改为：`原公式净利润 + ad_compensation_cny`。
+  - ROI 口径保持不变（仍为 `gmv_cny / ad_spend_cny`）。
+  - 汇总接口 `summaryJson` 增加 `ad_compensation_cny` 聚合，并在 KPI 展示“总广告赔付(CNY)”。
+- 导出与兼容：
+  - `exportCsv` 新增赔付三列（原币金额/币种/CNY）。
+  - 迁移脚本 `run_migration_profit_center.php` 幂等补齐上述三字段，兼容历史库。
+
+### 24.16 2026-04-13 利润中心界面分区重构（导入 Excel / 店铺添加 / 新增录入）
+- 目标：
+  - 对齐 Stitch 利润中心交互思路，突出三个高频操作区：`导入 Excel`、`店铺添加`、`新增录入`。
+  - 保持前后端分离与低耦合：只重构前端模板与文案，不改接口契约。
+- 页面改造（`view/admin/profit_center/index.html`）：
+  - 新增顶部 Hero 区和「核心操作区」三卡片，分别承载：
+    - 模板下载 + 导入入口
+    - 店铺/账户管理入口
+    - 单条录入 + 批量录入入口
+  - 筛选区重排为左右分区（筛选条件/报表动作），KPI 区统一卡片化样式。
+  - 新增录入弹窗重构为四分区：
+    - 基础信息
+    - 利润参数
+    - 金额与币种
+    - 扩展指标
+  - 店铺管理弹窗增加引导提示，并将表单分为「基础参数/费率参数」。
+  - 导入弹窗增加引导提示与文件上传说明区，降低模板映射出错率。
+- i18n 补齐（`public/static/i18n/i18n.ops2.js`）：
+  - 新增利润中心页面键：
+    - `page.profitCenter.heroDesc`
+    - `page.profitCenter.workspaceTitle`
+    - `page.profitCenter.workspaceDesc`
+    - `page.profitCenter.panelImportDesc`
+    - `page.profitCenter.panelStoreDesc`
+    - `page.profitCenter.panelEntryDesc`
+    - `page.profitCenter.importDialogTip`
+    - `page.profitCenter.fileSelectHint`
+    - `page.profitCenter.entrySectionBase`
+    - `page.profitCenter.entrySectionParam`
+    - `page.profitCenter.entrySectionAmount`
+    - `page.profitCenter.entrySectionExtra`
+    - `page.profitCenter.storeDialogTip`
+    - `page.profitCenter.storeSectionBasic`
+    - `page.profitCenter.storeSectionRates`
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.17 2026-04-13 利润中心弹窗居中与像素对齐
+- 目标：
+  - 将利润中心 6 个主弹窗统一为遮罩层居中 + 弹窗垂直居中，避免不同分辨率下出现偏移。
+  - 保持桌面端与移动端一致的边距、标题栏、内容区、底部操作区视觉对齐。
+- 页面实现（`view/admin/profit_center/index.html`）：
+  - 新增统一弹窗样式：
+    - `.pc-dialog-overlay`：遮罩层 `flex` 居中布局，统一内边距。
+    - `.pc-dialog`：`max-width/max-height` 限制，保证小屏不溢出。
+    - `.el-dialog__header/body/footer`：统一上下边界与间距，减少不同弹窗视觉跳动。
+  - 6 个弹窗统一增加：
+    - `class="pc-dialog"`
+    - `modal-class="pc-dialog-overlay"`
+    - `align-center`
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.18 2026-04-13 利润中心弹窗居中修正（Overlay 容器）
+- 问题：
+  - 已开启 `align-center` 后，部分环境下弹窗仍出现“视觉偏上”。
+- 根因：
+  - Element Plus 实际控制定位的是 `.el-overlay-dialog` 容器，仅设置遮罩层 class 不足以稳定垂直居中。
+- 修复：
+  - 在 `view/admin/profit_center/index.html` 增加：
+    - `.pc-dialog-overlay .el-overlay-dialog { display:flex; align-items:center; justify-content:center; }`
+    - `.pc-dialog-overlay .el-dialog { margin:0; top:0; }`
+  - 保留原有 `class="pc-dialog"` 与 `align-center`，形成双保险，兼容不同浏览器/缩放比例。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.19 2026-04-13 利润中心视觉对齐（Stitch 风格 Token 同步）
+- 背景：
+  - 用户反馈页面与设计稿存在明显视觉差异（层级、间距、按钮、卡片风格）。
+- 实施范围（仅前端样式，不改接口）：
+  - 文件：`view/admin/profit_center/index.html`
+  - 同步 Stitch 风格 Token：
+    - 页面背景、卡片圆角、边框、阴影、文本层级、按钮主色梯度。
+    - KPI、工作台卡片、筛选区、表格头部视觉统一。
+    - 弹窗遮罩与主体阴影统一，保留居中双保险（`align-center` + `overlay dialog flex center`）。
+  - 交互层级调整：
+    - 顶部与“新增录入”卡片按钮由 `success/warning` 调整为主次按钮层级（主按钮 `primary`，次按钮默认态）。
+- 兼容性说明：
+  - 仅新增/覆盖页面内 scoped 样式，未改后端接口与数据结构。
+  - Windows 开发与 Linux 部署无差异（纯模板/CSS 调整）。
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）
+
+### 24.20 2026-04-13 利润中心稳定性补丁（模板下载/汇率回退/i18n 键值）
+- 导入模板修复（`app/controller/admin/ProfitCenter.php`）：
+  - 修复模板下载与导入链路中的编码异常，恢复三 sheet 模板输出与导入识别。
+  - 模板新增“广告赔付金额”列（直播/视频/达人），导入时自动读取并参与利润计算。
+  - 导入兼容策略改为“标题 + 列结构”双重识别，避免旧模板标题编码差异导致跳过。
+- 汇率服务增强（`app/service/FxRateService.php`）：
+  - 新增多层请求回退：`Guzzle(严格 TLS) -> Guzzle(宽松 TLS) -> Stream(严格 TLS) -> Stream(宽松 TLS)`。
+  - 解决 Windows 本地证书链缺失场景下汇率获取失败问题，同时保留失败状态打标。
+- i18n 键值补齐（`public/static/i18n/i18n.js` + `public/static/i18n/i18n.ops2.js`）：
+  - 增加利润中心后端错误码映射，避免界面出现 `invalid_entry_date` / `store_account_required` 等原始参数键值。
+  - 新增多语种错误文案：
+    - `page.profitCenter.msg.batchTooLarge`
+    - `page.profitCenter.msg.invalidItem`
+    - `page.profitCenter.msg.invalidEntryDate`
+    - `page.profitCenter.msg.invalidStoreOrAccount`
+    - `page.profitCenter.msg.storeNotFound`
+    - `page.profitCenter.msg.storeAccountRequired`
+    - `page.profitCenter.msg.accountNotFound`
+    - `page.profitCenter.msg.accountStoreMismatch`
+    - `page.profitCenter.msg.invalidChannelType`
+    - `page.profitCenter.msg.calcFailed`
+    - `page.profitCenter.msg.xlsxOnly`
+    - `page.profitCenter.msg.fileUnreadable`
+    - `page.profitCenter.msg.importFailed`
+    - `page.profitCenter.msg.exportFailed`
+    - `page.profitCenter.msg.storeHasAccounts`
+    - `page.profitCenter.msg.storeHasEntries`
+    - `page.profitCenter.msg.accountHasEntries`
+  - 前端缓存版本号升级：`view/admin/common/layout.html` 中 i18n 资源版本更新为 `20260413_i18nfix4`。
+- 自动化测试补充：
+  - 新增利润中心专项冒烟脚本：`scripts/profit_center_smoke.ps1`
+  - 覆盖范围：登录、店铺/账户创建、单条录入、批量录入、汇总、汇率同步、模板下载、单店单账户约束、数据清理。
+- 本轮验证（Windows）：
+  - `php -l app/controller/admin/ProfitCenter.php`
+  - `php -l app/service/FxRateService.php`
+  - `node --check public/static/i18n/i18n.js`
+  - `node --check public/static/i18n/i18n.ops2.js`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`（`SUMMARY => PASS`）
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`（`PASS (21 checks)`）

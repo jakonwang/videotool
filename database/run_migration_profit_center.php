@@ -175,6 +175,9 @@ CREATE TABLE `growth_profit_daily_entries` (
   `ad_spend_amount` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   `ad_spend_currency` CHAR(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY',
   `ad_spend_cny` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  `ad_compensation_amount` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  `ad_compensation_currency` CHAR(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY',
+  `ad_compensation_cny` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   `gmv_amount` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   `gmv_currency` CHAR(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY',
   `gmv_cny` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
@@ -245,6 +248,18 @@ if ($hasTable('growth_profit_daily_entries') && !$hasColumn('growth_profit_daily
 if ($hasTable('growth_profit_daily_entries') && !$hasColumn('growth_profit_daily_entries', 'gmv_cny')) {
     $pdo->exec("ALTER TABLE `growth_profit_daily_entries` ADD COLUMN `gmv_cny` DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER `gmv_currency`");
     echo "  - growth_profit_daily_entries.gmv_cny added\n";
+}
+if ($hasTable('growth_profit_daily_entries') && !$hasColumn('growth_profit_daily_entries', 'ad_compensation_amount')) {
+    $pdo->exec("ALTER TABLE `growth_profit_daily_entries` ADD COLUMN `ad_compensation_amount` DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER `ad_spend_cny`");
+    echo "  - growth_profit_daily_entries.ad_compensation_amount added\n";
+}
+if ($hasTable('growth_profit_daily_entries') && !$hasColumn('growth_profit_daily_entries', 'ad_compensation_currency')) {
+    $pdo->exec("ALTER TABLE `growth_profit_daily_entries` ADD COLUMN `ad_compensation_currency` CHAR(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY' AFTER `ad_compensation_amount`");
+    echo "  - growth_profit_daily_entries.ad_compensation_currency added\n";
+}
+if ($hasTable('growth_profit_daily_entries') && !$hasColumn('growth_profit_daily_entries', 'ad_compensation_cny')) {
+    $pdo->exec("ALTER TABLE `growth_profit_daily_entries` ADD COLUMN `ad_compensation_cny` DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER `ad_compensation_currency`");
+    echo "  - growth_profit_daily_entries.ad_compensation_cny added\n";
 }
 if ($hasTable('growth_profit_stores') && !$hasColumn('growth_profit_stores', 'default_cancel_rate_live')) {
     $pdo->exec("ALTER TABLE `growth_profit_stores` ADD COLUMN `default_cancel_rate_live` DECIMAL(8,4) NOT NULL DEFAULT 0.0000 AFTER `default_product_cost_cny`");
