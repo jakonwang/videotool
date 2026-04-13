@@ -380,9 +380,45 @@ class FxRateService
             return ['ok' => false, 'error' => 'empty_url'];
         }
 
+        $attemptErrors = [];
+
+        $secureGuzzle = self::requestJsonByGuzzle($target, true);
+        if ($secureGuzzle['ok'] ?? false) {
+            return $secureGuzzle;
+        }
+        $attemptErrors[] = (string) ($secureGuzzle['error'] ?? 'guzzle_secure_failed');
+
+        // Windows 本地环境常见 CA 证书链缺失；在安全模式失败后，做一次宽松 TLS 回退，避免 FX 全量失败。
+        $insecureGuzzle = self::requestJsonByGuzzle($target, false);
+        if ($insecureGuzzle['ok'] ?? false) {
+            return $insecureGuzzle;
+        }
+        $attemptErrors[] = (string) ($insecureGuzzle['error'] ?? 'guzzle_insecure_failed');
+
+        $secureStream = self::requestJsonByStream($target, true);
+        if ($secureStream['ok'] ?? false) {
+            return $secureStream;
+        }
+        $attemptErrors[] = (string) ($secureStream['error'] ?? 'stream_secure_failed');
+
+        $insecureStream = self::requestJsonByStream($target, false);
+        if ($insecureStream['ok'] ?? false) {
+            return $insecureStream;
+        }
+        $attemptErrors[] = (string) ($insecureStream['error'] ?? 'stream_insecure_failed');
+
+        return ['ok' => false, 'error' => implode(' | ', array_filter($attemptErrors)) ?: 'request_failed'];
+    }
+
+    /**
+     * @return array{ok:bool,json?:array<string,mixed>,error?:string}
+     */
+    private static function requestJsonByGuzzle(string $url, bool $verifySsl): array
+    {
         try {
             $client = new Client(['timeout' => 8, 'connect_timeout' => 5]);
-            $resp = $client->get($target, [
+            $resp = $client->get($url, [
+                'verify' => $verifySsl,
                 'headers' => [
                     'Accept' => 'application/json',
                     'User-Agent' => 'TikStarOPS-FX/1.0',
@@ -392,10 +428,17 @@ class FxRateService
             if (is_array($json)) {
                 return ['ok' => true, 'json' => $json];
             }
+            return ['ok' => false, 'error' => 'invalid_json'];
         } catch (\Throwable $e) {
-            // Fallback to stream fetch for Windows environments where cURL CA chain is missing.
+            return ['ok' => false, 'error' => (string) $e->getMessage()];
         }
+    }
 
+    /**
+     * @return array{ok:bool,json?:array<string,mixed>,error?:string}
+     */
+    private static function requestJsonByStream(string $url, bool $verifySsl): array
+    {
         if (!function_exists('file_get_contents')) {
             return ['ok' => false, 'error' => 'stream_unavailable'];
         }
@@ -407,11 +450,11 @@ class FxRateService
                 'header' => "Accept: application/json\r\nUser-Agent: TikStarOPS-FX/1.0\r\n",
             ],
             'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
+                'verify_peer' => $verifySsl,
+                'verify_peer_name' => $verifySsl,
             ],
         ]);
-        $raw = @file_get_contents($target, false, $context);
+        $raw = @file_get_contents($url, false, $context);
         if ($raw === false || $raw === '') {
             $err = error_get_last();
             return ['ok' => false, 'error' => (string) ($err['message'] ?? 'stream_fetch_failed')];

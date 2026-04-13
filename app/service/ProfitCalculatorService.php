@@ -54,6 +54,7 @@ class ProfitCalculatorService
         $wageHourly = max(0.0, self::asFloat($input['wage_hourly_cny'] ?? 0));
         $adSpendCny = max(0.0, self::asFloat($input['ad_spend_cny'] ?? 0));
         $gmvCny = max(0.0, self::asFloat($input['gmv_cny'] ?? 0));
+        $adCompensationCny = max(0.0, self::asFloat($input['ad_compensation_cny'] ?? 0));
 
         if ($sale < 0 || $cost < 0) {
             return ['ok' => false, 'message' => 'invalid_cost_or_sale'];
@@ -104,6 +105,8 @@ class ProfitCalculatorService
             $perOrder = $singleProfit;
         }
 
+        $netProfit += $adCompensationCny;
+
         return [
             'ok' => true,
             'message' => 'ok',
@@ -119,6 +122,7 @@ class ProfitCalculatorService
                 'wage_hourly_cny' => round($wageHourly, 2),
                 'wage_cost_cny' => round($wageCost, 2),
                 'ad_spend_cny' => round($adSpendCny, 2),
+                'ad_compensation_cny' => round($adCompensationCny, 2),
                 'gmv_cny' => round($gmvCny, 2),
                 'roi' => round($roi, 6),
                 'net_profit_cny' => round($netProfit, 2),

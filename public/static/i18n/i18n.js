@@ -94,7 +94,24 @@
     'forbidden': 'common.forbidden',
     'unauthorized': 'common.sessionExpired',
     'session_expired': 'common.sessionExpired',
-    'csv_only': 'page.dataImport.csvOnly'
+    'csv_only': 'page.dataImport.csvOnly',
+    'batch_too_large': 'page.profitCenter.msg.batchTooLarge',
+    'invalid_item': 'page.profitCenter.msg.invalidItem',
+    'invalid_entry_date': 'page.profitCenter.msg.invalidEntryDate',
+    'invalid_store_or_account': 'page.profitCenter.msg.invalidStoreOrAccount',
+    'store_not_found': 'page.profitCenter.msg.storeNotFound',
+    'store_account_required': 'page.profitCenter.msg.storeAccountRequired',
+    'account_not_found': 'page.profitCenter.msg.accountNotFound',
+    'account_store_mismatch': 'page.profitCenter.msg.accountStoreMismatch',
+    'invalid_channel_type': 'page.profitCenter.msg.invalidChannelType',
+    'calc_failed': 'page.profitCenter.msg.calcFailed',
+    'xlsx_only': 'page.profitCenter.msg.xlsxOnly',
+    'file_unreadable': 'page.profitCenter.msg.fileUnreadable',
+    'import_failed': 'page.profitCenter.msg.importFailed',
+    'export_failed': 'page.profitCenter.msg.exportFailed',
+    'store_has_accounts': 'page.profitCenter.msg.storeHasAccounts',
+    'store_has_entries': 'page.profitCenter.msg.storeHasEntries',
+    'account_has_entries': 'page.profitCenter.msg.accountHasEntries'
   };
 
   var DICT = {
