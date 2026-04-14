@@ -819,6 +819,7 @@
     align-items: center;
     gap: 16px;
     margin-bottom: 8px;
+    flex-wrap: wrap;
   }
 
   .pc-batch-tip {
@@ -830,6 +831,116 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .pc-batch-mode-switch {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pc-batch-mode-switch .el-radio-button__inner {
+    min-width: 88px;
+  }
+
+  .pc-batch-base-card {
+    border: 1px solid #e6edf8;
+    border-radius: 10px;
+    background: #f8fbff;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .pc-batch-base-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2b40;
+    margin-bottom: 8px;
+  }
+
+  .pc-batch-base-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    align-items: end;
+  }
+
+  .pc-batch-base-item label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  .pc-batch-quick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 440px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .pc-batch-quick-row {
+    border: 1px solid #e8eef8;
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px;
+  }
+
+  .pc-batch-quick-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .pc-batch-quick-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #e8f0ff;
+    color: #1e40af;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .pc-batch-quick-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pc-batch-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .pc-batch-quick-item label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  .pc-batch-quick-item .el-input-number,
+  .pc-batch-quick-item .el-select {
+    width: 100%;
+  }
+
+  .pc-batch-quick-money {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    gap: 8px;
+    align-items: center;
   }
 
   .pc-inline-flex {
@@ -941,6 +1052,11 @@
     .pc-store-layout {
       grid-template-columns: 1fr;
     }
+
+    .pc-batch-base-grid,
+    .pc-batch-quick-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   @media (max-width: 900px) {
@@ -1023,6 +1139,11 @@
     }
 
     .pc-account-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .pc-batch-base-grid,
+    .pc-batch-quick-grid {
       grid-template-columns: 1fr;
     }
   }
@@ -1133,7 +1254,14 @@
       const batchDialogVisible = ref(false);
       const batchSaving = ref(false);
       const batchRowSeed = ref(1);
+      const batchMode = ref('quick');
       const batchRows = ref([]);
+      const batchPreset = reactive({
+        entry_date: today(),
+        store_id: '',
+        account_id: '',
+        channel_type: 'video'
+      });
       const batchResult = reactive({
         total: 0,
         saved_count: 0,
@@ -1205,6 +1333,10 @@
       const importAccountOptions = computed(() => {
         if (!importForm.store_id) return accounts.value;
         return accounts.value.filter((a) => String(a.store_id) === String(importForm.store_id));
+      });
+      const batchPresetAccountOptions = computed(() => {
+        if (!batchPreset.store_id) return accounts.value;
+        return accounts.value.filter((a) => String(a.store_id) === String(batchPreset.store_id));
       });
       const importFileName = computed(() => (importFile.value && importFile.value.name ? String(importFile.value.name) : ''));
       const selectedEntryStore = computed(() => stores.value.find((s) => String(s.id) === String(entryForm.store_id)) || null);
@@ -1435,6 +1567,56 @@
         entryDialogVisible.value = true;
       }
 
+      function ensureBatchPresetAccount() {
+        const opts = !batchPreset.store_id
+          ? accounts.value.slice()
+          : accounts.value.filter((a) => String(a.store_id) === String(batchPreset.store_id));
+        if (!opts.find((a) => String(a.id) === String(batchPreset.account_id))) {
+          batchPreset.account_id = opts.length > 0 ? String(opts[0].id) : '';
+        }
+      }
+
+      function resetBatchPreset(seed) {
+        const base = seed && typeof seed === 'object' ? seed : {};
+        batchPreset.entry_date = String(base.entry_date || filters.date_from || today());
+        batchPreset.store_id = String(base.store_id || '');
+        batchPreset.channel_type = String(base.channel_type || 'video');
+        batchPreset.account_id = String(base.account_id || '');
+
+        if (!batchPreset.store_id && stores.value.length > 0) {
+          batchPreset.store_id = String(stores.value[0].id || '');
+        }
+        ensureBatchPresetAccount();
+      }
+
+      function batchPresetPayload() {
+        return {
+          entry_date: String(batchPreset.entry_date || filters.date_from || today()),
+          store_id: String(batchPreset.store_id || ''),
+          account_id: String(batchPreset.account_id || ''),
+          channel_type: String(batchPreset.channel_type || 'video')
+        };
+      }
+
+      function syncBatchPresetToRows(forceCurrency) {
+        if (batchRows.value.length === 0) return;
+        const preset = batchPresetPayload();
+        batchRows.value.forEach((row) => {
+          row.entry_date = preset.entry_date;
+          row.store_id = preset.store_id;
+          row.account_id = preset.account_id;
+          row.channel_type = preset.channel_type;
+          if (forceCurrency) {
+            applyBatchAccountPreset(row);
+          }
+        });
+      }
+
+      function onBatchPresetStoreChange() {
+        ensureBatchPresetAccount();
+        syncBatchPresetToRows(true);
+      }
+
       function createBatchRow(seed) {
         const base = seed && typeof seed === 'object' ? seed : {};
         const requestedStoreId = base.store_id ? String(base.store_id) : '';
@@ -1481,7 +1663,15 @@
         batchResult.saved_count = 0;
         batchResult.failed_count = 0;
         batchResult.failed_items = [];
-        batchRows.value = [createBatchRow()];
+        batchMode.value = 'quick';
+        resetBatchPreset({
+          entry_date: filters.date_from || today(),
+          store_id: filters.store_id || '',
+          account_id: filters.account_id || '',
+          channel_type: filters.channel_type || 'video'
+        });
+        batchRows.value = [createBatchRow(batchPresetPayload())];
+        syncBatchPresetToRows(true);
       }
 
       function openBatchEntry() {
@@ -1522,18 +1712,31 @@
       }
 
       function addBatchRow(seed) {
-        const base = seed && typeof seed === 'object'
+        const isClone = !!(seed && typeof seed === 'object');
+        const base = isClone
           ? seed
           : (batchRows.value.length > 0 ? batchRows.value[batchRows.value.length - 1] : {});
-        batchRows.value.push(createBatchRow({
-          entry_date: base.entry_date || filters.date_from || today(),
-          store_id: base.store_id || '',
-          account_id: base.account_id || '',
-          channel_type: base.channel_type || 'video',
+        const preset = batchPresetPayload();
+        const usePreset = batchMode.value === 'quick';
+        const row = createBatchRow({
+          entry_date: usePreset ? preset.entry_date : (base.entry_date || filters.date_from || today()),
+          store_id: usePreset ? preset.store_id : (base.store_id || ''),
+          account_id: usePreset ? preset.account_id : (base.account_id || ''),
+          channel_type: usePreset ? preset.channel_type : (base.channel_type || 'video'),
           ad_spend_currency: base.ad_spend_currency || 'USD',
           ad_compensation_currency: base.ad_compensation_currency || 'USD',
-          gmv_currency: base.gmv_currency || 'VND'
-        }));
+          gmv_currency: base.gmv_currency || 'VND',
+          ad_spend_amount: isClone ? Number(base.ad_spend_amount || 0) : 0,
+          ad_compensation_amount: isClone ? Number(base.ad_compensation_amount || 0) : 0,
+          gmv_amount: isClone ? Number(base.gmv_amount || 0) : 0,
+          order_count: isClone ? Number(base.order_count || 0) : 0,
+          live_hours: isClone ? Number(base.live_hours || 0) : 0,
+          raw_metrics_json: isClone ? String(base.raw_metrics_json || '') : ''
+        });
+        batchRows.value.push(row);
+        if (usePreset) {
+          applyBatchAccountPreset(row);
+        }
       }
 
       function removeBatchRow(index) {
@@ -1548,6 +1751,14 @@
         if (!Array.isArray(batchRows.value) || batchRows.value.length === 0) {
           ElMessage.warning(tt('common.invalidParams'));
           return;
+        }
+        if (batchMode.value === 'quick') {
+          const preset = batchPresetPayload();
+          if (!preset.entry_date || !preset.store_id || !preset.account_id || !preset.channel_type) {
+            ElMessage.warning(tt('page.profitCenter.batchPresetInvalid'));
+            return;
+          }
+          syncBatchPresetToRows(true);
         }
         const items = [];
         for (let i = 0; i < batchRows.value.length; i += 1) {
@@ -1925,6 +2136,18 @@
           importForm.account_id = opts.length > 0 ? String(opts[0].id) : '';
         }
       });
+      watch(() => batchPreset.store_id, () => {
+        onBatchPresetStoreChange();
+      });
+      watch(() => batchPreset.account_id, () => {
+        syncBatchPresetToRows(true);
+      });
+      watch(() => batchPreset.entry_date, () => {
+        syncBatchPresetToRows(false);
+      });
+      watch(() => batchPreset.channel_type, () => {
+        syncBatchPresetToRows(false);
+      });
 
       onMounted(async () => {
         if (i18n) i18n.applyDom(document);
@@ -1939,14 +2162,14 @@
       return {
         tt, filters, stores, accounts, entries, total, page, pageSize, loading, summaryLoading, summary,
         fallbackCount, channelOptions, currencyOptions, entryDialogVisible, entrySaving, entryForm,
-        batchDialogVisible, batchSaving, batchRows, batchResult,
+        batchDialogVisible, batchSaving, batchRows, batchResult, batchMode, batchPreset, batchPresetAccountOptions,
         entryAccountOptions, storeDialogVisible, storeLoading, storeForm, accountDialogVisible, accountLoading,
         accountForm, importDialogVisible, importLoading, importForm, importAccountOptions, fxDialogVisible,
         fxLoading, fxSyncing, fxRows, fxForm, formatMoney, formatRoi, formatPercent, fxStatusLabel, fxTagType, fxSourceLabel,
         kpiTrends,
         importFileName, selectedEntryStore, selectedEntryAccount, entryRoiPreview, entryWageCostPreview, activeStoreCount,
         fetchEntries, reloadAll, resetFilter, openEntryCreate, openBatchEntry, openEntryEdit, saveEntry, deleteEntry,
-        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, batchAccountName, onBatchStoreChange, resetBatchDialog,
+        addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, batchAccountName, onBatchStoreChange, onBatchPresetStoreChange, syncBatchPresetToRows, resetBatchDialog,
         fillStoreForm, saveStore, deleteStore, resetStoreForm, fillAccountForm, saveAccount, deleteAccount,
         resetAccountForm, submitImport, fetchFxRates, syncFx, exportCsv, downloadTemplate,
         onImportFileChange: (e) => { importFile.value = e.target && e.target.files ? e.target.files[0] : null; }
@@ -2170,11 +2393,94 @@
         <div class="pc-batch-head">
           <div class="pc-batch-tip">{{ tt('page.profitCenter.batchDialogTip') }}</div>
           <div class="pc-batch-tools">
+            <el-radio-group v-model="batchMode" size="small" class="pc-batch-mode-switch">
+              <el-radio-button label="quick">{{ tt('page.profitCenter.batchModeQuick') }}</el-radio-button>
+              <el-radio-button label="full">{{ tt('page.profitCenter.batchModeFull') }}</el-radio-button>
+            </el-radio-group>
             <el-button class="pc-btn-sm pc-btn-ghost" @click="addBatchRow()">{{ tt('page.profitCenter.batchAddRow') }}</el-button>
+            <el-button v-if="batchMode === 'quick'" class="pc-btn-sm pc-btn-ghost" @click="syncBatchPresetToRows(true)">{{ tt('page.profitCenter.batchApplyBase') }}</el-button>
             <el-button class="pc-btn-sm pc-btn-ghost" @click="resetBatchDialog">{{ tt('common.reset') }}</el-button>
           </div>
         </div>
-        <el-table class="pc-batch-table" :data="batchRows" :row-key="(row) => row.row_key" border size="small" max-height="430">
+        <div v-if="batchMode === 'quick'">
+          <div class="pc-batch-base-card">
+            <div class="pc-batch-base-title">{{ tt('page.profitCenter.batchBaseTitle') }}</div>
+            <div class="pc-batch-base-grid">
+              <div class="pc-batch-base-item">
+                <label>{{ tt('page.profitCenter.colDate') }}</label>
+                <el-date-picker class="pc-full" v-model="batchPreset.entry_date" type="date" value-format="YYYY-MM-DD" />
+              </div>
+              <div class="pc-batch-base-item">
+                <label>{{ tt('page.profitCenter.colStore') }}</label>
+                <el-select class="pc-full" v-model="batchPreset.store_id" filterable @change="onBatchPresetStoreChange">
+                  <el-option v-for="s in stores" :key="'bps'+s.id" :label="s.store_name" :value="String(s.id)" />
+                </el-select>
+              </div>
+              <div class="pc-batch-base-item">
+                <label>{{ tt('page.profitCenter.colAccount') }}</label>
+                <el-select class="pc-full" v-model="batchPreset.account_id" filterable>
+                  <el-option v-for="a in batchPresetAccountOptions" :key="'bpa'+a.id" :label="a.account_name" :value="String(a.id)" />
+                </el-select>
+              </div>
+              <div class="pc-batch-base-item">
+                <label>{{ tt('page.profitCenter.colChannel') }}</label>
+                <el-select class="pc-full" v-model="batchPreset.channel_type">
+                  <el-option v-for="c in channelOptions" :key="'bpc'+c.value" :label="c.label" :value="c.value" />
+                </el-select>
+              </div>
+            </div>
+            <div class="pc-batch-tip pc-mt-8">{{ tt('page.profitCenter.batchQuickHint') }}</div>
+          </div>
+          <div class="pc-batch-quick-list">
+            <div v-for="(row, idx) in batchRows" :key="'bq'+row.row_key" class="pc-batch-quick-row">
+              <div class="pc-batch-quick-head">
+                <span class="pc-batch-quick-index">#{{ idx + 1 }}</span>
+                <div class="pc-batch-quick-actions">
+                  <el-button type="danger" link @click="removeBatchRow(idx)">{{ tt('page.profitCenter.batchRemoveRow') }}</el-button>
+                  <el-button type="primary" link @click="addBatchRow(row)">{{ tt('page.profitCenter.batchCloneRow') }}</el-button>
+                </div>
+              </div>
+              <div class="pc-batch-quick-grid">
+                <div class="pc-batch-quick-item">
+                  <label>{{ tt('page.profitCenter.colAdSpend') }}</label>
+                  <div class="pc-batch-quick-money">
+                    <el-input-number v-model="row.ad_spend_amount" :precision="2" :min="0" />
+                    <el-select v-model="row.ad_spend_currency">
+                      <el-option v-for="c in currencyOptions" :key="'qac'+c" :label="c" :value="c" />
+                    </el-select>
+                  </div>
+                </div>
+                <div class="pc-batch-quick-item">
+                  <label>{{ tt('page.profitCenter.colGmv') }}</label>
+                  <div class="pc-batch-quick-money">
+                    <el-input-number v-model="row.gmv_amount" :precision="2" :min="0" />
+                    <el-select v-model="row.gmv_currency">
+                      <el-option v-for="c in currencyOptions" :key="'qgc'+c" :label="c" :value="c" />
+                    </el-select>
+                  </div>
+                </div>
+                <div class="pc-batch-quick-item">
+                  <label>{{ tt('page.profitCenter.colAdCompensation') }}</label>
+                  <div class="pc-batch-quick-money">
+                    <el-input-number v-model="row.ad_compensation_amount" :precision="2" :min="0" />
+                    <el-select v-model="row.ad_compensation_currency">
+                      <el-option v-for="c in currencyOptions" :key="'qcc'+c" :label="c" :value="c" />
+                    </el-select>
+                  </div>
+                </div>
+                <div class="pc-batch-quick-item">
+                  <label>{{ tt('page.profitCenter.colOrders') }}</label>
+                  <el-input-number class="pc-full" v-model="row.order_count" :precision="0" :min="0" />
+                </div>
+                <div class="pc-batch-quick-item">
+                  <label>{{ tt('page.profitCenter.liveHours') }}</label>
+                  <el-input-number class="pc-full" v-model="row.live_hours" :precision="2" :min="0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <el-table v-else class="pc-batch-table" :data="batchRows" :row-key="(row) => row.row_key" border size="small" max-height="430">
           <el-table-column width="64" align="center" label="#"><template #default="{ $index }">{{ $index + 1 }}</template></el-table-column>
           <el-table-column :label="tt('page.profitCenter.colDate')" width="140">
             <template #default="{ row }">

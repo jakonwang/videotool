@@ -1750,3 +1750,86 @@
   - `php -l view/index/style_catalog.html`
   - `php -l view/index/download.html`
   - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+
+### 15.16 2026-04-13 利润中心批量录入体验升级（快捷批量）
+- 目标：
+  - 解决“批量录入营业额信息显示不全”的问题，提升多店铺/多账户高频录入效率。
+- 修复范围：
+  - `view/admin/profit_center/index.html`
+  - `public/static/i18n/i18n.ops2.js`
+- 交互改造：
+  - 批量录入弹窗新增“双模式”：
+    - `快捷录入`（默认）：顶部统一基础信息（日期/店铺/账户/渠道），下方卡片式多行录入金额与订单，减少横向滚动。
+    - `完整录入`：保留原表格录入模式，用于逐行细项调整。
+  - 快捷录入支持：
+    - 一键“应用基础信息”同步到全部行；
+    - 行级新增/复制/删除；
+    - 保留广告花费、成交金额、广告赔付、订单数、直播时长录入能力。
+- 逻辑与校验：
+  - 新增 `batchPreset` 基础信息模型，并与 `batchRows` 联动同步。
+  - 在快捷模式提交前强校验基础信息完整性；不完整时给出明确提示。
+  - 新行在快捷模式下自动继承基础信息与账户默认币种（广告币种/GMV 币种）。
+- i18n：
+  - 新增并落地 `zh/en/vi` 文案键值：
+    - `page.profitCenter.batchModeQuick`
+    - `page.profitCenter.batchModeFull`
+    - `page.profitCenter.batchBaseTitle`
+    - `page.profitCenter.batchApplyBase`
+    - `page.profitCenter.batchPresetInvalid`
+    - `page.profitCenter.batchQuickHint`
+- 本轮验证（Windows）：
+  - `php -l view/admin/profit_center/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+
+### 15.17 2026-04-14 商品管理分类补齐（列表筛选 + 分类列）
+- 目标：
+  - 补齐 `/admin.php/product` 商品管理页对“分类”的可见与可筛选能力。
+- 修复范围：
+  - `view/admin/product/index.html`
+- 实现内容：
+  - 列表查询参数新增 `category` 传递，复用后端 `listJson` 已有分类过滤能力。
+  - 前端接入 `listJson.data.category_options`，生成分类下拉选项。
+  - 顶部筛选区新增“分类”下拉（可清空）。
+  - 表格新增“分类”列，展示 `category_name`。
+  - 重置筛选时同步清空分类条件。
+- 兼容性说明：
+  - 不改接口结构与数据库，仅前端接线，Windows 开发与 Linux 部署通用。
+- 本轮验证（Windows）：
+  - `php -l view/admin/product/index.html`
+  - `node scripts/check_i18n_keys.js --scope=all`
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+
+## 17. 2026-04-14 仪表盘下载趋势兼容修复
+
+### 17.1 问题现象
+- 仪表盘“近 N 天趋势”中的下载曲线在部分环境始终为 `0`，即使业务端有实际下载行为。
+
+### 17.2 根因
+- 旧实现仅依赖 `download_logs.downloaded_at` 作为下载趋势口径。
+- 在部分部署中下载行为只更新 `videos.is_downloaded`（并触发 `updated_at`），未写入 `download_logs`，导致统计为空。
+
+### 17.3 修复方案（后端服务层）
+- 文件：`app/service/StatsService.php`
+- 新增下载统计回退链路：
+  1. `download_logs.downloaded_at`（优先）
+  2. `videos.downloaded_at` + `is_downloaded=1`
+  3. `videos.updated_at` + `is_downloaded=1`（兜底）
+- 覆盖范围：
+  - `overview()`：今日下载、昨日下载、近7天日均下载
+  - `trends()`：下载趋势数组
+- 接口保持兼容，新增可选调试字段：
+  - `/admin.php/stats/overview` 返回 `download_metric_source`
+  - `/admin.php/stats/trends` 返回 `download_source`
+
+### 17.4 验证命令（Windows）
+1. `php -l app/service/StatsService.php`
+2. `php -l app/controller/admin/Stats.php`
+3. 打开仪表盘接口检查趋势：
+   - `GET /admin.php/stats/trends?days=30`
+   - 确认 `downloaded` 不再因 `download_logs` 缺失而全为 0（有下载行为时）
+
+### 17.5 兼容性
+- 开发环境（Windows）与部署环境（Linux）均可用。
+- 若未来统一落库 `download_logs`，系统会自动使用该主口径，无需改动前端。

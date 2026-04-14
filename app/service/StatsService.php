@@ -35,17 +35,10 @@ class StatsService
             ->count();
 
         // 以 download_logs 作为“下载发生”口径；无日志表时可以退化为 is_downloaded 统计
-        $todayDownloaded = 0;
-        $yesterdayDownloaded = 0;
-        try {
-            $todayDownloaded = (int) Db::name('download_logs')->whereTime('downloaded_at', '>=', $todayStart)->count();
-            $yesterdayDownloaded = (int) Db::name('download_logs')
-                ->whereBetweenTime('downloaded_at', $yesterdayStart, $yesterdayEnd)
-                ->count();
-        } catch (\Throwable $e) {
-            $todayDownloaded = 0;
-            $yesterdayDownloaded = 0;
-        }
+        $todayDownloadMetric = self::resolveDownloadCount($todayStart);
+        $yesterdayDownloadMetric = self::resolveDownloadCount($yesterdayStart, $yesterdayEnd);
+        $todayDownloaded = $todayDownloadMetric['count'];
+        $yesterdayDownloaded = $yesterdayDownloadMetric['count'];
 
         $downloadRate = 0.0;
         if ($videos > 0) {
@@ -70,13 +63,8 @@ class StatsService
         $last7Start = date('Y-m-d 00:00:00', strtotime('-6 day'));
         $last7Uploaded = (int) Db::name('videos')->whereTime('created_at', '>=', $last7Start)->count();
         $avg7Uploaded = round($last7Uploaded / 7, 1);
-        $avg7Downloaded = 0.0;
-        try {
-            $last7Downloaded = (int) Db::name('download_logs')->whereTime('downloaded_at', '>=', $last7Start)->count();
-            $avg7Downloaded = round($last7Downloaded / 7, 1);
-        } catch (\Throwable $e) {
-            $avg7Downloaded = 0.0;
-        }
+        $last7DownloadedMetric = self::resolveDownloadCount($last7Start);
+        $avg7Downloaded = round($last7DownloadedMetric['count'] / 7, 1);
 
         $influencersTotal = 0;
         $styleIndexTotal = 0;
@@ -116,6 +104,7 @@ class StatsService
             'today_downloaded_delta_pct' => $todayDownloadedDeltaPct,
             'avg7_uploaded' => $avg7Uploaded,
             'avg7_downloaded' => $avg7Downloaded,
+            'download_metric_source' => $todayDownloadMetric['source'],
             'asof' => $todayDate,
         ];
     }
@@ -146,20 +135,8 @@ class StatsService
             $uploadedMap[(string) $r['d']] = (int) $r['c'];
         }
 
-        $downloadedMap = [];
-        try {
-            $dRows = Db::name('download_logs')
-                ->fieldRaw("DATE(downloaded_at) as d, COUNT(*) as c")
-                ->whereTime('downloaded_at', '>=', $startDate . ' 00:00:00')
-                ->group('d')
-                ->select()
-                ->toArray();
-            foreach ($dRows as $r) {
-                $downloadedMap[(string) $r['d']] = (int) $r['c'];
-            }
-        } catch (\Throwable $e) {
-            // ignore
-        }
+        $downloadMetric = self::resolveDownloadDailyMap($startDate . ' 00:00:00');
+        $downloadedMap = $downloadMetric['map'];
 
         $uploaded = [];
         $downloaded = [];
@@ -172,6 +149,7 @@ class StatsService
             'labels' => $labels,
             'uploaded' => $uploaded,
             'downloaded' => $downloaded,
+            'download_source' => $downloadMetric['source'],
         ];
     }
 
@@ -371,6 +349,172 @@ class StatsService
         ];
     }
 
+    /**
+     * @return array{count:int, source:string}
+     */
+    private static function resolveDownloadCount(string $startAt, ?string $endAt = null): array
+    {
+        $fallback = ['count' => 0, 'source' => 'none'];
+        foreach (self::downloadMetricCandidates() as $candidate) {
+            $count = self::queryRangeCount(
+                $candidate['table'],
+                $candidate['time_field'],
+                $startAt,
+                $endAt,
+                $candidate['where']
+            );
+            if ($count === null) {
+                continue;
+            }
+
+            if ($fallback['source'] === 'none') {
+                $fallback = ['count' => $count, 'source' => $candidate['source']];
+            }
+
+            if ($count > 0) {
+                return ['count' => $count, 'source' => $candidate['source']];
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * @return array{map:array<string,int>, source:string}
+     */
+    private static function resolveDownloadDailyMap(string $startAt): array
+    {
+        $fallback = ['map' => [], 'source' => 'none'];
+        foreach (self::downloadMetricCandidates() as $candidate) {
+            $map = self::queryDailyCountMap(
+                $candidate['table'],
+                $candidate['time_field'],
+                $startAt,
+                $candidate['where']
+            );
+            if ($map === null) {
+                continue;
+            }
+
+            if ($fallback['source'] === 'none') {
+                $fallback = ['map' => $map, 'source' => $candidate['source']];
+            }
+
+            if (self::mapTotal($map) > 0) {
+                return ['map' => $map, 'source' => $candidate['source']];
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * @return array<int, array{table:string, time_field:string, where:array<string,mixed>, source:string}>
+     */
+    private static function downloadMetricCandidates(): array
+    {
+        return [
+            [
+                'table' => 'download_logs',
+                'time_field' => 'downloaded_at',
+                'where' => [],
+                'source' => 'download_logs.downloaded_at',
+            ],
+            [
+                'table' => 'videos',
+                'time_field' => 'downloaded_at',
+                'where' => ['is_downloaded' => 1],
+                'source' => 'videos.downloaded_at',
+            ],
+            [
+                'table' => 'videos',
+                'time_field' => 'updated_at',
+                'where' => ['is_downloaded' => 1],
+                'source' => 'videos.updated_at',
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $where
+     */
+    private static function queryRangeCount(
+        string $table,
+        string $timeField,
+        string $startAt,
+        ?string $endAt = null,
+        array $where = []
+    ): ?int {
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $timeField)) {
+            return null;
+        }
+
+        try {
+            $query = Db::name($table);
+            foreach ($where as $key => $value) {
+                $query->where($key, $value);
+            }
+
+            if ($endAt === null) {
+                $query->whereTime($timeField, '>=', $startAt);
+            } else {
+                $query->whereBetweenTime($timeField, $startAt, $endAt);
+            }
+
+            return (int) $query->count();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $where
+     * @return array<string,int>|null
+     */
+    private static function queryDailyCountMap(
+        string $table,
+        string $timeField,
+        string $startAt,
+        array $where = []
+    ): ?array {
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $timeField)) {
+            return null;
+        }
+
+        try {
+            $query = Db::name($table)
+                ->fieldRaw("DATE({$timeField}) as d, COUNT(*) as c")
+                ->whereTime($timeField, '>=', $startAt)
+                ->group('d');
+
+            foreach ($where as $key => $value) {
+                $query->where($key, $value);
+            }
+
+            $rows = $query->select()->toArray();
+            $map = [];
+            foreach ($rows as $row) {
+                $date = (string) ($row['d'] ?? '');
+                if ($date === '') {
+                    continue;
+                }
+                $map[$date] = (int) ($row['c'] ?? 0);
+            }
+
+            return $map;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<string,int> $map
+     */
+    private static function mapTotal(array $map): int
+    {
+        return array_sum($map);
+    }
+
     private static function dirSize(string $dir): array
     {
         $bytes = 0;
@@ -397,4 +541,3 @@ class StatsService
         return ['bytes' => $bytes, 'files' => $files];
     }
 }
-
