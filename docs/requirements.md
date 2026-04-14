@@ -2231,3 +2231,23 @@
 3. `node scripts/check_i18n_keys.js --scope=all`
 4. `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
 5. Playwright 爬取侧栏页面，确认无空白页面和前端报错。
+
+## 30. 2026-04-14 商品链接点击复制
+
+### 30.1 需求说明
+- `/admin.php/product` 商品列表中的“商品链接”需要支持点击复制，减少人工选中 URL 的操作。
+- 复制行为不能影响原有打开商品链接的使用场景。
+
+### 30.2 修复范围
+- `view/admin/product/index.html`
+
+### 30.3 实现内容
+- 商品链接列改为“点击链接文本复制 URL”。
+- 右侧保留“打开”按钮，用于在新窗口查看商品链接。
+- 复制逻辑优先使用浏览器 Clipboard API，非安全上下文或旧浏览器回退到 textarea + `execCommand('copy')`。
+- 链接文本使用深灰和低饱和 hover 色，保持后台表格色彩降噪后的统一风格。
+
+### 30.4 验证（Windows）
+1. `php -l view/admin/product/index.html`
+2. `node scripts/check_i18n_keys.js --scope=all`
+3. 浏览器访问 `/admin.php/product`，点击商品链接文本应提示“已复制”，点击“打开”应新窗口打开原 URL。

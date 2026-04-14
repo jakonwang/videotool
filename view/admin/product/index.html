@@ -100,10 +100,37 @@
         text-overflow: ellipsis;
     }
     .url-cell {
-        color: #4b5563;
+        min-width: 0;
+    }
+    .product-link-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+    .product-link-copy {
+        flex: 1 1 auto;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #374151;
+        font: inherit;
+        text-align: left;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        cursor: copy !important;
+    }
+    .product-link-copy:hover,
+    .product-link-copy:focus {
+        color: #0f766e;
+        outline: none;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+    .product-link-cell .el-button {
+        flex: 0 0 auto;
     }
     .admin-product-footer {
         display: flex;
@@ -229,6 +256,40 @@
         window.location.href = '/admin.php/product/edit/' + row.id;
       }
 
+      async function copyGoodsUrl(url) {
+        const value = String(url || '').trim();
+        if (!value) {
+          ElMessage.error(tt('common.copyFail'));
+          return;
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = value;
+            textarea.setAttribute('readonly', 'readonly');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (!copied) throw new Error('copy failed');
+          }
+          ElMessage.success(tt('common.copyDone'));
+        } catch (e) {
+          ElMessage.error(tt('common.copyFail'));
+        }
+      }
+
+      function openGoodsUrl(url) {
+        const value = String(url || '').trim();
+        if (!value) return;
+        window.open(value, '_blank', 'noopener');
+      }
+
       async function doDelete(row) {
         await ElMessageBox.confirm(
           lang === 'en'
@@ -278,6 +339,8 @@
         goAdd,
         goCategoryManage,
         goEdit,
+        copyGoodsUrl,
+        openGoodsUrl,
         doDelete,
         fetchList,
       };
@@ -341,7 +404,15 @@
           <el-table-column :label="lang==='en'?'Product URL':'商品链接'" min-width="320">
             <template #default="{ row }">
               <div v-if="row.goods_url" class="url-cell" :title="row.goods_url">
-                <a :href="row.goods_url" target="_blank" rel="noopener">{{ row.goods_url }}</a>
+                <div class="product-link-cell">
+                  <button
+                    type="button"
+                    class="product-link-copy"
+                    :title="tt('page.product.copyLink') + ': ' + row.goods_url"
+                    @click="copyGoodsUrl(row.goods_url)"
+                  >{{ row.goods_url }}</button>
+                  <el-button size="default" link type="info" @click.stop="openGoodsUrl(row.goods_url)">{{ tt('common.open') }}</el-button>
+                </div>
               </div>
               <span v-else class="text-muted">—</span>
             </template>
