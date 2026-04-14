@@ -1,6 +1,6 @@
 ﻿{extend name="admin/common/layout" /}
 
-{block name="title"}鍟嗗搧{/block}
+{block name="title"}商品{/block}
 {block name="page_title"}{/block}
 {block name="breadcrumb"}{/block}
 {block name="page_actions"}{/block}
@@ -9,7 +9,7 @@
 <style>
     .content-header { display: none; }
 
-    /* High-Density Modern锛堜粎璇ラ〉鐢熸晥锛?*/
+    /* High-Density Modern（仅该页生效） */
     .tp-ep-wrap {
         padding: 24px;
         background: #f4f6f8;
@@ -47,11 +47,11 @@
         align-items: center;
         gap: 12px;
         flex-wrap: nowrap;
-        overflow-x: hidden; /* 榛樿涓嶅嚭鐜版í鍚戞粴鍔ㄦ潯 */
+        overflow-x: hidden; /* 默认不出现横向滚动条 */
         padding-bottom: 0;
         margin-bottom: 12px;
     }
-    /* 浠呭湪绐勫睆鏃跺厑璁告í鍚戞粴鍔紝閬垮厤甯冨眬鏂 */
+    /* 仅在窄屏时允许横向滚动，避免布局断行 */
     @media (max-width: 1200px) {
         .admin-product-filters { overflow-x: auto; padding-bottom: 4px; }
     }
@@ -90,7 +90,7 @@
 {/block}
 
 {block name="script"}
-<!-- Vue3 + ElementPlus锛圕DN锛?-->
+<!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
 <script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
@@ -200,8 +200,8 @@
         await ElMessageBox.confirm(
           lang === 'en'
             ? 'Delete this product? The "product" field of related videos will be cleared.'
-            : '纭畾鍒犻櫎璇ュ晢鍝侊紵鍏宠仈瑙嗛鐨勩€屾墍灞炲晢鍝併€嶅皢娓呯┖銆?,
-          lang === 'en' ? 'Confirm' : '鍒犻櫎纭',
+            : '确定删除该商品？关联视频的「所属商品」将清空。',
+          lang === 'en' ? 'Confirm' : '删除确认',
           { type: 'warning' }
         );
         const resp = await fetch('/admin.php/product/delete/' + row.id, {
@@ -212,12 +212,12 @@
         });
         const json = await resp.json();
         if (json && json.code === 0) {
-          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '宸插垹闄?));
+          ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '已删除'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
           page.value = Math.min(page.value, maxPage);
           fetchList();
         } else {
-          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '鍒犻櫎澶辫触'));
+          ElMessage.error((json && json.msg) || (lang === 'en' ? 'Delete failed' : '删除失败'));
         }
       }
 
@@ -293,9 +293,9 @@
           @sort-change="onSortChange"
         >
           <el-table-column prop="id" label="ID" width="80" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Name':'鍚嶇О'" min-width="220">
+          <el-table-column :label="lang==='en'?'Name':'名称'" min-width="220">
             <template #default="{ row }">
-              <div class="name-cell" :title="row.name">{{ row.name || '鈥? }}</div>
+              <div class="name-cell" :title="row.name">{{ row.name || '—' }}</div>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.product.colCategory')" min-width="140">
@@ -303,27 +303,27 @@
               <div class="name-cell" :title="row.category_name">{{ row.category_name || '--' }}</div>
             </template>
           </el-table-column>
-          <el-table-column :label="lang==='en'?'Product URL':'鍟嗗搧閾炬帴'" min-width="320">
+          <el-table-column :label="lang==='en'?'Product URL':'商品链接'" min-width="320">
             <template #default="{ row }">
               <div v-if="row.goods_url" class="url-cell" :title="row.goods_url">
                 <a :href="row.goods_url" target="_blank" rel="noopener">{{ row.goods_url }}</a>
               </div>
-              <span v-else class="text-muted">鈥?/span>
+              <span v-else class="text-muted">—</span>
             </template>
           </el-table-column>
           <el-table-column prop="total_videos" :label="tt('page.product.totalVideos')" width="110" />
           <el-table-column prop="downloaded_videos" :label="tt('page.product.downloadedVideos')" width="110" />
           <el-table-column prop="undownloaded_videos" :label="tt('page.product.undownloadedVideos')" width="110" />
-          <el-table-column prop="sort_order" :label="lang==='en'?'Sort':'鎺掑簭'" width="110" sortable="custom" />
-          <el-table-column :label="lang==='en'?'Status':'鐘舵€?" width="120">
+          <el-table-column prop="sort_order" :label="lang==='en'?'Sort':'排序'" width="110" sortable="custom" />
+          <el-table-column :label="lang==='en'?'Status':'状态'" width="120">
             <template #default="{ row }">
               <el-tag size="default" effect="light" :type="String(row.status) === '1' ? 'success' : 'info'">
                 {{ String(row.status) === '1' ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" :label="lang==='en'?'Updated':'鏇存柊鏃堕棿'" min-width="180" />
-          <el-table-column :label="lang==='en'?'Actions':'鎿嶄綔'" width="160" fixed="right">
+          <el-table-column prop="updated_at" :label="lang==='en'?'Updated':'更新时间'" min-width="180" />
+          <el-table-column :label="lang==='en'?'Actions':'操作'" width="160" fixed="right">
             <template #default="{ row }">
               <el-button size="default" link type="primary" @click="goEdit(row)">{{ tt('common.edit') }}</el-button>
               <el-button size="default" link type="danger" @click="doDelete(row)">{{ tt('common.delete') }}</el-button>

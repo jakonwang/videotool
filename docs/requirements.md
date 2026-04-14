@@ -1833,3 +1833,25 @@
 ### 17.5 兼容性
 - 开发环境（Windows）与部署环境（Linux）均可用。
 - 若未来统一落库 `download_logs`，系统会自动使用该主口径，无需改动前端。
+
+## 18. 2026-04-14 商品管理页面白屏修复（/admin.php/product）
+
+### 18.1 问题现象
+- 进入 `商品管理` 页面出现白屏，页面无法交互。
+
+### 18.2 根因
+- `view/admin/product/index.html` 的内联脚本存在编码污染，导致字符串引号缺失，触发前端 JavaScript 语法错误并中断渲染。
+- 同时存在一处模板标签损坏（`</span>` 丢失），加剧页面异常。
+
+### 18.3 修复内容
+- 修复删除确认/删除成功文案的字符串闭合，消除 JS 语法错误。
+- 修复商品链接列空值分支的 `</span>` 闭合标签。
+- 同步清理该页可见乱码文案（标题、列名、状态等），恢复正常中文显示。
+
+### 18.4 验证（Windows）
+1. `php -l view/admin/product/index.html`
+2. 解析并检查页面内联 JS：`node --check runtime/tmp_product_inline.js`（临时文件方式）
+3. `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+
+### 18.5 兼容性
+- 仅修改前端模板，不改数据库与接口；Windows 开发与 Linux 部署兼容。
