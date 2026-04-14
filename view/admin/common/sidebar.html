@@ -1,5 +1,4 @@
 {volist name="sidebar_sections" id="sec"}
-<div class="admin-sidenav-section" data-i18n="{$sec.section_i18n}">{$sec.section_i18n}</div>
 {volist name="sec.items" id="item"}
 {if condition="$item.kind == 'link'"}
 <a href="{$item.href}" class="admin-sidenav-link {if condition='$item.active'}active{/if}">

@@ -1855,3 +1855,379 @@
 
 ### 18.5 兼容性
 - 仅修改前端模板，不改数据库与接口；Windows 开发与 Linux 部署兼容。
+
+## 19. 2026-04-14 分类管理入口重构（商品管理可直接维护分类）
+
+### 19.1 目标
+- 解决“只能在达人语境看到分类，商品管理无法高效新增分类”的使用痛点。
+- 将分类管理入口提升到“素材与商品”大模块，支持商品与达人分类统一管理。
+
+### 19.2 变更范围
+- `app/service/ModuleManagerService.php`
+  - `category` 模块依赖调整为独立模块（不再绑定 `creator_crm`）。
+  - 侧边栏分类入口从“达人运营”迁移到“素材与商品”组。
+  - 分类菜单链接统一改为 `/admin.php/category`（不再固定 `type=influencer`）。
+  - 分类角标统计改为全量分类数（`categories`）。
+- `app/middleware/AdminAuthMiddleware.php`
+  - `/category` 路由映射到 `category` 模块，确保菜单与权限模型一致。
+- `view/admin/product/index.html`
+  - 商品管理页顶部新增“分类管理”按钮，直达 `/admin.php/category?type=product`。
+- `view/admin/category/index.html`
+  - 分类页标题/面包屑根据 `type` 动态显示（商品/达人/全部）。
+- `public/static/i18n/i18n.js`
+  - 新增上述交互对应的 `zh/en/vi` 文案键值。
+
+### 19.3 使用说明
+1. 进入 `素材与商品` -> `分类配置`，可统一维护商品与达人分类。
+2. 在 `商品管理` 页面点击 `分类管理`，可直接进入商品分类视图。
+3. 分类页支持：
+   - `/admin.php/category?type=product`：商品分类
+   - `/admin.php/category?type=influencer`：达人分类
+   - `/admin.php/category`：全部分类
+
+### 19.4 验证（Windows 开发）
+1. `php -l app/service/ModuleManagerService.php`
+2. `php -l app/middleware/AdminAuthMiddleware.php`
+3. `php -l view/admin/product/index.html`
+4. `php -l view/admin/category/index.html`
+5. `node scripts/check_i18n_keys.js --scope=all`
+6. `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+
+## 20. 2026-04-14 侧栏轻量化 + 主内容卡片式 Tab 子菜单
+
+### 20.1 目标
+- 保留后台顶层框架（顶部栏 + 侧栏主分组），将业务子菜单迁移为主内容区上方“卡片式 Tab”。
+- 降低左侧菜单层级复杂度，减少切换时的大面积重绘感，提升页面切换流畅度。
+
+### 20.2 设计参考
+- Stitch 项目：`现代界面设计`（ID: `3897242182509863659`）
+- 目标画面：`达人管理 - 卡片式 Tab 版`（Screen ID: `f7c89fd5abda4396a95db3538fb54dff`）
+
+### 20.3 实现范围
+- 文件：
+  - `view/admin/common/layout.html`
+  - `view/admin/product/index.html`
+- 关键实现：
+  - 新增主内容区顶部 Tab 容器：`#adminContentTabsWrap` / `#adminContentTabs`。
+  - 新增卡片式 Tab 样式（含 active 态、badge、横向滚动与移动端缩放）。
+  - 新增运行时脚本：
+    - 从当前激活侧栏分组读取子菜单链接（含二级叶子菜单）；
+    - 自动渲染为主内容区卡片 Tab；
+    - 自动同步当前 active 状态；
+    - 保留 i18n 与 Lucide 图标渲染；
+    - 桌面端将侧栏子菜单收敛为“主分组入口”，点击分组跳转至该组首个子页面。
+
+### 20.4 使用说明
+1. 进入任意包含多个业务子菜单的模块页（如达人运营、增长中台、素材与商品）。
+2. 主内容区标题下方会自动出现该模块的卡片式 Tab。
+3. 点击 Tab 可在同模块页面间快速切换；侧栏保留主分组导航。
+
+### 20.5 兼容性
+- 仅前端布局层改造，不改接口，不改数据库。
+- Windows 开发与 Linux 部署兼容。
+
+## 21. 2026-04-14 高级图标化主侧栏（Stitch 设计落地）
+
+### 21.1 目标
+- 将后台主侧栏调整为 Stitch 设计稿中的 80px 深色图标化主侧栏，减少左侧占用空间。
+- 桌面端侧栏只保留顶层模块图标；业务子菜单通过主内容区顶部横向 Tab 承接。
+- 手机端保持可展开的完整抽屉菜单，保证小屏设备仍可直接访问全部功能。
+
+### 21.2 设计参考
+- Stitch 项目：`现代界面设计`（ID: `3897242182509863659`）
+- 目标画面：`高级图标化主侧栏 - TikStar OPS 2.0`（Screen ID: `6e159098badf43e7beb4d3b876cca102`）
+- 已下载设计资源：
+  - `.codex/stitch/sidebar-design.html`
+  - `.codex/stitch/sidebar-design.png`
+
+### 21.3 实现范围
+- 文件：`view/admin/common/layout.html`
+- 关键实现：
+  - 新增桌面端 80px icon rail 样式，品牌区改为方形 `T` 标识。
+  - 顶层菜单图标使用 48px 点击区，active 态使用蓝色弱背景 + 左侧蓝色指示条。
+  - 桌面端隐藏侧栏文字、角标、页脚与子菜单，保留 tooltip 辅助识别。
+  - 顶层分组在桌面端点击时跳转到该分组第一个可用子页面，避免空点击。
+  - 内容标题区自动生成当前分组的横向 Tab 子菜单，支持 active 状态、i18n 与 Lucide 图标。
+  - 移动端保持顶部栏 + 侧栏抽屉模式，展开后显示完整菜单与子菜单。
+  - 商品管理页补充手机端标题/操作按钮换行规则，避免中文标题被压缩成逐字竖排。
+
+### 21.4 使用说明
+1. 桌面端进入后台后，左侧显示图标化主侧栏；悬停图标可看到模块名称。
+2. 点击顶层模块图标会进入该模块第一个页面。
+3. 当前模块的子页面入口显示在页面标题下方的横向 Tab 中。
+4. 手机端点击顶部菜单按钮打开侧栏，可直接查看完整文字菜单。
+
+### 21.5 兼容性
+- 仅修改前端布局层，不改接口、不改数据库。
+- Windows 开发与 Linux 部署通用。
+
+## 22. 2026-04-14 主界面 Tab 菜单可见性修复
+
+### 22.1 问题现象
+- `/admin.php/influencer` 等多个主界面没有显示顶部 Tab 菜单，图标侧栏收起子菜单后无法切换到同组其他页面。
+- 影响页面包括隐藏全局 `.content-header` 的页面，例如达人名录、商品管理、寻款、终端、系统等页面。
+
+### 22.2 根因
+- 上一版 Tab 容器挂在 `.content-header` 内。
+- 多个业务页面为了使用自定义标题区，会在页面级样式中设置 `.content-header { display: none; }`，导致 Tab 容器也被隐藏。
+- 仅依赖服务端 active 标记时，部分页面也可能无法可靠反推当前所属分组。
+
+### 22.3 修复内容
+- 文件：`view/admin/common/layout.html`
+- 将 `#adminContentTabsWrap` 从 `.content-header` 内提升到 `.content-header` 与 `.content` 之间的全局容器 `#adminContentTabsShell`。
+- 新增 `is-visible` 控制类，只有当前分组存在子菜单时才显示 Tab 区。
+- 增强前端匹配逻辑：
+  - 优先使用 active 子菜单；
+  - 其次按当前 URL 匹配侧栏子菜单链接；
+  - 自动为匹配项补 active 状态；
+  - 渲染 Tab 时按 URL 兜底设置当前 active Tab。
+- 修复桌面图标栏品牌区宽度，强制 `brand-link` 与 `sidebar` 锁定为 80px，避免品牌标识覆盖内容区 Tab。
+
+### 22.4 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. Playwright 批量访问以下页面，确认 `#adminContentTabsShell` 可见且存在 active Tab：
+   - `/admin.php/influencer`
+   - `/admin.php/outreach_workspace`
+   - `/admin.php/product`
+   - `/admin.php/product_search`
+   - `/admin.php/industry_trend`
+   - `/admin.php/platform`
+   - `/admin.php/settings`
+3. 截图验证：
+   - `.codex/stitch/verify-tabs-influencer.png`
+
+### 22.5 兼容性
+- 仅修改全局布局模板，不改接口、不改数据库。
+- Windows 开发与 Linux 部署通用。
+
+## 23. 2026-04-14 精致胶囊 Tab 与侧栏 hover 提示
+
+### 23.1 目标
+- 根据 Stitch “精致 Tab 版”设计稿，将主内容顶部 Tab 从卡片式按钮调整为精致胶囊导航。
+- 左侧图标化主侧栏在 hover 时显示文字提示，避免只看图标无法判断模块含义。
+
+### 23.2 设计参考
+- Stitch 项目：`现代界面设计`（ID: `3897242182509863659`）
+- 目标画面：
+  - `达人管理 - 精致 Tab 版`（Screen ID: `0a58aa8a091f4a5ea8e9a4727a6d9723`）
+  - `利润中心 - 精致 Tab 版`（Screen ID: `7a8219286ed74e83b14ddfd8885a9338`）
+- 已下载设计资源：
+  - `.codex/stitch/tab-influencer-design.html`
+  - `.codex/stitch/tab-influencer-design.png`
+  - `.codex/stitch/tab-profit-design.html`
+  - `.codex/stitch/tab-profit-design.png`
+
+### 23.3 修复内容
+- 文件：`view/admin/common/layout.html`
+- Tab 菜单：
+  - 外层改为浅灰半透明胶囊容器，圆角 `999px`，带轻边框与轻阴影。
+  - active 项改为白底、品牌蓝文字、轻阴影。
+  - 非 active 项改为透明底、灰色文字，hover 时轻白底。
+  - 默认隐藏 Tab 内图标，保留纯文字胶囊结构，与 Stitch 设计稿一致。
+- 侧栏提示：
+  - 桌面端 80px 图标栏增加 `data-tooltip` 伪元素提示。
+  - hover 时在图标右侧显示深色小浮层，含箭头、圆角、阴影。
+  - 桌面端侧栏提升层级并允许横向溢出，避免 tooltip 被裁剪。
+
+### 23.4 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. Playwright 验证：
+   - `/admin.php/product_search`：Tab 为胶囊容器，active 为白底蓝字，Tab 图标隐藏。
+   - hover 左侧图标：右侧显示模块文字提示。
+   - `/admin.php/influencer`：Tab 数量与 active 状态正常。
+3. 截图验证：
+   - `.codex/stitch/verify-refined-tabs-product-search.png`
+   - `.codex/stitch/verify-refined-tabs-influencer.png`
+   - `.codex/stitch/verify-sidebar-tooltip.png`
+
+### 23.5 兼容性
+- 仅修改全局布局模板，不改接口、不改数据库。
+- Windows 开发与 Linux 部署通用。
+
+## 24. 2026-04-14 内容区标题与 Tab 视觉统一
+
+### 24.1 问题现象
+- 部分页面（如 `/admin.php/industry_trend`）使用全局 `.content-header` 显示标题，部分页面（如 `/admin.php/offline_order`、`/admin.php/product_search`）在内容卡片内自定义标题并隐藏全局标题。
+- Tab 菜单独立显示在内容区外层，导致页面之间出现标题位置、字号、背景层级和间距不一致。
+
+### 24.2 修复范围
+- 文件：`view/admin/common/layout.html`
+
+### 24.3 实现内容
+- 将“当前模块标题 + 所属一级菜单 + 子 Tab 菜单”统一收进全局 `admin-workspace-shell` 工作区标题壳。
+- Tab 可见时自动给 `body` 增加 `admin-shell-tabs-active`，并隐藏旧 `.content-header`，避免同一页面出现两个标题体系。
+- 对已有 `admin-modern-card > admin-header-actions` 做兼容收敛：
+  - 隐藏重复的卡片内面包屑；
+  - 隐藏重复的卡片内标题文字；
+  - 保留右侧业务操作按钮（如导出、导入、筛选等）。
+- 统一内容区背景层级：
+  - 页面背景改为稳定浅色线性背景；
+  - `admin-page-container` 不再额外套灰底卡片；
+  - `admin-modern-card` 统一白底、12px 圆角、轻边框与轻阴影。
+
+### 24.4 使用说明
+1. 进入任意存在子菜单 Tab 的后台页面。
+2. 页面顶部统一显示所属一级菜单、小标题和胶囊 Tab。
+3. 业务内容统一从白色内容卡片开始，页面内不再重复显示同一标题。
+
+### 24.5 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. Playwright 对比验证：
+   - `/admin.php/offline_order`
+   - `/admin.php/industry_trend`
+   - `/admin.php/product_search`
+3. 确认三类页面的标题位置、Tab 位置、字号和内容卡片背景一致。
+
+## 25. 2026-04-14 单行标题栏与仪表盘标题收敛
+
+### 25.1 问题现象
+- 仪表盘页面同时显示全局标题“仪表盘”和页面内部大标题“系统指挥中心”，标题层级显得突兀。
+- 全局 Tab 区为上下结构，和 Stitch 设计稿中“左侧模块名 + 中间胶囊 Tab + 右侧操作”的单行顶部栏不一致。
+
+### 25.2 修复范围
+- 文件：`view/admin/common/layout.html`
+
+### 25.3 实现内容
+- 将 `admin-workspace-shell` 调整为单行网格结构：
+  - 左侧：模块图标 + 模块标题；
+  - 中间：胶囊 Tab 菜单，居中显示；
+  - 右侧：承接原 `page_actions` 的操作区。
+- 标题壳改为所有后台页面常驻：
+  - 有子菜单时显示 Tab；
+  - 无子菜单时只显示当前页面标题，并隐藏旧 `.content-header`。
+- 仪表盘在无 Tab 状态下隐藏页面内部大标题，保留同步状态与操作按钮，避免双标题。
+
+### 25.4 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. Playwright 验证：
+   - `/admin.php`：只显示一个统一标题栏，仪表盘内部不再重复大标题；
+   - `/admin.php/profit_center` 或同类页面：Tab 与设计稿一样在同一行居中；
+   - 移动端标题栏不横向溢出。
+
+## 26. 2026-04-14 单行标题栏语言与退出入口补齐
+
+### 26.1 问题现象
+- 桌面端采用图标化侧栏后，旧顶部栏被隐藏。
+- 语言切换和退出登录原本分别在旧顶部栏和侧栏底部，导致新单行标题栏下桌面端找不到入口。
+
+### 26.2 修复范围
+- 文件：`view/admin/common/layout.html`
+
+### 26.3 实现内容
+- 在 `admin-workspace-actions` 右侧操作区增加常驻入口：
+  - 当前登录用户名；
+  - 语言切换：`ZH / EN / VI`；
+  - 退出登录按钮。
+- 新增独立按钮 ID：
+  - `btnLangZhShell`
+  - `btnLangEnShell`
+  - `btnLangViShell`
+  - `btnAdminLogoutShell`
+- 复用原有 `AppI18n` 与退出登录逻辑，避免新增后端接口。
+- 保留旧移动端顶栏和侧栏底部入口，保证手机抽屉菜单仍可操作。
+
+### 26.4 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. `node scripts/check_i18n_keys.js --scope=all`
+3. Playwright 验证标题栏右侧显示语言切换与退出按钮，点击语言按钮可切换 active 状态。
+
+## 27. 2026-04-14 后台全局视觉体系统一
+
+### 27.1 问题现象
+- 各后台页面存在独立页面壳和局部卡片样式，例如 `.tp-ep-wrap`、`.tp-cat-wrap`、`.ext-wrap`、`.admin-cache-card`、`.db-card` 等，导致背景、卡片圆角、阴影和内边距不一致。
+- Bootstrap 与 Element Plus 的按钮、表格、表单、弹窗样式分别被页面覆盖，视觉层级和颜色体系不统一。
+- 部分页面标题、面包屑、提示文字字号和颜色差异明显，影响后台整体一致性。
+
+### 27.2 修复范围
+- 文件：`view/admin/common/layout.html`
+
+### 27.3 实现内容
+- 新增 OPS 2.0 全局视觉变量：
+  - 页面背景、卡片白底、文字色、弱文字色、边框、阴影、圆角；
+  - 主按钮、成功、警告、危险、信息按钮语义色。
+- 统一常见页面壳：
+  - `.admin-page-container`
+  - `.tp-ep-wrap`
+  - `.tp-cat-wrap`
+  - `.tp-mt-wrap`
+  - `.ext-wrap`
+  - `.auto-dm-wrap`
+  - `.dashboard-shell`
+- 统一常见内容卡片和统计卡片：
+  - `admin-modern-card`
+  - `admin-cat-card`
+  - `admin-cache-card`
+  - `ext-card`
+  - `auto-dm-card`
+  - `db-card`
+  - `stat-card`
+  - `admin-inf-card`、`admin-product-card`、`admin-dev-card`、`admin-dist-card`、`admin-log-card`、`admin-mt-card`、`admin-plat-card`
+  - `pc-panel`、`pc-kpi-card`、`pc-table-panel`、`pc-summary-card`
+- 统一 Bootstrap 与 Element Plus 的按钮、输入框、选择框、表格、标签、分页、弹窗和遮罩层风格。
+- 弹窗统一为白底、轻边框、轻阴影、8/12px 圆角体系，按钮使用同一语义色板。
+
+### 27.4 使用说明
+1. 新增后台页面时优先使用公共 `admin-page-container` + `admin-modern-card`。
+2. 页面内不要再定义整页灰底、独立大圆角卡片、独立按钮色板或弹窗色板。
+3. 业务组件需要语义按钮时使用标准类型：
+   - Bootstrap：`btn-primary`、`btn-success`、`btn-warning`、`btn-danger`、`btn-secondary`
+   - Element Plus：`type="primary|success|warning|danger|info"`
+
+### 27.5 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. `node scripts/check_i18n_keys.js --scope=all`
+3. `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+4. Playwright 抽样验证：
+   - `/admin.php`
+   - `/admin.php/influencer`
+   - `/admin.php/product_search`
+   - `/admin.php/profit_center`
+   - `/admin.php/cache`
+
+## 28. 2026-04-14 表格链接与标签色彩降噪
+
+### 28.1 问题现象
+- 表格内链接、`link` 按钮、`primary plain` 按钮和默认 `el-tag` 都使用蓝色，达人名录等页面出现大面积蓝字。
+- 蓝色过多导致主操作、联系人链接、状态标签和普通文本之间层级不清晰。
+
+### 28.2 修复范围
+- 文件：`view/admin/common/layout.html`
+
+### 28.3 实现内容
+- 保留主按钮和当前选中态使用蓝色。
+- 表格内普通链接默认改为深灰，hover 时才使用蓝色。
+- WhatsApp / Zalo 链接使用低饱和语义色区分，避免整列都是蓝色。
+- `primary plain` 按钮默认改为白底深灰文字，hover 时再体现蓝色。
+- 默认 `el-tag` 改为灰色标签；`success / warning / danger / info` 分别使用低饱和绿、琥珀、红、灰。
+
+### 28.4 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. Playwright 或浏览器检查 `/admin.php/influencer`：
+   - 表格正文不再大面积蓝字；
+   - 主按钮仍保持蓝色；
+   - 标签和链接有语义色但不过度抢眼。
+
+## 29. 2026-04-14 后台可见性与仪表盘色彩修复
+
+### 29.1 问题现象
+- 仪表盘“下载率”高亮卡被全局卡片白底覆盖后，内部文字仍使用白色，导致看起来像空白卡片。
+- `/admin.php/auto_dm` 自动私信页面存在 Vue slot 空参数解构问题，页面渲染失败。
+- `/admin.php/ops_center` 嵌入 iframe 后，AdminLTE IFrame 插件读取空配置并抛出 `autoIframeMode` 错误。
+
+### 29.2 修复范围
+- `view/admin/common/layout.html`
+- `view/admin/auto_dm/index.html`
+
+### 29.3 实现内容
+- 仪表盘高亮 KPI 卡改为白底浅灰渐变、左侧蓝色强调线，文字统一深色，避免白底白字。
+- 全局正文、表格、表单、弹窗文字进一步统一为深灰体系；弱信息使用低对比灰色。
+- 按钮高度、间距、表格操作按钮间距统一，移动端按钮触控高度不低于 36px。
+- 自动私信表格 slot 改为 `rowOf(scope)` 安全读取，避免空 slot 参数导致整页报错。
+- 公共布局写入 AdminLTE IFrame 默认配置，关闭自动 iframe 模式，避免运维中心 iframe 子页面报错。
+
+### 29.4 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. `php -l view/admin/auto_dm/index.html`
+3. `node scripts/check_i18n_keys.js --scope=all`
+4. `powershell -ExecutionPolicy Bypass -File scripts/ops2_smoke.ps1`
+5. Playwright 爬取侧栏页面，确认无空白页面和前端报错。

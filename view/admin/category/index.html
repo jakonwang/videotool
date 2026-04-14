@@ -22,12 +22,12 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
+<script src="/static/i18n/i18n.js?v=20260414_category_entry1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
   {literal}
-  const { createApp, ref, reactive, onMounted } = Vue;
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
   const { ElMessage, ElMessageBox } = ElementPlus;
   const i18n = window.AppI18n;
   const lang = i18n ? i18n.getLang('zh') : 'zh';
@@ -143,11 +143,23 @@
       function typeLabel(t) {
         return t === 'influencer' ? tt('page.category.typeInfluencer') : tt('page.category.typeProduct');
       }
+      const breadcrumbKey = computed(() => {
+        if (fixedType === 'product') return 'page.category.breadcrumbProduct';
+        if (fixedType === 'influencer') return 'page.category.breadcrumbInfluencer';
+        return 'page.category.breadcrumbAll';
+      });
+      const titleKey = computed(() => {
+        if (fixedType === 'product') return 'page.category.titleProduct';
+        if (fixedType === 'influencer') return 'page.category.titleInfluencer';
+        return 'page.category.titleAll';
+      });
       onMounted(() => fetchList());
 
       return {
         tt, loading, items, total, page, pageSize, query, dlg, saving, form,
         fixedType,
+        breadcrumbKey,
+        titleKey,
         fetchList, onSearch, onReset, openAdd, openEdit, saveForm, delRow, typeLabel
       };
     },
@@ -155,8 +167,8 @@
       <div class="admin-cat-card">
         <div class="admin-cat-header">
           <div>
-            <div class="admin-cat-breadcrumb">{{ tt('page.category.breadcrumb') }}</div>
-            <div class="admin-cat-title">{{ tt('page.category.title') }}</div>
+            <div class="admin-cat-breadcrumb">{{ tt(breadcrumbKey) }}</div>
+            <div class="admin-cat-title">{{ tt(titleKey) }}</div>
           </div>
           <el-button type="primary" @click="openAdd">{{ tt('page.category.add') }}</el-button>
         </div>

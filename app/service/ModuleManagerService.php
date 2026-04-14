@@ -107,7 +107,7 @@ class ModuleManagerService
                 'version' => '1.0.0',
                 'default_enabled' => 1,
                 'can_uninstall' => 0,
-                'dependencies' => ['creator_crm'],
+                'dependencies' => [],
                 'min_role' => self::ROLE_OPERATOR,
             ],
             'influencer' => [
@@ -949,7 +949,7 @@ class ModuleManagerService
             'influencer_pending' => self::safeCount('influencers', ['status' => 0]),
             'offline_order_pending' => self::safeCount('offline_orders', ['status' => 0]),
             'creator_links_total' => self::safeCount('product_links'),
-            'creator_category_total' => self::safeCount('categories', ['type' => 'influencer']),
+            'category_total' => self::safeCount('categories'),
             'template_total' => self::safeCount('message_templates', ['status' => 1]),
             'outreach_pending' => self::safeCount('influencer_outreach_tasks', ['task_status' => 0]),
             'auto_dm_pending' => self::safeCount('auto_dm_tasks', ['task_status' => 0]),
@@ -985,6 +985,36 @@ class ModuleManagerService
     }
 
     /**
+     * Find the first visible leaf link href from a menu tree.
+     *
+     * @param array<int, array<string, mixed>> $items
+     */
+    private static function firstLeafHref(array $items): string
+    {
+        foreach ($items as $item) {
+            if (!is_array($item) || !empty($item['hidden'])) {
+                continue;
+            }
+            $kind = (string) ($item['kind'] ?? 'link');
+            if ($kind === 'link') {
+                $href = trim((string) ($item['href'] ?? ''));
+                if ($href !== '') {
+                    return $href;
+                }
+                continue;
+            }
+            $children = $item['children'] ?? null;
+            if (is_array($children)) {
+                $href = self::firstLeafHref($children);
+                if ($href !== '') {
+                    return $href;
+                }
+            }
+        }
+        return '';
+    }
+
+    /**
      * Build enabled sidebar menus for current role and controller/action context.
      *
      * @return array<int, array<string, mixed>>
@@ -1013,7 +1043,7 @@ class ModuleManagerService
         $profitCenterEnabled = $growthEnabled && $isEnabled('profit_center', 1);
 
         $creatorEnabled = $isEnabled('creator_crm');
-        $creatorCategoryEnabled = $creatorEnabled && $isEnabled('category', 1);
+        $categoryEnabled = $isEnabled('category', 1);
         $creatorInfluencerEnabled = $creatorEnabled && $isEnabled('influencer', 1);
         $creatorOutreachEnabled = $creatorEnabled && $isEnabled('outreach_workspace', 1);
         $creatorAutoDmEnabled = $creatorEnabled && $isEnabled('auto_dm_campaign', 1);
@@ -1063,14 +1093,15 @@ class ModuleManagerService
             $menus[] = [
                 'section_i18n' => 'admin.menu.groupSearch',
                 'items' => [
-                    [
-                        'kind' => 'group',
-                        'id' => 'search',
-                        'icon' => 'search',
-                        'text_i18n' => 'admin.menu.groupSearch',
-                        'expanded' => self::menuTreeHasActive($searchChildren),
-                        'children' => $searchChildren,
-                    ],
+                        [
+                            'kind' => 'group',
+                            'id' => 'search',
+                            'href' => self::firstLeafHref($searchChildren),
+                            'icon' => 'search',
+                            'text_i18n' => 'admin.menu.groupSearch',
+                            'expanded' => self::menuTreeHasActive($searchChildren),
+                            'children' => $searchChildren,
+                        ],
                 ],
             ];
         }
@@ -1135,6 +1166,7 @@ class ModuleManagerService
                         [
                             'kind' => 'group',
                             'id' => 'growth',
+                            'href' => self::firstLeafHref($growthChildren),
                             'icon' => 'bar-chart-3',
                             'text_i18n' => 'admin.menu.growthHubMenu',
                             'expanded' => self::menuTreeHasActive($growthChildren),
@@ -1197,16 +1229,6 @@ class ModuleManagerService
                     'badge' => ($badges['sample_pending'] ?? 0) > 0 ? (string) $badges['sample_pending'] : '',
                 ];
             }
-            if ($creatorCategoryEnabled) {
-                $creatorChildren[] = [
-                    'kind' => 'link',
-                    'href' => '/admin.php/category?type=influencer',
-                    'icon' => 'tag',
-                    'text_i18n' => 'admin.menu.category',
-                    'active' => self::controllerIs($currentController, 'category'),
-                    'badge' => ($badges['creator_category_total'] ?? 0) > 0 ? (string) $badges['creator_category_total'] : '',
-                ];
-            }
             if ($creatorTemplateEnabled) {
                 $creatorChildren[] = [
                     'kind' => 'link',
@@ -1235,6 +1257,7 @@ class ModuleManagerService
                         [
                             'kind' => 'group',
                             'id' => 'creator',
+                            'href' => self::firstLeafHref($creatorChildren),
                             'icon' => 'users',
                             'text_i18n' => 'admin.menu.groupCreatorMenu',
                             'expanded' => self::menuTreeHasActive($creatorChildren),
@@ -1271,12 +1294,23 @@ class ModuleManagerService
                     'badge' => ($badges['product_total'] ?? 0) > 0 ? (string) $badges['product_total'] : '',
                 ],
             ];
+            if ($categoryEnabled) {
+                $materialChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/category',
+                    'icon' => 'tag',
+                    'text_i18n' => 'admin.menu.category',
+                    'active' => self::controllerIs($currentController, 'category'),
+                    'badge' => ($badges['category_total'] ?? 0) > 0 ? (string) $badges['category_total'] : '',
+                ];
+            }
             $menus[] = [
                 'section_i18n' => 'admin.menu.material',
                 'items' => [
                     [
                         'kind' => 'group',
                         'id' => 'material',
+                        'href' => self::firstLeafHref($materialChildren),
                         'icon' => 'folder',
                         'text_i18n' => 'admin.menu.materialMenu',
                         'expanded' => self::menuTreeHasActive($materialChildren),
@@ -1309,6 +1343,7 @@ class ModuleManagerService
                     [
                         'kind' => 'group',
                         'id' => 'terminal',
+                        'href' => self::firstLeafHref($terminalChildren),
                         'icon' => 'monitor-smartphone',
                         'text_i18n' => 'admin.menu.terminal',
                         'expanded' => self::menuTreeHasActive($terminalChildren),
@@ -1372,6 +1407,7 @@ class ModuleManagerService
                     [
                         'kind' => 'group',
                         'id' => 'system',
+                        'href' => self::firstLeafHref($systemChildren),
                         'icon' => 'settings',
                         'text_i18n' => 'admin.menu.system',
                         'expanded' => self::menuTreeHasActive($systemChildren),

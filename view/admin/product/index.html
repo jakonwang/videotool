@@ -40,7 +40,12 @@
         color: #111827;
         line-height: 28px;
     }
-    .admin-product-addbtn .el-button { border-radius: 6px; }
+    .admin-product-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .admin-product-actions .el-button { border-radius: 6px; }
 
     .admin-product-filters {
         display: flex;
@@ -54,6 +59,30 @@
     /* 仅在窄屏时允许横向滚动，避免布局断行 */
     @media (max-width: 1200px) {
         .admin-product-filters { overflow-x: auto; padding-bottom: 4px; }
+    }
+    @media (max-width: 576px) {
+        .tp-ep-wrap {
+            padding: 16px 12px;
+        }
+        .admin-product-card {
+            padding: 16px;
+        }
+        .admin-product-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+        .admin-product-header > div:first-child {
+            min-width: 0;
+        }
+        .admin-product-title {
+            word-break: keep-all;
+            overflow-wrap: anywhere;
+        }
+        .admin-product-actions {
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
     }
     .admin-product-filter-actions {
         display: flex;
@@ -92,7 +121,7 @@
 {block name="script"}
 <!-- Vue3 + ElementPlus（CDN） -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260407_sidebar_menu1"></script>
+<script src="/static/i18n/i18n.js?v=20260414_category_entry1"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
 <script>
@@ -192,6 +221,10 @@
         window.location.href = '/admin.php/product/add';
       }
 
+      function goCategoryManage() {
+        window.location.href = '/admin.php/category?type=product';
+      }
+
       function goEdit(row) {
         window.location.href = '/admin.php/product/edit/' + row.id;
       }
@@ -243,6 +276,7 @@
         onReset,
         onSortChange,
         goAdd,
+        goCategoryManage,
         goEdit,
         doDelete,
         fetchList,
@@ -255,8 +289,9 @@
             <div class="admin-product-breadcrumb">${tt('page.product.breadcrumb')}</div>
             <div class="admin-product-title">${tt('page.product.title')}</div>
           </div>
-          <div class="admin-product-addbtn">
-            <el-button size="default" type="primary" style="border-radius:6px" @click="goAdd">${tt('page.product.add')}</el-button>
+          <div class="admin-product-actions">
+            <el-button size="default" @click="goCategoryManage">${tt('page.product.actionCategoryManager')}</el-button>
+            <el-button size="default" type="primary" @click="goAdd">${tt('page.product.add')}</el-button>
           </div>
         </div>
 

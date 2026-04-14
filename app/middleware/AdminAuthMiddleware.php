@@ -102,7 +102,10 @@ class AdminAuthMiddleware
         if (preg_match('#^/profit_center(/|$)#i', $path)) {
             return 'profit_center';
         }
-        if (preg_match('#^/(influencer|outreach_workspace|sample|category|message_template|distribute|mobile_task|mobile_device|mobile_agent|auto_dm)(/|$)#i', $path)) {
+        if (preg_match('#^/category(/|$)#i', $path)) {
+            return 'category';
+        }
+        if (preg_match('#^/(influencer|outreach_workspace|sample|message_template|distribute|mobile_task|mobile_device|mobile_agent|auto_dm)(/|$)#i', $path)) {
             return 'creator_crm';
         }
         if (preg_match('#^/(video|product)(/|$)#i', $path)) {
