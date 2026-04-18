@@ -49,7 +49,7 @@
           p.set('page_size', String(pageSize.value));
           if (query.keyword) p.set('keyword', query.keyword);
           if (query.platform) p.set('platform', query.platform);
-          const res = await fetch('/admin.php/ad_insight/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/ad_insight/list?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           list.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];

@@ -2696,3 +2696,86 @@
 - 验证（Windows）：
   1. `php -l view/admin/common/layout.html`
   2. 刷新后台页面，确认一级菜单分组标题不再发暗。
+
+## 2026-04-18 一步到位无兼容层改造（全量路由清理 + 同日硬切）
+
+### 1) 路由标准化（不保留旧入口）
+
+- 文件：`route/admin.php`
+- 改造规则：
+  - 删除全部 `*Json` 路径别名，仅保留标准路径（如 `.../list`、`.../summary`、`.../sourceList`）。
+  - 直播选款仅保留 query 风格详情接口：
+    - `GET /admin.php/product_search/live/styleDetail`
+    - `POST /admin.php/product_search/live/styleImageUpdate`
+  - 移除旧路径式详情兼容：
+    - `/admin.php/product_search/live/styles/{style_code}`
+    - `/admin.php/product_search/live/styles/{style_code}/image`
+- 结果：每个能力只保留一个 URL，旧 URL 直接不可用（404/路由未命中）。
+
+### 2) 前端与客户端调用硬切新路由
+
+- 改造范围：
+  - `view/admin/*` 各模块页面内 fetch URL 全量改为标准路由（不再使用 `listJson/summaryJson/...`）。
+  - `public/static/admin/live_style_analysis.js` 全量切换为：
+    - `/product_search/live/store/list`
+    - `/product_search/live/catalog/list`
+    - `/product_search/live/sessions`
+    - `/product_search/live/unmatched`
+    - `/product_search/live/rankings`
+    - `/product_search/live/styleDetail`
+  - Android 客户端：
+    - `android_app/.../SessionApiClient.java` 改为 `/mobile_task/list`、`/mobile_device/list`。
+- 缓存强刷：
+  - `view/admin/product_search/live.html` 脚本版本升级为 `20260418_live_style_catalog_ops16_hardcut`。
+
+### 3) 店铺币种域逻辑收敛
+
+- 新增服务：`app/service/StoreCurrencyService.php`
+  - 统一 `default_gmv_currency` 规范化（默认 `VND`、按系统支持币种校验）。
+  - 统一店铺币种映射加载（店铺默认币种 -> 账号币种回退）。
+  - 统一店铺保存后账号默认币种同步。
+- 控制器改造：
+  - `ProfitCenter` 与 `ProductSearchLive` 均改为调用 `StoreCurrencyService`，不再各自维护一套币种校验/同步实现。
+
+### 4) 租户能力去重
+
+- 新增服务：`app/service/TenantScopeService.php`
+  - 统一 `tenant_id` 识别、注入与 query 过滤。
+- 收敛改造：
+  - `app/BaseController.php` 租户方法统一委托到 `TenantScopeService`。
+  - `DataImportService`、`DataImportDispatchService`、`MessageOutreachService`、`AutoDmService` 去除各自重复 tenant 过滤实现，统一复用。
+
+### 5) 迁移与运维治理增强
+
+- 文件：`app/service/OpsMaintenanceService.php`
+- 改造内容：
+  - 迁移脚本清单改为“自动发现 + 显式优先顺序”。
+  - 补齐遗漏优先脚本：
+    - `run_migration_live_product_analysis.php`
+    - `run_migration_auto_dm_hotfix.php`
+  - `status()` 增加完整性指标：
+    - `checksum_current`
+    - `checksum_history`
+    - `checksum_match`
+    - `integrity_missing_file_count`
+    - `integrity_checksum_mismatch_count`
+
+### 6) 发布与验证（Windows 开发 / Linux 部署）
+
+1. 语法与脚本检查（Windows）：
+   - `php -l route/admin.php`
+   - `php -l app/service/TenantScopeService.php`
+   - `php -l app/service/StoreCurrencyService.php`
+   - `php -l app/controller/admin/ProductSearchLive.php`
+   - `php -l app/controller/admin/ProfitCenter.php`
+   - `php -l app/service/OpsMaintenanceService.php`
+   - `php -l app/service/DataImportService.php`
+   - `php -l app/service/DataImportDispatchService.php`
+   - `php -l app/service/MessageOutreachService.php`
+   - `php -l app/service/AutoDmService.php`
+   - `node --check public/static/admin/live_style_analysis.js`
+2. 同日硬切发布：
+   - 后端和前端同版本上线（无灰度、无旧路由兼容）。
+3. 发布后立即清缓存：
+   - `runtime/cache/*`
+   - `runtime/temp/*`

@@ -209,7 +209,7 @@
           params.set('page_size', String(pageSize.value));
           if (keyword.value.trim()) params.set('keyword', keyword.value.trim());
 
-          const res = await fetch('/admin.php/cache/listJson?' + params.toString(), { credentials: 'same-origin' });
+          const res = await fetch('/admin.php/cache/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error(respMsg(json, 'common.loadingFailed'));
 

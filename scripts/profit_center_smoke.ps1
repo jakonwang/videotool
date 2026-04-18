@@ -296,7 +296,7 @@ try {
     } -Session $ws
     Assert-Ok 'profit.entryBatchSave' $batch
 
-    $summary = Invoke-ApiJson -Method 'GET' -Path ("/admin.php/profit_center/summaryJson?date_from=$today&date_to=$today") -Session $ws
+    $summary = Invoke-ApiJson -Method 'GET' -Path ("/admin.php/profit_center/summary?date_from=$today&date_to=$today") -Session $ws
     Assert-Ok 'profit.summaryJson' $summary
     if ([int]($summary.data.kpi.entry_count) -lt 3) {
         throw 'summary entry_count is smaller than expected'
@@ -306,7 +306,7 @@ try {
     }
     Write-Output ('PASS => profit.summary.kpi entry_count=' + [string]$summary.data.kpi.entry_count)
 
-    $entryList = Invoke-ApiJson -Method 'GET' -Path ("/admin.php/profit_center/entryListJson?date_from=$today&date_to=$today&page=1&page_size=50") -Session $ws
+    $entryList = Invoke-ApiJson -Method 'GET' -Path ("/admin.php/profit_center/entryList?date_from=$today&date_to=$today&page=1&page_size=50") -Session $ws
     Assert-Ok 'profit.entryListJson' $entryList
     $items = @()
     if ($entryList.data -and $entryList.data.items) { $items = @($entryList.data.items) }

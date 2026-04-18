@@ -256,7 +256,7 @@
             });
           }
           if (Number(query.sort_by_contact) === 1) p.set('sort_by_contact', '1');
-          const res = await fetch('/admin.php/influencer/listJson?' + p.toString(), { credentials: 'same-origin', headers: { ...apiFetchHeaders } });
+          const res = await fetch('/admin.php/influencer/list?' + p.toString(), { credentials: 'same-origin', headers: { ...apiFetchHeaders } });
           const json = parseJsonBody(res, await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
@@ -530,8 +530,8 @@
       async function loadOutreachLists() {
         try {
           const [r1, r2] = await Promise.all([
-            fetch('/admin.php/message_template/listJson?page=1&page_size=200&enabled=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
-            fetch('/admin.php/product/listJson?page=1&page_size=500&status=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
+            fetch('/admin.php/message_template/list?page=1&page_size=200&enabled=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
+            fetch('/admin.php/product/list?page=1&page_size=500&status=1', { credentials: 'same-origin', headers: { ...apiFetchHeaders } }),
           ]);
           const j1 = parseJsonBody(r1, await r1.text());
           const j2 = parseJsonBody(r2, await r2.text());

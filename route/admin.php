@@ -25,7 +25,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Users
     Route::get('user/list', 'app\controller\admin\User@listJson');
-    Route::get('user/listJson', 'app\controller\admin\User@listJson');
     Route::post('user/create', 'app\controller\admin\User@create');
     Route::post('user/update', 'app\controller\admin\User@update');
     Route::post('user/toggle', 'app\controller\admin\User@toggle');
@@ -35,7 +34,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Platform
     Route::get('platform/list', 'app\controller\admin\Platform@listJson');
-    Route::get('platform/listJson', 'app\controller\admin\Platform@listJson');
     Route::get('platform/edit/<id>', 'app\controller\admin\Platform@edit');
     Route::post('platform/edit/<id>', 'app\controller\admin\Platform@edit');
     Route::post('platform/delete/<id>', 'app\controller\admin\Platform@delete');
@@ -45,7 +43,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Device
     Route::get('device/list', 'app\controller\admin\Device@listJson');
-    Route::get('device/listJson', 'app\controller\admin\Device@listJson');
     Route::get('device/edit/<id>', 'app\controller\admin\Device@edit');
     Route::post('device/edit/<id>', 'app\controller\admin\Device@edit');
     Route::post('device/delete/<id>', 'app\controller\admin\Device@delete');
@@ -56,7 +53,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Product
     Route::get('product/list', 'app\controller\admin\Product@listJson');
-    Route::get('product/listJson', 'app\controller\admin\Product@listJson');
     Route::get('product/edit/<id>', 'app\controller\admin\Product@edit');
     Route::post('product/edit/<id>', 'app\controller\admin\Product@edit');
     Route::post('product/delete/<id>', 'app\controller\admin\Product@delete');
@@ -67,7 +63,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Distribute
     Route::get('distribute/list', 'app\controller\admin\Distribute@listJson');
-    Route::get('distribute/listJson', 'app\controller\admin\Distribute@listJson');
     Route::get('distribute/add', 'app\controller\admin\Distribute@add');
     Route::post('distribute/add', 'app\controller\admin\Distribute@add');
     Route::post('distribute/delete/<id>', 'app\controller\admin\Distribute@delete');
@@ -76,7 +71,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Video
     Route::get('video/list', 'app\\controller\\admin\\Video@listJson');
-    Route::get('video/listJson', 'app\\controller\\admin\\Video@listJson');
     Route::post('video/mixSuggestion', 'app\\controller\\admin\\Video@mixSuggestion');
     Route::get('video/edit/<id>', 'app\controller\admin\Video@edit');
     Route::post('video/edit/<id>', 'app\controller\admin\Video@edit');
@@ -91,7 +85,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Cache
     Route::get('cache/list', 'app\controller\admin\Cache@listJson');
-    Route::get('cache/listJson', 'app\controller\admin\Cache@listJson');
     Route::get('cache', 'app\controller\admin\Cache@index');
     Route::post('cache/delete/<hash>', 'app\controller\admin\Cache@delete');
     Route::post('cache/clear', 'app\controller\admin\Cache@clear');
@@ -99,13 +92,11 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Download log
     Route::get('downloadLog/list', 'app\controller\admin\DownloadLog@listJson');
-    Route::get('downloadLog/listJson', 'app\controller\admin\DownloadLog@listJson');
     Route::get('downloadLog', 'app\controller\admin\DownloadLog@index');
     Route::post('downloadLog/clear', 'app\controller\admin\DownloadLog@clear');
 
     // Client license/version + ops center
     Route::get('client_license/list', 'app\controller\admin\ClientLicense@listJson');
-    Route::get('client_license/listJson', 'app\controller\admin\ClientLicense@listJson');
     Route::post('client_license/add', 'app\controller\admin\ClientLicense@add');
     Route::post('client_license/update/<id>', 'app\controller\admin\ClientLicense@update');
     Route::post('client_license/toggle/<id>', 'app\controller\admin\ClientLicense@toggle');
@@ -114,7 +105,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('client_license', 'app\controller\admin\ClientLicense@index');
 
     Route::get('client_version/list', 'app\controller\admin\ClientVersion@listJson');
-    Route::get('client_version/listJson', 'app\controller\admin\ClientVersion@listJson');
     Route::post('client_version/add', 'app\controller\admin\ClientVersion@add');
     Route::post('client_version/uploadPackage', 'app\controller\admin\ClientVersion@uploadPackage');
     Route::post('client_version/update/<id>', 'app\controller\admin\ClientVersion@update');
@@ -128,7 +118,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Product search
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
-    Route::get('product_search/listJson', 'app\controller\admin\ProductSearch@listJson');
     Route::post('product_search/importCsv', 'app\controller\admin\ProductSearch@importCsv');
     Route::get('product_search/importTaskStatus', 'app\controller\admin\ProductSearch@importTaskStatus');
     Route::post('product_search/importTaskTick', 'app\controller\admin\ProductSearch@importTaskTick');
@@ -140,13 +129,10 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('product_search/sampleCsv', 'app\controller\admin\ProductSearch@sampleCsv');
     Route::get('product_search/exportCsv', 'app\controller\admin\ProductSearch@exportCsv');
     Route::get('product_search/live/stores', 'app\controller\admin\ProductSearchLive@storesJson');
-    Route::get('product_search/live/storesJson', 'app\controller\admin\ProductSearchLive@storesJson');
     Route::get('product_search/live/store/list', 'app\controller\admin\ProductSearchLive@storeListJson');
-    Route::get('product_search/live/store/listJson', 'app\controller\admin\ProductSearchLive@storeListJson');
     Route::post('product_search/live/store/save', 'app\controller\admin\ProductSearchLive@storeSave');
     Route::post('product_search/live/store/delete', 'app\controller\admin\ProductSearchLive@storeDelete');
     Route::get('product_search/live/catalog/list', 'app\controller\admin\ProductSearchLive@catalogListJson');
-    Route::get('product_search/live/catalog/listJson', 'app\controller\admin\ProductSearchLive@catalogListJson');
     Route::post('product_search/live/catalog/save', 'app\controller\admin\ProductSearchLive@catalogSave');
     Route::post('product_search/live/catalog/delete', 'app\controller\admin\ProductSearchLive@catalogDelete');
     Route::post('product_search/live/catalog/batchDelete', 'app\controller\admin\ProductSearchLive@catalogBatchDelete');
@@ -157,30 +143,21 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('product_search/live/session/delete', 'app\controller\admin\ProductSearchLive@sessionDelete');
     Route::post('product_search/live/session/batchDelete', 'app\controller\admin\ProductSearchLive@sessionBatchDelete');
     Route::get('product_search/live/sessions', 'app\controller\admin\ProductSearchLive@sessionsJson');
-    Route::get('product_search/live/sessionsJson', 'app\controller\admin\ProductSearchLive@sessionsJson');
     Route::get('product_search/live/unmatched', 'app\controller\admin\ProductSearchLive@unmatchedJson');
-    Route::get('product_search/live/unmatchedJson', 'app\controller\admin\ProductSearchLive@unmatchedJson');
     Route::post('product_search/live/unmatched/bind', 'app\controller\admin\ProductSearchLive@unmatchedBind');
     Route::get('product_search/live/rankings', 'app\controller\admin\ProductSearchLive@rankingsJson');
-    Route::get('product_search/live/rankingsJson', 'app\controller\admin\ProductSearchLive@rankingsJson');
-    // Stable detail/image APIs (query-style), avoid path-param parsing issues under non-complete route match.
+    // Stable detail/image APIs (query-style only).
     Route::get('product_search/live/styleDetail', 'app\controller\admin\ProductSearchLive@styleDetailJson');
-    Route::get('product_search/live/styleDetailJson', 'app\controller\admin\ProductSearchLive@styleDetailJson');
     Route::post('product_search/live/styleImageUpdate', 'app\controller\admin\ProductSearchLive@styleImageUpdate');
-    // Keep path-style routes for backward compatibility.
-    Route::get('product_search/live/styles/<style_code:[^/]+>', 'app\controller\admin\ProductSearchLive@styleDetailJson');
-    Route::post('product_search/live/styles/<style_code:[^/]+>/image', 'app\controller\admin\ProductSearchLive@styleImageUpdate');
     Route::get('product_search/live', 'app\controller\admin\ProductSearchLive@index');
     Route::get('product_search', 'app\controller\admin\ProductSearch@index');
     Route::get('offline_order/list', 'app\controller\admin\OfflineOrder@listJson');
-    Route::get('offline_order/listJson', 'app\controller\admin\OfflineOrder@listJson');
     Route::post('offline_order/updateStatus', 'app\controller\admin\OfflineOrder@updateStatus');
     Route::get('offline_order/exportXlsx', 'app\controller\admin\OfflineOrder@exportXlsx');
     Route::get('offline_order', 'app\controller\admin\OfflineOrder@index');
 
     // Influencer CRM
     Route::get('influencer/list', 'app\controller\admin\Influencer@listJson');
-    Route::get('influencer/listJson', 'app\controller\admin\Influencer@listJson');
     Route::get('influencer/search', 'app\controller\admin\Influencer@searchJson');
     Route::post('influencer/importCsv', 'app\controller\admin\Influencer@importCsv');
     Route::get('influencer/importTaskStatus', 'app\controller\admin\Influencer@importTaskStatus');
@@ -197,7 +174,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Category
     Route::get('category/list', 'app\controller\admin\Category@listJson');
-    Route::get('category/listJson', 'app\controller\admin\Category@listJson');
     Route::get('category/options', 'app\controller\admin\Category@options');
     Route::post('category/save', 'app\controller\admin\Category@save');
     Route::post('category/delete', 'app\controller\admin\Category@delete');
@@ -205,7 +181,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Module manager
     Route::get('extension/list', 'app\controller\admin\Extension@listJson');
-    Route::get('extension/listJson', 'app\controller\admin\Extension@listJson');
     Route::get('extension/logs', 'app\controller\admin\Extension@logsJson');
     Route::get('extension/permissionMatrix', 'app\controller\admin\Extension@permissionMatrix');
     Route::post('extension/install', 'app\controller\admin\Extension@install');
@@ -216,7 +191,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Message template
     Route::get('message_template/list', 'app\controller\admin\MessageTemplate@listJson');
-    Route::get('message_template/listJson', 'app\controller\admin\MessageTemplate@listJson');
     Route::post('message_template/save', 'app\controller\admin\MessageTemplate@save');
     Route::post('message_template/delete', 'app\controller\admin\MessageTemplate@delete');
     Route::post('message_template/render', 'app\controller\admin\MessageTemplate@render');
@@ -224,7 +198,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Outreach workspace
     Route::get('outreach_workspace/list', 'app\controller\admin\OutreachWorkspace@listJson');
-    Route::get('outreach_workspace/listJson', 'app\controller\admin\OutreachWorkspace@listJson');
     Route::get('outreach_workspace/nextTask', 'app\controller\admin\OutreachWorkspace@nextTaskJson');
     Route::post('outreach_workspace/generate', 'app\controller\admin\OutreachWorkspace@generate');
     Route::post('outreach_workspace/action', 'app\controller\admin\OutreachWorkspace@action');
@@ -233,24 +206,20 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     // Auto DM campaigns (unattended external IM)
     Route::post('auto_dm/campaign/create', 'app\controller\admin\AutoDm@create');
     Route::get('auto_dm/campaign/list', 'app\controller\admin\AutoDm@list');
-    Route::get('auto_dm/campaign/listJson', 'app\controller\admin\AutoDm@list');
     Route::post('auto_dm/campaign/rebuild_followups', 'app\controller\admin\AutoDm@rebuildFollowups');
     Route::post('auto_dm/campaign/pause', 'app\controller\admin\AutoDm@pause');
     Route::post('auto_dm/campaign/resume', 'app\controller\admin\AutoDm@resume');
     Route::get('auto_dm/reply_queue/list', 'app\controller\admin\AutoDm@replyQueueList');
-    Route::get('auto_dm/reply_queue/listJson', 'app\controller\admin\AutoDm@replyQueueList');
     Route::post('auto_dm/reply_queue/confirm', 'app\controller\admin\AutoDm@replyQueueConfirm');
     Route::get('auto_dm', 'app\controller\admin\AutoDm@index');
 
     // Mobile outreach tasking (Android + Appium agent)
     Route::get('mobile_task/list', 'app\controller\admin\MobileTask@listJson');
-    Route::get('mobile_task/listJson', 'app\controller\admin\MobileTask@listJson');
     Route::post('mobile_task/create_batch', 'app\controller\admin\MobileTask@createBatch');
     Route::post('mobile_task/retry', 'app\controller\admin\MobileTask@retry');
     Route::post('mobile_task/update_status', 'app\controller\admin\MobileTask@updateStatus');
 
     Route::get('mobile_device/list', 'app\controller\admin\MobileDevice@listJson');
-    Route::get('mobile_device/listJson', 'app\controller\admin\MobileDevice@listJson');
     Route::post('mobile_device/save', 'app\controller\admin\MobileDevice@save');
     Route::post('mobile_device/delete', 'app\controller\admin\MobileDevice@delete');
     Route::post('mobile_device/regenerateToken', 'app\controller\admin\MobileDevice@regenerateToken');
@@ -264,7 +233,6 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Sample management
     Route::get('sample/list', 'app\controller\admin\Sample@listJson');
-    Route::get('sample/listJson', 'app\controller\admin\Sample@listJson');
     Route::post('sample/save', 'app\controller\admin\Sample@save');
     Route::post('sample/createFromInfluencer', 'app\controller\admin\Sample@createFromInfluencer');
     Route::post('sample/markReceived', 'app\controller\admin\Sample@markReceived');
@@ -272,44 +240,35 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Growth intelligence
     Route::get('industry_trend/list', 'app\controller\admin\IndustryTrend@listJson');
-    Route::get('industry_trend/listJson', 'app\controller\admin\IndustryTrend@listJson');
     Route::get('industry_trend/summary', 'app\controller\admin\IndustryTrend@summaryJson');
-    Route::get('industry_trend/summaryJson', 'app\controller\admin\IndustryTrend@summaryJson');
     Route::post('industry_trend/importCsv', 'app\controller\admin\IndustryTrend@importCsv');
     Route::get('industry_trend/exportCsv', 'app\controller\admin\IndustryTrend@exportCsv');
     Route::get('industry_trend', 'app\controller\admin\IndustryTrend@index');
 
     Route::get('competitor_analysis/list', 'app\controller\admin\CompetitorAnalysis@listJson');
-    Route::get('competitor_analysis/listJson', 'app\controller\admin\CompetitorAnalysis@listJson');
     Route::post('competitor_analysis/saveCompetitor', 'app\controller\admin\CompetitorAnalysis@saveCompetitor');
     Route::post('competitor_analysis/importCsv', 'app\controller\admin\CompetitorAnalysis@importCsv');
     Route::get('competitor_analysis/exportCsv', 'app\controller\admin\CompetitorAnalysis@exportCsv');
     Route::get('competitor_analysis', 'app\controller\admin\CompetitorAnalysis@index');
 
     Route::get('ad_insight/list', 'app\controller\admin\AdInsight@listJson');
-    Route::get('ad_insight/listJson', 'app\controller\admin\AdInsight@listJson');
     Route::post('ad_insight/importCsv', 'app\controller\admin\AdInsight@importCsv');
     Route::get('ad_insight/exportCsv', 'app\controller\admin\AdInsight@exportCsv');
     Route::get('ad_insight', 'app\controller\admin\AdInsight@index');
 
     // Profit center (multi-store multi-currency)
     Route::get('profit_center/summary', 'app\controller\admin\ProfitCenter@summaryJson');
-    Route::get('profit_center/summaryJson', 'app\controller\admin\ProfitCenter@summaryJson');
     Route::get('profit_center/entryList', 'app\controller\admin\ProfitCenter@entryListJson');
-    Route::get('profit_center/entryListJson', 'app\controller\admin\ProfitCenter@entryListJson');
     Route::post('profit_center/entrySave', 'app\controller\admin\ProfitCenter@entrySave');
     Route::post('profit_center/entryBatchSave', 'app\controller\admin\ProfitCenter@entryBatchSave');
     Route::post('profit_center/entryDelete', 'app\controller\admin\ProfitCenter@entryDelete');
     Route::get('profit_center/storeList', 'app\controller\admin\ProfitCenter@storeListJson');
-    Route::get('profit_center/storeListJson', 'app\controller\admin\ProfitCenter@storeListJson');
     Route::post('profit_center/storeSave', 'app\controller\admin\ProfitCenter@storeSave');
     Route::post('profit_center/storeDelete', 'app\controller\admin\ProfitCenter@storeDelete');
     Route::get('profit_center/accountList', 'app\controller\admin\ProfitCenter@accountListJson');
-    Route::get('profit_center/accountListJson', 'app\controller\admin\ProfitCenter@accountListJson');
     Route::post('profit_center/accountSave', 'app\controller\admin\ProfitCenter@accountSave');
     Route::post('profit_center/accountDelete', 'app\controller\admin\ProfitCenter@accountDelete');
     Route::get('profit_center/fxRateList', 'app\controller\admin\ProfitCenter@fxRateListJson');
-    Route::get('profit_center/fxRateListJson', 'app\controller\admin\ProfitCenter@fxRateListJson');
     Route::post('profit_center/fxSync', 'app\controller\admin\ProfitCenter@fxSync');
     Route::get('profit_center/templateXlsx', 'app\controller\admin\ProfitCenter@templateXlsx');
     Route::post('profit_center/importXlsx', 'app\controller\admin\ProfitCenter@importXlsx');
@@ -318,16 +277,12 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
 
     // Data import center
     Route::get('data_import/sourceList', 'app\controller\admin\DataImport@sourceListJson');
-    Route::get('data_import/sourceListJson', 'app\controller\admin\DataImport@sourceListJson');
     Route::get('data_import/adapterList', 'app\controller\admin\DataImport@adapterListJson');
-    Route::get('data_import/adapterListJson', 'app\controller\admin\DataImport@adapterListJson');
     Route::post('data_import/sourceSave', 'app\controller\admin\DataImport@sourceSave');
     Route::post('data_import/sourceDelete', 'app\controller\admin\DataImport@sourceDelete');
     Route::post('data_import/runSource', 'app\controller\admin\DataImport@runSource');
     Route::get('data_import/jobList', 'app\controller\admin\DataImport@jobListJson');
-    Route::get('data_import/jobListJson', 'app\controller\admin\DataImport@jobListJson');
     Route::get('data_import/jobLogs', 'app\controller\admin\DataImport@jobLogsJson');
-    Route::get('data_import/jobLogsJson', 'app\controller\admin\DataImport@jobLogsJson');
     Route::post('data_import/retryJob', 'app\controller\admin\DataImport@retryJob');
     Route::get('data_import', 'app\controller\admin\DataImport@index');
 }

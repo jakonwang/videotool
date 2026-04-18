@@ -442,7 +442,7 @@
         storeManager.loading = true;
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/store/listJson',
+            '/admin.php/product_search/live/store/list',
             {
               keyword: storeManager.keyword,
               status: storeManager.status,
@@ -465,7 +465,7 @@
       async function fetchStores(preferredStoreId, silent) {
         storesLoading.value = true;
         try {
-          var data = await apiGet('/admin.php/product_search/live/store/listJson', { status: 1 }, '加载店铺失败');
+          var data = await apiGet('/admin.php/product_search/live/store/list', { status: 1 }, '加载店铺失败');
           stores.value = Array.isArray(data.items) ? data.items : [];
           var current = Number(preferredStoreId || selectedStoreId.value || 0);
           var hasCurrent = current > 0 && stores.value.some(function (s) { return Number(s.id || 0) === current; });
@@ -555,7 +555,7 @@
         catalog.loading = true;
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/catalog/listJson',
+            '/admin.php/product_search/live/catalog/list',
             {
               store_id: selectedStoreId.value,
               keyword: catalog.keyword,
@@ -743,7 +743,7 @@
         sessions.loading = true;
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/sessionsJson',
+            '/admin.php/product_search/live/sessions',
             {
               store_id: selectedStoreId.value,
               date_from: sessions.date_from,
@@ -914,7 +914,7 @@
         unmatched.loading = true;
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/unmatchedJson',
+            '/admin.php/product_search/live/unmatched',
             {
               store_id: selectedStoreId.value,
               session_id: unmatched.session_id || '',
@@ -981,7 +981,7 @@
         ranking.loading = true;
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/rankingsJson',
+            '/admin.php/product_search/live/rankings',
             {
               scope: ranking.scope,
               store_id: ranking.scope === 'store' ? selectedStoreId.value : '',
@@ -1043,7 +1043,7 @@
         }
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/styleDetailJson',
+            '/admin.php/product_search/live/styleDetail',
             { store_id: detailStoreId, style_code: styleCode },
             '加载款式详情失败'
           );

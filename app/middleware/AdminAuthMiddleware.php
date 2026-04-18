@@ -146,7 +146,7 @@ class AdminAuthMiddleware
         if ($request->isAjax()) {
             return true;
         }
-        if (preg_match('#/(list|listJson|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
+        if (preg_match('#/(list|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
             return true;
         }
         if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|profit_center|stats|mobile_task|mobile_device|mobile_agent|auto_dm)/#i', $path)) {

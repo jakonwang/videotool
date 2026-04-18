@@ -311,10 +311,10 @@ try {
     }
 
     Assert-Ok 'crm.category.options' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/category/options?type=influencer' -Session $ws)
-    Assert-Ok 'crm.influencer.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/influencer/listJson?keyword=' + [uri]::EscapeDataString([string]$seed.tiktok_id)) -Session $ws)
+    Assert-Ok 'crm.influencer.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/influencer/list?keyword=' + [uri]::EscapeDataString([string]$seed.tiktok_id)) -Session $ws)
     Assert-Ok 'crm.outreach.generate' (Invoke-ApiJson -Method 'POST' -Path '/admin.php/outreach_workspace/generate' -Body @{ category_id = [int]$seed.category_id; template_id = [int]$seed.template_id; product_id = [int]$seed.product_id; influencer_status = 0; limit = 10; tags = @('smoke') } -Session $ws)
 
-    $taskList = Invoke-ApiJson -Method 'GET' -Path ('/admin.php/outreach_workspace/listJson?keyword=' + [uri]::EscapeDataString([string]$seed.tiktok_id)) -Session $ws
+    $taskList = Invoke-ApiJson -Method 'GET' -Path ('/admin.php/outreach_workspace/list?keyword=' + [uri]::EscapeDataString([string]$seed.tiktok_id)) -Session $ws
     Assert-Ok 'crm.outreach.list' $taskList
     $taskId = 0
     if ($taskList.data -and $taskList.data.items -and $taskList.data.items.Count -gt 0) {
@@ -336,19 +336,19 @@ try {
 
     $trackingNo = '__' + [string]$seed.token + '_tracking'
     Assert-Ok 'crm.influencer.markSampleShipped' (Invoke-ApiJson -Method 'POST' -Path '/admin.php/influencer/markSampleShipped' -Body @{ id = [int]$seed.influencer_id; sample_tracking_no = $trackingNo; courier = 'SF' } -Session $ws)
-    Assert-Ok 'crm.sample.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/sample/listJson?keyword=' + [uri]::EscapeDataString($trackingNo)) -Session $ws)
+    Assert-Ok 'crm.sample.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/sample/list?keyword=' + [uri]::EscapeDataString($trackingNo)) -Session $ws)
 
-    Assert-Ok 'intel.industry.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/listJson?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category)) -Session $ws)
-    Assert-Ok 'intel.industry.summary' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/summaryJson?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category)) -Session $ws)
-    Assert-Ok 'intel.competitor.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/competitor_analysis/listJson?keyword=' + [uri]::EscapeDataString([string]$seed.competitor_name)) -Session $ws)
-    Assert-Ok 'intel.ad.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/ad_insight/listJson?keyword=' + [uri]::EscapeDataString([string]$seed.creative_code)) -Session $ws)
-    Assert-Ok 'intel.data_import.sourceList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/sourceListJson' -Session $ws)
-    Assert-Ok 'intel.data_import.adapterList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/adapterListJson' -Session $ws)
-    Assert-Ok 'intel.data_import.jobList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/jobListJson?domain=industry' -Session $ws)
-    Assert-Ok 'intel.data_import.jobLogs' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/data_import/jobLogsJson?job_id=' + [int]$seed.job_id) -Session $ws)
+    Assert-Ok 'intel.industry.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/list?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category)) -Session $ws)
+    Assert-Ok 'intel.industry.summary' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/summary?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category)) -Session $ws)
+    Assert-Ok 'intel.competitor.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/competitor_analysis/list?keyword=' + [uri]::EscapeDataString([string]$seed.competitor_name)) -Session $ws)
+    Assert-Ok 'intel.ad.list' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/ad_insight/list?keyword=' + [uri]::EscapeDataString([string]$seed.creative_code)) -Session $ws)
+    Assert-Ok 'intel.data_import.sourceList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/sourceList' -Session $ws)
+    Assert-Ok 'intel.data_import.adapterList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/adapterList' -Session $ws)
+    Assert-Ok 'intel.data_import.jobList' (Invoke-ApiJson -Method 'GET' -Path '/admin.php/data_import/jobList?domain=industry' -Session $ws)
+    Assert-Ok 'intel.data_import.jobLogs' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/data_import/jobLogs?job_id=' + [int]$seed.job_id) -Session $ws)
     Assert-Ok 'intel.data_import.retryJob' (Invoke-ApiJson -Method 'POST' -Path '/admin.php/data_import/retryJob' -Body @{ job_id = [int]$seed.retry_job_id } -Session $ws)
     Assert-Ok 'intel.data_import.runSource' (Invoke-ApiJson -Method 'POST' -Path '/admin.php/data_import/runSource' -Body @{ source_id = [int]$seed.api_source_id } -Session $ws)
-    Assert-Ok 'intel.industry.list.apiSource' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/listJson?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category_api)) -Session $ws)
+    Assert-Ok 'intel.industry.list.apiSource' (Invoke-ApiJson -Method 'GET' -Path ('/admin.php/industry_trend/list?country=VN&category=' + [uri]::EscapeDataString([string]$seed.industry_category_api)) -Session $ws)
 
     $verifyRaw = php $verifyFile $seed.influencer_id $seed.token
     $verify = $verifyRaw | ConvertFrom-Json

@@ -57,7 +57,7 @@
           if (query.category) p.set('category', query.category);
           if (query.date_from) p.set('date_from', query.date_from);
           if (query.date_to) p.set('date_to', query.date_to);
-          const res = await fetch('/admin.php/industry_trend/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/industry_trend/list?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           list.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
@@ -77,7 +77,7 @@
           if (query.category) p.set('category', query.category);
           if (query.date_from) p.set('date_from', query.date_from);
           if (query.date_to) p.set('date_to', query.date_to);
-          const res = await fetch('/admin.php/industry_trend/summaryJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/industry_trend/summary?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           const d = json.data || {};

@@ -206,7 +206,7 @@
           if (sortProp.value) params.set('sort_prop', sortProp.value);
           if (sortOrder.value) params.set('sort_order', sortOrder.value);
 
-          const res = await fetch('/admin.php/product/listJson?' + params.toString(), { credentials: 'same-origin' });
+          const res = await fetch('/admin.php/product/list?' + params.toString(), { credentials: 'same-origin' });
           const json = await res.json();
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];

@@ -9,6 +9,7 @@ use app\model\GrowthProfitDailyEntry as GrowthProfitDailyEntryModel;
 use app\model\GrowthProfitStore as GrowthProfitStoreModel;
 use app\service\FxRateService;
 use app\service\ProfitCalculatorService;
+use app\service\StoreCurrencyService;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -1334,11 +1335,7 @@ class ProfitCenter extends BaseController
 
     private function parseStoreDefaultGmvCurrency(string $currency): string
     {
-        $raw = strtoupper(trim($currency));
-        if (!preg_match('/^[A-Z]{3}$/', $raw)) {
-            return 'VND';
-        }
-        return in_array($raw, FxRateService::supportedCurrencies(), true) ? $raw : 'VND';
+        return StoreCurrencyService::normalize($currency);
     }
 
     private function hasTableColumnCached(string $table, string $column): bool
@@ -1359,22 +1356,7 @@ class ProfitCenter extends BaseController
 
     private function syncStoreAccountDefaultGmvCurrency(int $storeId, string $currency): void
     {
-        if ($storeId <= 0 || !$this->hasTableColumnCached('growth_profit_accounts', 'default_gmv_currency')) {
-            return;
-        }
-        $gmvCurrency = $this->parseStoreDefaultGmvCurrency($currency);
-        try {
-            $updateData = ['default_gmv_currency' => $gmvCurrency];
-            if ($this->hasTableColumnCached('growth_profit_accounts', 'updated_at')) {
-                $updateData['updated_at'] = date('Y-m-d H:i:s');
-            }
-            Db::name('growth_profit_accounts')
-                ->where('tenant_id', $this->currentTenantId())
-                ->where('store_id', $storeId)
-                ->update($updateData);
-        } catch (\Throwable $e) {
-            // Keep store save success even if account sync is blocked by old schema/data.
-        }
+        StoreCurrencyService::syncStoreAccountDefaultGmvCurrency($storeId, $currency, $this->currentTenantId());
     }
 
     private function channelLabel(string $channelType): string

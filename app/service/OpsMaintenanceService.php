@@ -12,7 +12,7 @@ class OpsMaintenanceService
      */
     public static function migrationScripts(): array
     {
-        $preferred = [
+        $priority = [
             'run_migration_admin_users.php',
             'run_migration_client_app.php',
             'run_migration_extensions.php',
@@ -30,6 +30,7 @@ class OpsMaintenanceService
             'run_migration_product_style_import_tasks.php',
             'run_migration_product_style_orders.php',
             'run_migration_product_style_price_levels.php',
+            'run_migration_live_product_analysis.php',
             'run_migration_openai_vision_columns.php',
             'run_migration_tikstar_ops2.php',
             'run_migration_tenant_saas_material.php',
@@ -37,27 +38,12 @@ class OpsMaintenanceService
             'run_migration_profit_store_currency.php',
             'run_migration_auto_dm_v1.php',
             'run_migration_auto_dm_v2.php',
+            'run_migration_auto_dm_hotfix.php',
         ];
-        $all = [];
-        $dbDir = self::databaseDir();
-        if (is_dir($dbDir)) {
-            $entries = scandir($dbDir);
-            if (is_array($entries)) {
-                foreach ($entries as $entry) {
-                    if (!is_string($entry)) {
-                        continue;
-                    }
-                    if (preg_match('/^run_migration.*\.php$/i', $entry)) {
-                        $all[] = $entry;
-                    }
-                }
-            }
-        }
-        $all = array_values(array_unique($all));
-        sort($all);
+        $all = self::discoverMigrationScripts();
 
         $ordered = [];
-        foreach ($preferred as $name) {
+        foreach ($priority as $name) {
             if (in_array($name, $all, true)) {
                 $ordered[] = $name;
             }
@@ -78,22 +64,38 @@ class OpsMaintenanceService
     {
         $scripts = self::migrationScripts();
         $historyMap = self::loadHistoryMap();
-        $exists = [];
+        $scriptStates = [];
         $appliedCount = 0;
         $pendingCount = 0;
+        $missingFileCount = 0;
+        $checksumMismatchCount = 0;
         foreach ($scripts as $script) {
+            $abs = self::databaseDir() . DIRECTORY_SEPARATOR . $script;
+            $exists = is_file($abs) ? 1 : 0;
             $history = $historyMap[$script] ?? null;
             $applied = is_array($history) && (int) ($history['status'] ?? 0) === 1 ? 1 : 0;
+            $historyChecksum = is_array($history) ? (string) ($history['checksum'] ?? '') : '';
+            $currentChecksum = $exists === 1 ? self::fileChecksum($abs) : '';
+            $checksumMatch = ($historyChecksum !== '' && $currentChecksum !== '' && $historyChecksum === $currentChecksum) ? 1 : 0;
+            if ($exists === 0) {
+                ++$missingFileCount;
+            }
+            if ($historyChecksum !== '' && $currentChecksum !== '' && $checksumMatch === 0) {
+                ++$checksumMismatchCount;
+            }
             if ($applied === 1) {
                 ++$appliedCount;
             } else {
                 ++$pendingCount;
             }
-            $exists[] = [
+            $scriptStates[] = [
                 'name' => $script,
-                'exists' => is_file(self::databaseDir() . DIRECTORY_SEPARATOR . $script) ? 1 : 0,
+                'exists' => $exists,
                 'applied' => $applied,
                 'last_run_at' => is_array($history) ? (string) ($history['last_run_at'] ?? '') : '',
+                'checksum_current' => $currentChecksum,
+                'checksum_history' => $historyChecksum,
+                'checksum_match' => $checksumMatch,
             ];
         }
         $gitInfo = self::gitInfo();
@@ -101,12 +103,41 @@ class OpsMaintenanceService
         return [
             'php_bin' => self::resolvePhpBin(),
             'exec_available' => self::canExec() ? 1 : 0,
-            'script_count' => count($exists),
+            'script_count' => count($scriptStates),
             'script_applied_count' => $appliedCount,
             'script_pending_count' => $pendingCount,
-            'scripts' => $exists,
+            'integrity_missing_file_count' => $missingFileCount,
+            'integrity_checksum_mismatch_count' => $checksumMismatchCount,
+            'scripts' => $scriptStates,
             'git' => $gitInfo,
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function discoverMigrationScripts(): array
+    {
+        $all = [];
+        $dbDir = self::databaseDir();
+        if (!is_dir($dbDir)) {
+            return $all;
+        }
+        $entries = scandir($dbDir);
+        if (!is_array($entries)) {
+            return $all;
+        }
+        foreach ($entries as $entry) {
+            if (!is_string($entry)) {
+                continue;
+            }
+            if (preg_match('/^run_migration.*\.php$/i', $entry)) {
+                $all[] = $entry;
+            }
+        }
+        $all = array_values(array_unique($all));
+        sort($all);
+        return $all;
     }
 
     /**

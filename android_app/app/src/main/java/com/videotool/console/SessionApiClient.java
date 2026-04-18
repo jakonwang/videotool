@@ -153,7 +153,7 @@ public class SessionApiClient
     public void listPendingTasks(String adminBase, final JsonCallback callback)
     {
         String base = AppPrefs.normalizeAdminBase(adminBase);
-        HttpUrl url = HttpUrl.parse(base + "/mobile_task/listJson");
+        HttpUrl url = HttpUrl.parse(base + "/mobile_task/list");
         if (url == null) {
             callback.onError("invalid_url");
             return;
@@ -185,7 +185,7 @@ public class SessionApiClient
             final JsonCallback callback
     ) {
         String base = AppPrefs.normalizeAdminBase(adminBase);
-        HttpUrl url = HttpUrl.parse(base + "/mobile_task/listJson");
+        HttpUrl url = HttpUrl.parse(base + "/mobile_task/list");
         if (url == null) {
             callback.onError("invalid_url");
             return;
@@ -219,7 +219,7 @@ public class SessionApiClient
     {
         String base = AppPrefs.normalizeAdminBase(adminBase);
         Request req = new Request.Builder()
-                .url(base + "/mobile_device/listJson")
+                .url(base + "/mobile_device/list")
                 .header("Accept", "application/json")
                 .get()
                 .build();

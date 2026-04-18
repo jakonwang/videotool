@@ -12,49 +12,18 @@ class MessageOutreachService
     private const LANG_VI = 'vi';
 
     /**
-     * @var array<string, bool>
-     */
-    private static array $tenantColumnCache = [];
-
-    /**
      * @var list<string>
      */
     private static array $emojiPool = ['😊', '🤝', '✨', '💬', '🙌', '👏', '👍', '🔥', '🌟', '💡'];
 
     private static function effectiveTenantId(?int $tenantId = null): int
     {
-        $tid = $tenantId !== null ? (int) $tenantId : AdminAuthService::tenantId();
-
-        return $tid > 0 ? $tid : 1;
-    }
-
-    private static function tableHasTenantId(string $table): bool
-    {
-        $name = strtolower(trim($table));
-        if ($name === '') {
-            return false;
-        }
-        if (array_key_exists($name, self::$tenantColumnCache)) {
-            return self::$tenantColumnCache[$name];
-        }
-        try {
-            $fields = Db::name($name)->getFields();
-            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
-        } catch (\Throwable $e) {
-            $has = false;
-        }
-        self::$tenantColumnCache[$name] = $has;
-
-        return $has;
+        return TenantScopeService::tenantId($tenantId);
     }
 
     private static function scopeTenant($query, string $table, ?int $tenantId = null)
     {
-        if (self::tableHasTenantId($table)) {
-            $query->where('tenant_id', self::effectiveTenantId($tenantId));
-        }
-
-        return $query;
+        return TenantScopeService::apply($query, $table, self::effectiveTenantId($tenantId));
     }
 
     public static function adminBaseUrl(): string
@@ -299,4 +268,3 @@ class MessageOutreachService
         return $unique;
     }
 }
-

@@ -8,6 +8,7 @@ use app\service\ChunkUploadService;
 use app\service\DataImportService;
 use app\service\FxRateService;
 use app\service\LiveStyleAnalysisService;
+use app\service\StoreCurrencyService;
 use think\facade\Db;
 use think\facade\Log;
 use think\facade\View;
@@ -1565,11 +1566,7 @@ class ProductSearchLive extends BaseController
 
     private function normalizeStoreGmvCurrency(string $currency): string
     {
-        $raw = strtoupper(trim($currency));
-        if (!preg_match('/^[A-Z]{3}$/', $raw)) {
-            return 'VND';
-        }
-        return in_array($raw, FxRateService::supportedCurrencies(), true) ? $raw : 'VND';
+        return StoreCurrencyService::normalize($currency);
     }
 
     /**
@@ -1578,135 +1575,12 @@ class ProductSearchLive extends BaseController
      */
     private function loadStoreGmvCurrencyMap(array $storeIds): array
     {
-        $ids = [];
-        foreach ($storeIds as $sid) {
-            $id = (int) $sid;
-            if ($id > 0) {
-                $ids[$id] = true;
-            }
-        }
-        if ($ids === []) {
-            return [];
-        }
-
-        $tenantId = $this->currentTenantId();
-        $map = [];
-        try {
-            $storeFields = Db::name('growth_profit_stores')->getFields();
-        } catch (\Throwable $e) {
-            $storeFields = [];
-        }
-        if (is_array($storeFields) && array_key_exists('default_gmv_currency', $storeFields)) {
-            $storeQuery = Db::name('growth_profit_stores')
-                ->whereIn('id', array_keys($ids))
-                ->field('id,default_gmv_currency');
-            if (array_key_exists('tenant_id', $storeFields)) {
-                $storeQuery->where('tenant_id', $tenantId);
-            }
-            $storeRows = $storeQuery->select()->toArray();
-            foreach ($storeRows as $row) {
-                $sid = (int) ($row['id'] ?? 0);
-                if ($sid <= 0) {
-                    continue;
-                }
-                $map[$sid] = $this->normalizeStoreGmvCurrency((string) ($row['default_gmv_currency'] ?? 'VND'));
-            }
-        }
-
-        if (count($map) === count($ids)) {
-            return $map;
-        }
-
-        $missingStoreIds = [];
-        foreach (array_keys($ids) as $sid) {
-            if (!isset($map[$sid])) {
-                $missingStoreIds[] = $sid;
-            }
-        }
-        if ($missingStoreIds === []) {
-            return $map;
-        }
-
-        try {
-            $fields = Db::name('growth_profit_accounts')->getFields();
-        } catch (\Throwable $e) {
-            return $map;
-        }
-        if (!is_array($fields)) {
-            return $map;
-        }
-
-        $currencyCol = '';
-        if (array_key_exists('default_gmv_currency', $fields)) {
-            $currencyCol = 'default_gmv_currency';
-        } elseif (array_key_exists('account_currency', $fields)) {
-            $currencyCol = 'account_currency';
-        }
-        if ($currencyCol === '') {
-            return $map;
-        }
-        if (!array_key_exists('store_id', $fields)) {
-            return $map;
-        }
-
-        try {
-            $query = Db::name('growth_profit_accounts')
-                ->whereIn('store_id', $missingStoreIds)
-                ->field('id,store_id,' . $currencyCol . ' AS gmv_currency')
-                ->order('id', 'desc');
-            if (array_key_exists('tenant_id', $fields)) {
-                $query->where('tenant_id', $tenantId);
-            }
-            if (array_key_exists('status', $fields)) {
-                $query->where('status', 1);
-            }
-
-            $rows = $query->select()->toArray();
-            foreach ($rows as $row) {
-                $sid = (int) ($row['store_id'] ?? 0);
-                if ($sid <= 0 || isset($map[$sid])) {
-                    continue;
-                }
-                $map[$sid] = $this->normalizeStoreGmvCurrency((string) ($row['gmv_currency'] ?? 'VND'));
-            }
-        } catch (\Throwable $e) {
-            // Keep store list available even if account schema differs.
-        }
-
-        return $map;
+        return StoreCurrencyService::loadStoreGmvCurrencyMap($storeIds, $this->currentTenantId());
     }
 
     private function syncStoreAccountDefaultGmvCurrency(int $storeId, string $currency): void
     {
-        if ($storeId <= 0) {
-            return;
-        }
-
-        try {
-            $accountFields = Db::name('growth_profit_accounts')->getFields();
-        } catch (\Throwable $e) {
-            return;
-        }
-        if (!is_array($accountFields) || !array_key_exists('default_gmv_currency', $accountFields)) {
-            return;
-        }
-
-        $query = Db::name('growth_profit_accounts')
-            ->where('store_id', $storeId);
-        if (array_key_exists('tenant_id', $accountFields)) {
-            $query->where('tenant_id', $this->currentTenantId());
-        }
-        $updateData = [
-            'default_gmv_currency' => $this->normalizeStoreGmvCurrency($currency !== '' ? $currency : 'VND'),
-        ];
-        if (array_key_exists('updated_at', $accountFields)) {
-            $updateData['updated_at'] = date('Y-m-d H:i:s');
-        }
-        try {
-            $query->update($updateData);
-        } catch (\Throwable $e) {
-            // Keep store save success when account table shape differs.
-        }
+        StoreCurrencyService::syncStoreAccountDefaultGmvCurrency($storeId, $currency, $this->currentTenantId());
     }
 
     /**

@@ -54,7 +54,7 @@
       async function fetchSources() {
         sourceLoading.value = true;
         try {
-          const res = await fetch('/admin.php/data_import/sourceListJson', { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/data_import/sourceList', { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           sources.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
@@ -67,7 +67,7 @@
 
       async function fetchAdapters() {
         try {
-          const res = await fetch('/admin.php/data_import/adapterListJson', { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/data_import/adapterList', { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           adapterOptions.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
@@ -84,7 +84,7 @@
           p.set('page_size', String(pageSize.value));
           if (query.domain) p.set('domain', query.domain);
           if (query.status !== '' && query.status !== null) p.set('status', String(query.status));
-          const res = await fetch('/admin.php/data_import/jobListJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/data_import/jobList?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           jobs.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
@@ -187,7 +187,7 @@
 
       async function viewLogs(row) {
         try {
-          const res = await fetch('/admin.php/data_import/jobLogsJson?job_id=' + encodeURIComponent(String(row.id)), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/data_import/jobLogs?job_id=' + encodeURIComponent(String(row.id)), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           logRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];

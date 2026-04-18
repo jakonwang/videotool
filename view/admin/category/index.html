@@ -65,7 +65,7 @@
           const typeValue = fixedType || query.type;
           if (typeValue) p.set('type', typeValue);
           if (query.status !== '') p.set('status', String(query.status));
-          const res = await fetch('/admin.php/category/listJson?' + p.toString(), { credentials: 'same-origin', headers: apiH });
+          const res = await fetch('/admin.php/category/list?' + p.toString(), { credentials: 'same-origin', headers: apiH });
           const json = parseJson(res, await res.text());
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];

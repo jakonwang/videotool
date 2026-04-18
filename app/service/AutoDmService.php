@@ -40,11 +40,6 @@ class AutoDmService
     public const REPLY_STATE_REVIEWED = 2;
 
     /**
-     * @var array<string, bool>
-     */
-    private static array $tenantColumnCache = [];
-
-    /**
      * @return array<string, mixed>
      */
     public static function defaultPolicy(): array
@@ -78,7 +73,7 @@ class AutoDmService
                 ->where('tenant_id', $tenantId)
                 ->where('policy_key', self::POLICY_KEY_DEFAULT)
                 ->order('id', 'desc');
-            if (self::tableHasTenantId('contact_policies')) {
+            if (TenantScopeService::tableHasTenantId('contact_policies')) {
                 $query->where('tenant_id', $tenantId);
             }
             $row = $query->find();
@@ -659,32 +654,8 @@ class AutoDmService
         return [$hour, $minute];
     }
 
-    private static function tableHasTenantId(string $table): bool
-    {
-        $name = strtolower(trim($table));
-        if ($name === '') {
-            return false;
-        }
-        if (array_key_exists($name, self::$tenantColumnCache)) {
-            return self::$tenantColumnCache[$name];
-        }
-        try {
-            $fields = Db::name($name)->getFields();
-            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
-        } catch (\Throwable $e) {
-            $has = false;
-        }
-        self::$tenantColumnCache[$name] = $has;
-
-        return $has;
-    }
-
     private static function scopeTenant($query, string $table, int $tenantId)
     {
-        if (self::tableHasTenantId($table)) {
-            $query->where('tenant_id', $tenantId > 0 ? $tenantId : 1);
-        }
-
-        return $query;
+        return TenantScopeService::apply($query, $table, $tenantId);
     }
 }

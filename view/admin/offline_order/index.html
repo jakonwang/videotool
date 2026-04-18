@@ -73,7 +73,7 @@
           p.set('page_size', String(pageSize.value));
           if (query.keyword) p.set('keyword', query.keyword);
           if (query.status !== '') p.set('status', String(query.status));
-          const res = await fetch('/admin.php/offline_order/listJson?' + p.toString(), {
+          const res = await fetch('/admin.php/offline_order/list?' + p.toString(), {
             credentials: 'same-origin',
           });
           const json = await res.json();

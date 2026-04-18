@@ -20,35 +20,9 @@ class DataImportService
     public const JOB_FAILED = 3;
     public const JOB_PARTIAL = 4;
 
-    /**
-     * @var array<string, bool>
-     */
-    private static array $tenantColumnCache = [];
-
     private static function currentTenantId(): int
     {
-        $tid = AdminAuthService::tenantId();
-        return $tid > 0 ? $tid : 1;
-    }
-
-    private static function tableHasTenantId(string $table): bool
-    {
-        $name = strtolower(trim($table));
-        if ($name === '') {
-            return false;
-        }
-        if (array_key_exists($name, self::$tenantColumnCache)) {
-            return self::$tenantColumnCache[$name];
-        }
-        try {
-            $fields = Db::name($name)->getFields();
-            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
-        } catch (\Throwable $e) {
-            $has = false;
-        }
-        self::$tenantColumnCache[$name] = $has;
-
-        return $has;
+        return TenantScopeService::tenantId();
     }
 
     /**
@@ -57,20 +31,12 @@ class DataImportService
      */
     private static function withTenantPayload(string $table, array $payload): array
     {
-        if (self::tableHasTenantId($table) && !array_key_exists('tenant_id', $payload)) {
-            $payload['tenant_id'] = self::currentTenantId();
-        }
-
-        return $payload;
+        return TenantScopeService::withPayload($table, $payload, self::currentTenantId());
     }
 
     private static function applyTenantFilter($query, string $table)
     {
-        if (self::tableHasTenantId($table)) {
-            $query->where('tenant_id', self::currentTenantId());
-        }
-
-        return $query;
+        return TenantScopeService::apply($query, $table, self::currentTenantId());
     }
 
     /**

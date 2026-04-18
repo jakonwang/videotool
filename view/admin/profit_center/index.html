@@ -1445,14 +1445,14 @@
       }
 
       async function fetchStores() {
-        const res = await fetch('/admin.php/profit_center/storeListJson', { credentials: 'same-origin', headers });
+        const res = await fetch('/admin.php/profit_center/storeList', { credentials: 'same-origin', headers });
         const json = parseJson(await res.text());
         if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
         stores.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
       }
 
       async function fetchAccounts() {
-        const res = await fetch('/admin.php/profit_center/accountListJson', { credentials: 'same-origin', headers });
+        const res = await fetch('/admin.php/profit_center/accountList', { credentials: 'same-origin', headers });
         const json = parseJson(await res.text());
         if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
         accounts.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
@@ -1460,7 +1460,7 @@
       async function fetchSummary() {
         summaryLoading.value = true;
         try {
-          const res = await fetch('/admin.php/profit_center/summaryJson?' + queryString.value, { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/profit_center/summary?' + queryString.value, { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           const data = json.data || {};
@@ -1483,7 +1483,7 @@
           const p = new URLSearchParams(queryString.value);
           p.set('page', String(page.value));
           p.set('page_size', String(pageSize.value));
-          const res = await fetch('/admin.php/profit_center/entryListJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/profit_center/entryList?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           entries.value = json.data && Array.isArray(json.data.items)
@@ -2059,7 +2059,7 @@
           const p = new URLSearchParams();
           if (filters.date_from) p.set('date_from', filters.date_from);
           if (filters.date_to) p.set('date_to', filters.date_to);
-          const res = await fetch('/admin.php/profit_center/fxRateListJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/profit_center/fxRateList?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           fxRows.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];

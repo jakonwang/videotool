@@ -33,8 +33,8 @@
 - `POST /admin.php/auth/login`
 - `POST /admin.php/auth/logout`
 - `POST /admin.php/mobile_task/create_batch`
-- `GET /admin.php/mobile_task/listJson`
-- `GET /admin.php/mobile_device/listJson`
+- `GET /admin.php/mobile_task/list`
+- `GET /admin.php/mobile_device/list`
 - `POST /admin.php/mobile_agent/pull`
 - `POST /admin.php/mobile_agent/report`
 

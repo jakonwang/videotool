@@ -313,7 +313,7 @@
           if (priceMin !== null) p.set('price_min', String(priceMin));
           if (priceMax !== null) p.set('price_max', String(priceMax));
           if (moqMin !== null && moqMin > 0) p.set('moq_min', String(Math.floor(moqMin)));
-          const res = await fetch('/admin.php/product_search/listJson?' + p.toString(), {
+          const res = await fetch('/admin.php/product_search/list?' + p.toString(), {
             credentials: 'same-origin',
             headers: { ...apiFetchHeaders },
           });

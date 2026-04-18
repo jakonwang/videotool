@@ -6,42 +6,12 @@ namespace app\service;
 use app\model\DataSource as DataSourceModel;
 use app\model\ImportJob as ImportJobModel;
 use app\service\data_import\SourceAdapterRegistry;
-use think\facade\Db;
 
 class DataImportDispatchService
 {
-    /**
-     * @var array<string, bool>
-     */
-    private static array $tenantColumnCache = [];
-
-    private static function tableHasTenantId(string $table): bool
-    {
-        $name = strtolower(trim($table));
-        if ($name === '') {
-            return false;
-        }
-        if (array_key_exists($name, self::$tenantColumnCache)) {
-            return self::$tenantColumnCache[$name];
-        }
-        try {
-            $fields = Db::name($name)->getFields();
-            $has = is_array($fields) && array_key_exists('tenant_id', $fields);
-        } catch (\Throwable $e) {
-            $has = false;
-        }
-        self::$tenantColumnCache[$name] = $has;
-
-        return $has;
-    }
-
     private static function applyTenantFilter($query, string $table)
     {
-        if (self::tableHasTenantId($table)) {
-            $query->where('tenant_id', AdminAuthService::tenantId());
-        }
-
-        return $query;
+        return TenantScopeService::apply($query, $table);
     }
 
     /**

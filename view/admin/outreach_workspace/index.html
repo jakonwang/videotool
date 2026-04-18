@@ -167,7 +167,7 @@
           if (query.keyword) p.set('keyword', query.keyword);
           if (query.task_status !== '' && query.task_status !== null) p.set('task_status', String(query.task_status));
           if (Number(query.assigned_only) === 1) p.set('assigned_only', '1');
-          const res = await fetch('/admin.php/outreach_workspace/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/outreach_workspace/list?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           list.value = (json.data && json.data.items) ? json.data.items : [];
@@ -209,8 +209,8 @@
         try {
           const [catRes, tplRes, prodRes] = await Promise.all([
             fetch('/admin.php/category/options?type=influencer', { credentials: 'same-origin', headers }),
-            fetch('/admin.php/message_template/listJson?enabled=1&page_size=200', { credentials: 'same-origin', headers }),
-            fetch('/admin.php/product/listJson?page_size=200', { credentials: 'same-origin', headers })
+            fetch('/admin.php/message_template/list?enabled=1&page_size=200', { credentials: 'same-origin', headers }),
+            fetch('/admin.php/product/list?page_size=200', { credentials: 'same-origin', headers })
           ]);
           const catJson = parseJson(await catRes.text());
           const tplJson = parseJson(await tplRes.text());
@@ -223,7 +223,7 @@
 
       async function loadMobileDevices() {
         try {
-          const res = await fetch('/admin.php/mobile_device/listJson', { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/mobile_device/list', { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           mobileDevices.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
@@ -241,7 +241,7 @@
           if (mobileDeviceId.value !== '' && mobileDeviceId.value !== null) {
             p.set('device_id', String(mobileDeviceId.value));
           }
-          const res = await fetch('/admin.php/mobile_task/listJson?' + p.toString(), { credentials: 'same-origin', headers });
+          const res = await fetch('/admin.php/mobile_task/list?' + p.toString(), { credentials: 'same-origin', headers });
           const json = parseJson(await res.text());
           if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
           mobileTasks.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];

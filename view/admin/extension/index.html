@@ -103,7 +103,7 @@ createApp({
     async function fetchList() {
       loading.value = true;
       try {
-        const res = await fetch('/admin.php/extension/listJson', { credentials: 'same-origin', headers: apiH });
+        const res = await fetch('/admin.php/extension/list', { credentials: 'same-origin', headers: apiH });
         const json = parseJson(res, await res.text());
         if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
         items.value = (json.data && json.data.items) ? json.data.items : [];
