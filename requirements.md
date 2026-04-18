@@ -2251,3 +2251,241 @@
 1. `php -l view/admin/product/index.html`
 2. `node scripts/check_i18n_keys.js --scope=all`
 3. 浏览器访问 `/admin.php/product`，点击商品链接文本应提示“已复制”，点击“打开”应新窗口打开原 URL。
+
+## 15. 2026-04-17 商机寻款直播分析（按店铺预置商品库）
+
+### 15.1 目标
+- 采用“两段式”流程：
+- 先维护店铺商品库（款式编号 + 商品图片）。
+- 每场直播仅导入指标表，系统从商品标题提取款号并回连店铺商品库。
+- 支持历史汇总、跨店铺导入、爆款分层（大爆款/畅销款/小爆款）。
+
+### 15.2 数据表（新增）
+- `growth_store_product_catalog`：店铺商品主数据（`tenant_id, store_id, style_code, product_name, image_url, status`）。
+- `growth_live_sessions`：直播场次主表（店铺、日期、场次名、文件信息、导入作业）。
+- `growth_live_product_metrics`：直播商品事实表（原始商品、指标、提取款号、匹配状态）。
+- `growth_live_style_agg`：款式聚合快照（店铺榜/全局榜，场次/7天/30天/全历史）。
+
+### 15.3 迁移脚本
+- Windows：`php database\run_migration_live_product_analysis.php`
+- Linux：`php database/run_migration_live_product_analysis.php`
+
+### 15.4 后台页面与接口
+- 页面：`/admin.php/product_search/live`
+- 店铺列表：`GET /admin.php/product_search/live/storesJson`
+- 店铺管理列表：`GET /admin.php/product_search/live/store/listJson`
+- 店铺新增/编辑：`POST /admin.php/product_search/live/store/save`
+- 店铺删除：`POST /admin.php/product_search/live/store/delete`
+- 店铺商品库查询：`GET /admin.php/product_search/live/catalog/listJson`
+- 店铺商品库导入：`POST /admin.php/product_search/live/catalog/import`
+- 直播场次导入：`POST /admin.php/product_search/live/import/create`
+- 场次列表：`GET /admin.php/product_search/live/sessionsJson`
+- 未匹配列表：`GET /admin.php/product_search/live/unmatchedJson`
+- 未匹配绑定：`POST /admin.php/product_search/live/unmatched/bind`
+- 爆款榜：`GET /admin.php/product_search/live/rankingsJson`
+- 款式详情：`GET /admin.php/product_search/live/styles/{style_code}`
+- 款式图片更新：`POST /admin.php/product_search/live/styles/{style_code}/image`
+
+### 15.5 导入模板建议字段
+1. 店铺商品库模板（至少包含款号）：
+- 必填：`style_code`（或中文别名：款号/款式编号/货号）
+- 可选：`product_name`、`image_url`
+
+2. 直播指标模板（每场直播导入）：
+- 建议：`product_id`、`product_name`、`gmv`、`impressions`、`clicks`、`add_to_cart_count`、`orders`
+- 中文列头兼容：成交额/销售额、曝光、点击、加购、订单数、支付转化率、点击率等
+
+### 15.6 匹配与分层口径
+- 匹配规则：商品标题提取款号（默认支持 `字母-数字`，如 `A-21`），按 `store_id + style_code` 精确匹配商品库。
+- 未匹配处理：进入未匹配列表，支持批量手动绑定并触发回算。
+- 综合分：`GMV 40% + CTR 20% + 加购率 20% + 支付转化率 20%`。
+- 分层规则：
+- 大爆款：`>= P90`
+- 畅销款：`P70 ~ P90`
+- 小爆款：`P50 ~ P70`
+
+### 15.7 使用步骤
+1. 打开“直播选款分析”，先进入“店铺管理”新增/维护店铺。
+2. 在页面顶部“选择店铺”切换到目标店铺。
+3. 在“店铺商品库管理”导入该店铺商品库（款号与图片）。
+4. 在“直播场次导入”按场次导入直播指标表。
+5. 在“未匹配处理”绑定未命中商品。
+6. 在“爆款榜”按窗口查看店铺榜或全局榜，进入款式详情查看趋势并维护图片。
+
+### 15.8 行为说明与异常处理
+- 同店铺同场次同商品重复导入为覆盖更新（不重复累计）。
+- 重新导入同场次时，会删除本次文件中不存在的旧商品行，保证“覆盖”语义。
+- 绑定未匹配后，会同步刷新场次匹配统计并重建聚合快照。
+- 店铺删除前会校验关联数据（商品库、直播场次、利润中心记录）；存在关联时拒绝删除，避免历史口径被破坏。
+- 店铺新增或编辑后，直播分析页会自动刷新店铺选择器并联动后续导入分析。
+- 若上传失败，优先检查：文件格式、字段名、PHP 上传大小限制、Nginx/Apache 请求体限制。
+- Windows 开发与 Linux 部署统一使用 UTF-8、正则提取与日期口径，避免路径分隔符差异导致行为不一致。
+
+### 15.18 2026-04-18 路由修复（店铺列表加载失败）
+- 问题现象：直播选款分析页“店铺管理”出现“加载店铺列表失败”，接口返回 HTML 而非 JSON。
+- 根因：`config/route.php` 使用非完整匹配（`route_complete_match=false`），`route/admin.php` 中 `GET /product_search/live` 在子接口前声明，导致 `/product_search/live/store/listJson` 被提前命中页面路由。
+- 修复措施：将 Route::get('product_search/live', ...) 调整到该路由组末尾，确保 store/listJson、storesJson、catalog/listJson 等接口优先匹配。
+- 影响范围：仅调整匹配顺序，不改动业务逻辑与数据库结构。
+
+### 15.19 回归验证（Windows）
+1. `php -l route/admin.php`
+2. `php -l app/controller/admin/ProductSearchLive.php`
+3. `curl -H "Accept: application/json" -H "X-Requested-With: XMLHttpRequest" -H "Cookie: PHPSESSID=<session>" "http://127.0.0.1:8011/admin.php/product_search/live/store/listJson"`
+- 期望结果：返回 `{"code":0,"data":{"items":[...]}}`，不再返回 HTML 页面内容。
+
+
+
+
+## 20. 2026-04-18 直播商品库 Excel 导入兼容增强
+
+- 修复 `LiveStyleAnalysisService` 在 xlsx 读取时调用 `Worksheet::getCellByColumnAndRow()` 导致的导入失败，改为坐标方式读取（Windows 开发与 Linux 部署均可用）。
+- `ProductSearchLive` 商品库导入新增“商品库专用解析链路”：
+  - 表头兼容：`编号/款号/货号/款式编号/产品编号/商品编号/商品编码`。
+  - 图片兼容：`图片/商品图片/主图/图/图片路径/图片链接`。
+  - 备注兼容：`爆款类型/备注/分类`，导入到 `growth_store_product_catalog.notes`。
+- 复用“款式检索”Excel 解析能力，支持 Office 365 `DISPIMG`/嵌入图提取，自动保存到 `/uploads/products/` 并写入 `image_url`。
+- 导入解析顺序：优先走款式检索 Excel 解析器；如遇异常自动回退通用解析器，保证任务可继续。
+- 已用样例文件 `1、耳环产品编号.xlsx` 验证：可解析 154 行，能正确识别 `A-1/A-5/...` 编号并提取图片路径。
+
+## 21. 2026-04-18 导入稳定性兜底（缺少 Torch/Python 依赖）
+
+- 问题场景：`款式检索` 导入依赖 Python + Torch 提取图片向量，若环境缺少 `torch`，会出现 `embed JSON invalid / ModuleNotFoundError: No module named torch`，导致行处理失败。
+- 修复：`ProductStyleEmbeddingService::embedFile()` 增加降级向量机制。
+  - 当脚本缺失、子进程无输出、JSON 解析失败时，自动按图片内容生成稳定向量（默认 128 维）。
+  - 默认开启：`product_search.embedding_fallback_enabled = true`（未配置时即开启）。
+  - 维度可配：`product_search.embedding_fallback_dims`（16~1024）。
+- 结果：导入链路不再因 Torch 缺失整批报错，先保证数据可入库；后续补齐 Python/Torch 后可恢复高质量特征。
+- 兼容性补充：直播商品库导入中将 `str_contains` 改为 `strpos`，并将 `catalogImport` 的 `createJob` 纳入异常捕获，确保接口持续返回 JSON 错误体而非 HTML 崩溃页。
+
+## 16. 2026-04-18 商品库大文件导入（413）修复
+
+### 16.1 问题根因
+- 线上与本地 Web 导入 `POST /admin.php/product_search/live/catalog/import` 出现 HTTP 413（Request Entity Too Large）。
+- 该错误发生在 Web 服务器层（常见于 Nginx `client_max_body_size`），请求未到达业务控制器。
+
+### 16.2 实施方案
+- 新增分片导入接口：`POST /admin.php/product_search/live/catalog/importChunk`。
+- 前端商品库导入改为 512KB 分片上传，逐片提交并显示进度。
+- 后端分片落盘后按顺序合并，再复用原有 `DataImportService + LiveStyleAnalysisService` 导入流程，保证口径一致。
+- 合并与导入完成后自动清理分片临时目录。
+
+### 16.3 兼容与提示
+- 旧接口 `catalog/import` 保留，兼容小文件与历史调用。
+- 前端在请求返回 HTTP 413 时给出明确提示，避免只显示通用“操作失败”。
+
+### 16.4 结果
+- 即使 Web 层单请求体限制较低，也可通过分片上传完成 100MB+ 商品库文件导入。
+- 导入成功后仍返回统一结构：`job_id / store_id / result(inserted,updated,skipped)`。
+
+## 17. 2026-04-18 直播商品库管理补充（编辑/删除/批量删除）
+
+### 17.1 后端接口新增
+- `POST /admin.php/product_search/live/catalog/save`：新增或编辑商品库记录。
+- `POST /admin.php/product_search/live/catalog/delete`：删除单条商品库记录。
+- `POST /admin.php/product_search/live/catalog/batchDelete`：按勾选 ID 批量删除。
+
+### 17.2 前端交互补充
+- 商品库页签新增：`新增商品`、`批量删除`、行内`编辑/删除`。
+- 表格新增多选列，支持批量操作。
+- 新增商品编辑弹窗：款式编号、商品名、图片 URL、状态、备注。
+
+### 17.3 校验规则
+- 必须先选择店铺。
+- 款式编号必填。
+- 同租户同店铺下，款式编号唯一。
+
+## 18. 2026-04-18 直播场次管理补充（编辑/删除/批量删除）
+
+### 18.1 后端接口新增
+- `POST /admin.php/product_search/live/session/save`：编辑场次日期/名称，并同步更新该场次指标行的日期与场次名。
+- `POST /admin.php/product_search/live/session/delete`：删除单个场次，并级联删除 `growth_live_product_metrics` 对应明细。
+- `POST /admin.php/product_search/live/session/batchDelete`：批量删除场次与对应指标明细。
+
+### 18.2 数据一致性处理
+- 场次编辑后自动重算 `total_rows/matched_rows/unmatched_rows`。
+- 场次编辑或删除后自动触发快照重建（`rebuildSnapshotsForAnchor`），保证榜单与汇总口径一致。
+
+### 18.3 前端交互补充
+- 直播场次表新增：多选框、行内“编辑/删除”、顶部“批量删除场次”按钮。
+- 新增“编辑直播场次”弹窗（日期、场次名称）。
+
+## 31. 2026-04-18 侧边栏菜单名称恢复 + 爆款榜可读性优化
+
+### 31.1 侧边栏（桌面端）
+- 调整 `view/admin/common/layout.html`，桌面端侧栏从图标 rail 改为“图标 + 菜单名称”的固定宽度样式。
+- 统一主菜单高亮为背景色块，移除左侧竖向蓝条，降低视觉噪音。
+- 保留“仅主菜单”展示：桌面端继续隐藏子菜单，子功能仍通过内容区上方 Tab 切换。
+- 增加桌面端状态纠偏：当存在 `sidebar-collapse` 残留类名时自动清理，避免菜单文字被折叠隐藏。
+
+### 31.2 直播选款分析 - 爆款榜
+- 调整 `view/admin/product_search/live.html` 与 `public/static/admin/live_style_analysis.js`：
+  - 榜单筛选区改为分组容器（边框+浅底），筛选控件尺寸与间距统一。
+  - KPI 卡片提升层级（统一高度、字号、留白），锚点信息改为独立文字规格。
+  - 榜单表格增加横向容器、表头浅底，关键列固定在左侧（排名/款号/图片/分层），操作列固定右侧。
+  - 数值列统一右对齐，`GMV` 使用数值格式化输出，减少阅读负担。
+- 页面脚本版本号升级：`live_style_analysis.js?v=20260418_live_style_catalog_ops3`，避免缓存导致“看不到更新”。
+
+### 31.3 验证（Windows）
+1. `php -l view/admin/common/layout.html`
+2. `node --check public/static/admin/live_style_analysis.js`
+3. 浏览器验证：
+- `/admin.php/product_search/live`：爆款榜筛选/卡片/表格布局正常，关键列固定后无需频繁横向拖动。
+- 任意后台页面：侧边栏显示主菜单文字，选中态为背景高亮，无左侧竖线。
+
+### 31.4 2026-04-18 爆款榜右侧留白修复
+- 问题：`/admin.php/product_search/live` 爆款榜在窄屏下出现右侧空白。
+- 原因：外层横向滚动容器与 `el-table` 固定列叠加，导致布局计算留白。
+- 修复：
+  - 移除榜单表的固定列（left/right fixed）。
+  - 表格滚动改为 Element Plus 内部滚动，外层容器取消 `overflow-x:auto`。
+- 影响：仅前端展示层，不改接口与数据口径。
+
+### 31.5 2026-04-18 侧边栏高亮与宽度微调
+- 根据最新 UI 反馈继续优化 `view/admin/common/layout.html`：
+  - 侧边栏宽度从 `228px` 收窄到 `214px`。
+  - 菜单 hover 态：文字和图标同步高亮（不再仅背景变化）。
+  - 菜单选中态：文字与图标使用品牌高亮色，提升可辨识度。
+- 验证：`php -l view/admin/common/layout.html`
+
+### 31.6 2026-04-18 直播选款分析图片点击放大
+- 页面：`/admin.php/product_search/live`
+- 改动：`public/static/admin/live_style_analysis.js`
+  - 商品库表、爆款榜表、详情抽屉中的图片均增加 Element Plus 预览参数：
+    - `:preview-src-list="[scope.row.image_url]"`
+    - `:preview-teleported="true"`
+  - 支持点击图片打开大图预览。
+- 改动：`view/admin/product_search/live.html`
+  - 图片 hover 光标改为 `zoom-in`，增强可点击放大提示。
+  - 脚本版本号更新为 `live_style_catalog_ops4`，避免缓存导致旧页面不生效。
+- 验证：
+  1. `node --check public/static/admin/live_style_analysis.js`
+  2. `php -l view/admin/product_search/live.html`
+
+### 31.7 2026-04-18 移动端侧栏子菜单可折叠修复
+- 问题：手机端侧栏中一级菜单的子项全部常驻展开，无法收起。
+- 根因：`view/admin/common/layout.html` 在 `@media (max-width: 992px)` 下将 `.admin-sidenav-subwrap.collapse` / `.admin-sidenav-sub2wrap.collapse` 强制为 `display:block !important`。
+- 修复：
+  - 移除移动端对 collapse 的强制展开样式，恢复 Bootstrap collapse 原生折叠行为。
+  - 恢复移动端菜单箭头显示，便于识别“可展开/收起”。
+- 验证：`php -l view/admin/common/layout.html`
+
+## 2026-04-18 支付转化率解析修复（直播选款分析）
+
+- 修复导入解析：无百分号且值为 `1` 时按 `1%` 处理，避免被误判为 `100%`。
+- 修复计算口径：`pay_cvr` 优先按 `orders_count / clicks` 计算；仅在无点击数据时回退 `payment_rate`。
+- 修复聚合口径：榜单快照 `growth_live_style_agg.pay_cvr` 改为 `SUM(orders_count) / SUM(clicks)`，不再沿用历史 `m.pay_cvr` 加权。
+- 增加快照自愈：若检测到 `orders_sum < clicks_sum` 但 `pay_cvr≈100%` 的异常快照，查询时自动重建。
+- 影响接口：`/admin.php/product_search/live/rankingsJson`、`/admin.php/product_search/live/unmatchedJson`。
+- 开发验证：
+  - `php -l app/service/LiveStyleAnalysisService.php`
+  - `php -l app/controller/admin/ProductSearchLive.php`
+## 2026-04-18 直播选款详情空数据修复
+
+- 修复前端详情请求：在“全局榜单”下点击详情不再携带当前店铺 `store_id` 过滤，避免误查空。
+- 修复后端款号匹配：`styleDetailJson` 对 `A109 / A-109 / A_109` 做统一匹配（去连接符后比对），兼容历史数据格式。
+- 同步增强：`normalizeCatalogStyleCode` 统一大写并标准化连接符，减少款号格式漂移。
+- 兼容路由参数注入差异：`styleDetailJson/styleImageUpdate` 优先读取 `style_code` 路由变量，并回退请求参数，避免款号丢失导致详情全空。
+- 前端脚本版本升级为 `20260418_live_style_catalog_ops7`，确保浏览器拉取最新逻辑。
+- 验证：
+  - `php -l app/controller/admin/ProductSearchLive.php`
+  - `node --check public/static/admin/live_style_analysis.js`

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'videotool-cache-v1';
+const CACHE_NAME = 'videotool-cache-v2';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json'
@@ -25,15 +25,24 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') {
     return;
   }
-  // 对 html 文档走网络优先，其它静态资源走缓存优先
+
+  const url = new URL(request.url);
+  // Avoid stale admin UI scripts/styles in SW cache.
+  if (url.pathname.startsWith('/admin.php') || url.pathname.startsWith('/static/admin/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // HTML: network-first, fallback to cached shell.
   if (request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(request).catch(() => caches.match('/'))
     );
     return;
   }
+
+  // Static assets: cache-first.
   event.respondWith(
     caches.match(request).then(cached => cached || fetch(request))
   );
 });
-

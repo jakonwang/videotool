@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260413_i18nfix4"></script>
-    <script src="/static/i18n/i18n.ops2.js?v=20260413_i18nfix4"></script>
+    <script src="/static/i18n/i18n.js?v=20260417_live_style_3"></script>
+    <script src="/static/i18n/i18n.ops2.js?v=20260417_live_style_3"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -60,14 +60,14 @@
             /* Sidebar: modern minimal dark style */
             --dash-sidebar-bg: #111827;
             --dash-sidebar-border: rgba(255,255,255,0.06);
-            --dash-sidebar-text: #9CA3AF;
-            --dash-sidebar-text-active: #FFFFFF;
+            --dash-sidebar-text: #8da0bc;
+            --dash-sidebar-text-active: #EAF1FF;
             --primary-rgb: 99,102,241;
-            --dash-sidebar-primary: #6366F1;
-            --dash-sidebar-hover-bg: rgba(var(--primary-rgb),0.10);
-            --dash-sidebar-hover-text: #e8f3ff;
+            --dash-sidebar-primary: #7C83FF;
+            --dash-sidebar-hover-bg: rgba(var(--primary-rgb),0.14);
+            --dash-sidebar-hover-text: #cfddff;
             --dash-sidebar-expanded-bg: rgba(var(--primary-rgb),0.16);
-            --dash-sidebar-active-bg: rgba(var(--primary-rgb),0.20);
+            --dash-sidebar-active-bg: rgba(var(--primary-rgb),0.26);
             --dash-sidebar-ease: 0.3s ease-in-out;
             --dash-sidebar-item-radius: 8px;
             --dash-sidebar-item-pad-x: 12px;
@@ -76,7 +76,7 @@
             --dash-sidebar-subitem-h: 36px;
             --dash-sidebar-tooltip-bg: rgba(15,23,42,0.96);
             --dash-sidebar-rail-w: 80px;
-            --dash-sidebar-full-w: 250px;
+            --dash-sidebar-full-w: 214px;
             --dash-topbar-h: 0px;
             --dash-footer-h: 3.25rem;
             --dash-brand-h: 80px;
@@ -137,27 +137,37 @@
         }
         @media (min-width: 993px) {
             .dark-dashboard .main-sidebar {
-                width: var(--dash-sidebar-rail-w) !important;
-                min-width: var(--dash-sidebar-rail-w);
+                width: var(--dash-sidebar-full-w) !important;
+                min-width: var(--dash-sidebar-full-w);
                 overflow: visible;
                 z-index: 1085 !important;
                 box-shadow: 4px 0 20px rgba(0,82,208,0.04);
             }
             .dark-dashboard .main-sidebar .brand-link,
             .dark-dashboard .main-sidebar .sidebar {
-                width: var(--dash-sidebar-rail-w) !important;
+                width: var(--dash-sidebar-full-w) !important;
             }
             .dark-dashboard .main-sidebar .sidebar {
                 overflow: visible !important;
             }
             .dark-dashboard .brand-link .brand-text {
-                display: none !important;
+                display: inline-flex !important;
+                align-items: center;
+                max-width: 150px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .dark-dashboard .brand-link {
+                justify-content: flex-start;
+                padding: 16px 14px 12px;
+                gap: 12px;
             }
             .dark-dashboard:not(.sidebar-collapse) .content-wrapper,
             .dark-dashboard:not(.sidebar-collapse) .main-footer,
             .dark-dashboard.sidebar-mini.sidebar-collapse .content-wrapper,
             .dark-dashboard.sidebar-mini.sidebar-collapse .main-footer {
-                margin-left: var(--dash-sidebar-rail-w) !important;
+                margin-left: var(--dash-sidebar-full-w) !important;
             }
         }
         .dark-dashboard .content-wrapper,
@@ -248,14 +258,11 @@
                 min-height: calc(100vh - var(--dash-brand-h));
                 display: flex;
                 flex-direction: column;
-                align-items: center;
-                padding: 0 0 16px;
+                align-items: stretch;
+                padding: 0 12px 16px;
+                gap: 6px;
             }
             .dark-dashboard .sidebar .admin-sidenav-section,
-            .dark-dashboard .sidebar .admin-sidenav-txt,
-            .dark-dashboard .sidebar .admin-sidenav-subtxt,
-            .dark-dashboard .sidebar .admin-sidenav-chev,
-            .dark-dashboard .sidebar .admin-sidenav-badge,
             .dark-dashboard .sidebar .admin-sidenav-footer,
             .dark-dashboard .sidebar .admin-sidenav-subwrap,
             .dark-dashboard .sidebar .admin-sidenav-sub2wrap {
@@ -263,101 +270,60 @@
             }
             .dark-dashboard .sidebar .admin-sidenav-link,
             .dark-dashboard .sidebar .admin-sidenav-group-head {
-                width: 48px;
-                height: 48px;
-                min-height: 48px;
-                justify-content: center;
-                padding: 0;
-                margin: 0 0 16px;
+                width: 100%;
+                min-height: 40px;
+                justify-content: flex-start;
+                padding: 8px 12px;
+                margin: 0;
                 border-radius: 8px;
                 color: #94a3b8;
-                overflow: visible;
+                overflow: hidden;
+                transform: none;
+            }
+            .dark-dashboard .sidebar .admin-sidenav-txt {
+                display: inline-flex !important;
+                align-items: center;
+            }
+            .dark-dashboard .sidebar .admin-sidenav-chev {
+                display: none !important;
             }
             .dark-dashboard .sidebar .admin-sidenav-link[data-tooltip]::before,
             .dark-dashboard .sidebar .admin-sidenav-group-head[data-tooltip]::before {
-                content: "";
-                position: absolute;
-                left: calc(100% + 8px);
-                top: 50%;
-                transform: translateY(-50%) translateX(-4px);
-                border-width: 6px;
-                border-style: solid;
-                border-color: transparent rgba(15,23,42,0.96) transparent transparent;
-                opacity: 0;
-                visibility: hidden;
-                pointer-events: none;
-                transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
-                z-index: 1080;
+                content: none !important;
+                display: none !important;
             }
             .dark-dashboard .sidebar .admin-sidenav-link[data-tooltip]::after,
             .dark-dashboard .sidebar .admin-sidenav-group-head[data-tooltip]::after {
-                content: attr(data-tooltip);
-                position: absolute;
-                left: calc(100% + 14px);
-                top: 50%;
-                transform: translateY(-50%) translateX(-4px);
-                min-width: max-content;
-                max-width: 180px;
-                padding: 7px 11px;
-                border-radius: 8px;
-                border: 1px solid rgba(148,163,184,0.22);
-                background: rgba(15,23,42,0.96);
-                color: #f8fafc;
-                font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
-                font-size: 12px;
-                font-weight: 700;
-                line-height: 1.2;
-                white-space: nowrap;
-                box-shadow: 0 14px 28px rgba(2,6,23,0.28);
-                opacity: 0;
-                visibility: hidden;
-                pointer-events: none;
-                transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
-                z-index: 1081;
-            }
-            .dark-dashboard .sidebar .admin-sidenav-link[data-tooltip]:hover::before,
-            .dark-dashboard .sidebar .admin-sidenav-group-head[data-tooltip]:hover::before,
-            .dark-dashboard .sidebar .admin-sidenav-link[data-tooltip]:hover::after,
-            .dark-dashboard .sidebar .admin-sidenav-group-head[data-tooltip]:hover::after {
-                opacity: 1;
-                visibility: visible;
-                transform: translateY(-50%) translateX(0);
+                content: none !important;
+                display: none !important;
             }
             .dark-dashboard .sidebar .admin-sidenav-link:hover,
             .dark-dashboard .sidebar .admin-sidenav-group-head:hover {
-                background: rgba(255,255,255,0.05);
+                background: rgba(255,255,255,0.06);
                 color: #fff;
-                transform: translateX(4px);
+                transform: none;
             }
             .dark-dashboard .sidebar .admin-sidenav-link.active,
             .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot,
             .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) {
-                background: rgba(0,82,208,0.22);
+                background: rgba(var(--primary-rgb),0.14);
                 color: #fff;
                 border-color: transparent;
             }
             .dark-dashboard .sidebar .admin-sidenav-link.active::after,
             .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot::after,
             .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed)::after {
-                content: "";
-                position: absolute;
-                left: 0;
-                top: 50%;
-                width: 4px;
-                height: 24px;
-                border-radius: 0 999px 999px 0;
-                background: #3b82f6;
-                transform: translateY(-50%);
+                content: none !important;
             }
             .dark-dashboard .sidebar .admin-sidenav-ico,
             .dark-dashboard .sidebar .admin-sidenav-ico svg {
-                width: 24px;
-                height: 24px;
+                width: 18px;
+                height: 18px;
             }
             .dark-dashboard .sidebar .admin-sidenav-link.active .admin-sidenav-ico,
             .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) .admin-sidenav-ico,
             .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot .admin-sidenav-ico {
-                color: #fff;
+                color: var(--dash-sidebar-primary);
             }
         }
         .dark-dashboard .sidebar .admin-sidenav-link:hover,
@@ -365,11 +331,23 @@
             background: var(--dash-sidebar-hover-bg);
             color: var(--dash-sidebar-hover-text);
         }
+        .dark-dashboard .sidebar .admin-sidenav-link:hover .admin-sidenav-txt,
+        .dark-dashboard .sidebar .admin-sidenav-group-head:hover .admin-sidenav-txt,
+        .dark-dashboard .sidebar .admin-sidenav-link:hover .admin-sidenav-ico,
+        .dark-dashboard .sidebar .admin-sidenav-group-head:hover .admin-sidenav-ico {
+            color: var(--dash-sidebar-hover-text);
+        }
         .dark-dashboard .sidebar .admin-sidenav-link.active {
             background: var(--dash-sidebar-active-bg);
             color: var(--dash-sidebar-text-active);
             border-color: rgba(var(--primary-rgb),0.26);
             box-shadow: none;
+        }
+        .dark-dashboard .sidebar .admin-sidenav-link.active .admin-sidenav-txt,
+        .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot .admin-sidenav-txt,
+        .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) .admin-sidenav-txt {
+            color: var(--dash-sidebar-primary);
+            font-weight: 700;
         }
         .dark-dashboard .sidebar .admin-sidenav-link.active::before,
         .dark-dashboard .sidebar .admin-sidenav-sublink.active::before,
@@ -651,6 +629,32 @@
             opacity: 1;
             visibility: visible;
             transform: translateY(-50%) translateX(0);
+        }
+        @media (min-width: 993px) {
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar {
+                margin-left: 0 !important;
+                width: var(--dash-sidebar-full-w) !important;
+            }
+            .dark-dashboard.sidebar-mini.sidebar-collapse .content-wrapper,
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-footer {
+                margin-left: var(--dash-sidebar-full-w) !important;
+            }
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-link,
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-group-head {
+                width: 100% !important;
+                min-height: 40px !important;
+                justify-content: flex-start !important;
+                padding: 8px 12px !important;
+                margin: 0 !important;
+            }
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-txt {
+                display: inline-flex !important;
+            }
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-subwrap,
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-sub2wrap,
+            .dark-dashboard.sidebar-mini.sidebar-collapse .main-sidebar .admin-sidenav-footer {
+                display: none !important;
+            }
         }
 
         .dark-dashboard .sidebar .admin-sidenav-footer {
@@ -1725,14 +1729,10 @@
             letter-spacing: 0;
         }
         @media (max-width: 992px) {
-            .dark-dashboard .sidebar .admin-sidenav-subwrap.collapse,
-            .dark-dashboard .sidebar .admin-sidenav-sub2wrap.collapse {
-                display: block !important;
-                height: auto !important;
-            }
             .dark-dashboard .sidebar .admin-sidenav-group-head .admin-sidenav-chev,
             .dark-dashboard .sidebar .admin-sidenav-subgroup-head .admin-sidenav-chev {
-                display: none !important;
+                display: inline-flex !important;
+                opacity: 0.8;
             }
             .admin-content-tab {
                 min-height: 32px;
@@ -2387,7 +2387,19 @@
                         href: item.href
                     });
                     $a.append($('<span/>', { class: 'admin-content-tab-ico' }).append($('<i/>').attr('data-lucide', item.icon)));
-                    const $text = $('<span/>', { class: 'admin-content-tab-text', text: item.text || item.i18nKey || item.href });
+                    let resolvedText = item.text || item.i18nKey || item.href;
+                    if (item.i18nKey && window.AppI18n && typeof window.AppI18n.t === 'function') {
+                        const tr = window.AppI18n.t(item.i18nKey, null, window.AppI18n.getLang('zh'));
+                        if (tr && tr !== item.i18nKey) {
+                            resolvedText = tr;
+                        } else if (item.i18nKey === 'admin.menu.liveStyleAnalysis') {
+                            resolvedText = '直播选款分析';
+                        }
+                    }
+                    if (item.i18nKey === 'admin.menu.liveStyleAnalysis' && (!resolvedText || resolvedText === item.i18nKey || resolvedText === 'admin.menu.liveStyleAnalysis')) {
+                        resolvedText = '直播选款分析';
+                    }
+                    const $text = $('<span/>', { class: 'admin-content-tab-text', text: resolvedText });
                     if (item.i18nKey) $text.attr('data-i18n', item.i18nKey);
                     $a.append($text);
                     $tabs.append($a);
@@ -2415,6 +2427,23 @@
             window.AdminSidebarRail = { refreshTabs: renderContentTabs };
             renderContentTabs();
         });
+    </script>
+    <script>
+        (function () {
+            const mq = window.matchMedia('(min-width: 993px)');
+            function syncDesktopSidebarState() {
+                if (!document.body) return;
+                if (mq.matches) {
+                    document.body.classList.remove('sidebar-collapse');
+                }
+            }
+            syncDesktopSidebarState();
+            if (typeof mq.addEventListener === 'function') {
+                mq.addEventListener('change', syncDesktopSidebarState);
+            } else if (typeof mq.addListener === 'function') {
+                mq.addListener(syncDesktopSidebarState);
+            }
+        })();
     </script>
     <script>
         // Global logout

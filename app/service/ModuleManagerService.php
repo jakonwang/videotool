@@ -1083,6 +1083,13 @@ class ModuleManagerService
                 ],
                 [
                     'kind' => 'link',
+                    'href' => '/admin.php/product_search/live',
+                    'icon' => 'activity',
+                    'text_i18n' => 'admin.menu.liveStyleAnalysis',
+                    'active' => self::controllerIs($currentController, 'productsearchlive', 'product_search_live'),
+                ],
+                [
+                    'kind' => 'link',
                     'href' => '/admin.php/offline_order',
                     'icon' => 'shopping-cart',
                     'text_i18n' => 'admin.menu.offlineOrders',

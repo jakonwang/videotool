@@ -9,6 +9,7 @@
     zh: {
       'admin.menu.groupSearch': '商机寻款',
       'admin.menu.styleSearch': '款式检索',
+      'admin.menu.liveStyleAnalysis': '直播选款分析',
       'admin.menu.growthHub': '增长中台',
       'admin.menu.growthHubMenu': '增长中台',
       'admin.menu.groupCreator': '达人运营',
@@ -361,6 +362,7 @@
     en: {
       'admin.menu.groupSearch': 'Opportunity Search',
       'admin.menu.styleSearch': 'Style Search',
+      'admin.menu.liveStyleAnalysis': 'Live Style Analysis',
       'admin.menu.growthHub': 'Growth Hub',
       'admin.menu.growthHubMenu': 'Growth Hub',
       'admin.menu.groupCreator': 'Creator Operations',
@@ -713,6 +715,7 @@
     vi: {
       'admin.menu.groupSearch': 'Tìm kiếm cơ hội',
       'admin.menu.styleSearch': 'Tra cứu mẫu',
+      'admin.menu.liveStyleAnalysis': 'Phân tích mẫu live',
       'admin.menu.growthHub': 'Trung tâm tăng trưởng',
       'admin.menu.growthHubMenu': 'Trung tâm tăng trưởng',
       'admin.menu.groupCreator': 'Vận hành influencer',
