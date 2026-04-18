@@ -163,8 +163,13 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('product_search/live/unmatched/bind', 'app\controller\admin\ProductSearchLive@unmatchedBind');
     Route::get('product_search/live/rankings', 'app\controller\admin\ProductSearchLive@rankingsJson');
     Route::get('product_search/live/rankingsJson', 'app\controller\admin\ProductSearchLive@rankingsJson');
-    Route::get('product_search/live/styles/<style_code>', 'app\controller\admin\ProductSearchLive@styleDetailJson');
-    Route::post('product_search/live/styles/<style_code>/image', 'app\controller\admin\ProductSearchLive@styleImageUpdate');
+    // Stable detail/image APIs (query-style), avoid path-param parsing issues under non-complete route match.
+    Route::get('product_search/live/styleDetail', 'app\controller\admin\ProductSearchLive@styleDetailJson');
+    Route::get('product_search/live/styleDetailJson', 'app\controller\admin\ProductSearchLive@styleDetailJson');
+    Route::post('product_search/live/styleImageUpdate', 'app\controller\admin\ProductSearchLive@styleImageUpdate');
+    // Keep path-style routes for backward compatibility.
+    Route::get('product_search/live/styles/<style_code:[^/]+>', 'app\controller\admin\ProductSearchLive@styleDetailJson');
+    Route::post('product_search/live/styles/<style_code:[^/]+>/image', 'app\controller\admin\ProductSearchLive@styleImageUpdate');
     Route::get('product_search/live', 'app\controller\admin\ProductSearchLive@index');
     Route::get('product_search', 'app\controller\admin\ProductSearch@index');
     Route::get('offline_order/list', 'app\controller\admin\OfflineOrder@listJson');

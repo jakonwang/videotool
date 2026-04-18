@@ -31,8 +31,19 @@
   };
 
   function parseJson(text) {
+    if (typeof text !== 'string') {
+      return null;
+    }
+    var raw = text;
+    if (raw.charCodeAt(0) === 0xfeff) {
+      raw = raw.slice(1);
+    }
+    raw = raw.trim();
+    if (!raw) {
+      return null;
+    }
     try {
-      return JSON.parse(text);
+      return JSON.parse(raw);
     } catch (e) {
       return null;
     }
@@ -44,6 +55,9 @@
       if (i18nMsg && i18nMsg !== String(json.error_key)) {
         return i18nMsg;
       }
+    }
+    if (json && json.data && typeof json.data.message === 'string' && json.data.message) {
+      return String(json.data.message);
     }
     if (json && typeof json.msg === 'string' && json.msg) {
       var msgKey = String(json.msg);
@@ -122,6 +136,58 @@
     return n.toFixed(d);
   }
 
+  function moneyDigits(currency) {
+    var cur = String(currency || '').toUpperCase();
+    if (cur === 'VND') return 0;
+    return 2;
+  }
+
+  function fmtMoney(v, currency) {
+    var n = Number(v || 0);
+    if (!isFinite(n)) return '--';
+    var cur = String(currency || 'CNY').toUpperCase();
+    var d = moneyDigits(cur);
+    try {
+      return new Intl.NumberFormat('zh-CN', {
+        minimumFractionDigits: d,
+        maximumFractionDigits: d,
+      }).format(n) + ' ' + cur;
+    } catch (e) {
+      return n.toFixed(d) + ' ' + cur;
+    }
+  }
+
+  function fmtCny(v) {
+    var n = Number(v || 0);
+    if (!isFinite(n)) return '¥0.00';
+    try {
+      return '¥' + new Intl.NumberFormat('zh-CN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n);
+    } catch (e) {
+      return '¥' + n.toFixed(2);
+    }
+  }
+
+  function currencyLabel(code) {
+    var cur = String(code || 'CNY').toUpperCase();
+    if (cur === 'USD') return '美元 (USD)';
+    if (cur === 'VND') return '越南盾 (VND)';
+    if (cur === 'MIXED') return '混合币种';
+    return '人民币 (CNY)';
+  }
+
+  function fxStatusLabel(status) {
+    var s = String(status || '').toLowerCase();
+    if (s === 'exact') return '实时汇率';
+    if (s === 'fallback_latest') return '最近汇率回退';
+    if (s === 'identity') return '同币种';
+    return '汇率缺失';
+  }
+
+  var storeCurrencyOptions = ['VND', 'USD', 'CNY'];
+
   createApp({
     setup: function () {
       var CATALOG_CHUNK_SIZE = 512 * 1024;
@@ -137,10 +203,12 @@
       });
       var storeDialogVisible = ref(false);
       var storeSaving = ref(false);
+      var storeLoadErrorNotified = false;
       var storeForm = reactive({
         id: 0,
         store_name: '',
         store_code: '',
+        default_gmv_currency: 'VND',
         status: 1,
         notes: '',
       });
@@ -239,12 +307,19 @@
           product_count: 0,
           session_count: 0,
           gmv_sum: 0,
+          gmv_cny_sum: 0,
           impressions_sum: 0,
           clicks_sum: 0,
           add_to_cart_sum: 0,
           orders_sum: 0,
           ctr: 0,
           add_to_cart_rate: 0,
+        },
+        currency: {
+          gmv_currency: 'VND',
+          gmv_currency_label: '越南盾 (VND)',
+          base_currency: 'CNY',
+          fx_status: 'exact',
         },
         trend: [],
         catalog_items: [],
@@ -288,6 +363,7 @@
         storeForm.id = Number((row && row.id) || 0);
         storeForm.store_name = String((row && row.store_name) || '');
         storeForm.store_code = String((row && row.store_code) || '');
+        storeForm.default_gmv_currency = String((row && (row.default_gmv_currency || row.gmv_currency)) || 'VND').toUpperCase();
         storeForm.status = Number((row && row.status) || 1) === 0 ? 0 : 1;
         storeForm.notes = String((row && row.notes) || '');
       }
@@ -353,7 +429,16 @@
         sessionSelection.value = Array.isArray(rows) ? rows : [];
       }
 
-      async function fetchStoreManager() {
+      function showStoreLoadError(message) {
+        if (storeLoadErrorNotified) return;
+        storeLoadErrorNotified = true;
+        ElMessage.error(message || '加载店铺失败');
+        window.setTimeout(function () {
+          storeLoadErrorNotified = false;
+        }, 1200);
+      }
+
+      async function fetchStoreManager(silent) {
         storeManager.loading = true;
         try {
           var data = await apiGet(
@@ -366,13 +451,18 @@
           );
           storeManager.items = Array.isArray(data.items) ? data.items : [];
         } catch (e) {
-          ElMessage.error(e.message || '加载店铺列表失败');
+          var msg = e.message || '加载店铺列表失败';
+          if (silent) {
+            showStoreLoadError(msg);
+          } else {
+            ElMessage.error(msg);
+          }
         } finally {
           storeManager.loading = false;
         }
       }
 
-      async function fetchStores(preferredStoreId) {
+      async function fetchStores(preferredStoreId, silent) {
         storesLoading.value = true;
         try {
           var data = await apiGet('/admin.php/product_search/live/store/listJson', { status: 1 }, '加载店铺失败');
@@ -387,7 +477,12 @@
             selectedStoreId.value = 0;
           }
         } catch (e) {
-          ElMessage.error(e.message || '加载店铺失败');
+          var msg = e.message || '加载店铺失败';
+          if (silent) {
+            showStoreLoadError(msg);
+          } else {
+            ElMessage.error(msg);
+          }
         } finally {
           storesLoading.value = false;
         }
@@ -406,6 +501,7 @@
               id: Number(storeForm.id || 0),
               store_name: storeForm.store_name,
               store_code: storeForm.store_code,
+              default_gmv_currency: String(storeForm.default_gmv_currency || 'VND').toUpperCase(),
               status: Number(storeForm.status || 0) === 0 ? 0 : 1,
               notes: storeForm.notes,
             },
@@ -416,7 +512,7 @@
           ElMessage.success('店铺保存成功');
           storeDialogVisible.value = false;
           await fetchStoreManager();
-          await fetchStores(keepId > 0 ? keepId : undefined);
+          await fetchStores(keepId > 0 ? keepId : undefined, true);
           await onStoreChange();
         } catch (e) {
           ElMessage.error(e.message || '店铺保存失败');
@@ -440,7 +536,7 @@
             keepId = 0;
           }
           await fetchStoreManager();
-          await fetchStores(keepId);
+          await fetchStores(keepId, true);
           await onStoreChange();
         } catch (e) {
           if (e !== 'cancel' && e !== 'close') {
@@ -916,16 +1012,27 @@
         var styleCode = row && row.style_code ? String(row.style_code) : '';
         if (!styleCode) return;
         var detailStoreId = ranking.scope === 'store' ? (selectedStoreId.value || '') : '';
+        var detailStore = stores.value.find(function (s) {
+          return Number(s.id || 0) === Number(detailStoreId || 0);
+        }) || null;
+        var defaultCurrency = detailStore && detailStore.gmv_currency ? String(detailStore.gmv_currency) : 'VND';
         detailVisible.value = true;
         detailLoading.value = true;
         detail.style_code = styleCode;
         detail.image_store_id = detailStoreId ? Number(detailStoreId) : 0;
         detail.image_url_input = '';
         detail.error_message = '';
+        detail.currency = {
+          gmv_currency: defaultCurrency,
+          gmv_currency_label: currencyLabel(defaultCurrency),
+          base_currency: 'CNY',
+          fx_status: defaultCurrency === 'CNY' ? 'identity' : 'exact',
+        };
         if (row) {
           detail.summary = Object.assign({}, detail.summary, {
             session_count: Number(row.session_count || 0),
             gmv_sum: Number(row.gmv_sum || 0),
+            gmv_cny_sum: Number(row.gmv_cny_sum || 0),
             impressions_sum: Number(row.impressions_sum || 0),
             clicks_sum: Number(row.clicks_sum || 0),
             add_to_cart_sum: Number(row.add_to_cart_sum || 0),
@@ -936,11 +1043,12 @@
         }
         try {
           var data = await apiGet(
-            '/admin.php/product_search/live/styles/' + encodeURIComponent(styleCode),
-            { store_id: detailStoreId },
+            '/admin.php/product_search/live/styleDetailJson',
+            { store_id: detailStoreId, style_code: styleCode },
             '加载款式详情失败'
           );
           detail.summary = Object.assign({}, detail.summary, data.summary || {});
+          detail.currency = Object.assign({}, detail.currency, data.currency || {});
           detail.trend = Array.isArray(data.trend) ? data.trend : [];
           detail.catalog_items = Array.isArray(data.catalog_items) ? data.catalog_items : [];
           if (!detail.image_store_id && detail.catalog_items.length > 0) {
@@ -972,8 +1080,9 @@
           var fd = new FormData();
           fd.append('store_id', String(detail.image_store_id));
           fd.append('image_url', detail.image_url_input);
+          fd.append('style_code', detail.style_code);
           await apiUpload(
-            '/admin.php/product_search/live/styles/' + encodeURIComponent(detail.style_code) + '/image',
+            '/admin.php/product_search/live/styleImageUpdate',
             fd,
             '更新图片失败'
           );
@@ -1007,8 +1116,9 @@
           var fd = new FormData();
           fd.append('store_id', String(detail.image_store_id));
           fd.append('image', file);
+          fd.append('style_code', detail.style_code);
           await apiUpload(
-            '/admin.php/product_search/live/styles/' + encodeURIComponent(detail.style_code) + '/image',
+            '/admin.php/product_search/live/styleImageUpdate',
             fd,
             '上传图片失败'
           );
@@ -1050,8 +1160,8 @@
         resetStoreForm();
         resetCatalogForm();
         resetSessionForm();
-        await fetchStoreManager();
-        await fetchStores();
+        await fetchStoreManager(true);
+        await fetchStores(undefined, true);
         if (selectedStoreId.value) {
           await fetchCatalog();
           await fetchSessions();
@@ -1077,6 +1187,7 @@
         saveStore: saveStore,
         deleteStore: deleteStore,
         resetStoreForm: resetStoreForm,
+        storeCurrencyOptions: storeCurrencyOptions,
 
         catalog: catalog,
         catalogImporting: catalogImporting,
@@ -1130,6 +1241,10 @@
         tierType: tierType,
         fmtPercent: fmtPercent,
         fmtNum: fmtNum,
+        fmtMoney: fmtMoney,
+        fmtCny: fmtCny,
+        currencyLabel: currencyLabel,
+        fxStatusLabel: fxStatusLabel,
         sessionOptions: sessionOptions,
         detailTitle: detailTitle,
 
@@ -1148,7 +1263,12 @@
 <div class="admin-modern-card live-style-layout">
   <div class="live-style-toolbar">
     <el-select v-model="selectedStoreId" filterable clearable placeholder="选择店铺" :loading="storesLoading" @change="onStoreChange">
-      <el-option v-for="s in stores" :key="s.id" :label="s.store_name + (s.store_code ? (' (' + s.store_code + ')') : '')" :value="Number(s.id)" />
+      <el-option
+        v-for="s in stores"
+        :key="s.id"
+        :label="s.store_name + (s.store_code ? (' (' + s.store_code + ')') : '') + ' · ' + (s.default_gmv_currency || s.gmv_currency || 'VND')"
+        :value="Number(s.id)"
+      />
     </el-select>
     <el-button @click="activeTab='store_manage'">店铺管理</el-button>
     <span class="live-style-muted">店铺商品图片与款式编号来自店铺商品库，直播表只导入指标数据。</span>
@@ -1171,6 +1291,9 @@
         <el-table-column prop="id" label="ID" width="90" />
         <el-table-column prop="store_name" label="店铺名称" min-width="180" />
         <el-table-column prop="store_code" label="店铺编码" min-width="140" />
+        <el-table-column prop="default_gmv_currency" label="GMV币种" width="120">
+          <template #default="scope">{{ scope.row.default_gmv_currency || scope.row.gmv_currency || 'VND' }}</template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="90">
           <template #default="scope">
             <el-tag :type="Number(scope.row.status)===1?'success':'info'">{{ Number(scope.row.status)===1 ? "启用" : "停用" }}</el-tag>
@@ -1451,6 +1574,11 @@
       <el-form-item label="店铺编码">
         <el-input v-model="storeForm.store_code" placeholder="如：VN-TT-01" />
       </el-form-item>
+      <el-form-item label="GMV币种">
+        <el-select v-model="storeForm.default_gmv_currency" placeholder="选择GMV币种">
+          <el-option v-for="c in storeCurrencyOptions" :key="'sgmv'+c" :label="c" :value="c" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="状态">
         <el-switch v-model="storeForm.status" :active-value="1" :inactive-value="0" />
       </el-form-item>
@@ -1515,41 +1643,80 @@
         :closable="false"
         style="margin-bottom:12px;"
       />
+      <el-alert
+        v-if="detail.currency && detail.currency.gmv_currency === 'MIXED'"
+        title="当前明细包含多个店铺币种，原币GMV仅供参考，已提供人民币折算金额"
+        type="warning"
+        :closable="false"
+        style="margin-bottom:12px;"
+      />
       <div class="live-style-summary-grid">
-        <div class="live-style-summary-card"><div class="label">场次覆盖</div><div class="value">{{ Number(detail.summary.session_count || 0) }}</div></div>
-        <div class="live-style-summary-card"><div class="label">GMV汇总</div><div class="value">{{ fmtNum(detail.summary.gmv_sum, 2) }}</div></div>
-        <div class="live-style-summary-card"><div class="label">CTR</div><div class="value">{{ fmtPercent(detail.summary.ctr, 2) }}</div></div>
-        <div class="live-style-summary-card"><div class="label">加购率</div><div class="value">{{ fmtPercent(detail.summary.add_to_cart_rate, 2) }}</div></div>
+        <div class="live-style-summary-card">
+          <div class="label">场次覆盖</div>
+          <div class="value">{{ Number(detail.summary.session_count || 0) }}</div>
+          <div class="sub">商品记录 {{ Number(detail.summary.product_count || 0) }} 条</div>
+        </div>
+        <div class="live-style-summary-card">
+          <div class="label">GMV原币（{{ detail.currency && detail.currency.gmv_currency ? detail.currency.gmv_currency : 'CNY' }}）</div>
+          <div class="value live-style-money">{{ fmtMoney(detail.summary.gmv_sum, detail.currency && detail.currency.gmv_currency ? detail.currency.gmv_currency : 'CNY') }}</div>
+          <div class="sub">{{ detail.currency && detail.currency.gmv_currency_label ? detail.currency.gmv_currency_label : currencyLabel('VND') }}</div>
+        </div>
+        <div class="live-style-summary-card">
+          <div class="label">折合人民币（CNY）</div>
+          <div class="value live-style-money-cny">{{ fmtCny(detail.summary.gmv_cny_sum) }}</div>
+          <div class="sub">汇率状态：{{ fxStatusLabel(detail.currency && detail.currency.fx_status ? detail.currency.fx_status : '') }}</div>
+        </div>
+        <div class="live-style-summary-card">
+          <div class="label">CTR</div>
+          <div class="value">{{ fmtPercent(detail.summary.ctr, 2) }}</div>
+          <div class="sub">点击 {{ Number(detail.summary.clicks_sum || 0) }}</div>
+        </div>
+        <div class="live-style-summary-card">
+          <div class="label">加购率</div>
+          <div class="value">{{ fmtPercent(detail.summary.add_to_cart_rate, 2) }}</div>
+          <div class="sub">加购 {{ Number(detail.summary.add_to_cart_sum || 0) }}</div>
+        </div>
       </div>
 
-      <div class="live-style-toolbar">
-        <el-select v-model="detail.image_store_id" filterable placeholder="选择店铺">
-          <el-option v-for="s in stores" :key="s.id" :label="s.store_name" :value="Number(s.id)" />
+      <div class="live-style-detail-media-bar">
+        <el-select v-model="detail.image_store_id" filterable placeholder="选择店铺（用于维护图片）">
+          <el-option
+            v-for="s in stores"
+            :key="s.id"
+            :label="s.store_name + ' · ' + (s.default_gmv_currency || s.gmv_currency || 'VND')"
+            :value="Number(s.id)"
+          />
         </el-select>
         <el-input v-model="detail.image_url_input" placeholder="图片URL（可选）" />
-        <el-button type="primary" :loading="detailImageLoading" @click="updateImageWithUrl">更新图片URL</el-button>
+        <el-button type="primary" :loading="detailImageLoading" @click="updateImageWithUrl">更新图片 URL</el-button>
         <el-button :loading="detailImageLoading" @click="triggerDetailImageFile">上传图片文件</el-button>
         <input ref="detailImageInput" type="file" accept=".jpg,.jpeg,.png,.gif,.webp" style="display:none" @change="onDetailImageChange" />
       </div>
 
-      <el-table :data="detail.trend" stripe size="small">
-        <el-table-column prop="session_date" label="日期" width="120" />
-        <el-table-column prop="gmv_sum" label="GMV" width="110" />
-        <el-table-column prop="impressions_sum" label="曝光" width="100" />
-        <el-table-column prop="clicks_sum" label="点击" width="100" />
-        <el-table-column prop="add_to_cart_sum" label="加购" width="100" />
-        <el-table-column prop="orders_sum" label="订单" width="100" />
-        <el-table-column label="CTR" width="100"><template #default="scope">{{ fmtPercent(scope.row.ctr, 2) }}</template></el-table-column>
-        <el-table-column label="加购率" width="100"><template #default="scope">{{ fmtPercent(scope.row.add_to_cart_rate, 2) }}</template></el-table-column>
+      <div class="live-style-section-title">日期趋势</div>
+      <el-table class="live-style-detail-table" :data="detail.trend" stripe>
+        <el-table-column prop="session_date" label="日期" min-width="120" />
+        <el-table-column label="GMV原币" min-width="180" align="right">
+          <template #default="scope">{{ fmtMoney(scope.row.gmv_sum, scope.row.gmv_currency || (detail.currency && detail.currency.gmv_currency ? detail.currency.gmv_currency : 'VND')) }}</template>
+        </el-table-column>
+        <el-table-column label="GMV(CNY)" min-width="160" align="right">
+          <template #default="scope">{{ fmtCny(scope.row.gmv_cny_sum) }}</template>
+        </el-table-column>
+        <el-table-column prop="impressions_sum" label="曝光" min-width="100" align="right" />
+        <el-table-column prop="clicks_sum" label="点击" min-width="90" align="right" />
+        <el-table-column prop="add_to_cart_sum" label="加购" min-width="90" align="right" />
+        <el-table-column prop="orders_sum" label="订单" min-width="90" align="right" />
+        <el-table-column label="CTR" min-width="90" align="right"><template #default="scope">{{ fmtPercent(scope.row.ctr, 2) }}</template></el-table-column>
+        <el-table-column label="加购率" min-width="100" align="right"><template #default="scope">{{ fmtPercent(scope.row.add_to_cart_rate, 2) }}</template></el-table-column>
       </el-table>
 
-      <div style="margin-top:12px;">
-        <div class="live-style-muted" style="margin-bottom:8px;">店铺商品库记录</div>
-        <el-table :data="detail.catalog_items" stripe size="small">
-          <el-table-column prop="store_id" label="店铺ID" width="90" />
-          <el-table-column prop="style_code" label="款式编号" width="120" />
+      <div class="live-style-detail-catalog">
+        <div class="live-style-section-title">店铺商品库记录</div>
+        <el-table class="live-style-detail-table" :data="detail.catalog_items" stripe>
+          <el-table-column prop="store_id" label="店铺ID" min-width="100" />
+          <el-table-column prop="style_code" label="款式编号" min-width="120" />
           <el-table-column prop="product_name" label="商品名" min-width="180" />
-          <el-table-column label="图片" width="110">
+          <el-table-column label="图片" min-width="110">
             <template #default="scope">
               <div class="live-style-image-box">
                 <el-image
@@ -1562,7 +1729,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" label="更新时间" width="170" />
+          <el-table-column prop="updated_at" label="更新时间" min-width="170" />
         </el-table>
       </div>
     </div>

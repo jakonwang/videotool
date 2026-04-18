@@ -24,6 +24,7 @@ class GrowthProfitStore extends Model
         'default_influencer_commission_rate' => 'float',
         'default_live_wage_hourly_cny' => 'float',
         'default_timezone' => 'string',
+        'default_gmv_currency' => 'string',
         'status' => 'int',
         'notes' => 'string',
         'created_at' => 'datetime',

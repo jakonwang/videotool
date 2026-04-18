@@ -1285,6 +1285,7 @@
         default_influencer_commission_rate: 0,
         default_live_wage_hourly_cny: 0,
         default_timezone: 'Asia/Bangkok',
+        default_gmv_currency: 'VND',
         status: 1,
         notes: ''
       });
@@ -1907,11 +1908,12 @@
         storeForm.default_influencer_commission_rate = Number(row.default_influencer_commission_rate || 0);
         storeForm.default_live_wage_hourly_cny = Number(row.default_live_wage_hourly_cny || 0);
         storeForm.default_timezone = row.default_timezone || 'Asia/Bangkok';
+        storeForm.default_gmv_currency = String(row.default_gmv_currency || 'VND');
         storeForm.status = Number(row.status || 1);
         storeForm.notes = row.notes || '';
       }
 
-      function resetStoreForm() { fillStoreForm({ id: 0, status: 1, default_timezone: 'Asia/Bangkok' }); }
+      function resetStoreForm() { fillStoreForm({ id: 0, status: 1, default_timezone: 'Asia/Bangkok', default_gmv_currency: 'VND' }); }
 
       async function saveStore() {
         if (!storeForm.store_name) {
@@ -2721,6 +2723,7 @@
               <el-form-item :label="tt('page.profitCenter.cancelRateInfluencer')"><el-input-number class="pc-full" v-model="storeForm.default_cancel_rate_influencer" :precision="4" :min="0" :max="1" /></el-form-item>
               <el-form-item :label="tt('page.profitCenter.platformFeeRate')"><el-input-number class="pc-full" v-model="storeForm.default_platform_fee_rate" :precision="4" :min="0" :max="1" /></el-form-item>
               <el-form-item :label="tt('page.profitCenter.commissionRate')"><el-input-number class="pc-full" v-model="storeForm.default_influencer_commission_rate" :precision="4" :min="0" :max="1" /></el-form-item>
+              <el-form-item :label="tt('page.profitCenter.storeDefaultGmvCurrency')"><el-select class="pc-full" v-model="storeForm.default_gmv_currency"><el-option v-for="c in currencyOptions" :key="'sgc'+c" :label="c" :value="c" /></el-select></el-form-item>
               <el-form-item :label="tt('common.status')"><el-switch v-model="storeForm.status" :active-value="1" :inactive-value="0" /></el-form-item>
             </div>
             <el-form-item>

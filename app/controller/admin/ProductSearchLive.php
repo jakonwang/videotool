@@ -6,6 +6,7 @@ namespace app\controller\admin;
 use app\BaseController;
 use app\service\ChunkUploadService;
 use app\service\DataImportService;
+use app\service\FxRateService;
 use app\service\LiveStyleAnalysisService;
 use think\facade\Db;
 use think\facade\Log;
@@ -40,29 +41,51 @@ class ProductSearchLive extends BaseController
             return $this->jsonOk(['items' => []]);
         }
 
-        $query = Db::name('growth_profit_stores')->order('id', 'desc');
-        $query = $this->scopeTenant($query, 'growth_profit_stores');
+        try {
+            $query = Db::name('growth_profit_stores')->order('id', 'desc');
+            $query = $this->scopeTenant($query, 'growth_profit_stores');
 
-        $hasStatus = is_array($fields) && array_key_exists('status', $fields);
-        if ($status !== '' && $hasStatus) {
-            $query->where('status', (int) $status === 0 ? 0 : 1);
-        }
-        $rows = $query->select()->toArray();
-        $items = [];
-        foreach ($rows as $row) {
-            $storeName = (string) ($row['store_name'] ?? '');
-            if ($storeName === '') {
-                $storeName = (string) ($row['name'] ?? '');
+            $hasStatus = is_array($fields) && array_key_exists('status', $fields);
+            if ($status !== '' && $hasStatus) {
+                $query->where('status', (int) $status === 0 ? 0 : 1);
             }
-            $items[] = [
-                'id' => (int) ($row['id'] ?? 0),
-                'store_code' => (string) ($row['store_code'] ?? ''),
-                'store_name' => $storeName,
-                'status' => $hasStatus ? (int) ($row['status'] ?? 1) : 1,
-                'updated_at' => (string) ($row['updated_at'] ?? ''),
-            ];
+            $rows = $query->select()->toArray();
+            $storeIds = [];
+            foreach ($rows as $row) {
+                $sid = (int) ($row['id'] ?? 0);
+                if ($sid > 0) {
+                    $storeIds[] = $sid;
+                }
+            }
+            $storeCurrencyMap = $this->loadStoreGmvCurrencyMap($storeIds);
+            $items = [];
+            foreach ($rows as $row) {
+                $sid = (int) ($row['id'] ?? 0);
+                $storeName = (string) ($row['store_name'] ?? '');
+                if ($storeName === '') {
+                    $storeName = (string) ($row['name'] ?? '');
+                }
+                $defaultGmvCurrency = (string) ($storeCurrencyMap[$sid] ?? 'VND');
+                $items[] = [
+                    'id' => $sid,
+                    'store_code' => (string) ($row['store_code'] ?? ''),
+                    'store_name' => $storeName,
+                    'default_gmv_currency' => $defaultGmvCurrency,
+                    'gmv_currency' => $defaultGmvCurrency,
+                    'status' => $hasStatus ? (int) ($row['status'] ?? 1) : 1,
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                ];
+            }
+
+            return $this->jsonOk(['items' => $items]);
+        } catch (\Throwable $e) {
+            try {
+                Log::error('live_stores_json_failed ' . $e->getMessage());
+            } catch (\Throwable $ignore) {
+            }
+
+            return $this->jsonOk(['items' => []]);
         }
-        return $this->jsonOk(['items' => $items]);
     }
 
     public function storeListJson()
@@ -84,39 +107,60 @@ class ProductSearchLive extends BaseController
             return $this->jsonOk(['items' => []]);
         }
 
-        $query = Db::name('growth_profit_stores')->order('id', 'desc');
-        $query = $this->scopeTenant($query, 'growth_profit_stores');
-        if ($status !== '' && $hasStatus) {
-            $query->where('status', (int) $status === 0 ? 0 : 1);
-        }
-        if ($keyword !== '') {
-            $query->where(function ($q) use ($keyword, $nameCol, $hasStoreCode): void {
-                $kw = '%' . $keyword . '%';
-                $q->where($nameCol, 'like', $kw);
-                if ($hasStoreCode) {
-                    $q->whereOr('store_code', 'like', $kw);
-                }
-            });
-        }
-
-        $rows = $query->select()->toArray();
-        $items = [];
-        foreach ($rows as $row) {
-            $storeName = (string) ($row['store_name'] ?? '');
-            if ($storeName === '') {
-                $storeName = (string) ($row['name'] ?? '');
+        try {
+            $query = Db::name('growth_profit_stores')->order('id', 'desc');
+            $query = $this->scopeTenant($query, 'growth_profit_stores');
+            if ($status !== '' && $hasStatus) {
+                $query->where('status', (int) $status === 0 ? 0 : 1);
             }
-            $items[] = [
-                'id' => (int) ($row['id'] ?? 0),
-                'store_code' => (string) ($row['store_code'] ?? ''),
-                'store_name' => $storeName,
-                'status' => $hasStatus ? (int) ($row['status'] ?? 1) : 1,
-                'notes' => (string) ($row['notes'] ?? ''),
-                'updated_at' => (string) ($row['updated_at'] ?? ''),
-            ];
-        }
+            if ($keyword !== '') {
+                $query->where(function ($q) use ($keyword, $nameCol, $hasStoreCode): void {
+                    $kw = '%' . $keyword . '%';
+                    $q->where($nameCol, 'like', $kw);
+                    if ($hasStoreCode) {
+                        $q->whereOr('store_code', 'like', $kw);
+                    }
+                });
+            }
 
-        return $this->jsonOk(['items' => $items]);
+            $rows = $query->select()->toArray();
+            $storeIds = [];
+            foreach ($rows as $row) {
+                $sid = (int) ($row['id'] ?? 0);
+                if ($sid > 0) {
+                    $storeIds[] = $sid;
+                }
+            }
+            $storeCurrencyMap = $this->loadStoreGmvCurrencyMap($storeIds);
+            $items = [];
+            foreach ($rows as $row) {
+                $sid = (int) ($row['id'] ?? 0);
+                $storeName = (string) ($row['store_name'] ?? '');
+                if ($storeName === '') {
+                    $storeName = (string) ($row['name'] ?? '');
+                }
+                $defaultGmvCurrency = (string) ($storeCurrencyMap[$sid] ?? 'VND');
+                $items[] = [
+                    'id' => $sid,
+                    'store_code' => (string) ($row['store_code'] ?? ''),
+                    'store_name' => $storeName,
+                    'default_gmv_currency' => $defaultGmvCurrency,
+                    'gmv_currency' => $defaultGmvCurrency,
+                    'status' => $hasStatus ? (int) ($row['status'] ?? 1) : 1,
+                    'notes' => (string) ($row['notes'] ?? ''),
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                ];
+            }
+
+            return $this->jsonOk(['items' => $items]);
+        } catch (\Throwable $e) {
+            try {
+                Log::error('live_store_list_json_failed ' . $e->getMessage());
+            } catch (\Throwable $ignore) {
+            }
+
+            return $this->jsonOk(['items' => []]);
+        }
     }
 
     public function storeSave()
@@ -142,6 +186,7 @@ class ProductSearchLive extends BaseController
         $hasNotes = is_array($fields) && array_key_exists('notes', $fields);
         $hasStoreName = is_array($fields) && array_key_exists('store_name', $fields);
         $hasLegacyName = is_array($fields) && array_key_exists('name', $fields);
+        $hasDefaultGmvCurrency = is_array($fields) && array_key_exists('default_gmv_currency', $fields);
         $nameCol = $hasStoreName ? 'store_name' : ($hasLegacyName ? 'name' : '');
         if ($nameCol === '') {
             return $this->jsonErr('store_name_missing', 1, null, 'common.operationFailed');
@@ -151,6 +196,7 @@ class ProductSearchLive extends BaseController
         $storeCode = trim((string) ($payload['store_code'] ?? ''));
         $status = (int) ($payload['status'] ?? 1) === 0 ? 0 : 1;
         $notes = trim((string) ($payload['notes'] ?? ''));
+        $defaultGmvCurrency = $this->normalizeStoreGmvCurrency((string) ($payload['default_gmv_currency'] ?? 'VND'));
 
         try {
             if ($hasStoreCode && $storeCode !== '') {
@@ -181,6 +227,9 @@ class ProductSearchLive extends BaseController
             if ($hasNotes) {
                 $saveData['notes'] = $notes === '' ? null : mb_substr($notes, 0, 255);
             }
+            if ($hasDefaultGmvCurrency) {
+                $saveData['default_gmv_currency'] = $defaultGmvCurrency;
+            }
             if (is_array($fields) && array_key_exists('updated_at', $fields)) {
                 $saveData['updated_at'] = date('Y-m-d H:i:s');
             }
@@ -199,11 +248,15 @@ class ProductSearchLive extends BaseController
                     $updateQuery->where('tenant_id', $tenantId);
                 }
                 $updateQuery->update($saveData);
+                $this->syncStoreAccountDefaultGmvCurrency($id, $defaultGmvCurrency);
             } else {
                 if (is_array($fields) && array_key_exists('created_at', $fields)) {
                     $saveData['created_at'] = date('Y-m-d H:i:s');
                 }
                 $id = (int) Db::name('growth_profit_stores')->insertGetId($saveData);
+                if ($id > 0) {
+                    $this->syncStoreAccountDefaultGmvCurrency($id, $defaultGmvCurrency);
+                }
             }
 
             $rowQuery = Db::name('growth_profit_stores')->where('id', $id);
@@ -219,11 +272,14 @@ class ProductSearchLive extends BaseController
             if ($storeName === '') {
                 $storeName = (string) ($row['name'] ?? '');
             }
+            $savedDefaultGmvCurrency = $this->normalizeStoreGmvCurrency((string) ($row['default_gmv_currency'] ?? $defaultGmvCurrency));
             return $this->jsonOk([
                 'item' => [
                     'id' => (int) ($row['id'] ?? 0),
                     'store_code' => (string) ($row['store_code'] ?? ''),
                     'store_name' => $storeName,
+                    'default_gmv_currency' => $savedDefaultGmvCurrency,
+                    'gmv_currency' => $savedDefaultGmvCurrency,
                     'status' => $hasStatus ? (int) ($row['status'] ?? 1) : 1,
                     'notes' => (string) ($row['notes'] ?? ''),
                     'updated_at' => (string) ($row['updated_at'] ?? ''),
@@ -1116,118 +1172,239 @@ class ProductSearchLive extends BaseController
         $storeId = (int) $this->request->param('store_id', 0);
         $dateFrom = trim((string) $this->request->param('date_from', ''));
         $dateTo = trim((string) $this->request->param('date_to', ''));
-        $styleInput = trim((string) $style_code);
+        $styleInput = trim((string) $this->request->param('style_code', (string) $this->request->param('styleCode', '')));
         if ($styleInput === '') {
-            $styleInput = trim((string) $this->request->route('style_code', ''));
+            $styleInput = trim((string) $style_code);
         }
         if ($styleInput === '') {
-            $styleInput = trim((string) $this->request->param('style_code', (string) $this->request->param('styleCode', '')));
+            $styleInput = trim((string) $this->request->route('style_code', ''));
         }
         $style = $this->normalizeCatalogStyleCode($styleInput);
         if ($style === '') {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
-        $styleCompact = $this->compactCatalogStyleCode($style);
-        if ($styleCompact === '') {
+        $styleCandidates = $this->buildCatalogStyleCandidates($style);
+        if ($styleCandidates === []) {
             return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
         }
 
-        $query = Db::name('growth_live_product_metrics')
-            ->where('tenant_id', $tenantId)
-            ->where('is_matched', 1)
-            ->where(function ($q) use ($style, $styleCompact): void {
-                $q->where('catalog_style_code', $style)
-                    ->whereOrRaw(
-                        'REPLACE(REPLACE(REPLACE(UPPER(TRIM(catalog_style_code)), "-", ""), "_", ""), " ", "") = :style_compact',
-                        ['style_compact' => $styleCompact]
-                    );
-            });
-        if ($storeId > 0) {
-            $query->where('store_id', $storeId);
-        }
-        if ($dateFrom !== '') {
-            $query->where('session_date', '>=', $dateFrom);
-        }
-        if ($dateTo !== '') {
-            $query->where('session_date', '<=', $dateTo);
-        }
+        try {
+            $buildMetricsQuery = function (?int $sid = null) use ($tenantId, $styleCandidates, $dateFrom, $dateTo) {
+                $q = Db::name('growth_live_product_metrics')
+                    ->where('tenant_id', $tenantId)
+                    ->where('is_matched', 1)
+                    ->whereIn('catalog_style_code', $styleCandidates);
+                if ($sid !== null && $sid > 0) {
+                    $q->where('store_id', $sid);
+                }
+                if ($dateFrom !== '') {
+                    $q->where('session_date', '>=', $dateFrom);
+                }
+                if ($dateTo !== '') {
+                    $q->where('session_date', '<=', $dateTo);
+                }
+                return $q;
+            };
 
-        $totalRow = $query->fieldRaw('
-            COUNT(*) as product_count,
-            COUNT(DISTINCT session_id) as session_count,
-            COALESCE(SUM(gmv),0) as gmv_sum,
-            COALESCE(SUM(impressions),0) as impressions_sum,
-            COALESCE(SUM(clicks),0) as clicks_sum,
-            COALESCE(SUM(add_to_cart_count),0) as add_to_cart_sum,
-            COALESCE(SUM(orders_count),0) as orders_sum
-        ')->find();
-        $impressions = (float) ($totalRow['impressions_sum'] ?? 0);
-        $clicks = (float) ($totalRow['clicks_sum'] ?? 0);
-        $atc = (float) ($totalRow['add_to_cart_sum'] ?? 0);
+            $resolvedStoreId = $storeId > 0 ? $storeId : 0;
+            $metricsRows = (clone $buildMetricsQuery($resolvedStoreId > 0 ? $resolvedStoreId : null))
+                ->field('session_id,session_date,store_id,gmv,impressions,clicks,add_to_cart_count,orders_count')
+                ->select()
+                ->toArray();
+            if ($metricsRows === [] && $resolvedStoreId > 0) {
+                $metricsRows = (clone $buildMetricsQuery(null))
+                    ->field('session_id,session_date,store_id,gmv,impressions,clicks,add_to_cart_count,orders_count')
+                    ->select()
+                    ->toArray();
+                if ($metricsRows !== []) {
+                    $resolvedStoreId = 0;
+                }
+            }
 
-        $trendRows = $query->fieldRaw('
-            session_date,
-            COALESCE(SUM(gmv),0) as gmv_sum,
-            COALESCE(SUM(impressions),0) as impressions_sum,
-            COALESCE(SUM(clicks),0) as clicks_sum,
-            COALESCE(SUM(add_to_cart_count),0) as add_to_cart_sum,
-            COALESCE(SUM(orders_count),0) as orders_sum
-        ')
-            ->group('session_date')
-            ->order('session_date', 'asc')
-            ->select()
-            ->toArray();
+            $metricsStoreIds = [];
+            foreach ($metricsRows as $row) {
+                $sid = (int) ($row['store_id'] ?? 0);
+                if ($sid > 0) {
+                    $metricsStoreIds[] = $sid;
+                }
+            }
+            if ($storeId > 0) {
+                $metricsStoreIds[] = $storeId;
+            }
+            $storeCurrencyMap = $this->loadStoreGmvCurrencyMap($metricsStoreIds);
+            $fxCache = [];
+            $sessionSet = [];
+            $summaryCurrencySet = [];
+            $summaryFxStatuses = [];
+            $trendMap = [];
 
-        $trend = [];
-        foreach ($trendRows as $row) {
-            $exp = (float) ($row['impressions_sum'] ?? 0);
-            $clk = (float) ($row['clicks_sum'] ?? 0);
-            $add = (float) ($row['add_to_cart_sum'] ?? 0);
-            $trend[] = [
-                'session_date' => (string) ($row['session_date'] ?? ''),
-                'gmv_sum' => round((float) ($row['gmv_sum'] ?? 0), 4),
-                'impressions_sum' => (int) $exp,
-                'clicks_sum' => (int) $clk,
-                'add_to_cart_sum' => (int) $add,
-                'orders_sum' => (int) ($row['orders_sum'] ?? 0),
-                'ctr' => $exp > 0 ? round($clk / $exp, 6) : 0,
-                'add_to_cart_rate' => $clk > 0 ? round($add / $clk, 6) : 0,
+            $summary = [
+                'product_count' => 0,
+                'session_count' => 0,
+                'gmv_sum' => 0.0,
+                'gmv_cny_sum' => 0.0,
+                'impressions_sum' => 0.0,
+                'clicks_sum' => 0.0,
+                'add_to_cart_sum' => 0.0,
+                'orders_sum' => 0.0,
             ];
+
+            foreach ($metricsRows as $row) {
+                $sid = (int) ($row['store_id'] ?? 0);
+                $sessionKey = (string) ($row['session_id'] ?? '');
+                if ($sessionKey !== '') {
+                    $sessionSet[$sessionKey] = true;
+                }
+                $sessionDate = FxRateService::normalizeDate((string) ($row['session_date'] ?? ''));
+                $gmvCurrency = (string) ($storeCurrencyMap[$sid] ?? 'VND');
+                $gmvAmount = (float) ($row['gmv'] ?? 0);
+                $impressions = (float) ($row['impressions'] ?? 0);
+                $clicks = (float) ($row['clicks'] ?? 0);
+                $addToCart = (float) ($row['add_to_cart_count'] ?? 0);
+                $orders = (float) ($row['orders_count'] ?? 0);
+
+                $summary['product_count']++;
+                $summary['gmv_sum'] += $gmvAmount;
+                $summary['impressions_sum'] += $impressions;
+                $summary['clicks_sum'] += $clicks;
+                $summary['add_to_cart_sum'] += $addToCart;
+                $summary['orders_sum'] += $orders;
+                $summaryCurrencySet[$gmvCurrency] = true;
+
+                $fx = $this->convertAmountToCnyCached($gmvAmount, $gmvCurrency, $sessionDate, $tenantId, $fxCache);
+                $gmvCnyAmount = (float) ($fx['amount_cny'] ?? 0);
+                $summary['gmv_cny_sum'] += $gmvCnyAmount;
+                $summaryFxStatuses[] = (string) ($fx['status'] ?? FxRateService::STATUS_MISSING);
+
+                if (!isset($trendMap[$sessionDate])) {
+                    $trendMap[$sessionDate] = [
+                        'session_date' => $sessionDate,
+                        'gmv_sum' => 0.0,
+                        'gmv_cny_sum' => 0.0,
+                        'impressions_sum' => 0.0,
+                        'clicks_sum' => 0.0,
+                        'add_to_cart_sum' => 0.0,
+                        'orders_sum' => 0.0,
+                        'currency_set' => [],
+                        'fx_statuses' => [],
+                    ];
+                }
+                $trendMap[$sessionDate]['gmv_sum'] += $gmvAmount;
+                $trendMap[$sessionDate]['gmv_cny_sum'] += $gmvCnyAmount;
+                $trendMap[$sessionDate]['impressions_sum'] += $impressions;
+                $trendMap[$sessionDate]['clicks_sum'] += $clicks;
+                $trendMap[$sessionDate]['add_to_cart_sum'] += $addToCart;
+                $trendMap[$sessionDate]['orders_sum'] += $orders;
+                $trendMap[$sessionDate]['currency_set'][$gmvCurrency] = true;
+                $trendMap[$sessionDate]['fx_statuses'][] = (string) ($fx['status'] ?? FxRateService::STATUS_MISSING);
+            }
+
+            $summary['session_count'] = count($sessionSet);
+            $summaryCurrency = $this->resolveSummaryCurrency($summaryCurrencySet, $storeId > 0 ? (string) ($storeCurrencyMap[$storeId] ?? '') : '');
+            $summaryFxStatus = $this->mergeFxStatuses($summaryFxStatuses);
+
+            $trend = [];
+            if ($trendMap !== []) {
+                ksort($trendMap);
+                foreach ($trendMap as $row) {
+                    $exp = (float) ($row['impressions_sum'] ?? 0);
+                    $clk = (float) ($row['clicks_sum'] ?? 0);
+                    $add = (float) ($row['add_to_cart_sum'] ?? 0);
+                    $currencySet = is_array($row['currency_set'] ?? null) ? $row['currency_set'] : [];
+                    $gmvCurrency = $this->resolveSummaryCurrency($currencySet, $summaryCurrency);
+                    $trend[] = [
+                        'session_date' => (string) ($row['session_date'] ?? ''),
+                        'gmv_sum' => round((float) ($row['gmv_sum'] ?? 0), 4),
+                        'gmv_currency' => $gmvCurrency,
+                        'gmv_cny_sum' => round((float) ($row['gmv_cny_sum'] ?? 0), 4),
+                        'impressions_sum' => (int) $exp,
+                        'clicks_sum' => (int) $clk,
+                        'add_to_cart_sum' => (int) $add,
+                        'orders_sum' => (int) ($row['orders_sum'] ?? 0),
+                        'ctr' => $exp > 0 ? round($clk / $exp, 6) : 0,
+                        'add_to_cart_rate' => $clk > 0 ? round($add / $clk, 6) : 0,
+                        'fx_status' => $this->mergeFxStatuses(is_array($row['fx_statuses'] ?? null) ? $row['fx_statuses'] : []),
+                    ];
+                }
+            }
+
+            $buildCatalogQuery = function (?int $sid = null) use ($tenantId, $styleCandidates) {
+                $q = Db::name('growth_store_product_catalog')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('style_code', $styleCandidates);
+                if ($sid !== null && $sid > 0) {
+                    $q->where('store_id', $sid);
+                }
+                return $q;
+            };
+            $catalogRows = $buildCatalogQuery($storeId > 0 ? $storeId : null)
+                ->field('id,store_id,style_code,product_name,image_url,updated_at')
+                ->order('id', 'desc')
+                ->select()
+                ->toArray();
+            if ($catalogRows === [] && $storeId > 0) {
+                $catalogRows = $buildCatalogQuery(null)
+                    ->field('id,store_id,style_code,product_name,image_url,updated_at')
+                    ->order('id', 'desc')
+                    ->select()
+                    ->toArray();
+            }
+
+            try {
+                Log::info(
+                    'live_style_detail_debug ' . json_encode([
+                        'tenant_id' => $tenantId,
+                        'store_id_req' => $storeId,
+                        'store_id_resolved' => $resolvedStoreId,
+                        'style_input' => $styleInput,
+                        'style_normalized' => $style,
+                        'style_candidates' => $styleCandidates,
+                        'product_count' => (int) ($summary['product_count'] ?? 0),
+                        'session_count' => (int) ($summary['session_count'] ?? 0),
+                        'summary_currency' => $summaryCurrency,
+                        'summary_fx_status' => $summaryFxStatus,
+                        'trend_count' => count($trend),
+                        'catalog_count' => count($catalogRows),
+                    ], JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR)
+                );
+            } catch (\Throwable $e) {
+            }
+
+            $summaryImpressions = (float) ($summary['impressions_sum'] ?? 0);
+            $summaryClicks = (float) ($summary['clicks_sum'] ?? 0);
+            $summaryAddToCart = (float) ($summary['add_to_cart_sum'] ?? 0);
+
+            return $this->jsonOk([
+                'style_code' => $style,
+                'resolved_store_id' => $resolvedStoreId,
+                'currency' => [
+                    'gmv_currency' => $summaryCurrency,
+                    'gmv_currency_label' => $this->currencyLabel($summaryCurrency),
+                    'base_currency' => FxRateService::BASE_CURRENCY,
+                    'fx_status' => $summaryFxStatus,
+                ],
+                'summary' => [
+                    'product_count' => (int) ($summary['product_count'] ?? 0),
+                    'session_count' => (int) ($summary['session_count'] ?? 0),
+                    'gmv_sum' => round((float) ($summary['gmv_sum'] ?? 0), 4),
+                    'gmv_cny_sum' => round((float) ($summary['gmv_cny_sum'] ?? 0), 4),
+                    'impressions_sum' => (int) $summaryImpressions,
+                    'clicks_sum' => (int) $summaryClicks,
+                    'add_to_cart_sum' => (int) $summaryAddToCart,
+                    'orders_sum' => (int) ($summary['orders_sum'] ?? 0),
+                    'ctr' => $summaryImpressions > 0 ? round($summaryClicks / $summaryImpressions, 6) : 0,
+                    'add_to_cart_rate' => $summaryClicks > 0 ? round($summaryAddToCart / $summaryClicks, 6) : 0,
+                ],
+                'trend' => $trend,
+                'catalog_items' => $catalogRows,
+            ]);
+        } catch (\Throwable $e) {
+            try {
+                Log::error('live_style_detail_failed ' . $e->getMessage());
+            } catch (\Throwable $ignore) {
+            }
+            return $this->jsonErr('detail_failed', 1, ['message' => $e->getMessage()], 'common.operationFailed');
         }
-
-        $catalogRows = Db::name('growth_store_product_catalog')
-            ->where('tenant_id', $tenantId)
-            ->where(function ($q) use ($style, $styleCompact): void {
-                $q->where('style_code', $style)
-                    ->whereOrRaw(
-                        'REPLACE(REPLACE(REPLACE(UPPER(TRIM(style_code)), "-", ""), "_", ""), " ", "") = :style_compact',
-                        ['style_compact' => $styleCompact]
-                    );
-            })
-            ->when($storeId > 0, static function ($q) use ($storeId): void {
-                $q->where('store_id', $storeId);
-            })
-            ->field('id,store_id,style_code,product_name,image_url,updated_at')
-            ->order('id', 'desc')
-            ->select()
-            ->toArray();
-
-        return $this->jsonOk([
-            'style_code' => $style,
-            'summary' => [
-                'product_count' => (int) ($totalRow['product_count'] ?? 0),
-                'session_count' => (int) ($totalRow['session_count'] ?? 0),
-                'gmv_sum' => round((float) ($totalRow['gmv_sum'] ?? 0), 4),
-                'impressions_sum' => (int) $impressions,
-                'clicks_sum' => (int) $clicks,
-                'add_to_cart_sum' => (int) $atc,
-                'orders_sum' => (int) ($totalRow['orders_sum'] ?? 0),
-                'ctr' => $impressions > 0 ? round($clicks / $impressions, 6) : 0,
-                'add_to_cart_rate' => $clicks > 0 ? round($atc / $clicks, 6) : 0,
-            ],
-            'trend' => $trend,
-            'catalog_items' => $catalogRows,
-        ]);
     }
 
     public function styleImageUpdate(string $style_code = '')
@@ -1248,12 +1425,12 @@ class ProductSearchLive extends BaseController
         if ($imageUrl === '') {
             return $this->jsonErr('image_required', 1, null, 'common.invalidParams');
         }
-        $styleInput = trim((string) $style_code);
+        $styleInput = trim((string) $this->request->param('style_code', (string) $this->request->param('styleCode', '')));
         if ($styleInput === '') {
-            $styleInput = trim((string) $this->request->route('style_code', ''));
+            $styleInput = trim((string) $style_code);
         }
         if ($styleInput === '') {
-            $styleInput = trim((string) $this->request->param('style_code', (string) $this->request->param('styleCode', '')));
+            $styleInput = trim((string) $this->request->route('style_code', ''));
         }
         $style = $this->normalizeCatalogStyleCode($styleInput);
         if ($style === '') {
@@ -1324,8 +1501,10 @@ class ProductSearchLive extends BaseController
         if ($s === '') {
             return '';
         }
-        $s = str_replace(['—', '–', '_', ' '], '-', $s);
+        // Normalize separators: spaces/underscores and common dash-like unicode chars.
+        $s = preg_replace('/[\s_\x{2010}\x{2011}\x{2012}\x{2013}\x{2014}\x{2212}\x{FE58}\x{FE63}\x{FF0D}]+/u', '-', $s) ?? $s;
         $s = preg_replace('/-+/', '-', $s) ?? $s;
+        $s = trim($s, '-');
         return mb_substr($s, 0, 64);
     }
 
@@ -1336,6 +1515,345 @@ class ProductSearchLive extends BaseController
             return '';
         }
         return str_replace('-', '', $normalized);
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function buildCatalogStyleCandidates(string $styleCode): array
+    {
+        $normalized = $this->normalizeCatalogStyleCode($styleCode);
+        if ($normalized === '') {
+            return [];
+        }
+
+        $compact = $this->compactCatalogStyleCode($normalized);
+        $candidates = [
+            $normalized,
+            str_replace('-', '_', $normalized),
+            str_replace('-', ' ', $normalized),
+        ];
+        if ($compact !== '') {
+            $candidates[] = $compact;
+        }
+
+        // For patterns like A201 / A-201, always include both compact and dashed forms.
+        if (preg_match('/^([A-Z]{1,16})[-_ ]?(\d{1,12})$/u', $normalized, $m) === 1) {
+            $prefix = (string) ($m[1] ?? '');
+            $num = (string) ($m[2] ?? '');
+            if ($prefix !== '' && $num !== '') {
+                $dashed = $prefix . '-' . $num;
+                $plain = $prefix . $num;
+                $candidates[] = $dashed;
+                $candidates[] = str_replace('-', '_', $dashed);
+                $candidates[] = str_replace('-', ' ', $dashed);
+                $candidates[] = $plain;
+            }
+        }
+
+        $uniq = [];
+        foreach ($candidates as $item) {
+            $v = trim((string) $item);
+            if ($v === '') {
+                continue;
+            }
+            $uniq[$v] = true;
+        }
+
+        return array_keys($uniq);
+    }
+
+    private function normalizeStoreGmvCurrency(string $currency): string
+    {
+        $raw = strtoupper(trim($currency));
+        if (!preg_match('/^[A-Z]{3}$/', $raw)) {
+            return 'VND';
+        }
+        return in_array($raw, FxRateService::supportedCurrencies(), true) ? $raw : 'VND';
+    }
+
+    /**
+     * @param array<int,int> $storeIds
+     * @return array<int,string>
+     */
+    private function loadStoreGmvCurrencyMap(array $storeIds): array
+    {
+        $ids = [];
+        foreach ($storeIds as $sid) {
+            $id = (int) $sid;
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+
+        $tenantId = $this->currentTenantId();
+        $map = [];
+        try {
+            $storeFields = Db::name('growth_profit_stores')->getFields();
+        } catch (\Throwable $e) {
+            $storeFields = [];
+        }
+        if (is_array($storeFields) && array_key_exists('default_gmv_currency', $storeFields)) {
+            $storeQuery = Db::name('growth_profit_stores')
+                ->whereIn('id', array_keys($ids))
+                ->field('id,default_gmv_currency');
+            if (array_key_exists('tenant_id', $storeFields)) {
+                $storeQuery->where('tenant_id', $tenantId);
+            }
+            $storeRows = $storeQuery->select()->toArray();
+            foreach ($storeRows as $row) {
+                $sid = (int) ($row['id'] ?? 0);
+                if ($sid <= 0) {
+                    continue;
+                }
+                $map[$sid] = $this->normalizeStoreGmvCurrency((string) ($row['default_gmv_currency'] ?? 'VND'));
+            }
+        }
+
+        if (count($map) === count($ids)) {
+            return $map;
+        }
+
+        $missingStoreIds = [];
+        foreach (array_keys($ids) as $sid) {
+            if (!isset($map[$sid])) {
+                $missingStoreIds[] = $sid;
+            }
+        }
+        if ($missingStoreIds === []) {
+            return $map;
+        }
+
+        try {
+            $fields = Db::name('growth_profit_accounts')->getFields();
+        } catch (\Throwable $e) {
+            return $map;
+        }
+        if (!is_array($fields)) {
+            return $map;
+        }
+
+        $currencyCol = '';
+        if (array_key_exists('default_gmv_currency', $fields)) {
+            $currencyCol = 'default_gmv_currency';
+        } elseif (array_key_exists('account_currency', $fields)) {
+            $currencyCol = 'account_currency';
+        }
+        if ($currencyCol === '') {
+            return $map;
+        }
+        if (!array_key_exists('store_id', $fields)) {
+            return $map;
+        }
+
+        try {
+            $query = Db::name('growth_profit_accounts')
+                ->whereIn('store_id', $missingStoreIds)
+                ->field('id,store_id,' . $currencyCol . ' AS gmv_currency')
+                ->order('id', 'desc');
+            if (array_key_exists('tenant_id', $fields)) {
+                $query->where('tenant_id', $tenantId);
+            }
+            if (array_key_exists('status', $fields)) {
+                $query->where('status', 1);
+            }
+
+            $rows = $query->select()->toArray();
+            foreach ($rows as $row) {
+                $sid = (int) ($row['store_id'] ?? 0);
+                if ($sid <= 0 || isset($map[$sid])) {
+                    continue;
+                }
+                $map[$sid] = $this->normalizeStoreGmvCurrency((string) ($row['gmv_currency'] ?? 'VND'));
+            }
+        } catch (\Throwable $e) {
+            // Keep store list available even if account schema differs.
+        }
+
+        return $map;
+    }
+
+    private function syncStoreAccountDefaultGmvCurrency(int $storeId, string $currency): void
+    {
+        if ($storeId <= 0) {
+            return;
+        }
+
+        try {
+            $accountFields = Db::name('growth_profit_accounts')->getFields();
+        } catch (\Throwable $e) {
+            return;
+        }
+        if (!is_array($accountFields) || !array_key_exists('default_gmv_currency', $accountFields)) {
+            return;
+        }
+
+        $query = Db::name('growth_profit_accounts')
+            ->where('store_id', $storeId);
+        if (array_key_exists('tenant_id', $accountFields)) {
+            $query->where('tenant_id', $this->currentTenantId());
+        }
+        $updateData = [
+            'default_gmv_currency' => $this->normalizeStoreGmvCurrency($currency !== '' ? $currency : 'VND'),
+        ];
+        if (array_key_exists('updated_at', $accountFields)) {
+            $updateData['updated_at'] = date('Y-m-d H:i:s');
+        }
+        try {
+            $query->update($updateData);
+        } catch (\Throwable $e) {
+            // Keep store save success when account table shape differs.
+        }
+    }
+
+    /**
+     * @param array<string,array<string,mixed>> $cache
+     * @return array<string,mixed>
+     */
+    private function convertAmountToCnyCached(
+        float $amount,
+        string $currency,
+        string $rateDate,
+        int $tenantId,
+        array &$cache
+    ): array {
+        $cur = FxRateService::normalizeCurrency($currency);
+        $date = FxRateService::normalizeDate($rateDate);
+        $cacheKey = $cur . '|' . $date;
+
+        if (!isset($cache[$cacheKey])) {
+            $cache[$cacheKey] = FxRateService::convertToCny(1.0, $cur, $date, $tenantId);
+        }
+
+        $base = is_array($cache[$cacheKey]) ? $cache[$cacheKey] : [];
+        $rate = (float) ($base['rate'] ?? 0);
+        $status = (string) ($base['status'] ?? FxRateService::STATUS_MISSING);
+        $source = (string) ($base['source'] ?? '');
+        $isFallback = (int) ($base['is_fallback'] ?? 0);
+        $resolvedDate = (string) ($base['rate_date'] ?? $date);
+        $amt = max(0.0, (float) $amount);
+
+        if ($cur === FxRateService::BASE_CURRENCY) {
+            $rate = 1.0;
+            $status = FxRateService::STATUS_IDENTITY;
+            $source = 'identity';
+            $isFallback = 0;
+            $resolvedDate = $date;
+        }
+        if ($rate <= 0) {
+            return [
+                'amount' => round($amt, 2),
+                'currency' => $cur,
+                'rate_date' => $resolvedDate,
+                'rate' => 0.0,
+                'amount_cny' => 0.0,
+                'source' => $source,
+                'status' => FxRateService::STATUS_MISSING,
+                'is_fallback' => 1,
+            ];
+        }
+
+        return [
+            'amount' => round($amt, 2),
+            'currency' => $cur,
+            'rate_date' => $resolvedDate,
+            'rate' => $rate,
+            'amount_cny' => round($amt * $rate, 2),
+            'source' => $source,
+            'status' => $status,
+            'is_fallback' => $isFallback,
+        ];
+    }
+
+    /**
+     * @param array<int|string,mixed> $currencySet
+     */
+    private function resolveSummaryCurrency(array $currencySet, string $fallback = ''): string
+    {
+        $uniq = [];
+        foreach ($currencySet as $k => $v) {
+            if (is_string($k) && $v === true) {
+                $code = strtoupper(trim($k));
+            } else {
+                $code = strtoupper(trim((string) $v));
+            }
+            if ($code === '' || $code === '0') {
+                continue;
+            }
+            if ($code === 'MIXED') {
+                return 'MIXED';
+            }
+            $uniq[$code] = true;
+        }
+        if (count($uniq) > 1) {
+            return 'MIXED';
+        }
+        if ($uniq !== []) {
+            $first = array_key_first($uniq);
+            return is_string($first) ? FxRateService::normalizeCurrency($first) : FxRateService::BASE_CURRENCY;
+        }
+        $fb = strtoupper(trim($fallback));
+        if ($fb === 'MIXED') {
+            return 'MIXED';
+        }
+        return $fb !== '' ? FxRateService::normalizeCurrency($fb) : FxRateService::BASE_CURRENCY;
+    }
+
+    /**
+     * @param array<int,string> $statuses
+     */
+    private function mergeFxStatuses(array $statuses): string
+    {
+        if ($statuses === []) {
+            return FxRateService::STATUS_MISSING;
+        }
+        $hasFallback = false;
+        $hasExact = false;
+        $hasIdentity = false;
+        foreach ($statuses as $status) {
+            $s = trim((string) $status);
+            if ($s === '') {
+                continue;
+            }
+            if ($s === FxRateService::STATUS_MISSING) {
+                return FxRateService::STATUS_MISSING;
+            }
+            if ($s === FxRateService::STATUS_FALLBACK_LATEST) {
+                $hasFallback = true;
+            } elseif ($s === FxRateService::STATUS_EXACT) {
+                $hasExact = true;
+            } elseif ($s === FxRateService::STATUS_IDENTITY) {
+                $hasIdentity = true;
+            }
+        }
+        if ($hasFallback) {
+            return FxRateService::STATUS_FALLBACK_LATEST;
+        }
+        if ($hasExact) {
+            return FxRateService::STATUS_EXACT;
+        }
+        if ($hasIdentity) {
+            return FxRateService::STATUS_IDENTITY;
+        }
+        return FxRateService::STATUS_MISSING;
+    }
+
+    private function currencyLabel(string $currency): string
+    {
+        $cur = strtoupper(trim($currency));
+        if ($cur === 'USD') {
+            return '美元 (USD)';
+        }
+        if ($cur === 'VND') {
+            return '越南盾 (VND)';
+        }
+        if ($cur === 'MIXED') {
+            return '混合币种';
+        }
+        return '人民币 (CNY)';
     }
 
     /**
@@ -1447,3 +1965,4 @@ class ProductSearchLive extends BaseController
         return '/' . ltrim($rel, '/');
     }
 }
+

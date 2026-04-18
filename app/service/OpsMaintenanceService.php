@@ -34,6 +34,7 @@ class OpsMaintenanceService
             'run_migration_tikstar_ops2.php',
             'run_migration_tenant_saas_material.php',
             'run_migration_profit_center.php',
+            'run_migration_profit_store_currency.php',
             'run_migration_auto_dm_v1.php',
             'run_migration_auto_dm_v2.php',
         ];

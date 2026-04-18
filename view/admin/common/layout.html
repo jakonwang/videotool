@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260417_live_style_3"></script>
-    <script src="/static/i18n/i18n.ops2.js?v=20260417_live_style_3"></script>
+    <script src="/static/i18n/i18n.js?v=20260418_menu_gmv_2"></script>
+    <script src="/static/i18n/i18n.ops2.js?v=20260418_menu_gmv_2"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -25,7 +25,7 @@
             --dash-border: rgba(29,36,78,0.12);
             --dash-danger: #ff6b8e;
             --dash-success: #28c7a5;
-            /* 鎸夐挳缁熶竴鑹叉澘 */
+            /* 閹稿鎸崇紒鐔剁閼瑰弶婢?*/
             --dash-btn-primary: #1677ff;
             --dash-btn-primary-hover: #0f6fe8;
             --dash-btn-primary-active: #0c5fca;
@@ -60,12 +60,12 @@
             /* Sidebar: modern minimal dark style */
             --dash-sidebar-bg: #111827;
             --dash-sidebar-border: rgba(255,255,255,0.06);
-            --dash-sidebar-text: #8da0bc;
+            --dash-sidebar-text: #c9d8ef;
             --dash-sidebar-text-active: #EAF1FF;
             --primary-rgb: 99,102,241;
             --dash-sidebar-primary: #7C83FF;
             --dash-sidebar-hover-bg: rgba(var(--primary-rgb),0.14);
-            --dash-sidebar-hover-text: #cfddff;
+            --dash-sidebar-hover-text: #e2ebff;
             --dash-sidebar-expanded-bg: rgba(var(--primary-rgb),0.16);
             --dash-sidebar-active-bg: rgba(var(--primary-rgb),0.26);
             --dash-sidebar-ease: 0.3s ease-in-out;
@@ -126,7 +126,7 @@
             font-size: 1.5rem;
             font-weight: 600;
         }
-        /* 椤堕儴鏍忥細鏈」鐩笉浣跨敤锛堜繚鐣欑粨鏋勫吋瀹癸紝浣嗛殣钘忥級 */
+        /* 妞ゅ爼鍎撮弽蹇ョ窗閺堫剟銆嶉惄顔荤瑝娴ｈ法鏁ら敍鍫滅箽閻ｆ瑧绮ㄩ弸鍕悑鐎圭櫢绱濇担鍡涙閽樺骏绱?*/
         .dark-dashboard .main-header { display: none; }
         .dark-dashboard .main-sidebar {
             background: var(--dash-sidebar-bg);
@@ -218,7 +218,7 @@
         .layout-fixed .main-footer {
             padding-bottom: 0.75rem;
         }
-        /* 渚ф爮鑿滃崟锛欱ootstrap collapse 鎺у埗灞曞紑锛堜笌 SSR 涓€鑷达級+ 鏋佺畝鏆楅粦 */
+        /* 娓氀勭埉閼挎粌宕熼敍娆眔otstrap collapse 閹貉冨煑鐏炴洖绱戦敍鍫滅瑢 SSR 娑撯偓閼疯揪绱? 閺嬩胶鐣濋弳妤呯拨 */
         .dark-dashboard .sidebar .admin-sidenav {
             padding: 8px;
         }
@@ -276,7 +276,7 @@
                 padding: 8px 12px;
                 margin: 0;
                 border-radius: 8px;
-                color: #94a3b8;
+                color: var(--dash-sidebar-text);
                 overflow: hidden;
                 transform: none;
             }
@@ -937,7 +937,7 @@
             border-color: rgba(23,32,66,.12);
         }
 
-        /* ===== OPS 2.0 全局视觉收敛：页面壳 / 卡片 / 表单 / 表格 / 弹窗 ===== */
+        /* ===== OPS 2.0 鍏ㄥ眬瑙嗚鏀舵暃锛氶〉闈㈠３ / 鍗＄墖 / 琛ㄥ崟 / 琛ㄦ牸 / 寮圭獥 ===== */
         .dark-dashboard .content-wrapper {
             background: linear-gradient(120deg, var(--ops-bg) 0%, var(--ops-bg-soft) 58%, #f8fbff 100%);
         }
@@ -1376,13 +1376,13 @@
             color: #243044;
         }
         .dark-dashboard .kpi-action,
-        .dark-dashboard a:not(.btn):not(.admin-content-tab):not(.admin-sidenav-link):not(.admin-sidenav-sublink):not(.admin-sidenav-sub2link) {
+        .dark-dashboard a:not(.btn):not(.admin-content-tab):not(.admin-sidenav-link):not(.admin-sidenav-group-head):not(.admin-sidenav-sublink):not(.admin-sidenav-subgroup-head):not(.admin-sidenav-sub2link) {
             color: #334155;
             font-weight: 700;
             text-decoration: none;
         }
         .dark-dashboard .kpi-action:hover,
-        .dark-dashboard a:not(.btn):not(.admin-content-tab):not(.admin-sidenav-link):not(.admin-sidenav-sublink):not(.admin-sidenav-sub2link):hover {
+        .dark-dashboard a:not(.btn):not(.admin-content-tab):not(.admin-sidenav-link):not(.admin-sidenav-group-head):not(.admin-sidenav-sublink):not(.admin-sidenav-subgroup-head):not(.admin-sidenav-sub2link):hover {
             color: #0052d0;
         }
         .dark-dashboard .btn,
@@ -1494,7 +1494,7 @@
             }
         }
 
-        /* ===== 缁熶竴鍚庡彴椤甸潰瑙勮寖锛堜笌 /video 椋庢牸涓€鑷达級===== */
+        /* ===== 缂佺喍绔撮崥搴″酱妞ょ敻娼扮憴鍕瘱閿涘牅绗?/video 妞嬪孩鐗告稉鈧懛杈剧礆===== */
         .admin-page-container {
             padding: 0 20px 20px;
             background: transparent;
@@ -1762,7 +1762,7 @@
             }
         }
 
-        /* ===== 绉诲姩绔€傞厤锛氭樉绀洪《閮ㄦ爮 + 鎶藉眽渚ф爮 ===== */
+        /* ===== 缁夎濮╃粩顖炩偓鍌炲帳閿涙碍妯夌粈娲€婇柈銊︾埉 + 閹惰棄鐪芥笟褎鐖?===== */
         @media (max-width: 992px) {
             :root { --dash-topbar-h: 56px; }
             .dark-dashboard .main-header {
@@ -1770,15 +1770,15 @@
                 position: sticky;
                 top: 0;
                 z-index: 1030;
-                /* 绉诲姩绔伩鍏嶉€忓簳锛氱湅寰楀埌涓嬫柟鍐呭鏂囧瓧 */
+                /* 缁夎濮╃粩顖炰缉閸忓秹鈧繐绨抽敍姘辨箙瀵版鍩屾稉瀣煙閸愬懎顔愰弬鍥х摟 */
                 background: rgba(255,255,255,0.98);
                 border-bottom: 1px solid rgba(29,36,78,.08);
                 backdrop-filter: blur(10px);
             }
-            /* 渚ф爮鎺ㄦ媺/閬僵鏃讹紝淇濊瘉鑳屾櫙涓嶉€忔槑 */
+            /* 娓氀勭埉閹恒劍濯?闁喚鍍甸弮璁圭礉娣囨繆鐦夐懗灞炬珯娑撳秹鈧繑妲?*/
             .dark-dashboard .main-sidebar {
                 background: var(--dash-sidebar-bg);
-                /* 纭繚绉诲姩绔晶鏍忓眰绾ф渶楂橈紝閬垮厤琚唴瀹瑰尯瑕嗙洊 */
+                /* 绾喕绻氱粔璇插З缁旑垯鏅堕弽蹇撶湴缁狙勬付妤傛﹫绱濋柆鍨帳鐞氼偄鍞寸€圭懓灏憰鍡欐磰 */
                 z-index: 1085 !important;
             }
             .dark-dashboard .main-sidebar .sidebar {
@@ -2200,7 +2200,7 @@
                 }
             }
 
-            // 鍙鐞嗘垜浠嚜宸辩殑鍒嗙粍瀹瑰櫒
+            // 閸欘亜顦╅悶鍡樺灉娴狀剝鍤滃杈╂畱閸掑棛绮嶇€圭懓娅?
             const $collapses = $('.admin-sidenav-subwrap.collapse, .admin-sidenav-sub2wrap.collapse');
             if (!$collapses.length) return;
 
@@ -2209,7 +2209,7 @@
                 const href = ($(this).attr('href') || '').replace(/\/+$/, '');
                 if (!href) return;
 
-                // href 閫氬父褰㈠ /admin.php/video/batchUpload
+                // href 闁艾鐖惰ぐ銏狀洤 /admin.php/video/batchUpload
                 const hit = (path === href) || (path && href && path.indexOf(href) !== -1) || (full && full.indexOf(href) !== -1);
                 if (hit) {
                     const $collapse = $(this).closest('.collapse');
@@ -2227,7 +2227,7 @@
                 }
             });
 
-            // 濡傛灉娌″尮閰嶅埌瀛愰」锛屽垯淇濈暀鏈嶅姟绔覆鏌撶姸鎬侊紙涓€鑸笉浼氬彂鐢燂級
+            // 婵″倹鐏夊▽鈥冲爱闁板秴鍩岀€涙劙銆嶉敍灞藉灟娣囨繄鏆€閺堝秴濮熺粩顖涜閺屾挾濮搁幀渚婄礄娑撯偓閼割兛绗夋导姘絺閻㈢噦绱?
             if (!matched) {
                 $collapses.each(function () {
                     const $c = $(this);
@@ -2388,16 +2388,33 @@
                     });
                     $a.append($('<span/>', { class: 'admin-content-tab-ico' }).append($('<i/>').attr('data-lucide', item.icon)));
                     let resolvedText = item.text || item.i18nKey || item.href;
-                    if (item.i18nKey && window.AppI18n && typeof window.AppI18n.t === 'function') {
-                        const tr = window.AppI18n.t(item.i18nKey, null, window.AppI18n.getLang('zh'));
-                        if (tr && tr !== item.i18nKey) {
-                            resolvedText = tr;
-                        } else if (item.i18nKey === 'admin.menu.liveStyleAnalysis') {
-                            resolvedText = '直播选款分析';
+                    const fallbackMap = {
+                        'admin.menu.liveStyleAnalysis': '直播选款分析'
+                    };
+                    if (window.AppI18n) {
+                        const appI18n = window.AppI18n;
+                        const lang = typeof appI18n.getLang === 'function' ? appI18n.getLang('zh') : 'zh';
+                        const maybeKeys = [item.i18nKey, item.text];
+                        for (let i = 0; i < maybeKeys.length; i++) {
+                            const key = (maybeKeys[i] || '').trim();
+                            if (!key) continue;
+                            const looksLikeKey = /^[a-z0-9]+(?:[._-][a-z0-9]+)+$/i.test(key);
+                            if (!looksLikeKey) continue;
+                            let translated = '';
+                            if (typeof appI18n.translateMaybeKey === 'function') {
+                                translated = appI18n.translateMaybeKey(key, null, lang);
+                            } else if (typeof appI18n.t === 'function') {
+                                translated = appI18n.t(key, null, lang);
+                            }
+                            if (translated && translated !== key) {
+                                resolvedText = translated;
+                                break;
+                            }
                         }
                     }
-                    if (item.i18nKey === 'admin.menu.liveStyleAnalysis' && (!resolvedText || resolvedText === item.i18nKey || resolvedText === 'admin.menu.liveStyleAnalysis')) {
-                        resolvedText = '直播选款分析';
+                    const fallbackKey = (item.i18nKey || item.text || '').trim();
+                    if ((!resolvedText || resolvedText === item.i18nKey || resolvedText === item.text) && fallbackMap[fallbackKey]) {
+                        resolvedText = fallbackMap[fallbackKey];
                     }
                     const $text = $('<span/>', { class: 'admin-content-tab-text', text: resolvedText });
                     if (item.i18nKey) $text.attr('data-i18n', item.i18nKey);

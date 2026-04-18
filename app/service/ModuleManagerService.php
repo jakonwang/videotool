@@ -1072,45 +1072,58 @@ class ModuleManagerService
             ];
         }
 
-        if ($searchEnabled) {
-            $searchChildren = [
-                [
+        if ($searchEnabled || $profitCenterEnabled) {
+            $searchChildren = [];
+            if ($searchEnabled) {
+                $searchChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/product_search',
                     'icon' => 'camera',
                     'text_i18n' => 'admin.menu.styleSearch',
                     'active' => self::controllerIs($currentController, 'productsearch', 'product_search'),
-                ],
-                [
+                ];
+                $searchChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/product_search/live',
                     'icon' => 'activity',
                     'text_i18n' => 'admin.menu.liveStyleAnalysis',
                     'active' => self::controllerIs($currentController, 'productsearchlive', 'product_search_live'),
-                ],
-                [
+                ];
+                $searchChildren[] = [
                     'kind' => 'link',
                     'href' => '/admin.php/offline_order',
                     'icon' => 'shopping-cart',
                     'text_i18n' => 'admin.menu.offlineOrders',
                     'active' => self::controllerIs($currentController, 'offlineorder', 'offline_order'),
                     'badge' => ($badges['offline_order_pending'] ?? 0) > 0 ? (string) $badges['offline_order_pending'] : '',
-                ],
-            ];
-            $menus[] = [
-                'section_i18n' => 'admin.menu.groupSearch',
-                'items' => [
+                ];
+            }
+            if ($profitCenterEnabled) {
+                $searchChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/profit_center',
+                    'icon' => 'wallet',
+                    'text_i18n' => 'admin.menu.profitCenter',
+                    'active' => self::controllerIs($currentController, 'profitcenter', 'profit_center'),
+                    'badge' => ($badges['profit_entry_total'] ?? 0) > 0 ? (string) $badges['profit_entry_total'] : '',
+                ];
+            }
+            if ($searchChildren !== []) {
+                $menus[] = [
+                    'section_i18n' => 'admin.menu.groupSelectionOps',
+                    'items' => [
                         [
                             'kind' => 'group',
                             'id' => 'search',
                             'href' => self::firstLeafHref($searchChildren),
                             'icon' => 'search',
-                            'text_i18n' => 'admin.menu.groupSearch',
+                            'text_i18n' => 'admin.menu.groupSelectionOpsMenu',
                             'expanded' => self::menuTreeHasActive($searchChildren),
                             'children' => $searchChildren,
                         ],
-                ],
-            ];
+                    ],
+                ];
+            }
         }
 
         if ($growthEnabled) {
@@ -1155,27 +1168,16 @@ class ModuleManagerService
                     'badge' => ($badges['import_running'] ?? 0) > 0 ? (string) $badges['import_running'] : '',
                 ];
             }
-            if ($profitCenterEnabled) {
-                $growthChildren[] = [
-                    'kind' => 'link',
-                    'href' => '/admin.php/profit_center',
-                    'icon' => 'wallet',
-                    'text_i18n' => 'admin.menu.profitCenter',
-                    'active' => self::controllerIs($currentController, 'profitcenter', 'profit_center'),
-                    'badge' => ($badges['profit_entry_total'] ?? 0) > 0 ? (string) $badges['profit_entry_total'] : '',
-                ];
-            }
-
             if ($growthChildren !== []) {
                 $menus[] = [
-                    'section_i18n' => 'admin.menu.growthHub',
+                    'section_i18n' => 'admin.menu.groupGrowthAnalysis',
                     'items' => [
                         [
                             'kind' => 'group',
                             'id' => 'growth',
                             'href' => self::firstLeafHref($growthChildren),
                             'icon' => 'bar-chart-3',
-                            'text_i18n' => 'admin.menu.growthHubMenu',
+                            'text_i18n' => 'admin.menu.groupGrowthAnalysisMenu',
                             'expanded' => self::menuTreeHasActive($growthChildren),
                             'children' => $growthChildren,
                         ],
@@ -1312,14 +1314,14 @@ class ModuleManagerService
                 ];
             }
             $menus[] = [
-                'section_i18n' => 'admin.menu.material',
+                'section_i18n' => 'admin.menu.groupMaterialProduct',
                 'items' => [
                     [
                         'kind' => 'group',
                         'id' => 'material',
                         'href' => self::firstLeafHref($materialChildren),
                         'icon' => 'folder',
-                        'text_i18n' => 'admin.menu.materialMenu',
+                        'text_i18n' => 'admin.menu.groupMaterialProductMenu',
                         'expanded' => self::menuTreeHasActive($materialChildren),
                         'children' => $materialChildren,
                     ],
@@ -1327,36 +1329,21 @@ class ModuleManagerService
             ];
         }
 
+        $systemTerminalChildren = [];
         if ($terminalEnabled) {
-            $terminalChildren = [
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/platform',
-                    'icon' => 'layers',
-                    'text_i18n' => 'admin.menu.platform',
-                    'active' => self::controllerIs($currentController, 'platform'),
-                ],
-                [
-                    'kind' => 'link',
-                    'href' => '/admin.php/device',
-                    'icon' => 'smartphone',
-                    'text_i18n' => 'admin.menu.device',
-                    'active' => self::controllerIs($currentController, 'device'),
-                ],
+            $systemTerminalChildren[] = [
+                'kind' => 'link',
+                'href' => '/admin.php/platform',
+                'icon' => 'layers',
+                'text_i18n' => 'admin.menu.platform',
+                'active' => self::controllerIs($currentController, 'platform'),
             ];
-            $menus[] = [
-                'section_i18n' => 'admin.menu.terminalSection',
-                'items' => [
-                    [
-                        'kind' => 'group',
-                        'id' => 'terminal',
-                        'href' => self::firstLeafHref($terminalChildren),
-                        'icon' => 'monitor-smartphone',
-                        'text_i18n' => 'admin.menu.terminal',
-                        'expanded' => self::menuTreeHasActive($terminalChildren),
-                        'children' => $terminalChildren,
-                    ],
-                ],
+            $systemTerminalChildren[] = [
+                'kind' => 'link',
+                'href' => '/admin.php/device',
+                'icon' => 'smartphone',
+                'text_i18n' => 'admin.menu.device',
+                'active' => self::controllerIs($currentController, 'device'),
             ];
         }
 
@@ -1373,7 +1360,7 @@ class ModuleManagerService
                 'downloadlog',
                 'download_log'
             );
-            $systemChildren = [
+            $adminSystemChildren = [
                 [
                     'kind' => 'link',
                     'href' => '/admin.php/settings',
@@ -1405,20 +1392,24 @@ class ModuleManagerService
                     'hidden' => !self::canManageModules($role),
                 ],
             ];
-            $systemChildren = array_values(array_filter($systemChildren, static function ($item) {
+            $adminSystemChildren = array_values(array_filter($adminSystemChildren, static function ($item) {
                 return empty($item['hidden']);
             }));
+            $systemTerminalChildren = array_merge($systemTerminalChildren, $adminSystemChildren);
+        }
+
+        if ($systemTerminalChildren !== []) {
             $menus[] = [
-                'section_i18n' => 'admin.menu.system',
+                'section_i18n' => 'admin.menu.groupSystemTerminal',
                 'items' => [
                     [
                         'kind' => 'group',
-                        'id' => 'system',
-                        'href' => self::firstLeafHref($systemChildren),
-                        'icon' => 'settings',
-                        'text_i18n' => 'admin.menu.system',
-                        'expanded' => self::menuTreeHasActive($systemChildren),
-                        'children' => $systemChildren,
+                        'id' => 'system_terminal',
+                        'href' => self::firstLeafHref($systemTerminalChildren),
+                        'icon' => 'monitor-smartphone',
+                        'text_i18n' => 'admin.menu.groupSystemTerminalMenu',
+                        'expanded' => self::menuTreeHasActive($systemTerminalChildren),
+                        'children' => $systemTerminalChildren,
                     ],
                 ],
             ];

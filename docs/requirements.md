@@ -1,4 +1,4 @@
-﻿# 鍔熻兘闇€姹備笌瀹炵幇璇存槑锛圱ikStar OPS 2.0锛?
+# 鍔熻兘闇€姹備笌瀹炵幇璇存槑锛圱ikStar OPS 2.0锛?
 > 鏇存柊鏃ユ湡锛?026-04-07  
 > 缁存姢绾﹀畾锛歚docs/requirements.md` 涓烘鏈紝鏍圭洰褰?`requirements.md` 涓庡叾淇濇寔涓€鑷淬€?
 ## 1. 鎬讳綋鏂瑰悜锛堝凡钀藉湴锛?
@@ -2489,3 +2489,210 @@
 - 验证：
   - `php -l app/controller/admin/ProductSearchLive.php`
   - `node --check public/static/admin/live_style_analysis.js`
+- 详情接口增强容错：款号改为候选集合匹配（`A-201/A201/A_201`），并在店铺过滤无结果时自动回退全店铺查询，避免因店铺维度异常导致详情全空。
+- 前端详情请求与图片更新请求增加 `style_code` 参数冗余传递（除路径参数外），规避路由变量注入异常。
+- 脚本版本升级为 `20260418_live_style_catalog_ops8`。
+- 进一步增强款号归一化：统一处理 `A201/A-201/A_201` 及常见 Unicode 横杠字符（en/em dash 等），避免详情匹配漏数。
+- 新增详情调试日志：`live_style_detail_debug` 记录 `tenant/store/style/candidate/product_count`，用于排查线上“详情空数据”。
+- 前端脚本版本升级为 `20260418_live_style_catalog_ops9`。
+
+## 2026-04-18 直播选款详情接口稳态修复（路由与错误兜底）
+
+- 问题现象：点击“详情”偶发提示“加载款式详情失败”，且日志未稳定出现对应详情请求。
+- 根因：在 `route_complete_match=false` 场景下，`/styles/{style_code}` 这种路径参数接口存在命中不稳定风险（包含款号连接符时更容易受路由匹配影响）。
+- 修复方案：
+  - 新增稳定接口（query 方式，不依赖 path 参数解析）：
+    - `GET /admin.php/product_search/live/styleDetailJson`
+    - `POST /admin.php/product_search/live/styleImageUpdate`
+  - 前端 `public/static/admin/live_style_analysis.js` 详情与图片更新请求统一切换到以上稳定接口。
+  - 保留原路径接口 `styles/{style_code}` 与 `styles/{style_code}/image` 作为兼容入口。
+  - `styleDetailJson` 新增全方法异常兜底，统一返回 JSON 错误体，避免前端收到 HTML 异常页。
+  - 详情调试日志改为 `JSON_PARTIAL_OUTPUT_ON_ERROR`，避免因个别非法字符导致日志 JSON 为空。
+- 缓存策略：页面脚本版本升级为 `20260418_live_style_catalog_ops11`，并建议清理 `runtime/cache` 与 `runtime/temp` 后回归。
+- 验证（Windows）：
+  1. `php -l route/admin.php`
+  2. `php -l app/controller/admin/ProductSearchLive.php`
+  3. `node --check public/static/admin/live_style_analysis.js`
+
+## 2026-04-18 直播选款详情币种显示与人民币换算
+
+- 问题：款式详情弹窗仅显示原始 GMV 数值，未体现店铺已配置币种，也没有人民币折算；同时表格列固定宽导致大屏空白较多，排版可读性较差。
+- 后端改造（`ProductSearchLive@styleDetailJson`）：
+  - 增加店铺币种映射：从 `growth_profit_accounts.default_gmv_currency`（回退 `account_currency`）读取 `store_id -> gmv_currency`。
+  - 无账号配置时，直播分析页店铺币种显示默认回退 `VND`（越南站场景），避免误按 CNY 直读。
+  - 返回新增字段：
+    - `currency.gmv_currency / gmv_currency_label / base_currency / fx_status`
+    - `summary.gmv_cny_sum`
+    - `trend[].gmv_currency / gmv_cny_sum / fx_status`
+  - 汇率转换使用 `FxRateService`，按 `session_date` 折算 CNY，并在明细接口内部做币种+日期缓存，降低重复查汇率开销。
+- 前端改造（`live_style_analysis.js` + `live.html`）：
+  - 款式详情 KPI 改为 5 卡：场次覆盖、GMV原币、折合CNY、CTR、加购率。
+  - 趋势表新增 `GMV原币` 与 `GMV(CNY)` 双列展示，金额格式化为千分位 + 币种后缀。
+  - 店铺选择项和店铺管理列表显示金额币种（如 `VND/USD/CNY`）。
+  - 弹窗工具栏改为栅格布局，减少控件拥挤；表格列改为 `min-width`，避免大屏左挤右空。
+  - 页面脚本版本升级：`live_style_catalog_ops12`。
+- 验证（Windows）：
+  1. `php -l app/controller/admin/ProductSearchLive.php`
+  2. `php -l view/admin/product_search/live.html`
+  3. `node --check public/static/admin/live_style_analysis.js`
+
+## 2026-04-18 店铺默认 GMV 币种 + 菜单重构（决策版落地）
+
+### 1) 店铺级默认 GMV 币种
+
+- 新增增量迁移脚本：`database/run_migration_profit_store_currency.php`
+  - 为 `growth_profit_stores` 增加字段：`default_gmv_currency CHAR(3) NOT NULL DEFAULT 'VND'`
+  - 历史数据回填规则：优先使用店铺现有账号币种（`growth_profit_accounts.default_gmv_currency`，回退 `account_currency`），无则 `VND`
+  - 同时规范脏值（空值、非 3 位币种）为 `VND`
+- 运维自动迁移清单增加该脚本：`app/service/OpsMaintenanceService.php`
+
+### 2) 后端接口字段扩展（向后兼容）
+
+- `GET /admin.php/profit_center/storeListJson`
+  - 返回新增：`default_gmv_currency`
+- `POST /admin.php/profit_center/storeSave`
+  - 入参支持：`default_gmv_currency`
+  - 保存店铺后自动同步该店铺账号：`growth_profit_accounts.default_gmv_currency`
+- `GET /admin.php/product_search/live/store/listJson`
+  - 返回新增：`default_gmv_currency`（保留 `gmv_currency` 兼容旧前端）
+- `POST /admin.php/product_search/live/store/save`
+  - 入参支持：`default_gmv_currency`
+  - 保存店铺后自动同步该店铺账号默认 GMV 币种
+- 账号保存逻辑补充：
+  - `ProfitCenter::accountSave` 在未显式传入 `default_gmv_currency` 时，默认继承店铺币种
+
+### 3) 前端改造
+
+- 利润中心 `view/admin/profit_center/index.html`
+  - 店铺管理弹窗新增「店铺默认GMV币种」下拉
+  - 保存时随店铺一起提交，保存后店铺/账号列表联动刷新
+- 直播选款分析 `public/static/admin/live_style_analysis.js`
+  - 店铺管理弹窗新增「GMV币种」下拉
+  - 店铺列表显示字段改为店铺默认币种
+  - 保存店铺时提交 `default_gmv_currency`
+
+### 4) 菜单重构（仅重排，不改路由）
+
+- `app/service/ModuleManagerService.php` 按业务流程调整为：
+  - `概览`：仪表盘
+  - `选品经营`：款式检索、直播选款分析、线下预定、利润中心
+  - `增长分析`：行业趋势、竞品分析、广告情报、数据导入
+  - `达人运营`：达人名录、外联工作台、自动私信、移动设备、寄样管理、话术模板、达人链路
+  - `素材商品`：视频素材、批量上传、商品管理、分类配置
+  - `系统终端`：平台、设备、系统设置、运维中心、用户管理、模块管理（后四项仍受 super_admin 控制）
+
+### 5) i18n 三语同步
+
+- 更新文件：
+  - `public/static/i18n/i18n.js`
+  - `public/static/i18n/i18n.ops2.js`
+- 新增/调整菜单 key（并保留旧 key 文案兼容）：
+  - `admin.menu.groupSelectionOps(_Menu)`
+  - `admin.menu.groupGrowthAnalysis(_Menu)`
+  - `admin.menu.groupMaterialProduct(_Menu)`
+  - `admin.menu.groupSystemTerminal(_Menu)`
+- 新增字段文案 key：
+  - `page.profitCenter.storeDefaultGmvCurrency`
+- 前端缓存版本已更新：
+  - `view/admin/common/layout.html` i18n 版本参数：`20260418_menu_gmv_1`
+  - `view/admin/product_search/live.html` 脚本版本：`20260418_live_style_catalog_ops13`
+
+### 6) 执行顺序与使用说明（Windows 开发 / Linux 部署通用）
+
+1. 先执行迁移（Windows）：
+   - `php database\\run_migration_profit_store_currency.php`
+2. Linux 部署执行：
+   - `php database/run_migration_profit_store_currency.php`
+3. 清理缓存后回归（建议）：
+   - 删除 `runtime/cache/*`、`runtime/temp/*`
+4. 进入后台：
+   - 利润中心 -> 店铺管理：可直接设置店铺默认 GMV 币种
+   - 商机寻款 -> 直播选款分析 -> 店铺管理：可设置/修改店铺默认 GMV 币种
+5. 验证口径：
+   - 店铺保存后，账号默认 GMV 币种应自动同步
+   - 菜单按五组重排且切换 `zh/en/vi` 不出现 `admin.menu.*` 直出
+
+## 2026-04-18 店铺加载与菜单显示补强（稳定性修复）
+
+- 问题：直播选款分析页偶发“加载店铺失败/加载店铺列表失败”，并出现 `admin.menu.liveStyleAnalysis` key 直出。
+- 后端加固（`app/controller/admin/ProductSearchLive.php`）：
+  - `storesJson`、`storeListJson` 增加全链路异常兜底，异常时返回空列表并记录日志（`live_stores_json_failed` / `live_store_list_json_failed`），避免前端收到 HTML 异常页。
+  - `loadStoreGmvCurrencyMap` 增加 `growth_profit_accounts.store_id` 字段存在性检查；账号币种查询增加 try/catch，表结构差异时自动回退，不阻断店铺列表。
+  - 修复币种中文标签乱码（美元/越南盾/混合币种/人民币）。
+- 前端修复：
+  - `public/static/admin/live_style_analysis.js` 店铺选择器与详情图片维护店铺下拉优先显示 `default_gmv_currency`。
+  - `view/admin/common/layout.html` 修正 `admin.menu.liveStyleAnalysis` 兜底文案，避免出现乱码。
+  - `view/admin/product_search/live.html` 修复页面标题与面包屑乱码；脚本版本升级为 `20260418_live_style_catalog_ops14`。
+- 验证（Windows）：
+  1. `php -l app/controller/admin/ProductSearchLive.php`
+  2. `node --check public/static/admin/live_style_analysis.js`
+  3. 打开 `商机寻款 -> 直播选款分析`，确认店铺列表可加载、店铺管理可打开，菜单不再显示 i18n key。
+
+## 2026-04-18 店铺加载稳态 + 菜单翻译兜底（补丁）
+
+- 现场排查：
+  - 本地库存在 `growth_profit_accounts.default_gmv_currency`，但缺少 `growth_profit_stores.default_gmv_currency`。
+  - 已执行迁移：`php database\\run_migration_profit_store_currency.php`，字段补齐并按账号币种回填。
+- 前端稳态（`public/static/admin/live_style_analysis.js`）：
+  - `parseJson` 增加 BOM 清理与空文本保护，避免响应前缀 BOM 导致 JSON 解析失败。
+  - 店铺加载新增一次性报错节流：初始化阶段不再弹出两条重复错误（“加载店铺失败 / 加载店铺列表失败”）。
+  - 页面初始化改为静默首轮加载店铺数据，减少误报和噪音提示。
+- 菜单翻译兜底（`view/admin/common/layout.html`）：
+  - content tabs 增强 key 识别与翻译逻辑：即使缺少 `data-i18n` 或文本直接是 key，也会尝试自动翻译。
+  - `admin.menu.liveStyleAnalysis` 保留硬兜底文案，避免显示 key 原文。
+- i18n 补齐：
+  - `public/static/i18n/i18n.js` 新增 `page.profitCenter.storeDefaultGmvCurrency` 的 `zh/en/vi` 文案，和 `i18n.ops2.js` 保持一致。
+- 缓存版本升级：
+  - `view/admin/common/layout.html`：`i18n.js/i18n.ops2.js?v=20260418_menu_gmv_2`
+  - `view/admin/product_search/live.html`：`live_style_analysis.js?v=20260418_live_style_catalog_ops15`
+- 验证（Windows）：
+  1. `php -l view/admin/common/layout.html`
+  2. `node --check public/static/admin/live_style_analysis.js`
+  3. `node --check public/static/i18n/i18n.js`
+  4. 打开 `商机寻款 -> 直播选款分析`，确认：
+     - 初始化不再连续弹两条店铺加载失败；
+     - 顶部 shortcut 不再出现 `admin.menu.liveStyleAnalysis`；
+     - 店铺管理弹窗可编辑并保存 GMV 币种。
+
+## 2026-04-18 侧边菜单可读性优化（文字提亮）
+
+- 问题：深色侧边栏中一级菜单文字/图标对比度偏低，阅读不清晰。
+- 调整文件：`view/admin/common/layout.html`
+  - `--dash-sidebar-text` 从 `#8da0bc` 提亮为 `#b4c5e1`。
+  - 桌面端主菜单颜色由硬编码 `#94a3b8` 改为 `var(--dash-sidebar-text)`，与主题变量统一。
+- 影响范围：
+  - 仅侧边栏主菜单默认态可读性提升；
+  - hover、active 状态逻辑与配色保持不变。
+- 验证（Windows）：
+  1. `php -l view/admin/common/layout.html`
+  2. 刷新后台页面，确认一级菜单文字更清晰、选中态仍可区分。
+
+## 2026-04-18 侧边菜单可读性优化（二次提亮）
+
+- 反馈问题：一级菜单未选中分组（如“选品经营/增长分析”）仍偏暗，不易识别。
+- 调整文件：`view/admin/common/layout.html`
+  - `--dash-sidebar-text` 从 `#b4c5e1` 再提亮到 `#c9d8ef`。
+  - `--dash-sidebar-hover-text` 从 `#cfddff` 调整到 `#e2ebff`，保持 hover 层级清晰。
+- 影响范围：
+  - 仅深色侧栏一级菜单文字/图标颜色增强；
+  - active 样式与交互逻辑不变。
+- 验证（Windows）：
+  1. `php -l view/admin/common/layout.html`
+  2. 刷新后台页面，确认未选中一级菜单文字更亮，hover/active 仍可区分。
+
+## 2026-04-18 侧边菜单可读性优化（三次修复：覆盖规则）
+
+- 反馈问题：提亮变量后，一级菜单分组标题仍偏暗。
+- 根因：`view/admin/common/layout.html` 中全局链接规则
+  - `a:not(.btn)...` 未排除 `admin-sidenav-group-head` / `admin-sidenav-subgroup-head`
+  - 该规则在样式后段把侧栏分组链接重置为 `#334155`，覆盖了侧栏变量色。
+- 修复：
+  - 在全局链接规则与 hover 规则中，新增排除：
+    - `.admin-sidenav-group-head`
+    - `.admin-sidenav-subgroup-head`
+- 结果：
+  - 侧栏一级分组（如“选品经营/增长分析/达人运营/素材商品”）恢复使用 `--dash-sidebar-text` / hover 变量色；
+  - 其他正文链接配色不变。
+- 验证（Windows）：
+  1. `php -l view/admin/common/layout.html`
+  2. 刷新后台页面，确认一级菜单分组标题不再发暗。

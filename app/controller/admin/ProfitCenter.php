@@ -389,6 +389,7 @@ class ProfitCenter extends BaseController
         $items = [];
         foreach ($rows as $row) {
             $baseCancelRate = (float) ($row->default_cancel_rate ?? 0);
+            $storeDefaultCurrency = $this->parseStoreDefaultGmvCurrency((string) ($row->default_gmv_currency ?? 'VND'));
             $items[] = [
                 'id' => (int) $row->id,
                 'store_code' => (string) ($row->store_code ?? ''),
@@ -403,6 +404,7 @@ class ProfitCenter extends BaseController
                 'default_influencer_commission_rate' => (float) ($row->default_influencer_commission_rate ?? 0),
                 'default_live_wage_hourly_cny' => round((float) ($row->default_live_wage_hourly_cny ?? 0), 2),
                 'default_timezone' => (string) ($row->default_timezone ?? 'Asia/Bangkok'),
+                'default_gmv_currency' => $storeDefaultCurrency,
                 'status' => (int) ($row->status ?? 1),
                 'notes' => (string) ($row->notes ?? ''),
                 'updated_at' => (string) ($row->updated_at ?? ''),
@@ -428,6 +430,8 @@ class ProfitCenter extends BaseController
         $cancelRateLive = $this->parseRate($payload['default_cancel_rate_live'] ?? $cancelRateBase, $cancelRateBase);
         $cancelRateVideo = $this->parseRate($payload['default_cancel_rate_video'] ?? $cancelRateBase, $cancelRateBase);
         $cancelRateInfluencer = $this->parseRate($payload['default_cancel_rate_influencer'] ?? $cancelRateBase, $cancelRateBase);
+        $defaultGmvCurrency = $this->parseStoreDefaultGmvCurrency((string) ($payload['default_gmv_currency'] ?? 'VND'));
+        $storeHasDefaultGmvCurrency = $this->hasTableColumnCached('growth_profit_stores', 'default_gmv_currency');
         $savePayload = [
             'store_code' => $storeCode !== '' ? mb_substr($storeCode, 0, 64) : null,
             'store_name' => mb_substr($storeName, 0, 128),
@@ -444,6 +448,9 @@ class ProfitCenter extends BaseController
             'status' => (int) ($payload['status'] ?? 1) === 0 ? 0 : 1,
             'notes' => $this->cleanNullableText($payload['notes'] ?? null, 255),
         ];
+        if ($storeHasDefaultGmvCurrency) {
+            $savePayload['default_gmv_currency'] = $defaultGmvCurrency;
+        }
 
         if ($id > 0) {
             $query = GrowthProfitStoreModel::where('id', $id);
@@ -456,12 +463,23 @@ class ProfitCenter extends BaseController
                 $row->$k = $v;
             }
             $row->save();
+            $syncCurrency = $storeHasDefaultGmvCurrency
+                ? $this->parseStoreDefaultGmvCurrency((string) ($row->default_gmv_currency ?? $defaultGmvCurrency))
+                : $defaultGmvCurrency;
+            $this->syncStoreAccountDefaultGmvCurrency($id, $syncCurrency);
             return $this->jsonOk(['id' => $id], 'saved');
         }
 
         $createPayload = $this->withTenantPayload($savePayload, 'growth_profit_stores');
         $created = GrowthProfitStoreModel::create($createPayload);
-        return $this->jsonOk(['id' => (int) ($created->id ?? 0)], 'saved');
+        $createdId = (int) ($created->id ?? 0);
+        if ($createdId > 0) {
+            $syncCurrency = $storeHasDefaultGmvCurrency
+                ? $this->parseStoreDefaultGmvCurrency((string) ($created->default_gmv_currency ?? $defaultGmvCurrency))
+                : $defaultGmvCurrency;
+            $this->syncStoreAccountDefaultGmvCurrency($createdId, $syncCurrency);
+        }
+        return $this->jsonOk(['id' => $createdId], 'saved');
     }
 
     public function storeDelete()
@@ -560,10 +578,16 @@ class ProfitCenter extends BaseController
             // GMV MAX account is shared by live/video channels; keep legacy column for compatibility.
             'channel_type' => ProfitCalculatorService::CHANNEL_VIDEO,
             'account_currency' => FxRateService::normalizeCurrency((string) ($payload['account_currency'] ?? 'USD')),
-            'default_gmv_currency' => FxRateService::normalizeCurrency((string) ($payload['default_gmv_currency'] ?? 'VND')),
             'status' => (int) ($payload['status'] ?? 1) === 0 ? 0 : 1,
             'notes' => $this->cleanNullableText($payload['notes'] ?? null, 255),
         ];
+        if ($this->hasTableColumnCached('growth_profit_accounts', 'default_gmv_currency')) {
+            $storeDefaultCurrency = $this->parseStoreDefaultGmvCurrency((string) ($store->default_gmv_currency ?? 'VND'));
+            $payloadGmvCurrency = trim((string) ($payload['default_gmv_currency'] ?? ''));
+            $savePayload['default_gmv_currency'] = $payloadGmvCurrency !== ''
+                ? FxRateService::normalizeCurrency($payloadGmvCurrency)
+                : $storeDefaultCurrency;
+        }
 
         $sameStoreQuery = Db::name('growth_profit_accounts')
             ->where('tenant_id', $tenantId)
@@ -1306,6 +1330,51 @@ class ProfitCenter extends BaseController
             return 1.0;
         }
         return $rate;
+    }
+
+    private function parseStoreDefaultGmvCurrency(string $currency): string
+    {
+        $raw = strtoupper(trim($currency));
+        if (!preg_match('/^[A-Z]{3}$/', $raw)) {
+            return 'VND';
+        }
+        return in_array($raw, FxRateService::supportedCurrencies(), true) ? $raw : 'VND';
+    }
+
+    private function hasTableColumnCached(string $table, string $column): bool
+    {
+        static $cache = [];
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, $cache)) {
+            return (bool) $cache[$key];
+        }
+        try {
+            $fields = Db::name($table)->getFields();
+            $cache[$key] = is_array($fields) && array_key_exists($column, $fields);
+        } catch (\Throwable $e) {
+            $cache[$key] = false;
+        }
+        return (bool) $cache[$key];
+    }
+
+    private function syncStoreAccountDefaultGmvCurrency(int $storeId, string $currency): void
+    {
+        if ($storeId <= 0 || !$this->hasTableColumnCached('growth_profit_accounts', 'default_gmv_currency')) {
+            return;
+        }
+        $gmvCurrency = $this->parseStoreDefaultGmvCurrency($currency);
+        try {
+            $updateData = ['default_gmv_currency' => $gmvCurrency];
+            if ($this->hasTableColumnCached('growth_profit_accounts', 'updated_at')) {
+                $updateData['updated_at'] = date('Y-m-d H:i:s');
+            }
+            Db::name('growth_profit_accounts')
+                ->where('tenant_id', $this->currentTenantId())
+                ->where('store_id', $storeId)
+                ->update($updateData);
+        } catch (\Throwable $e) {
+            // Keep store save success even if account sync is blocked by old schema/data.
+        }
     }
 
     private function channelLabel(string $channelType): string
