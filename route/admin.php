@@ -32,6 +32,20 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('user/delete', 'app\controller\admin\User@delete');
     Route::get('user', 'app\controller\admin\User@index');
 
+    // Tenant SaaS operations (super_admin only)
+    Route::get('tenant/list', 'app\controller\admin\Tenant@list');
+    Route::post('tenant/save', 'app\controller\admin\Tenant@save');
+    Route::post('tenant/status', 'app\controller\admin\Tenant@status');
+    Route::get('tenant/admin/list', 'app\controller\admin\Tenant@adminList');
+    Route::post('tenant/admin/save', 'app\controller\admin\Tenant@adminSave');
+    Route::get('tenant/package/list', 'app\controller\admin\Tenant@packageList');
+    Route::post('tenant/package/save', 'app\controller\admin\Tenant@packageSave');
+    Route::post('tenant/subscription/save', 'app\controller\admin\Tenant@subscriptionSave');
+    Route::get('tenant/subscription/modules', 'app\controller\admin\Tenant@subscriptionModules');
+    Route::get('tenant/audit/list', 'app\controller\admin\Tenant@auditList');
+    Route::post('tenant/switch', 'app\controller\admin\Tenant@switchTenant');
+    Route::get('tenant', 'app\controller\admin\Tenant@index');
+
     // Platform
     Route::get('platform/list', 'app\controller\admin\Platform@listJson');
     Route::get('platform/edit/<id>', 'app\controller\admin\Platform@edit');
@@ -115,6 +129,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('ops_center/runMigrations', 'app\controller\admin\OpsCenter@runMigrations');
     Route::post('ops_center/gitPull', 'app\controller\admin\OpsCenter@gitPull');
     Route::get('ops_center', 'app\controller\admin\OpsCenter@index');
+    Route::post('ops_frontend/health/save', 'app\controller\admin\OpsFrontend@healthSave');
 
     // Product search
     Route::get('product_search/list', 'app\controller\admin\ProductSearch@listJson');
@@ -273,6 +288,13 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('profit_center/templateXlsx', 'app\controller\admin\ProfitCenter@templateXlsx');
     Route::post('profit_center/importXlsx', 'app\controller\admin\ProfitCenter@importXlsx');
     Route::get('profit_center/exportCsv', 'app\controller\admin\ProfitCenter@exportCsv');
+    Route::get('profit_center/plugin/bootstrap', 'app\controller\admin\ProfitCenter@pluginBootstrap');
+    Route::post('profit_center/plugin/tokenCreate', 'app\controller\admin\ProfitCenter@pluginTokenCreate');
+    Route::post('profit_center/plugin/tokenRevoke', 'app\controller\admin\ProfitCenter@pluginTokenRevoke');
+    Route::post('profit_center/plugin/ingestBatch', 'app\controller\admin\ProfitCenter@pluginIngestBatch');
+    Route::get('profit_center/plugin/ingestLogs', 'app\controller\admin\ProfitCenter@pluginIngestLogs');
+    Route::post('profit_center/plugin/mappingSave', 'app\controller\admin\ProfitCenter@pluginMappingSave');
+    Route::post('profit_center/plugin/mappingDelete', 'app\controller\admin\ProfitCenter@pluginMappingDelete');
     Route::get('profit_center', 'app\controller\admin\ProfitCenter@index');
 
     // Data import center

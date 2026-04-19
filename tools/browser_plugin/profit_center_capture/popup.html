@@ -1,0 +1,81 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TikStar Profit Capture</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="pcp-app">
+    <header class="pcp-header">
+      <div>
+        <h1>TikTok 利润回传插件</h1>
+        <p>一键抓取 -> 预览确认 -> 回传利润中心</p>
+      </div>
+      <span id="connectBadge" class="pcp-badge pcp-badge-idle">未连接</span>
+    </header>
+
+    <section class="pcp-card">
+      <h2>连接设置</h2>
+      <div class="pcp-grid pcp-grid-config">
+        <label class="pcp-field">
+          <span>API Base</span>
+          <input id="apiBaseInput" type="text" placeholder="例如：https://your-domain.com" />
+        </label>
+        <label class="pcp-field">
+          <span>插件 Token</span>
+          <input id="tokenInput" type="password" placeholder="在利润中心插件接入中生成" />
+        </label>
+      </div>
+      <div class="pcp-actions">
+        <button id="saveConfigBtn" class="btn btn-default">保存配置</button>
+        <button id="connectBtn" class="btn btn-primary">连接并拉取配置</button>
+      </div>
+      <div id="statusBar" class="pcp-status"></div>
+    </section>
+
+    <section class="pcp-card">
+      <div class="pcp-row-between">
+        <h2>抓取与预览</h2>
+        <div class="pcp-actions">
+          <button id="captureBtn" class="btn btn-primary">抓取当前页面</button>
+          <button id="addRowBtn" class="btn btn-default">新增空行</button>
+          <button id="clearRowsBtn" class="btn btn-default">清空</button>
+        </div>
+      </div>
+      <div id="summaryBar" class="pcp-summary"></div>
+      <div class="pcp-table-wrap">
+        <table class="pcp-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>日期</th>
+              <th>店铺</th>
+              <th>广告户</th>
+              <th>渠道</th>
+              <th>广告费</th>
+              <th>GMV</th>
+              <th>订单数</th>
+              <th>来源</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody"></tbody>
+        </table>
+      </div>
+      <div class="pcp-submit-row">
+        <button id="submitBtn" class="btn btn-primary btn-lg">回传到利润中心</button>
+      </div>
+    </section>
+
+    <section class="pcp-card">
+      <h2>回传结果</h2>
+      <div id="resultBox" class="pcp-result">暂无提交记录</div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

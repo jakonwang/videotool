@@ -4,10 +4,13 @@ declare(strict_types=1);
 namespace app\middleware;
 
 use app\service\AdminAuthService;
+use app\service\ProfitPluginTokenService;
 use app\service\TenantModuleService;
 use Closure;
 use think\Request;
+use think\Response;
 use think\facade\Db;
+use think\facade\View;
 
 class AdminAuthMiddleware
 {
@@ -45,11 +48,24 @@ class AdminAuthMiddleware
             ]);
         }
 
+        if ($this->isProfitPluginPublicPath($path) && !AdminAuthService::isLoggedIn()) {
+            if ($this->passesProfitPluginAuth($request)) {
+                return $next($request);
+            }
+            return json([
+                'code' => 401,
+                'msg' => 'token_required',
+                'error_key' => 'common.forbidden',
+                'data' => null,
+            ]);
+        }
+
         if (AdminAuthService::isLoggedIn()) {
-            $moduleName = $this->resolveModuleName($path);
+            $moduleName = TenantModuleService::resolveModuleNameByPath($path);
             if ($moduleName !== '') {
                 $state = TenantModuleService::moduleState($moduleName, AdminAuthService::tenantId());
-                if (!(bool) ($state['allowed'] ?? true)) {
+                $accessMode = (string) ($state['access_mode'] ?? 'enabled');
+                if ($accessMode === 'disabled') {
                     if ($this->expectsJson($request, $path)) {
                         return json([
                             'code' => 403,
@@ -58,12 +74,26 @@ class AdminAuthMiddleware
                             'data' => [
                                 'module' => $moduleName,
                                 'reason' => (string) ($state['reason'] ?? 'forbidden'),
+                                'module_access_mode' => $accessMode,
                                 'expires_at' => $state['expires_at'] ?? null,
                             ],
                         ]);
                     }
 
-                    return redirect('/admin.php');
+                    return $this->renderNoAccessPage($moduleName, $state);
+                }
+                if ($accessMode === 'expired_readonly' && $this->isWriteRequest($request)) {
+                    return json([
+                        'code' => 403,
+                        'msg' => 'module_expired_readonly',
+                        'error_key' => 'common.forbidden',
+                        'data' => [
+                            'module' => $moduleName,
+                            'reason' => (string) ($state['reason'] ?? 'expired'),
+                            'module_access_mode' => $accessMode,
+                            'expires_at' => $state['expires_at'] ?? null,
+                        ],
+                    ]);
                 }
             }
 
@@ -77,48 +107,6 @@ class AdminAuthMiddleware
         $redirect = $this->buildAdminRedirect($request, $path);
         $to = '/admin.php/auth/login?redirect=' . urlencode($redirect);
         return redirect($to);
-    }
-
-    private function resolveModuleName(string $path): string
-    {
-        if ($path === '/' || str_starts_with($path, '/stats/')) {
-            return 'overview';
-        }
-        if (preg_match('#^/(product_search|offline_order)(/|$)#i', $path)) {
-            return 'product_search';
-        }
-        if (preg_match('#^/industry_trend(/|$)#i', $path)) {
-            return 'industry_trend';
-        }
-        if (preg_match('#^/competitor_analysis(/|$)#i', $path)) {
-            return 'competitor_analysis';
-        }
-        if (preg_match('#^/ad_insight(/|$)#i', $path)) {
-            return 'ad_insight';
-        }
-        if (preg_match('#^/data_import(/|$)#i', $path)) {
-            return 'data_import';
-        }
-        if (preg_match('#^/profit_center(/|$)#i', $path)) {
-            return 'profit_center';
-        }
-        if (preg_match('#^/category(/|$)#i', $path)) {
-            return 'category';
-        }
-        if (preg_match('#^/(influencer|outreach_workspace|sample|message_template|distribute|mobile_task|mobile_device|mobile_agent|auto_dm)(/|$)#i', $path)) {
-            return 'creator_crm';
-        }
-        if (preg_match('#^/(video|product)(/|$)#i', $path)) {
-            return 'material_distribution';
-        }
-        if (preg_match('#^/(platform|device)(/|$)#i', $path)) {
-            return 'terminal_devices';
-        }
-        if (preg_match('#^/(settings|ops_center|client_license|client_version|cache|downloadlog|download_log|user|extension)(/|$)#i', $path)) {
-            return 'system_ops';
-        }
-
-        return '';
     }
 
     private function buildAdminRedirect(Request $request, string $path): string
@@ -149,7 +137,10 @@ class AdminAuthMiddleware
         if (preg_match('#/(list|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
             return true;
         }
-        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|profit_center|stats|mobile_task|mobile_device|mobile_agent|auto_dm)/#i', $path)) {
+        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|profit_center|stats|mobile_task|mobile_device|mobile_agent|auto_dm|ops_frontend)/#i', $path)) {
+            return true;
+        }
+        if (preg_match('#^/tenant/#i', $path)) {
             return true;
         }
         if (preg_match('#^/(client_version|client_license)/(list|add|batchGenerate|update|toggle|delete|unbind|uploadPackage)#i', $path)) {
@@ -157,6 +148,12 @@ class AdminAuthMiddleware
         }
 
         return false;
+    }
+
+    private function isWriteRequest(Request $request): bool
+    {
+        $method = strtoupper((string) $request->method());
+        return in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true);
     }
 
     private function passesMobileAgentAuth(Request $request): bool
@@ -193,5 +190,37 @@ class AdminAuthMiddleware
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private function isProfitPluginPublicPath(string $path): bool
+    {
+        return $path === '/profit_center/plugin/bootstrap'
+            || $path === '/profit_center/plugin/ingestBatch';
+    }
+
+    private function passesProfitPluginAuth(Request $request): bool
+    {
+        try {
+            $token = ProfitPluginTokenService::extractTokenFromRequest($request);
+            $verify = ProfitPluginTokenService::verifyToken($token, ProfitPluginTokenService::SCOPE_INGEST);
+            return (bool) ($verify['ok'] ?? false);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function renderNoAccessPage(string $moduleName, array $state): Response
+    {
+        $html = View::fetch('admin/common/no_access', [
+            'module_name' => $moduleName,
+            'module_reason' => (string) ($state['reason'] ?? 'forbidden'),
+            'module_access_mode' => (string) ($state['access_mode'] ?? 'disabled'),
+            'module_expires_at' => (string) ($state['expires_at'] ?? ''),
+        ]);
+
+        return Response::create($html, 'html', 403);
     }
 }

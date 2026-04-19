@@ -137,12 +137,25 @@
         justify-content: flex-end;
         margin-top: 20px;
     }
+    .admin-inline-error {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #b91c1c;
+        font-size: 13px;
+    }
     .admin-product-card .el-table__inner-wrapper::before { height: 0; }
 </style>
 {/block}
 
 {block name="content"}
-<div class="tp-ep-wrap" id="productApp"></div>
+<div class="tp-ep-wrap" id="productApp" data-module="product"></div>
 {/block}
 
 {block name="script"}
@@ -177,9 +190,14 @@
     return '';
   }
 
-  createApp({
+  function mountProductApp(options) {
+    return createApp(options).use(ElementPlus).mount('#productApp');
+  }
+
+  const productAppOptions = {
     setup() {
       const loading = ref(false);
+      const loadError = ref('');
       const items = ref([]);
       const total = ref(0);
       const page = ref(1);
@@ -196,18 +214,30 @@
 
       async function fetchList() {
         loading.value = true;
+        loadError.value = '';
         try {
-          const params = new URLSearchParams();
-          params.set('page', String(page.value));
-          params.set('page_size', String(pageSize.value));
-          if (query.keyword) params.set('keyword', query.keyword);
-          if (query.category) params.set('category', String(query.category));
-          if (query.status !== '' && query.status !== null) params.set('status', String(query.status));
-          if (sortProp.value) params.set('sort_prop', sortProp.value);
-          if (sortOrder.value) params.set('sort_order', sortOrder.value);
-
-          const res = await fetch('/admin.php/product/list?' + params.toString(), { credentials: 'same-origin' });
-          const json = await res.json();
+          const params = {
+            page: String(page.value),
+            page_size: String(pageSize.value),
+            keyword: query.keyword || '',
+            category: query.category ? String(query.category) : '',
+            status: (query.status !== '' && query.status !== null) ? String(query.status) : '',
+            sort_prop: sortProp.value || '',
+            sort_order: sortOrder.value || '',
+          };
+          let json = null;
+          if (window.AdminApi && typeof window.AdminApi.get === 'function') {
+            json = await window.AdminApi.get('/admin.php/product/list', params, { fallbackKey: 'common.loadingFailed' });
+          } else {
+            const queryParams = new URLSearchParams();
+            Object.keys(params).forEach((key) => {
+              const value = params[key];
+              if (value === '') return;
+              queryParams.set(key, value);
+            });
+            const res = await fetch('/admin.php/product/list?' + queryParams.toString(), { credentials: 'same-origin' });
+            json = await res.json();
+          }
           if (!json || json.code !== 0) throw new Error((json && json.msg) || tt('common.loadingFailed'));
           items.value = (json.data && json.data.items) ? json.data.items : [];
           total.value = (json.data && json.data.total) ? json.data.total : 0;
@@ -217,7 +247,9 @@
             value: String(item && item.id != null ? item.id : '')
           })).filter((item) => item.label !== '' && item.value !== '');
         } catch (e) {
-          ElMessage.error(e && e.message ? e.message : tt('common.loadingFailed'));
+          const message = e && e.message ? e.message : tt('common.loadingFailed');
+          loadError.value = String(message || tt('common.loadingFailed'));
+          ElMessage.error(loadError.value);
         } finally {
           loading.value = false;
         }
@@ -298,13 +330,18 @@
           lang === 'en' ? 'Confirm' : '删除确认',
           { type: 'warning' }
         );
-        const resp = await fetch('/admin.php/product/delete/' + row.id, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-          body: '',
-          credentials: 'same-origin',
-        });
-        const json = await resp.json();
+        let json = null;
+        if (window.AdminApi && typeof window.AdminApi.post === 'function') {
+          json = await window.AdminApi.post('/admin.php/product/delete/' + row.id, {}, { fallbackKey: 'common.deleteFailed' });
+        } else {
+          const resp = await fetch('/admin.php/product/delete/' + row.id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: '',
+            credentials: 'same-origin',
+          });
+          json = await resp.json();
+        }
         if (json && json.code === 0) {
           ElMessage.success(json.msg || (lang === 'en' ? 'Deleted' : '已删除'));
           const maxPage = Math.max(1, Math.ceil(Math.max(0, total.value - 1) / pageSize.value));
@@ -316,6 +353,9 @@
       }
 
       const rows = computed(() => items.value || []);
+      function retryLoad() {
+        fetchList();
+      }
 
       onMounted(() => {
         fetchList();
@@ -326,6 +366,7 @@
         query,
         categoryOptions,
         rows,
+        loadError,
         total,
         page,
         pageSize,
@@ -342,11 +383,12 @@
         copyGoodsUrl,
         openGoodsUrl,
         doDelete,
+        retryLoad,
         fetchList,
       };
     },
     template: `
-      <div class="admin-product-card">
+      <div class="admin-product-card" data-section="product_list">
         <div class="admin-product-header">
           <div>
             <div class="admin-product-breadcrumb">${tt('page.product.breadcrumb')}</div>
@@ -379,6 +421,11 @@
             <el-button size="default" type="primary" @click="onSearch">{{ tt('common.filter') }}</el-button>
             <el-button size="default" @click="onReset">{{ tt('common.reset') }}</el-button>
           </div>
+        </div>
+
+        <div v-if="loadError" class="admin-inline-error" data-section="error_state">
+          <span>{{ loadError }}</span>
+          <el-button link type="primary" @click="retryLoad">{{ tt('common.refresh') }}</el-button>
         </div>
 
         <el-table
@@ -455,8 +502,24 @@
         </div>
       </div>
     `
-  }).use(ElementPlus).mount('#productApp');
+  };
+
+  if (window.AdminPageBootstrap && typeof window.AdminPageBootstrap.init === 'function') {
+    window.AdminPageBootstrap.init({
+      appId: 'productApp',
+      module: 'product',
+      defaultSection: 'product_list',
+      sectionSelector: '[data-section]',
+      dependencies: ['Vue', 'ElementPlus'],
+      onLoad: function () {
+        return mountProductApp(productAppOptions);
+      }
+    });
+  } else {
+    mountProductApp(productAppOptions);
+  }
   {/literal}
 </script>
 {/block}
+
 

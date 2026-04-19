@@ -191,6 +191,15 @@ class ModuleManagerService
                 'dependencies' => [],
                 'min_role' => self::ROLE_SUPER_ADMIN,
             ],
+            'platform_ops' => [
+                'name' => 'platform_ops',
+                'title' => 'Platform Operations',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['system_ops'],
+                'min_role' => self::ROLE_SUPER_ADMIN,
+            ],
         ];
     }
     /**
@@ -927,6 +936,9 @@ class ModuleManagerService
         }
         try {
             $query = Db::name($table);
+            if (TenantScopeService::tableHasTenantId($table)) {
+                $query->where('tenant_id', TenantScopeService::tenantId());
+            }
             foreach ($where as $k => $v) {
                 if (is_array($v) && count($v) === 2) {
                     $query->where((string) $k, (string) $v[0], $v[1]);
@@ -963,6 +975,7 @@ class ModuleManagerService
             'video_total' => self::safeCount('videos'),
             'product_total' => self::safeCount('products'),
             'ops_error_total' => self::safeCount('download_logs'),
+            'tenant_total' => self::safeCount('tenants'),
         ];
     }
     /**
@@ -1027,6 +1040,12 @@ class ModuleManagerService
         $role = AdminAuthService::role();
         $enabled = self::enabledModuleMap();
         $badges = self::menuBadges();
+        $tenantTab = '';
+        try {
+            $tenantTab = strtolower(trim((string) request()->param('tab', '')));
+        } catch (\Throwable $e) {
+            $tenantTab = '';
+        }
 
         $isEnabled = static function (string $moduleName, int $fallback = 0) use ($enabled): bool {
             return (int) ($enabled[$moduleName] ?? $fallback) === 1;
@@ -1054,6 +1073,7 @@ class ModuleManagerService
         $materialEnabled = $isEnabled('material_distribution');
         $terminalEnabled = $isEnabled('terminal_devices');
         $systemEnabled = $isEnabled('system_ops');
+        $platformOpsEnabled = $role === self::ROLE_SUPER_ADMIN && $isEnabled('platform_ops', 1) && $systemEnabled;
 
         $menus = [];
 
@@ -1324,6 +1344,61 @@ class ModuleManagerService
                         'text_i18n' => 'admin.menu.groupMaterialProductMenu',
                         'expanded' => self::menuTreeHasActive($materialChildren),
                         'children' => $materialChildren,
+                    ],
+                ],
+            ];
+        }
+
+        if ($platformOpsEnabled) {
+            $platformChildren = [
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/tenant?tab=tenants',
+                    'icon' => 'building-2',
+                    'text_i18n' => 'admin.menu.tenantCenter',
+                    'active' => self::controllerIs($currentController, 'tenant') && self::actionIs($currentAction, 'index') && ($tenantTab === '' || $tenantTab === 'tenants'),
+                    'badge' => ($badges['tenant_total'] ?? 0) > 0 ? (string) $badges['tenant_total'] : '',
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/tenant?tab=packages',
+                    'icon' => 'package-2',
+                    'text_i18n' => 'admin.menu.tenantPackages',
+                    'active' => self::controllerIs($currentController, 'tenant') && self::actionIs($currentAction, 'index') && $tenantTab === 'packages',
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/tenant?tab=subscriptions',
+                    'icon' => 'shield-check',
+                    'text_i18n' => 'admin.menu.tenantSubscriptions',
+                    'active' => self::controllerIs($currentController, 'tenant') && self::actionIs($currentAction, 'index') && $tenantTab === 'subscriptions',
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/tenant?tab=admins',
+                    'icon' => 'users-round',
+                    'text_i18n' => 'admin.menu.tenantAdmins',
+                    'active' => self::controllerIs($currentController, 'tenant') && self::actionIs($currentAction, 'index') && $tenantTab === 'admins',
+                ],
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php/tenant?tab=audit',
+                    'icon' => 'scroll-text',
+                    'text_i18n' => 'admin.menu.tenantAudit',
+                    'active' => self::controllerIs($currentController, 'tenant') && self::actionIs($currentAction, 'index') && $tenantTab === 'audit',
+                ],
+            ];
+            $menus[] = [
+                'section_i18n' => 'admin.menu.groupPlatformOps',
+                'items' => [
+                    [
+                        'kind' => 'group',
+                        'id' => 'platform_ops',
+                        'href' => self::firstLeafHref($platformChildren),
+                        'icon' => 'building',
+                        'text_i18n' => 'admin.menu.groupPlatformOpsMenu',
+                        'expanded' => self::menuTreeHasActive($platformChildren),
+                        'children' => $platformChildren,
                     ],
                 ],
             ];

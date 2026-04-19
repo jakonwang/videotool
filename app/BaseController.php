@@ -5,7 +5,9 @@ namespace app;
 
 use app\service\AdminAuthService;
 use app\service\ModuleManagerService;
+use app\service\TenantModuleService;
 use app\service\TenantScopeService;
+use app\service\TraceIdService;
 use think\App;
 use think\exception\ValidateException;
 use think\facade\View;
@@ -88,12 +90,29 @@ abstract class BaseController
                 View::assign('current_controller', $curController);
                 View::assign('current_action', $curAction);
                 View::assign('sidebar_sections', ModuleManagerService::getEnabledMenus($curController, $curAction));
+                $path = '/' . ltrim((string) $this->request->pathinfo(), '/');
+                $path = rtrim($path, '/');
+                if ($path === '') {
+                    $path = '/';
+                }
+                $moduleName = TenantModuleService::resolveModuleNameByPath($path);
+                $moduleState = $moduleName !== ''
+                    ? TenantModuleService::moduleState($moduleName, AdminAuthService::tenantId())
+                    : ['access_mode' => 'enabled', 'expires_at' => null];
+                View::assign('current_tenant_id', AdminAuthService::tenantId());
+                View::assign('current_module_name', $moduleName);
+                View::assign('current_module_access_mode', (string) ($moduleState['access_mode'] ?? 'enabled'));
+                View::assign('current_module_expires_at', (string) ($moduleState['expires_at'] ?? ''));
             } catch (\Throwable $e) {
                 View::assign('app_version', '1.0.2');
                 View::assign('app_year', date('Y'));
                 View::assign('current_controller', '');
                 View::assign('current_action', '');
                 View::assign('sidebar_sections', []);
+                View::assign('current_tenant_id', 1);
+                View::assign('current_module_name', '');
+                View::assign('current_module_access_mode', 'enabled');
+                View::assign('current_module_expires_at', '');
             }
         }
 
@@ -107,7 +126,12 @@ abstract class BaseController
 
     protected function apiJsonOk(array $data = [], string $msg = 'ok')
     {
-        return json(['code' => 0, 'msg' => $msg, 'data' => $data]);
+        return json([
+            'code' => 0,
+            'msg' => $msg,
+            'trace_id' => TraceIdService::ensure($this->request),
+            'data' => $data,
+        ]);
     }
 
     protected function apiJsonErr(string $msg, int $code = 1, $data = null, string $errorKey = '')
@@ -121,6 +145,7 @@ abstract class BaseController
             'code' => $code,
             'msg' => $msg,
             'error_key' => $resolvedKey,
+            'trace_id' => TraceIdService::ensure($this->request),
             'data' => $data,
         ]);
     }

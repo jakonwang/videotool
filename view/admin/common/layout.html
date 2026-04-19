@@ -25,7 +25,7 @@
             --dash-border: rgba(29,36,78,0.12);
             --dash-danger: #ff6b8e;
             --dash-success: #28c7a5;
-            /* 閹稿鎸崇紒鐔剁閼瑰弶婢?*/
+            /* 闁圭顦甸幐宕囩磼閻斿墎顏遍柤鐟板级濠?*/
             --dash-btn-primary: #1677ff;
             --dash-btn-primary-hover: #0f6fe8;
             --dash-btn-primary-active: #0c5fca;
@@ -126,7 +126,15 @@
             font-size: 1.5rem;
             font-weight: 600;
         }
-        /* 妞ゅ爼鍎撮弽蹇ョ窗閺堫剟銆嶉惄顔荤瑝娴ｈ法鏁ら敍鍫滅箽閻ｆ瑧绮ㄩ弸鍕悑鐎圭櫢绱濇担鍡涙閽樺骏绱?*/
+        .admin-readonly-banner {
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            background: rgba(245, 158, 11, 0.12);
+            color: #8a4b00;
+            border-radius: 10px;
+            font-weight: 600;
+            margin: 0 0 10px;
+        }
+        /* 濡炪倕鐖奸崕鎾冀韫囥儳绐楅柡鍫墴閵嗗秹鎯勯鑽ょ憹濞达綀娉曢弫銈夋晬閸粎绠介柣锝嗙懅缁劑寮搁崟顐㈡倯閻庡湱娅㈢槐婵囨媴閸℃稒顓洪柦妯洪獜缁?*/
         .dark-dashboard .main-header { display: none; }
         .dark-dashboard .main-sidebar {
             background: var(--dash-sidebar-bg);
@@ -218,7 +226,7 @@
         .layout-fixed .main-footer {
             padding-bottom: 0.75rem;
         }
-        /* 娓氀勭埉閼挎粌宕熼敍娆眔otstrap collapse 閹貉冨煑鐏炴洖绱戦敍鍫滅瑢 SSR 娑撯偓閼疯揪绱? 閺嬩胶鐣濋弳妤呯拨 */
+        /* 濞撴皜鍕焿闁兼寧绮屽畷鐔兼晬濞嗙湐otstrap collapse 闁硅矇鍐ㄧ厬閻忕偞娲栫槐鎴︽晬閸粎鐟?SSR 濞戞挴鍋撻柤鐤彧缁? 闁哄鑳堕悾婵嬪汲濡ゅ懐鎷?*/
         .dark-dashboard .sidebar .admin-sidenav {
             padding: 8px;
         }
@@ -937,7 +945,7 @@
             border-color: rgba(23,32,66,.12);
         }
 
-        /* ===== OPS 2.0 鍏ㄥ眬瑙嗚鏀舵暃锛氶〉闈㈠３ / 鍗＄墖 / 琛ㄥ崟 / 琛ㄦ牸 / 寮圭獥 ===== */
+        /* ===== OPS 2.0 閸忋劌鐪憴鍡氼潕閺€鑸垫殐閿涙岸銆夐棃銏狅紦 / 閸楋紕澧?/ 鐞涖劌宕?/ 鐞涖劍鐗?/ 瀵湱鐛?===== */
         .dark-dashboard .content-wrapper {
             background: linear-gradient(120deg, var(--ops-bg) 0%, var(--ops-bg-soft) 58%, #f8fbff 100%);
         }
@@ -1494,7 +1502,7 @@
             }
         }
 
-        /* ===== 缂佺喍绔撮崥搴″酱妞ょ敻娼扮憴鍕瘱閿涘牅绗?/video 妞嬪孩鐗告稉鈧懛杈剧礆===== */
+        /* ===== 缂備胶鍠嶇粩鎾触鎼粹€抽叡濡炪倗鏁诲鎵喆閸曨喖鐦遍柨娑樼墔缁?/video 濡炲瀛╅悧鍛婄▔閳ь剟鎳涙潏鍓х===== */
         .admin-page-container {
             padding: 0 20px 20px;
             background: transparent;
@@ -1762,7 +1770,7 @@
             }
         }
 
-        /* ===== 缁夎濮╃粩顖炩偓鍌炲帳閿涙碍妯夌粈娲€婇柈銊︾埉 + 閹惰棄鐪芥笟褎鐖?===== */
+        /* ===== 缂佸顕ф慨鈺冪博椤栫偐鍋撻崒鐐插赋闁挎稒纰嶅Ο澶岀矆濞差亗鈧﹪鏌堥妸锔惧焿 + 闁规儼妫勯惇鑺ョ瑹瑜庨悥?===== */
         @media (max-width: 992px) {
             :root { --dash-topbar-h: 56px; }
             .dark-dashboard .main-header {
@@ -1770,15 +1778,15 @@
                 position: sticky;
                 top: 0;
                 z-index: 1030;
-                /* 缁夎濮╃粩顖炰缉閸忓秹鈧繐绨抽敍姘辨箙瀵版鍩屾稉瀣煙閸愬懎顔愰弬鍥х摟 */
+                /* 缂佸顕ф慨鈺冪博椤栫偘缂夐柛蹇撶Ч閳ь剙绻愮花鎶芥晬濮樿鲸绠欑€电増顨呴崺灞剧▔鐎ｎ偅鐓欓柛鎰噹椤旀劙寮崶褏鎽?*/
                 background: rgba(255,255,255,0.98);
                 border-bottom: 1px solid rgba(29,36,78,.08);
                 backdrop-filter: blur(10px);
             }
-            /* 娓氀勭埉閹恒劍濯?闁喚鍍甸弮璁圭礉娣囨繆鐦夐懗灞炬珯娑撳秹鈧繑妲?*/
+            /* 濞撴皜鍕焿闁规亽鍔嶆刊?闂侇剦鍠氶崓鐢稿籍鐠佸湱绀夊ǎ鍥ㄧ箚閻﹀鎳楃仦鐐彲濞戞挸绉归埀顒€绻戝Σ?*/
             .dark-dashboard .main-sidebar {
                 background: var(--dash-sidebar-bg);
-                /* 绾喕绻氱粔璇插З缁旑垯鏅堕弽蹇撶湴缁狙勬付妤傛﹫绱濋柆鍨帳鐞氼偄鍞寸€圭懓灏憰鍡欐磰 */
+                /* 缁绢収鍠曠换姘辩矓鐠囨彃袟缂佹棏鍨弲鍫曞冀韫囨挾婀寸紒鐙欏嫭浠樺Δ鍌涳公缁辨繈鏌嗛崹顔煎赋閻炴凹鍋勯崬瀵糕偓鍦嚀鐏忣垳鎲伴崱娆愮０ */
                 z-index: 1085 !important;
             }
             .dark-dashboard .main-sidebar .sidebar {
@@ -2200,7 +2208,7 @@
                 }
             }
 
-            // 閸欘亜顦╅悶鍡樺灉娴狀剝鍤滃杈╂畱閸掑棛绮嶇€圭懓娅?
+            // 闁告瑯浜滈ˇ鈺呮偠閸℃ê鐏夊ù鐙€鍓濋崵婊冾啅鏉堚晜鐣遍柛鎺戞缁秶鈧湱鎳撳▍?
             const $collapses = $('.admin-sidenav-subwrap.collapse, .admin-sidenav-sub2wrap.collapse');
             if (!$collapses.length) return;
 
@@ -2209,7 +2217,7 @@
                 const href = ($(this).attr('href') || '').replace(/\/+$/, '');
                 if (!href) return;
 
-                // href 闁艾鐖惰ぐ銏狀洤 /admin.php/video/batchUpload
+                // href 闂侇偅鑹鹃悥鎯般亹閵忕媭娲?/admin.php/video/batchUpload
                 const hit = (path === href) || (path && href && path.indexOf(href) !== -1) || (full && full.indexOf(href) !== -1);
                 if (hit) {
                     const $collapse = $(this).closest('.collapse');
@@ -2227,7 +2235,7 @@
                 }
             });
 
-            // 婵″倹鐏夊▽鈥冲爱闁板秴鍩岀€涙劙銆嶉敍灞藉灟娣囨繄鏆€閺堝秴濮熺粩顖涜閺屾挾濮搁幀渚婄礄娑撯偓閼割兛绗夋导姘絺閻㈢噦绱?
+            // 濠碘€冲€归悘澶娾柦閳ュ啿鐖遍梺鏉跨Т閸╁瞼鈧稒鍔欓妴宥夋晬鐏炶棄鐏熷ǎ鍥ㄧ箘閺嗏偓闁哄牆绉存慨鐔虹博椤栨稖顩柡灞炬尵婵悂骞€娓氬﹦绀勫☉鎾亾闁煎壊鍏涚粭澶嬪濮橆剙绲洪柣銏㈠櫐缁?
             if (!matched) {
                 $collapses.each(function () {
                     const $c = $(this);
@@ -2389,7 +2397,7 @@
                     $a.append($('<span/>', { class: 'admin-content-tab-ico' }).append($('<i/>').attr('data-lucide', item.icon)));
                     let resolvedText = item.text || item.i18nKey || item.href;
                     const fallbackMap = {
-                        'admin.menu.liveStyleAnalysis': '直播选款分析'
+                        'admin.menu.liveStyleAnalysis': 'Live Style Analysis'
                     };
                     if (window.AppI18n) {
                         const appI18n = window.AppI18n;
@@ -2532,6 +2540,308 @@
             bind('btnLangViShell', 'vi');
             setActive();
             refreshSidebarTooltips();
+        })();
+    </script>
+    <script>
+        (function () {
+            const i18n = window.AppI18n || null;
+            let lastTraceId = '';
+            let sessionRedirecting = false;
+
+            function tt(key, fallback) {
+                if (i18n && typeof i18n.t === 'function') {
+                    const translated = i18n.t(key, null, i18n.getLang('zh'));
+                    if (translated && translated !== key) {
+                        return translated;
+                    }
+                }
+                return fallback || key;
+            }
+
+            function normalizeError(payload, fallbackKey) {
+                if (i18n && typeof i18n.resolveApiMessage === 'function') {
+                    return i18n.resolveApiMessage(payload || {}, fallbackKey || 'common.operationFailed');
+                }
+                const msg = payload && payload.msg ? String(payload.msg) : '';
+                return msg || tt(fallbackKey || 'common.operationFailed', 'Operation failed');
+            }
+
+            function parseJson(text) {
+                let raw = String(text || '').trim();
+                if (!raw) return null;
+                if (raw.charCodeAt(0) === 0xfeff) {
+                    raw = raw.slice(1);
+                }
+                try {
+                    return JSON.parse(raw);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function appendTrace(msg, traceId) {
+                if (!traceId) return msg;
+                return msg + ' (Trace ID: ' + traceId + ')';
+            }
+
+            function markSessionExpired() {
+                if (sessionRedirecting) {
+                    return;
+                }
+                sessionRedirecting = true;
+                window.setTimeout(function () {
+                    window.location.href = '/admin.php/auth/login';
+                }, 260);
+            }
+
+            function buildError(message, payload, traceId) {
+                const err = new Error(appendTrace(message, traceId));
+                err.payload = payload || null;
+                err.trace_id = traceId || '';
+                return err;
+            }
+
+            async function requestJson(url, options) {
+                const opts = options || {};
+                const method = String(opts.method || (opts.payload ? 'POST' : 'GET')).toUpperCase();
+                const headers = Object.assign(
+                    {
+                        'Accept': 'application/json, text/javascript, */*;q=0.01',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    opts.headers || {}
+                );
+
+                let finalUrl = String(url || '');
+                if (opts.params && typeof opts.params === 'object') {
+                    const u = new URL(finalUrl, window.location.origin);
+                    Object.keys(opts.params).forEach(function (key) {
+                        const value = opts.params[key];
+                        if (value === null || typeof value === 'undefined' || value === '') {
+                            return;
+                        }
+                        u.searchParams.set(key, String(value));
+                    });
+                    finalUrl = u.pathname + (u.search ? u.search : '');
+                }
+
+                let body = opts.body;
+                if (!body && opts.payload && method !== 'GET') {
+                    headers['Content-Type'] = headers['Content-Type'] || 'application/json; charset=UTF-8';
+                    body = JSON.stringify(opts.payload);
+                }
+
+                const response = await fetch(finalUrl, {
+                    method: method,
+                    credentials: opts.credentials || 'same-origin',
+                    headers: headers,
+                    body: body,
+                    keepalive: opts.keepalive === true
+                });
+                const text = await response.text();
+                const payload = parseJson(text);
+                const headerTrace = response.headers ? String(response.headers.get('x-trace-id') || '') : '';
+                if (headerTrace) {
+                    lastTraceId = headerTrace;
+                }
+
+                if (!payload || typeof payload.code === 'undefined') {
+                    const looksLoginPage = /auth\/login/i.test(text) || /<html/i.test(text);
+                    if (response.status === 401 || looksLoginPage) {
+                        if (opts.autoRedirect !== false) {
+                            markSessionExpired();
+                        }
+                        throw buildError(tt('common.sessionExpired', 'Session expired'), null, headerTrace);
+                    }
+                    throw buildError(tt('common.operationFailed', 'Operation failed'), null, headerTrace);
+                }
+
+                const traceId = String(payload.trace_id || headerTrace || '');
+                if (traceId) {
+                    lastTraceId = traceId;
+                }
+
+                if (Number(payload.code) !== 0) {
+                    const message = normalizeError(payload, opts.fallbackKey || 'common.operationFailed');
+                    const sessionExpired = Number(payload.code) === 401
+                        || String(payload.error_key || '') === 'common.sessionExpired'
+                        || String(payload.msg || '').toLowerCase() === 'not_logged_in';
+                    if (sessionExpired && opts.autoRedirect !== false) {
+                        markSessionExpired();
+                    }
+                    throw buildError(message, payload, traceId);
+                }
+
+                return payload;
+            }
+
+            function healthReport(payload) {
+                try {
+                    const body = Object.assign({}, payload || {});
+                    if (!body.trace_id) {
+                        body.trace_id = lastTraceId || '';
+                    }
+                    fetch('/admin.php/ops_frontend/health/save', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        keepalive: true,
+                        headers: {
+                            'Accept': 'application/json, text/javascript, */*;q=0.01',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/json; charset=UTF-8'
+                        },
+                        body: JSON.stringify(body)
+                    }).catch(function () {});
+                } catch (e) {}
+            }
+
+            window.AdminApi = {
+                requestJson: requestJson,
+                get: function (url, params, options) {
+                    const opts = Object.assign({}, options || {}, { method: 'GET', params: params || {} });
+                    return requestJson(url, opts);
+                },
+                post: function (url, payload, options) {
+                    const opts = Object.assign({}, options || {}, { method: 'POST', payload: payload || {} });
+                    return requestJson(url, opts);
+                },
+                resolveErrorText: normalizeError,
+                healthReport: healthReport,
+                getLastTraceId: function () { return lastTraceId; }
+            };
+        })();
+    </script>
+    <script>
+        (function () {
+            function isVisible(el) {
+                if (!el) return false;
+                const style = window.getComputedStyle(el);
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+                    return false;
+                }
+                if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') {
+                    return false;
+                }
+                return el.getClientRects().length > 0;
+            }
+
+            function renderError(root, html) {
+                if (!root) return;
+                root.innerHTML = html;
+            }
+
+            function report(moduleName, pageName, eventName, detail) {
+                if (!window.AdminApi || typeof window.AdminApi.healthReport !== 'function') {
+                    return;
+                }
+                window.AdminApi.healthReport({
+                    module: moduleName || '',
+                    page: pageName || window.location.pathname || '',
+                    event: eventName || 'unknown',
+                    detail: detail || {}
+                });
+            }
+
+            function ensureSectionVisible(root, selector, defaultSection, moduleName, pageName) {
+                const sections = root.querySelectorAll(selector || '[data-section]');
+                if (!sections || !sections.length) {
+                    return;
+                }
+                let visibleCount = 0;
+                sections.forEach(function (el) {
+                    if (isVisible(el)) {
+                        visibleCount += 1;
+                    }
+                });
+                if (visibleCount > 0) {
+                    return;
+                }
+
+                let fallback = null;
+                if (defaultSection) {
+                    fallback = root.querySelector('[data-section="' + defaultSection + '"]');
+                }
+                if (!fallback) {
+                    fallback = sections[0];
+                }
+                if (fallback) {
+                    fallback.style.display = '';
+                    fallback.removeAttribute('hidden');
+                    fallback.setAttribute('aria-hidden', 'false');
+                    if (!isVisible(fallback)) {
+                        fallback.style.display = 'block';
+                    }
+                }
+                report(moduleName, pageName, 'section_all_hidden', {
+                    section_selector: selector || '[data-section]',
+                    default_section: defaultSection || '',
+                    section_count: sections.length
+                });
+            }
+
+            window.AdminPageBootstrap = {
+                init: function (options) {
+                    const cfg = options || {};
+                    const appId = String(cfg.appId || '').trim();
+                    const root = document.getElementById(appId);
+                    if (!root) {
+                        return { ok: false, reason: 'root_missing' };
+                    }
+
+                    const moduleName = String(cfg.module || root.getAttribute('data-module') || '');
+                    const pageName = window.location.pathname || '';
+                    const deps = Array.isArray(cfg.dependencies) && cfg.dependencies.length > 0
+                        ? cfg.dependencies.slice()
+                        : ['Vue', 'ElementPlus'];
+                    const missing = deps.filter(function (name) {
+                        return !window[name];
+                    });
+                    if (missing.length > 0) {
+                        renderError(root, '<div class="alert alert-danger mb-0">' +
+                            'Dependencies failed to load: ' + missing.join(', ') +
+                            '. Please refresh and try again.' +
+                            '</div>');
+                        report(moduleName, pageName, 'dependency_missing', { missing_dependencies: missing });
+                        return { ok: false, reason: 'dependency_missing', missing: missing };
+                    }
+
+                    const runSectionCheck = function () {
+                        window.setTimeout(function () {
+                            ensureSectionVisible(
+                                root,
+                                cfg.sectionSelector || '[data-section]',
+                                cfg.defaultSection || '',
+                                moduleName,
+                                pageName
+                            );
+                        }, 80);
+                    };
+
+                    try {
+                        const result = typeof cfg.onLoad === 'function' ? cfg.onLoad(root, cfg) : null;
+                        Promise.resolve(result).then(function () {
+                            runSectionCheck();
+                        }).catch(function (err) {
+                            renderError(root, '<div class="alert alert-danger mb-0">' +
+                                'Page initialization failed. Please refresh and try again.' +
+                                '</div>');
+                            report(moduleName, pageName, 'mount_failed', {
+                                message: err && err.message ? String(err.message) : 'mount_failed'
+                            });
+                        });
+                    } catch (err) {
+                        renderError(root, '<div class="alert alert-danger mb-0">' +
+                            'Page initialization failed. Please refresh and try again.' +
+                            '</div>');
+                        report(moduleName, pageName, 'mount_failed', {
+                            message: err && err.message ? String(err.message) : 'mount_failed'
+                        });
+                        return { ok: false, reason: 'mount_failed' };
+                    }
+
+                    return { ok: true };
+                }
+            };
         })();
     </script>
     {block name="script"}{/block}

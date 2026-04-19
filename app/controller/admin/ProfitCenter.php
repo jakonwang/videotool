@@ -7,9 +7,12 @@ use app\BaseController;
 use app\model\GrowthProfitAccount as GrowthProfitAccountModel;
 use app\model\GrowthProfitDailyEntry as GrowthProfitDailyEntryModel;
 use app\model\GrowthProfitStore as GrowthProfitStoreModel;
+use app\service\AdminAuthService;
 use app\service\FxRateService;
+use app\service\ProfitPluginTokenService;
 use app\service\ProfitCalculatorService;
 use app\service\StoreCurrencyService;
+use app\service\TraceIdService;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -1013,6 +1016,396 @@ class ProfitCenter extends BaseController
         exit;
     }
 
+    public function pluginBootstrap()
+    {
+        $payload = $this->parseJsonOrPost();
+        $ctx = $this->resolvePluginTenantContext(true, $payload);
+        if (!($ctx['ok'] ?? false)) {
+            return $this->jsonErr((string) ($ctx['message'] ?? 'forbidden'), 401, null, 'common.forbidden');
+        }
+        $tenantId = (int) ($ctx['tenant_id'] ?? 1);
+        $stores = Db::name('growth_profit_stores')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 1)
+            ->field('id,store_name,store_code,default_gmv_currency,default_sale_price_cny,default_product_cost_cny')
+            ->order('id', 'desc')
+            ->select()
+            ->toArray();
+        $accounts = Db::name('growth_profit_accounts')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 1)
+            ->field('id,store_id,account_name,account_code,account_currency,default_gmv_currency')
+            ->order('id', 'desc')
+            ->select()
+            ->toArray();
+        $tokens = [];
+        if (($ctx['auth_mode'] ?? '') === 'session') {
+            $tokens = ProfitPluginTokenService::listTokens($tenantId, 40);
+        }
+
+        $apiBase = (string) $this->request->domain();
+        if ($apiBase === '') {
+            $apiBase = ((string) ($this->request->isSsl() ? 'https' : 'http')) . '://' . (string) $this->request->host(true);
+        }
+        $apiBase = rtrim($apiBase, '/');
+
+        return $this->jsonOk([
+            'tenant_id' => $tenantId,
+            'auth_mode' => (string) ($ctx['auth_mode'] ?? 'token'),
+            'api_base' => $apiBase,
+            'ingest_path' => '/admin.php/profit_center/plugin/ingestBatch',
+            'bootstrap_path' => '/admin.php/profit_center/plugin/bootstrap',
+            'stores' => $stores,
+            'accounts' => $accounts,
+            'tokens' => $tokens,
+            'mappings' => $this->loadPluginMappings($tenantId),
+            'channel_options' => ProfitCalculatorService::channelOptions(),
+            'currency_options' => FxRateService::supportedCurrencies(),
+            'defaults' => [
+                'channel_type' => ProfitCalculatorService::CHANNEL_VIDEO,
+            ],
+        ]);
+    }
+
+    public function pluginTokenCreate()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+        }
+        if (!$this->canWriteProfitPluginConfig()) {
+            return $this->jsonErr('forbidden', 403, null, 'common.forbidden');
+        }
+        $payload = $this->parseJsonOrPost();
+        $tenantId = $this->currentTenantId();
+        $name = trim((string) ($payload['name'] ?? 'TikTok Browser Plugin'));
+        $expiresDays = $this->parseInt($payload['expires_days'] ?? 30, 30);
+        if ($expiresDays < 0) {
+            $expiresDays = 0;
+        }
+        if ($expiresDays > 3650) {
+            $expiresDays = 3650;
+        }
+
+        try {
+            $created = ProfitPluginTokenService::createToken(
+                $tenantId,
+                AdminAuthService::userId(),
+                $name,
+                $expiresDays,
+                ProfitPluginTokenService::SCOPE_INGEST
+            );
+        } catch (\Throwable $e) {
+            return $this->jsonErr('save_failed', 1, null, 'common.saveFailed');
+        }
+
+        return $this->jsonOk([
+            'token' => (string) ($created['token'] ?? ''),
+            'token_info' => [
+                'id' => (int) ($created['id'] ?? 0),
+                'token_prefix' => (string) ($created['token_prefix'] ?? ''),
+                'expires_at' => (string) ($created['expires_at'] ?? ''),
+                'scope' => (string) ($created['scope'] ?? ProfitPluginTokenService::SCOPE_INGEST),
+            ],
+            'warning' => 'token_shown_once',
+        ], 'created');
+    }
+
+    public function pluginTokenRevoke()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+        }
+        if (!$this->canWriteProfitPluginConfig()) {
+            return $this->jsonErr('forbidden', 403, null, 'common.forbidden');
+        }
+        $payload = $this->parseJsonOrPost();
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+        }
+
+        $ok = ProfitPluginTokenService::revokeToken($this->currentTenantId(), $id);
+        if (!$ok) {
+            return $this->jsonErr('not_found', 1, null, 'common.notFound');
+        }
+
+        return $this->jsonOk(['id' => $id], 'revoked');
+    }
+
+    public function pluginIngestBatch()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+        }
+        $payload = $this->parseJsonOrPost();
+        $ctx = $this->resolvePluginTenantContext(true, $payload);
+        if (!($ctx['ok'] ?? false)) {
+            return $this->jsonErr((string) ($ctx['message'] ?? 'forbidden'), 401, null, 'common.forbidden');
+        }
+        $tenantId = (int) ($ctx['tenant_id'] ?? 1);
+        $tokenId = (int) ($ctx['token_id'] ?? 0);
+
+        $rows = $payload['rows'] ?? null;
+        if (!is_array($rows)) {
+            $isListPayload = false;
+            if (is_array($payload) && $payload !== []) {
+                $keys = array_keys($payload);
+                $isListPayload = ($keys === range(0, count($payload) - 1));
+            }
+            $rows = $isListPayload ? $payload : [];
+        }
+        if ($rows === []) {
+            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+        }
+        if (count($rows) > 500) {
+            return $this->jsonErr('batch_too_large', 1, ['max' => 500], 'common.invalidParams');
+        }
+
+        $saved = [];
+        $failed = [];
+        foreach ($rows as $index => $row) {
+            if (!is_array($row)) {
+                $failed[] = [
+                    'index' => (int) $index + 1,
+                    'message' => 'invalid_item',
+                ];
+                continue;
+            }
+
+            $prepared = $this->preparePluginRowPayload($row, $tenantId);
+            if (!($prepared['ok'] ?? false)) {
+                $failed[] = [
+                    'index' => (int) $index + 1,
+                    'message' => (string) ($prepared['message'] ?? 'invalid_params'),
+                ];
+                continue;
+            }
+
+            $saveResult = $this->upsertEntry((array) ($prepared['payload'] ?? []), $tenantId);
+            if (!($saveResult['ok'] ?? false)) {
+                $failed[] = [
+                    'index' => (int) $index + 1,
+                    'message' => (string) ($saveResult['message'] ?? 'save_failed'),
+                ];
+                continue;
+            }
+
+            $data = is_array($saveResult['data'] ?? null) ? $saveResult['data'] : [];
+            $saved[] = [
+                'index' => (int) $index + 1,
+                'id' => (int) ($data['id'] ?? 0),
+                'entry_date' => (string) ($data['entry_date'] ?? ''),
+                'store_id' => (int) ($data['store_id'] ?? 0),
+                'account_id' => (int) ($data['account_id'] ?? 0),
+                'channel_type' => (string) ($data['channel_type'] ?? ''),
+            ];
+        }
+
+        if ($tokenId > 0) {
+            ProfitPluginTokenService::touchTokenUsage($tokenId, (string) $this->request->ip());
+        }
+
+        $traceId = TraceIdService::ensure($this->request);
+        $status = count($failed) === 0 ? 'success' : (count($saved) > 0 ? 'partial' : 'failed');
+        $this->writePluginIngestLog(
+            $tenantId,
+            $tokenId,
+            $traceId,
+            $status,
+            count($rows),
+            count($saved),
+            count($failed),
+            $payload,
+            ['saved_items' => $saved, 'failed_items' => $failed]
+        );
+
+        return $this->jsonOk([
+            'total' => count($rows),
+            'saved_count' => count($saved),
+            'failed_count' => count($failed),
+            'saved_items' => array_slice($saved, 0, 500),
+            'failed_items' => array_slice($failed, 0, 500),
+        ], 'ingested');
+    }
+
+    public function pluginIngestLogs()
+    {
+        if (!AdminAuthService::isLoggedIn()) {
+            return $this->jsonErr('forbidden', 403, null, 'common.forbidden');
+        }
+        $page = max(1, (int) $this->request->param('page', 1));
+        $pageSize = (int) $this->request->param('page_size', 20);
+        if ($pageSize <= 0) {
+            $pageSize = 20;
+        }
+        if ($pageSize > 200) {
+            $pageSize = 200;
+        }
+
+        try {
+            $base = Db::name('growth_profit_plugin_ingest_logs')
+                ->where('tenant_id', $this->currentTenantId());
+            $total = (int) (clone $base)->count();
+            $rows = (clone $base)
+                ->order('id', 'desc')
+                ->page($page, $pageSize)
+                ->select()
+                ->toArray();
+        } catch (\Throwable $e) {
+            return $this->jsonOk([
+                'items' => [],
+                'total' => 0,
+                'page' => $page,
+                'page_size' => $pageSize,
+            ]);
+        }
+
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'trace_id' => (string) ($row['trace_id'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+                'row_count' => (int) ($row['row_count'] ?? 0),
+                'saved_count' => (int) ($row['saved_count'] ?? 0),
+                'failed_count' => (int) ($row['failed_count'] ?? 0),
+                'source_page' => (string) ($row['source_page'] ?? ''),
+                'request_date' => (string) ($row['request_date'] ?? ''),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+            ];
+        }
+
+        return $this->jsonOk([
+            'items' => $items,
+            'total' => $total,
+            'page' => $page,
+            'page_size' => $pageSize,
+        ]);
+    }
+
+    public function pluginMappingSave()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+        }
+        if (!$this->canWriteProfitPluginConfig()) {
+            return $this->jsonErr('forbidden', 403, null, 'common.forbidden');
+        }
+        $payload = $this->parseJsonOrPost();
+        $type = mb_strtolower(trim((string) ($payload['type'] ?? '')), 'UTF-8');
+        $alias = trim((string) ($payload['alias'] ?? ''));
+        if ($alias === '') {
+            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+        }
+        $tenantId = $this->currentTenantId();
+        $now = date('Y-m-d H:i:s');
+
+        if ($type === 'store') {
+            $storeId = (int) ($payload['store_id'] ?? 0);
+            if ($storeId <= 0) {
+                return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+            }
+            $store = Db::name('growth_profit_stores')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $storeId)
+                ->find();
+            if (!is_array($store)) {
+                return $this->jsonErr('store_not_found', 1, null, 'common.notFound');
+            }
+            $exists = Db::name('growth_profit_plugin_store_maps')
+                ->where('tenant_id', $tenantId)
+                ->where('store_alias', $alias)
+                ->find();
+            if (is_array($exists)) {
+                $id = (int) ($exists['id'] ?? 0);
+                Db::name('growth_profit_plugin_store_maps')
+                    ->where('id', $id)
+                    ->where('tenant_id', $tenantId)
+                    ->update([
+                        'store_id' => $storeId,
+                        'status' => 1,
+                        'updated_at' => $now,
+                    ]);
+                return $this->jsonOk(['id' => $id], 'saved');
+            }
+            $id = (int) Db::name('growth_profit_plugin_store_maps')->insertGetId([
+                'tenant_id' => $tenantId,
+                'store_alias' => mb_substr($alias, 0, 128),
+                'store_id' => $storeId,
+                'status' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            return $this->jsonOk(['id' => $id], 'saved');
+        }
+
+        if ($type === 'account') {
+            $accountId = (int) ($payload['account_id'] ?? 0);
+            if ($accountId <= 0) {
+                return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+            }
+            $account = Db::name('growth_profit_accounts')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $accountId)
+                ->find();
+            if (!is_array($account)) {
+                return $this->jsonErr('account_not_found', 1, null, 'common.notFound');
+            }
+            $exists = Db::name('growth_profit_plugin_account_maps')
+                ->where('tenant_id', $tenantId)
+                ->where('account_alias', $alias)
+                ->find();
+            if (is_array($exists)) {
+                $id = (int) ($exists['id'] ?? 0);
+                Db::name('growth_profit_plugin_account_maps')
+                    ->where('id', $id)
+                    ->where('tenant_id', $tenantId)
+                    ->update([
+                        'account_id' => $accountId,
+                        'status' => 1,
+                        'updated_at' => $now,
+                    ]);
+                return $this->jsonOk(['id' => $id], 'saved');
+            }
+            $id = (int) Db::name('growth_profit_plugin_account_maps')->insertGetId([
+                'tenant_id' => $tenantId,
+                'account_alias' => mb_substr($alias, 0, 128),
+                'account_id' => $accountId,
+                'status' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            return $this->jsonOk(['id' => $id], 'saved');
+        }
+
+        return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+    }
+
+    public function pluginMappingDelete()
+    {
+        if (!$this->request->isPost()) {
+            return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+        }
+        if (!$this->canWriteProfitPluginConfig()) {
+            return $this->jsonErr('forbidden', 403, null, 'common.forbidden');
+        }
+        $payload = $this->parseJsonOrPost();
+        $id = (int) ($payload['id'] ?? 0);
+        $type = mb_strtolower(trim((string) ($payload['type'] ?? '')), 'UTF-8');
+        if ($id <= 0 || !in_array($type, ['store', 'account'], true)) {
+            return $this->jsonErr('invalid_params', 1, null, 'common.invalidParams');
+        }
+        $tenantId = $this->currentTenantId();
+        $table = $type === 'store'
+            ? 'growth_profit_plugin_store_maps'
+            : 'growth_profit_plugin_account_maps';
+        Db::name($table)
+            ->where('tenant_id', $tenantId)
+            ->where('id', $id)
+            ->delete();
+        return $this->jsonOk([], 'deleted');
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array{ok:bool,message:string,data?:array<string,mixed>}
@@ -1528,6 +1921,433 @@ class ProfitCenter extends BaseController
         } catch (\Throwable $e) {
             return '';
         }
+    }
+
+    private function canWriteProfitPluginConfig(): bool
+    {
+        if (!AdminAuthService::isLoggedIn()) {
+            return false;
+        }
+        $role = strtolower(trim((string) AdminAuthService::role()));
+        return in_array($role, ['super_admin', 'operator'], true);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{ok:bool,tenant_id?:int,auth_mode?:string,token_id?:int,token_prefix?:string,message?:string}
+     */
+    private function resolvePluginTenantContext(bool $allowSession, array $payload = []): array
+    {
+        if ($allowSession && AdminAuthService::isLoggedIn()) {
+            return [
+                'ok' => true,
+                'tenant_id' => $this->currentTenantId(),
+                'auth_mode' => 'session',
+                'token_id' => 0,
+                'token_prefix' => '',
+            ];
+        }
+
+        $token = ProfitPluginTokenService::extractTokenFromRequest($this->request, $payload);
+        $verify = ProfitPluginTokenService::verifyToken($token, ProfitPluginTokenService::SCOPE_INGEST);
+        if (!($verify['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => (string) ($verify['reason'] ?? 'token_invalid'),
+            ];
+        }
+        $row = is_array($verify['row'] ?? null) ? $verify['row'] : [];
+        return [
+            'ok' => true,
+            'tenant_id' => max(1, (int) ($row['tenant_id'] ?? 1)),
+            'auth_mode' => 'token',
+            'token_id' => (int) ($row['id'] ?? 0),
+            'token_prefix' => (string) ($row['token_prefix'] ?? ''),
+        ];
+    }
+
+    /**
+     * @return array{store:array<int,array<string,mixed>>,account:array<int,array<string,mixed>>}
+     */
+    private function loadPluginMappings(int $tenantId): array
+    {
+        $tenantId = max(1, $tenantId);
+        $result = ['store' => [], 'account' => []];
+        try {
+            $storeRows = Db::name('growth_profit_plugin_store_maps')->alias('m')
+                ->leftJoin('growth_profit_stores s', 's.id=m.store_id')
+                ->where('m.tenant_id', $tenantId)
+                ->field('m.id,m.store_alias,m.store_id,m.status,m.updated_at,s.store_name')
+                ->order('m.id', 'desc')
+                ->select()
+                ->toArray();
+            foreach ($storeRows as $row) {
+                $result['store'][] = [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'alias' => (string) ($row['store_alias'] ?? ''),
+                    'store_id' => (int) ($row['store_id'] ?? 0),
+                    'store_name' => (string) ($row['store_name'] ?? ''),
+                    'status' => (int) ($row['status'] ?? 1),
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                ];
+            }
+        } catch (\Throwable $e) {
+            $result['store'] = [];
+        }
+
+        try {
+            $accountRows = Db::name('growth_profit_plugin_account_maps')->alias('m')
+                ->leftJoin('growth_profit_accounts a', 'a.id=m.account_id')
+                ->where('m.tenant_id', $tenantId)
+                ->field('m.id,m.account_alias,m.account_id,m.status,m.updated_at,a.account_name,a.store_id')
+                ->order('m.id', 'desc')
+                ->select()
+                ->toArray();
+            foreach ($accountRows as $row) {
+                $result['account'][] = [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'alias' => (string) ($row['account_alias'] ?? ''),
+                    'account_id' => (int) ($row['account_id'] ?? 0),
+                    'account_name' => (string) ($row['account_name'] ?? ''),
+                    'store_id' => (int) ($row['store_id'] ?? 0),
+                    'status' => (int) ($row['status'] ?? 1),
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                ];
+            }
+        } catch (\Throwable $e) {
+            $result['account'] = [];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array{ok:bool,payload?:array<string,mixed>,message?:string}
+     */
+    private function preparePluginRowPayload(array $row, int $tenantId): array
+    {
+        $entryDate = $this->normalizeDate((string) ($row['entry_date'] ?? ''));
+        if ($entryDate === '') {
+            return ['ok' => false, 'message' => 'invalid_entry_date'];
+        }
+
+        $storeRef = trim((string) ($row['store_ref'] ?? ($row['store_id'] ?? '')));
+        $accountRef = trim((string) ($row['account_ref'] ?? ($row['account_id'] ?? '')));
+        $channelType = ProfitCalculatorService::normalizeChannelType((string) ($row['channel_type'] ?? ProfitCalculatorService::CHANNEL_VIDEO));
+        if ($channelType === '') {
+            $channelType = ProfitCalculatorService::CHANNEL_VIDEO;
+        }
+
+        $storeId = $this->resolvePluginStoreId($tenantId, $storeRef);
+        $accountId = $this->resolvePluginAccountId($tenantId, $accountRef);
+
+        if ($storeId <= 0 && $accountId <= 0) {
+            return ['ok' => false, 'message' => 'invalid_store_or_account'];
+        }
+        if ($storeId <= 0 && $accountId > 0) {
+            $accountRow = Db::name('growth_profit_accounts')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $accountId)
+                ->find();
+            if (!is_array($accountRow)) {
+                return ['ok' => false, 'message' => 'account_not_found'];
+            }
+            $storeId = (int) ($accountRow['store_id'] ?? 0);
+        }
+        if ($storeId <= 0) {
+            return ['ok' => false, 'message' => 'store_not_found'];
+        }
+
+        if ($accountId <= 0) {
+            $primary = Db::name('growth_profit_accounts')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $storeId)
+                ->where('status', 1)
+                ->order('id', 'asc')
+                ->find();
+            if (!is_array($primary)) {
+                $primary = Db::name('growth_profit_accounts')
+                    ->where('tenant_id', $tenantId)
+                    ->where('store_id', $storeId)
+                    ->order('id', 'asc')
+                    ->find();
+            }
+            $accountId = is_array($primary) ? (int) ($primary['id'] ?? 0) : 0;
+        }
+        if ($accountId <= 0) {
+            return ['ok' => false, 'message' => 'store_account_required'];
+        }
+
+        $account = Db::name('growth_profit_accounts')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $accountId)
+            ->find();
+        if (!is_array($account)) {
+            return ['ok' => false, 'message' => 'account_not_found'];
+        }
+        if ((int) ($account['store_id'] ?? 0) !== $storeId) {
+            return ['ok' => false, 'message' => 'account_store_mismatch'];
+        }
+
+        $existing = Db::name('growth_profit_daily_entries')
+            ->where('tenant_id', $tenantId)
+            ->where('entry_date', $entryDate)
+            ->where('store_id', $storeId)
+            ->where('account_id', $accountId)
+            ->where('channel_type', $channelType)
+            ->find();
+
+        $payload = [
+            'entry_date' => $entryDate,
+            'store_id' => $storeId,
+            'account_id' => $accountId,
+            'channel_type' => $channelType,
+        ];
+
+        if (is_array($existing)) {
+            $payload['id'] = (int) ($existing['id'] ?? 0);
+            $keepFields = [
+                'sale_price_cny',
+                'product_cost_cny',
+                'cancel_rate',
+                'platform_fee_rate',
+                'influencer_commission_rate',
+                'live_hours',
+                'wage_hourly_cny',
+                'ad_compensation_amount',
+                'ad_compensation_currency',
+                'raw_metrics_json',
+            ];
+            foreach ($keepFields as $field) {
+                if (array_key_exists($field, $existing)) {
+                    $payload[$field] = $existing[$field];
+                }
+            }
+        }
+
+        $adSpendAmount = $this->parseNullableDecimal($row['ad_spend_amount'] ?? null);
+        $gmvAmount = $this->parseNullableDecimal($row['gmv_amount'] ?? null);
+        $orderCount = $this->parseNullableInt($row['order_count'] ?? null);
+        $adSpendCurrency = trim((string) ($row['ad_spend_currency'] ?? ''));
+        $gmvCurrency = trim((string) ($row['gmv_currency'] ?? ''));
+
+        if ($adSpendAmount !== null) {
+            $payload['ad_spend_amount'] = $adSpendAmount;
+        } elseif (is_array($existing)) {
+            $payload['ad_spend_amount'] = (float) ($existing['ad_spend_amount'] ?? 0);
+        }
+
+        if ($gmvAmount !== null) {
+            $payload['gmv_amount'] = $gmvAmount;
+        } elseif (is_array($existing)) {
+            $payload['gmv_amount'] = (float) ($existing['gmv_amount'] ?? 0);
+        }
+
+        if ($orderCount !== null) {
+            $payload['order_count'] = $orderCount;
+        } elseif (is_array($existing)) {
+            $payload['order_count'] = (int) ($existing['order_count'] ?? 0);
+        }
+
+        if ($adSpendCurrency !== '') {
+            $payload['ad_spend_currency'] = FxRateService::normalizeCurrency($adSpendCurrency);
+        } elseif (is_array($existing) && trim((string) ($existing['ad_spend_currency'] ?? '')) !== '') {
+            $payload['ad_spend_currency'] = FxRateService::normalizeCurrency((string) $existing['ad_spend_currency']);
+        } else {
+            $payload['ad_spend_currency'] = FxRateService::normalizeCurrency((string) ($account['account_currency'] ?? 'USD'));
+        }
+
+        if ($gmvCurrency !== '') {
+            $payload['gmv_currency'] = FxRateService::normalizeCurrency($gmvCurrency);
+        } elseif (is_array($existing) && trim((string) ($existing['gmv_currency'] ?? '')) !== '') {
+            $payload['gmv_currency'] = FxRateService::normalizeCurrency((string) $existing['gmv_currency']);
+        } else {
+            $payload['gmv_currency'] = FxRateService::normalizeCurrency((string) ($account['default_gmv_currency'] ?? 'VND'));
+        }
+
+        $adValue = (float) ($payload['ad_spend_amount'] ?? 0);
+        $gmvValue = (float) ($payload['gmv_amount'] ?? 0);
+        $orderValue = (int) ($payload['order_count'] ?? 0);
+        if (in_array($channelType, [ProfitCalculatorService::CHANNEL_LIVE, ProfitCalculatorService::CHANNEL_VIDEO], true)) {
+            if ($adValue <= 0 || $gmvValue <= 0 || $orderValue <= 0) {
+                return ['ok' => false, 'message' => 'invalid_live_video_required_fields'];
+            }
+        } elseif ($channelType === ProfitCalculatorService::CHANNEL_INFLUENCER && $orderValue <= 0) {
+            return ['ok' => false, 'message' => 'invalid_influencer_order_count'];
+        }
+
+        return ['ok' => true, 'payload' => $payload];
+    }
+
+    private function resolvePluginStoreId(int $tenantId, string $ref): int
+    {
+        $raw = trim($ref);
+        if ($raw === '') {
+            return 0;
+        }
+        if (ctype_digit($raw)) {
+            $id = (int) $raw;
+            $row = Db::name('growth_profit_stores')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $id)
+                ->find();
+            if (is_array($row)) {
+                return $id;
+            }
+        }
+
+        try {
+            $mapped = Db::name('growth_profit_plugin_store_maps')
+                ->where('tenant_id', $tenantId)
+                ->where('store_alias', $raw)
+                ->where('status', 1)
+                ->find();
+            if (is_array($mapped) && (int) ($mapped['store_id'] ?? 0) > 0) {
+                return (int) $mapped['store_id'];
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        $store = Db::name('growth_profit_stores')
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($raw) {
+                $q->where('store_code', $raw)->whereOr('store_name', $raw);
+            })
+            ->order('id', 'asc')
+            ->find();
+
+        return is_array($store) ? (int) ($store['id'] ?? 0) : 0;
+    }
+
+    private function resolvePluginAccountId(int $tenantId, string $ref): int
+    {
+        $raw = trim($ref);
+        if ($raw === '') {
+            return 0;
+        }
+        if (ctype_digit($raw)) {
+            $id = (int) $raw;
+            $row = Db::name('growth_profit_accounts')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $id)
+                ->find();
+            if (is_array($row)) {
+                return $id;
+            }
+        }
+
+        try {
+            $mapped = Db::name('growth_profit_plugin_account_maps')
+                ->where('tenant_id', $tenantId)
+                ->where('account_alias', $raw)
+                ->where('status', 1)
+                ->find();
+            if (is_array($mapped) && (int) ($mapped['account_id'] ?? 0) > 0) {
+                return (int) $mapped['account_id'];
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        $account = Db::name('growth_profit_accounts')
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($raw) {
+                $q->where('account_code', $raw)->whereOr('account_name', $raw);
+            })
+            ->order('id', 'asc')
+            ->find();
+
+        return is_array($account) ? (int) ($account['id'] ?? 0) : 0;
+    }
+
+    /**
+     * @param array<string, mixed> $requestPayload
+     * @param array<string, mixed> $resultPayload
+     */
+    private function writePluginIngestLog(
+        int $tenantId,
+        int $tokenId,
+        string $traceId,
+        string $status,
+        int $rowCount,
+        int $savedCount,
+        int $failedCount,
+        array $requestPayload,
+        array $resultPayload
+    ): void {
+        try {
+            $sourcePage = '';
+            $requestDate = '';
+            $rows = $requestPayload['rows'] ?? [];
+            if (is_array($rows) && isset($rows[0]) && is_array($rows[0])) {
+                $sourcePage = mb_substr(trim((string) ($rows[0]['source_page'] ?? '')), 0, 255);
+                $requestDate = $this->normalizeDate((string) ($rows[0]['entry_date'] ?? ''));
+            }
+            $requestJson = json_encode($requestPayload, JSON_UNESCAPED_UNICODE);
+            if (!is_string($requestJson)) {
+                $requestJson = '{}';
+            }
+            if (mb_strlen($requestJson) > 50000) {
+                $requestJson = mb_substr($requestJson, 0, 50000);
+            }
+            $resultJson = json_encode($resultPayload, JSON_UNESCAPED_UNICODE);
+            if (!is_string($resultJson)) {
+                $resultJson = '{}';
+            }
+            if (mb_strlen($resultJson) > 50000) {
+                $resultJson = mb_substr($resultJson, 0, 50000);
+            }
+
+            Db::name('growth_profit_plugin_ingest_logs')->insert([
+                'tenant_id' => max(1, $tenantId),
+                'token_id' => $tokenId > 0 ? $tokenId : null,
+                'trace_id' => mb_substr($traceId, 0, 96),
+                'status' => mb_substr($status, 0, 16),
+                'row_count' => max(0, $rowCount),
+                'saved_count' => max(0, $savedCount),
+                'failed_count' => max(0, $failedCount),
+                'source_page' => $sourcePage !== '' ? $sourcePage : null,
+                'request_date' => $requestDate !== '' ? $requestDate : null,
+                'request_json' => $requestJson,
+                'result_json' => $resultJson,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $e) {
+            // ignore logging errors
+        }
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function parseNullableDecimal($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+        return round($this->parseDecimal($value, 0), 2);
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function parseNullableInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+        return max(0, $this->parseInt($value, 0));
     }
 
     /**

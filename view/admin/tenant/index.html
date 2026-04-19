@@ -1,0 +1,399 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}租户中心{/block}
+{block name="page_title"}<span data-i18n="page.tenant.title">Tenant Center</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.tenant.breadcrumb">Platform Ops / Tenant Center</span>{/block}
+
+{block name="style"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css" onerror="this.onerror=null;this.href='https://unpkg.com/element-plus@2.7.8/dist/index.css';">
+<style>
+  .tenant-page-card { padding: 20px; }
+  .tenant-desc {
+    margin: 0 0 12px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .tenant-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+  }
+  .tenant-toolbar .el-input,
+  .tenant-toolbar .el-select {
+    width: 220px;
+  }
+  .tenant-toolbar .tenant-w-sm {
+    width: 150px !important;
+  }
+  .tenant-panel {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    padding: 12px;
+  }
+  .tenant-panel + .tenant-panel { margin-top: 12px; }
+  .tenant-subtitle {
+    font-size: 13px;
+    color: #475569;
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .tenant-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .tenant-full {
+    width: 100%;
+  }
+  .tenant-module-list {
+    max-height: 200px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f8fafc;
+  }
+  .tenant-module-list .el-checkbox {
+    margin: 0 12px 8px 0;
+  }
+  .tenant-split {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 12px;
+  }
+  .tenant-json {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    color: #475569;
+    max-height: 120px;
+    overflow: auto;
+  }
+  .tenant-inline-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13px;
+  }
+  @media (max-width: 1280px) {
+    .tenant-split { grid-template-columns: 1fr; }
+  }
+</style>
+{/block}
+
+{block name="content"}
+<div class="admin-page-container">
+  <div class="admin-modern-card tenant-page-card">
+    <div id="tenantCenterApp" data-module="tenant_center">
+      <p class="tenant-desc">{{ tt('page.tenant.desc') }}</p>
+      <el-alert
+        v-if="moduleAccessMode !== 'enabled'"
+        :title="tt('page.tenant.readOnlyTip')"
+        type="warning"
+        :closable="false"
+        style="margin-bottom:12px;"
+      ></el-alert>
+      <div v-if="activePanelError" class="tenant-inline-error" data-section="error_state">
+        <span>{{ activePanelError }}</span>
+        <el-button link type="primary" @click="retryActiveTab">{{ tt('common.refresh') }}</el-button>
+      </div>
+
+      <div v-show="activeTab==='tenants'" data-panel-tab="tenants" data-section="tenants" class="tenant-panel">
+        <div class="tenant-toolbar">
+          <el-input v-model="tenantFilters.keyword" clearable :placeholder="tt('page.tenant.filterKeyword')" ></el-input>
+          <el-select v-model="tenantFilters.status" clearable :placeholder="tt('common.status')" class="tenant-w-sm">
+            <el-option :label="tt('common.statusEnabled')" :value="1" ></el-option>
+            <el-option :label="tt('common.statusDisabled')" :value="0" ></el-option>
+          </el-select>
+          <el-button @click="loadTenants" :loading="tenantLoading">{{ tt('common.search') }}</el-button>
+          <el-button type="primary" @click="openTenantDialog()">{{ tt('page.tenant.btnNewTenant') }}</el-button>
+        </div>
+
+        <el-table :data="tenants" v-loading="tenantLoading" size="small">
+          <el-table-column prop="tenant_id" :label="tt('page.tenant.colTenantId')" width="90" ></el-table-column>
+          <el-table-column prop="tenant_code" :label="tt('page.tenant.colTenantCode')" width="150" ></el-table-column>
+          <el-table-column prop="tenant_name" :label="tt('page.tenant.colTenantName')" min-width="180" ></el-table-column>
+          <el-table-column prop="package_name" :label="tt('page.tenant.colPackage')" min-width="160" ></el-table-column>
+          <el-table-column prop="admin_count" :label="tt('page.tenant.colAdminCount')" width="100" ></el-table-column>
+          <el-table-column prop="expires_at" :label="tt('page.tenant.colExpiresAt')" width="170" ></el-table-column>
+          <el-table-column :label="tt('common.status')" width="110">
+            <template #default="{row}">
+              <el-tag :type="Number(row.status||0)===1?'success':'info'" size="small">
+                {{ Number(row.status||0)===1 ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('page.tenant.colActions')" width="290" fixed="right">
+            <template #default="{row}">
+              <el-button link type="primary" @click="openTenantDialog(row)">{{ tt('common.edit') }}</el-button>
+              <el-button link type="primary" @click="toggleTenantStatus(row)">
+                {{ Number(row.status||0)===1 ? tt('page.tenant.actionDisable') : tt('page.tenant.actionEnable') }}
+              </el-button>
+              <el-button link type="warning" @click="switchTenant(row)">{{ tt('page.tenant.actionSwitch') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div v-show="activeTab==='packages'" data-panel-tab="packages" data-section="packages" class="tenant-panel tenant-split">
+        <div>
+          <div class="tenant-toolbar">
+            <el-button @click="loadPackages" :loading="packageLoading">{{ tt('common.refresh') }}</el-button>
+            <el-button type="primary" @click="openPackageDialog()">{{ tt('page.tenant.btnNewPackage') }}</el-button>
+          </div>
+          <el-table :data="packages" v-loading="packageLoading" size="small" height="520">
+            <el-table-column prop="id" :label="tt('page.tenant.colId')" width="80" ></el-table-column>
+            <el-table-column prop="package_code" :label="tt('page.tenant.colPackageCode')" width="150" ></el-table-column>
+            <el-table-column prop="package_name" :label="tt('page.tenant.colPackageName')" min-width="160" ></el-table-column>
+            <el-table-column :label="tt('page.tenant.colModuleCount')" width="110">
+              <template #default="{row}">
+                {{ Array.isArray(row.modules)?row.modules.length:0 }}
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('common.status')" width="100">
+              <template #default="{row}">
+                <el-tag :type="Number(row.status||0)===1?'success':'info'" size="small">
+                  {{ Number(row.status||0)===1 ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('page.tenant.colActions')" width="90" fixed="right">
+              <template #default="{row}">
+                <el-button link type="primary" @click="openPackageDialog(row)">{{ tt('common.edit') }}</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <div class="tenant-panel">
+          <h4 class="tenant-subtitle">{{ tt('page.tenant.moduleCatalogTitle') }}</h4>
+          <el-table :data="moduleCatalog" size="small" height="480">
+            <el-table-column prop="name" :label="tt('page.tenant.colModuleName')" min-width="140" ></el-table-column>
+            <el-table-column prop="title" :label="tt('page.tenant.colModuleTitle')" min-width="160" ></el-table-column>
+            <el-table-column prop="min_role" :label="tt('page.tenant.colMinRole')" width="120" ></el-table-column>
+            <el-table-column :label="tt('page.tenant.colDefaultEnabled')" width="120">
+              <template #default="{row}">
+                <el-tag :type="Number(row.default_enabled||0)===1?'success':'info'" size="small">
+                  {{ Number(row.default_enabled||0)===1 ? tt('common.yes') : tt('common.no') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+
+      <div v-show="activeTab==='subscriptions'" data-panel-tab="subscriptions" data-section="subscriptions" class="tenant-panel tenant-split">
+        <div class="tenant-panel">
+          <h4 class="tenant-subtitle">{{ tt('page.tenant.subscriptionTitle') }}</h4>
+          <el-form label-width="120px">
+            <el-form-item :label="tt('page.tenant.colTenantName')">
+              <el-select v-model="subscriptionForm.tenant_id" class="tenant-full" @change="onSubscriptionTenantChange">
+                <el-option v-for="t in tenants" :key="'st-'+t.tenant_id" :label="t.tenant_name" :value="t.tenant_id" ></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="tt('page.tenant.colPackage')">
+              <el-select v-model="subscriptionForm.package_id" class="tenant-full">
+                <el-option v-for="p in packages" :key="'sp-'+p.id" :label="p.package_name" :value="p.id" ></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="tt('page.tenant.colExpiresAt')">
+              <el-date-picker
+                v-model="subscriptionForm.expires_at"
+                type="datetime"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                class="tenant-full"
+                clearable
+              ></el-date-picker>
+            </el-form-item>
+            <el-form-item :label="tt('common.status')">
+              <el-switch v-model="subscriptionForm.status" :active-value="1" :inactive-value="0" ></el-switch>
+            </el-form-item>
+            <el-form-item :label="tt('page.tenant.colAddonModules')">
+              <div class="tenant-module-list">
+                <el-checkbox-group v-model="subscriptionForm.addon_modules">
+                  <el-checkbox v-for="m in moduleNames" :key="'add-'+m" :label="m">{{ m }}</el-checkbox>
+                </el-checkbox-group>
+              </div>
+            </el-form-item>
+            <el-form-item :label="tt('page.tenant.colDisabledModules')">
+              <div class="tenant-module-list">
+                <el-checkbox-group v-model="subscriptionForm.disabled_modules">
+                  <el-checkbox v-for="m in moduleNames" :key="'dis-'+m" :label="m">{{ m }}</el-checkbox>
+                </el-checkbox-group>
+              </div>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="subscriptionSaving" @click="saveSubscription">{{ tt('page.tenant.btnSaveSubscription') }}</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+        <div class="tenant-panel">
+          <h4 class="tenant-subtitle">{{ tt('page.tenant.subscriptionModuleState') }}</h4>
+          <el-table :data="subscriptionModules" v-loading="subscriptionModuleLoading" size="small" height="520">
+            <el-table-column prop="module_name" :label="tt('page.tenant.colModuleName')" min-width="140" ></el-table-column>
+            <el-table-column prop="module_title" :label="tt('page.tenant.colModuleTitle')" min-width="160" ></el-table-column>
+            <el-table-column :label="tt('page.tenant.colEnabled')" width="100">
+              <template #default="{row}">
+                <el-tag :type="Number(row.is_enabled||0)===1?'success':'info'" size="small">
+                  {{ Number(row.is_enabled||0)===1 ? tt('common.yes') : tt('common.no') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="module_access_mode" :label="tt('page.tenant.colAccessMode')" width="150" ></el-table-column>
+            <el-table-column prop="expires_at" :label="tt('page.tenant.colExpiresAt')" width="170" ></el-table-column>
+          </el-table>
+        </div>
+      </div>
+
+      <div v-show="activeTab==='admins'" data-panel-tab="admins" data-section="admins" class="tenant-panel">
+        <div class="tenant-toolbar">
+          <el-select v-model="adminFilters.tenant_id" clearable :placeholder="tt('page.tenant.colTenantName')">
+            <el-option v-for="t in tenants" :key="'af-'+t.tenant_id" :label="t.tenant_name" :value="t.tenant_id" ></el-option>
+          </el-select>
+          <el-input v-model="adminFilters.keyword" clearable :placeholder="tt('page.tenant.filterKeyword')" ></el-input>
+          <el-button @click="loadAdmins" :loading="adminLoading">{{ tt('common.search') }}</el-button>
+          <el-button type="primary" @click="openAdminDialog()">{{ tt('page.tenant.btnNewAdmin') }}</el-button>
+        </div>
+        <el-table :data="admins" v-loading="adminLoading" size="small">
+          <el-table-column prop="id" :label="tt('page.tenant.colId')" width="80" ></el-table-column>
+          <el-table-column prop="tenant_name" :label="tt('page.tenant.colTenantName')" width="140" ></el-table-column>
+          <el-table-column prop="username" :label="tt('page.tenant.colUsername')" min-width="140" ></el-table-column>
+          <el-table-column prop="role" :label="tt('page.tenant.colRole')" width="130" ></el-table-column>
+          <el-table-column :label="tt('common.status')" width="100">
+            <template #default="{row}">
+              <el-tag :type="Number(row.status||0)===1?'success':'info'" size="small">
+                {{ Number(row.status||0)===1 ? tt('common.statusEnabled') : tt('common.statusDisabled') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="last_login_at" :label="tt('page.tenant.colLastLoginAt')" width="170" ></el-table-column>
+          <el-table-column prop="last_login_ip" :label="tt('page.tenant.colLastLoginIp')" width="140" ></el-table-column>
+          <el-table-column :label="tt('page.tenant.colActions')" width="90" fixed="right">
+            <template #default="{row}">
+              <el-button link type="primary" @click="openAdminDialog(row)">{{ tt('common.edit') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div v-show="activeTab==='audit'" data-panel-tab="audit" data-section="audit" class="tenant-panel">
+        <div class="tenant-toolbar">
+          <el-select v-model="auditFilters.tenant_id" clearable :placeholder="tt('page.tenant.colTenantName')">
+            <el-option v-for="t in tenants" :key="'audit-t-'+t.tenant_id" :label="t.tenant_name" :value="t.tenant_id" ></el-option>
+          </el-select>
+          <el-input v-model="auditFilters.action" clearable :placeholder="tt('page.tenant.filterAction')" ></el-input>
+          <el-input-number v-model="auditFilters.limit" :min="10" :max="500" :step="10" class="tenant-w-sm" ></el-input-number>
+          <el-button @click="loadAudit" :loading="auditLoading">{{ tt('common.search') }}</el-button>
+        </div>
+        <el-table :data="audits" v-loading="auditLoading" size="small">
+          <el-table-column prop="id" :label="tt('page.tenant.colId')" width="80" ></el-table-column>
+          <el-table-column prop="created_at" :label="tt('page.tenant.colCreatedAt')" width="170" ></el-table-column>
+          <el-table-column prop="tenant_id" :label="tt('page.tenant.colTenantId')" width="90" ></el-table-column>
+          <el-table-column prop="admin_username" :label="tt('page.tenant.colUsername')" width="130" ></el-table-column>
+          <el-table-column prop="action" :label="tt('page.tenant.colAction')" min-width="160" ></el-table-column>
+          <el-table-column prop="target_table" :label="tt('page.tenant.colTargetTable')" width="140" ></el-table-column>
+          <el-table-column prop="target_id" :label="tt('page.tenant.colTargetId')" width="90" ></el-table-column>
+          <el-table-column prop="request_path" :label="tt('page.tenant.colPath')" min-width="160" ></el-table-column>
+          <el-table-column prop="request_method" :label="tt('page.tenant.colMethod')" width="100" ></el-table-column>
+          <el-table-column prop="ip" :label="tt('page.tenant.colIp')" width="130" ></el-table-column>
+          <el-table-column :label="tt('page.tenant.colPayload')" min-width="200">
+            <template #default="{row}">
+              <div class="tenant-json">{{ formatPayload(row.payload) }}</div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <el-dialog v-model="tenantDialogVisible" :title="tt('page.tenant.dialogTenantTitle')" width="620px" align-center>
+        <el-form label-width="130px">
+          <el-form-item :label="tt('page.tenant.colTenantCode')"><el-input v-model="tenantForm.tenant_code" ></el-input></el-form-item>
+          <el-form-item :label="tt('page.tenant.colTenantName')"><el-input v-model="tenantForm.tenant_name" ></el-input></el-form-item>
+          <el-form-item :label="tt('common.status')"><el-switch v-model="tenantForm.status" :active-value="1" :inactive-value="0" ></el-switch></el-form-item>
+          <el-form-item :label="tt('page.tenant.colRemark')"><el-input v-model="tenantForm.remark" type="textarea" :rows="2" ></el-input></el-form-item>
+          <el-form-item :label="tt('page.tenant.colPackage')">
+            <el-select v-model="tenantForm.package_id" class="tenant-full" clearable>
+              <el-option v-for="p in packages" :key="'tenant-pkg-'+p.id" :label="p.package_name" :value="p.id" ></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="tt('page.tenant.colExpiresAt')">
+            <el-date-picker v-model="tenantForm.expires_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" class="tenant-full" clearable ></el-date-picker>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="tenantDialogVisible=false">{{ tt('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="tenantSaving" @click="saveTenant">{{ tt('common.save') }}</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="packageDialogVisible" :title="tt('page.tenant.dialogPackageTitle')" width="740px" align-center>
+        <el-form label-width="130px">
+          <el-form-item :label="tt('page.tenant.colPackageCode')"><el-input v-model="packageForm.package_code" ></el-input></el-form-item>
+          <el-form-item :label="tt('page.tenant.colPackageName')"><el-input v-model="packageForm.package_name" ></el-input></el-form-item>
+          <el-form-item :label="tt('page.tenant.colDescription')"><el-input v-model="packageForm.description" type="textarea" :rows="2" ></el-input></el-form-item>
+          <el-form-item :label="tt('common.status')"><el-switch v-model="packageForm.status" :active-value="1" :inactive-value="0" ></el-switch></el-form-item>
+          <el-form-item :label="tt('page.tenant.colModules')">
+            <div class="tenant-module-list">
+              <el-checkbox-group v-model="packageForm.modules">
+                <el-checkbox v-for="m in moduleNames" :key="'pkg-m-'+m" :label="m">{{ m }}</el-checkbox>
+              </el-checkbox-group>
+            </div>
+          </el-form-item>
+          <el-form-item :label="tt('page.tenant.colOptionalModules')">
+            <div class="tenant-module-list">
+              <el-checkbox-group v-model="packageForm.optional_modules">
+                <el-checkbox v-for="m in packageForm.modules" :key="'pkg-opt-'+m" :label="m">{{ m }}</el-checkbox>
+              </el-checkbox-group>
+            </div>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="packageDialogVisible=false">{{ tt('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="packageSaving" @click="savePackage">{{ tt('common.save') }}</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="adminDialogVisible" :title="tt('page.tenant.dialogAdminTitle')" width="560px" align-center>
+        <el-form label-width="120px">
+          <el-form-item :label="tt('page.tenant.colTenantName')">
+            <el-select v-model="adminForm.tenant_id" class="tenant-full">
+              <el-option v-for="t in tenants" :key="'admin-t-'+t.tenant_id" :label="t.tenant_name" :value="t.tenant_id" ></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="tt('page.tenant.colUsername')"><el-input v-model="adminForm.username" ></el-input></el-form-item>
+          <el-form-item :label="tt('page.tenant.colRole')">
+            <el-select v-model="adminForm.role" class="tenant-full">
+              <el-option label="super_admin" value="super_admin" ></el-option>
+              <el-option label="operator" value="operator" ></el-option>
+              <el-option label="viewer" value="viewer" ></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="tt('common.status')"><el-switch v-model="adminForm.status" :active-value="1" :inactive-value="0" ></el-switch></el-form-item>
+          <el-form-item :label="tt('page.tenant.colPassword')">
+            <el-input v-model="adminForm.password" show-password :placeholder="tt('page.tenant.passwordTip')" ></el-input>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="adminDialogVisible=false">{{ tt('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="adminSaving" @click="saveAdmin">{{ tt('common.save') }}</el-button>
+        </template>
+      </el-dialog>
+    </div>
+  </div>
+</div>
+{/block}
+
+{block name="script"}
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@3.4.38/dist/vue.global.prod.js';"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-plus@2.7.8/dist/index.full.min.js';"></script>
+<script src="/static/admin/tenant_center.js?v=20260419_tenant_suite_5"></script>
+{/block}

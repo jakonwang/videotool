@@ -15,6 +15,7 @@ class Platform extends Model
     // 设置字段信息
     protected $schema = [
         'id'          => 'int',
+        'tenant_id'   => 'int',
         'name'        => 'string',
         'code'        => 'string',
         'icon'        => 'string',

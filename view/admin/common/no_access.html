@@ -1,0 +1,73 @@
+{extend name="admin/common/layout" /}
+
+{block name="title"}No Access{/block}
+{block name="page_title"}<span data-i18n="common.forbidden">No Access</span>{/block}
+{block name="breadcrumb"}<span data-i18n="common.forbidden">No Access</span>{/block}
+
+{block name="style"}
+<style>
+  .no-access-wrap {
+    max-width: 760px;
+    margin: 28px auto;
+  }
+  .no-access-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  }
+  .no-access-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .no-access-desc {
+    margin: 14px 0 0;
+    color: #475569;
+    line-height: 1.7;
+    font-size: 14px;
+  }
+  .no-access-meta {
+    margin: 14px 0 0;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .no-access-actions {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+</style>
+{/block}
+
+{block name="content"}
+<div class="admin-page-container no-access-wrap">
+  <div class="no-access-card">
+    <h2 class="no-access-title" data-i18n="common.forbidden">No Access To This Module</h2>
+    <p class="no-access-desc">
+      The current module is not available for this tenant. Please contact the administrator to check subscription and module authorization.
+    </p>
+    <div class="no-access-meta">
+      <div><strong>Module:</strong> {$module_name|default='-'}</div>
+      <div><strong>Access Mode:</strong> {$module_access_mode|default='-'}</div>
+      <div><strong>Reason:</strong> {$module_reason|default='-'}</div>
+      {notempty name="module_expires_at"}
+      <div><strong>Expires At:</strong> {$module_expires_at}</div>
+      {/notempty}
+    </div>
+    <div class="no-access-actions">
+      <a class="btn btn-primary" href="/admin.php">Back To Dashboard</a>
+      <a class="btn btn-default" href="javascript:history.back();">Back</a>
+    </div>
+  </div>
+</div>
+{/block}
+

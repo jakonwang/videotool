@@ -258,6 +258,170 @@
     flex-wrap: wrap;
   }
 
+  .pc-inline-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13px;
+  }
+
+  .pc-plugin-card {
+    padding: 16px;
+  }
+
+  .pc-plugin-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .pc-plugin-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .pc-plugin-desc {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
+  }
+
+  .pc-plugin-metrics {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .pc-plugin-metric {
+    padding: 12px;
+    border: 1px solid #e6ecf5;
+    border-radius: 10px;
+    background: #f8fbff;
+  }
+
+  .pc-plugin-metric-label {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .pc-plugin-metric-value {
+    margin-top: 4px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e3a8a;
+    font-family: Manrope, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .pc-plugin-metric-value.is-small {
+    font-size: 14px;
+    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .pc-plugin-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .pc-plugin-layout > * {
+    min-width: 0;
+  }
+
+  .pc-plugin-block {
+    border: 1px solid #e6ecf5;
+    border-radius: 10px;
+    background: #fff;
+    padding: 12px;
+    min-width: 0;
+  }
+
+  .pc-plugin-block h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .pc-plugin-block-sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+
+  .pc-plugin-form-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .pc-plugin-form-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .pc-plugin-token-box {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px dashed #bfdbfe;
+    background: #eff6ff;
+    font-size: 12px;
+    color: #1e3a8a;
+  }
+
+  .pc-plugin-tables {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .pc-plugin-tables > * {
+    min-width: 0;
+  }
+
+  .pc-plugin-logs {
+    margin-top: 16px;
+    min-width: 0;
+  }
+
+  .pc-plugin-block .el-table,
+  .pc-plugin-logs .el-table {
+    width: 100% !important;
+    max-width: 100%;
+    table-layout: fixed;
+  }
+
+  .pc-plugin-block .el-table__inner-wrapper,
+  .pc-plugin-logs .el-table__inner-wrapper {
+    overflow-x: auto;
+  }
+
+  .pc-plugin-logs .el-table .cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .pc-action-left,
   .pc-action-right {
     display: flex;
@@ -493,7 +657,8 @@
     justify-content: center !important;
     padding: 16px !important;
     box-sizing: border-box;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .pc-dialog.el-dialog {
@@ -506,6 +671,10 @@
     box-shadow: 0 20px 56px rgba(9, 16, 26, .26);
   }
 
+  .pc-plugin-dialog.el-dialog {
+    width: min(1220px, calc(100vw - 28px)) !important;
+  }
+
   .pc-dialog .el-dialog__header {
     margin-right: 0;
     border-bottom: 1px solid #f0f3f7;
@@ -515,7 +684,8 @@
   .pc-dialog .el-dialog__body {
     padding: 16px;
     max-height: calc(100vh - 160px);
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     background: #fff;
   }
 
@@ -1049,12 +1219,17 @@
     }
 
     .pc-entry-layout,
-    .pc-store-layout {
+    .pc-store-layout,
+    .pc-plugin-layout {
       grid-template-columns: 1fr;
     }
 
     .pc-batch-base-grid,
     .pc-batch-quick-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pc-plugin-metrics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
@@ -1066,6 +1241,11 @@
     }
 
     .pc-summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .pc-plugin-form-grid,
+    .pc-plugin-tables {
       grid-template-columns: 1fr;
     }
   }
@@ -1146,12 +1326,16 @@
     .pc-batch-quick-grid {
       grid-template-columns: 1fr;
     }
+
+    .pc-plugin-metrics {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 {/block}
 
 {block name="content"}
-<div id="profitCenterApp" class="admin-page-container"></div>
+<div id="profitCenterApp" class="admin-page-container" data-module="profit_center"></div>
 {/block}
 
 {block name="script"}
@@ -1199,7 +1383,42 @@
     return y + '-' + m + '-' + day;
   }
 
-  createApp({
+  async function apiGet(url, params, fallbackKey) {
+    if (window.AdminApi && typeof window.AdminApi.get === 'function') {
+      return window.AdminApi.get(url, params || {}, { fallbackKey: fallbackKey || 'common.loadingFailed' });
+    }
+    const u = new URL(url, window.location.origin);
+    Object.keys(params || {}).forEach((key) => {
+      const value = params[key];
+      if (value === null || typeof value === 'undefined' || value === '') return;
+      u.searchParams.set(key, String(value));
+    });
+    const res = await fetch(u.pathname + (u.search || ''), { credentials: 'same-origin', headers });
+    const json = parseJson(await res.text());
+    if (!json || Number(json.code || 0) !== 0) {
+      throw new Error(resolveApiMessage(json, fallbackKey || 'common.loadingFailed'));
+    }
+    return json;
+  }
+
+  async function apiPost(url, payload, fallbackKey) {
+    if (window.AdminApi && typeof window.AdminApi.post === 'function') {
+      return window.AdminApi.post(url, payload || {}, { fallbackKey: fallbackKey || 'common.operationFailed' });
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify(payload || {})
+    });
+    const json = parseJson(await res.text());
+    if (!json || Number(json.code || 0) !== 0) {
+      throw new Error(resolveApiMessage(json, fallbackKey || 'common.operationFailed'));
+    }
+    return json;
+  }
+
+  const profitCenterAppOptions = {
     setup() {
       const loading = ref(false);
       const summaryLoading = ref(false);
@@ -1210,6 +1429,7 @@
       const page = ref(1);
       const pageSize = ref(20);
       const fallbackCount = ref(0);
+      const loadError = ref('');
 
       const filters = reactive({
         date_from: today(),
@@ -1319,6 +1539,31 @@
       const fxRows = ref([]);
       const fxForm = reactive({ rate_date: today(), currencies: ['USD', 'VND'] });
 
+      const pluginDialogVisible = ref(false);
+      const pluginLoading = ref(false);
+      const pluginLogsLoading = ref(false);
+      const pluginTokenCreating = ref(false);
+      const pluginBootstrapData = reactive({
+        api_base: '',
+        ingest_path: '/admin.php/profit_center/plugin/ingestBatch',
+        stores: [],
+        accounts: [],
+        tokens: [],
+        mappings: { store: [], account: [] }
+      });
+      const pluginTokenForm = reactive({
+        name: 'TikTok Browser Plugin',
+        expires_days: 30,
+        latest_token: ''
+      });
+      const pluginMappingForm = reactive({
+        type: 'store',
+        alias: '',
+        store_id: '',
+        account_id: ''
+      });
+      const pluginLogs = ref([]);
+
       const channelOptions = computed(() => [
         { value: 'live', label: tt('page.profitCenter.channelLive') },
         { value: 'video', label: tt('page.profitCenter.channelVideo') },
@@ -1350,6 +1595,16 @@
       });
       const entryWageCostPreview = computed(() => Number(entryForm.live_hours || 0) * Number(entryForm.wage_hourly_cny || 0));
       const activeStoreCount = computed(() => stores.value.filter((s) => Number(s.status || 0) === 1).length);
+      const pluginTokenCount = computed(() => Array.isArray(pluginBootstrapData.tokens) ? pluginBootstrapData.tokens.filter((x) => Number(x.status || 0) === 1).length : 0);
+      const pluginMapCount = computed(() => {
+        const storeCount = Array.isArray(pluginBootstrapData.mappings && pluginBootstrapData.mappings.store) ? pluginBootstrapData.mappings.store.length : 0;
+        const accountCount = Array.isArray(pluginBootstrapData.mappings && pluginBootstrapData.mappings.account) ? pluginBootstrapData.mappings.account.length : 0;
+        return storeCount + accountCount;
+      });
+      const pluginLastIngestAt = computed(() => {
+        if (!Array.isArray(pluginLogs.value) || pluginLogs.value.length === 0) return '--';
+        return String(pluginLogs.value[0].created_at || '--');
+      });
 
       const queryString = computed(() => {
         const p = new URLSearchParams();
@@ -1445,24 +1700,19 @@
       }
 
       async function fetchStores() {
-        const res = await fetch('/admin.php/profit_center/storeList', { credentials: 'same-origin', headers });
-        const json = parseJson(await res.text());
-        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+        const json = await apiGet('/admin.php/profit_center/storeList', {}, 'common.loadingFailed');
         stores.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
       }
 
       async function fetchAccounts() {
-        const res = await fetch('/admin.php/profit_center/accountList', { credentials: 'same-origin', headers });
-        const json = parseJson(await res.text());
-        if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+        const json = await apiGet('/admin.php/profit_center/accountList', {}, 'common.loadingFailed');
         accounts.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
       }
       async function fetchSummary() {
         summaryLoading.value = true;
         try {
-          const res = await fetch('/admin.php/profit_center/summary?' + queryString.value, { credentials: 'same-origin', headers });
-          const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          const queryParams = Object.fromEntries(new URLSearchParams(queryString.value).entries());
+          const json = await apiGet('/admin.php/profit_center/summary', queryParams, 'common.loadingFailed');
           const data = json.data || {};
           summary.kpi = data.kpi || summary.kpi;
           summary.by_store = Array.isArray(data.by_store) ? data.by_store : [];
@@ -1470,8 +1720,12 @@
             ? data.by_channel.map((row) => ({ ...row, channel_label: channelLabelByType(row.channel_type) }))
             : [];
           summary.by_day = Array.isArray(data.by_day) ? data.by_day : [];
+          if (loadError.value) {
+            loadError.value = '';
+          }
         } catch (e) {
-          ElMessage.error(e.message || tt('common.loadingFailed'));
+          loadError.value = e.message || tt('common.loadingFailed');
+          ElMessage.error(loadError.value);
         } finally {
           summaryLoading.value = false;
         }
@@ -1480,30 +1734,38 @@
       async function fetchEntries() {
         loading.value = true;
         try {
-          const p = new URLSearchParams(queryString.value);
-          p.set('page', String(page.value));
-          p.set('page_size', String(pageSize.value));
-          const res = await fetch('/admin.php/profit_center/entryList?' + p.toString(), { credentials: 'same-origin', headers });
-          const json = parseJson(await res.text());
-          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          const queryParams = Object.fromEntries(new URLSearchParams(queryString.value).entries());
+          queryParams.page = String(page.value);
+          queryParams.page_size = String(pageSize.value);
+          const json = await apiGet('/admin.php/profit_center/entryList', queryParams, 'common.loadingFailed');
           entries.value = json.data && Array.isArray(json.data.items)
             ? json.data.items.map((row) => ({ ...row, channel_label: channelLabelByType(row.channel_type) }))
             : [];
           total.value = json.data ? Number(json.data.total || 0) : 0;
           fallbackCount.value = entries.value.filter((x) => String(x.fx_status || '') === 'fallback_latest').length;
+          if (loadError.value) {
+            loadError.value = '';
+          }
         } catch (e) {
-          ElMessage.error(e.message || tt('common.loadingFailed'));
+          loadError.value = e.message || tt('common.loadingFailed');
+          ElMessage.error(loadError.value);
         } finally {
           loading.value = false;
         }
       }
 
       async function reloadAll() {
+        loadError.value = '';
         try {
           await Promise.all([fetchSummary(), fetchEntries()]);
         } catch (e) {
-          ElMessage.error(e.message || tt('common.loadingFailed'));
+          loadError.value = e.message || tt('common.loadingFailed');
+          ElMessage.error(loadError.value);
         }
+      }
+
+      function retryLoad() {
+        reloadAll();
       }
 
       function resetFilter() {
@@ -2090,6 +2352,148 @@
         }
       }
 
+      async function fetchPluginBootstrap() {
+        pluginLoading.value = true;
+        try {
+          const json = await apiGet('/admin.php/profit_center/plugin/bootstrap', {}, 'common.loadingFailed');
+          const data = json.data || {};
+          pluginBootstrapData.api_base = String(data.api_base || '');
+          pluginBootstrapData.ingest_path = String(data.ingest_path || '/admin.php/profit_center/plugin/ingestBatch');
+          pluginBootstrapData.stores = Array.isArray(data.stores) ? data.stores : [];
+          pluginBootstrapData.accounts = Array.isArray(data.accounts) ? data.accounts : [];
+          pluginBootstrapData.tokens = Array.isArray(data.tokens) ? data.tokens : [];
+          pluginBootstrapData.mappings = {
+            store: Array.isArray(data.mappings && data.mappings.store) ? data.mappings.store : [],
+            account: Array.isArray(data.mappings && data.mappings.account) ? data.mappings.account : []
+          };
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          pluginLoading.value = false;
+        }
+      }
+
+      async function fetchPluginLogs() {
+        pluginLogsLoading.value = true;
+        try {
+          const json = await apiGet('/admin.php/profit_center/plugin/ingestLogs', { page: 1, page_size: 20 }, 'common.loadingFailed');
+          pluginLogs.value = json.data && Array.isArray(json.data.items) ? json.data.items : [];
+        } catch (e) {
+          pluginLogs.value = [];
+          ElMessage.error(e.message || tt('common.loadingFailed'));
+        } finally {
+          pluginLogsLoading.value = false;
+        }
+      }
+
+      async function openPluginDialog() {
+        pluginDialogVisible.value = true;
+        await Promise.all([fetchPluginBootstrap(), fetchPluginLogs()]);
+      }
+
+      function resetPluginMappingForm() {
+        pluginMappingForm.alias = '';
+        pluginMappingForm.store_id = '';
+        pluginMappingForm.account_id = '';
+      }
+
+      async function createPluginToken() {
+        pluginTokenCreating.value = true;
+        try {
+          const json = await apiPost('/admin.php/profit_center/plugin/tokenCreate', {
+            name: pluginTokenForm.name,
+            expires_days: Number(pluginTokenForm.expires_days || 30)
+          }, 'common.saveFailed');
+          const data = json.data || {};
+          pluginTokenForm.latest_token = String(data.token || '');
+          ElMessage.success(tt('common.done'));
+          await fetchPluginBootstrap();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        } finally {
+          pluginTokenCreating.value = false;
+        }
+      }
+
+      async function revokePluginToken(row) {
+        try {
+          await ElMessageBox.confirm(tt('common.confirmDelete'), tt('common.tip'), { type: 'warning' });
+          await apiPost('/admin.php/profit_center/plugin/tokenRevoke', { id: Number(row.id || 0) }, 'common.deleteFailed');
+          ElMessage.success(tt('common.done'));
+          await fetchPluginBootstrap();
+        } catch (e) {
+          if (e !== 'cancel') ElMessage.error(e.message || tt('common.deleteFailed'));
+        }
+      }
+
+      async function savePluginMapping() {
+        if (!pluginMappingForm.alias) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        if (pluginMappingForm.type === 'store' && !pluginMappingForm.store_id) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        if (pluginMappingForm.type === 'account' && !pluginMappingForm.account_id) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        try {
+          await apiPost('/admin.php/profit_center/plugin/mappingSave', {
+            type: pluginMappingForm.type,
+            alias: pluginMappingForm.alias,
+            store_id: Number(pluginMappingForm.store_id || 0),
+            account_id: Number(pluginMappingForm.account_id || 0)
+          }, 'common.saveFailed');
+          ElMessage.success(tt('common.done'));
+          resetPluginMappingForm();
+          await fetchPluginBootstrap();
+        } catch (e) {
+          ElMessage.error(e.message || tt('common.saveFailed'));
+        }
+      }
+
+      async function deletePluginMapping(type, row) {
+        try {
+          await ElMessageBox.confirm(tt('common.confirmDelete'), tt('common.tip'), { type: 'warning' });
+          await apiPost('/admin.php/profit_center/plugin/mappingDelete', {
+            type: type,
+            id: Number(row.id || 0)
+          }, 'common.deleteFailed');
+          ElMessage.success(tt('common.done'));
+          await fetchPluginBootstrap();
+        } catch (e) {
+          if (e !== 'cancel') ElMessage.error(e.message || tt('common.deleteFailed'));
+        }
+      }
+
+      async function copyLatestPluginToken() {
+        const token = String(pluginTokenForm.latest_token || '');
+        if (!token) {
+          ElMessage.warning(tt('common.invalidParams'));
+          return;
+        }
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(token);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = token;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+          }
+          ElMessage.success(tt('common.done'));
+        } catch (e) {
+          ElMessage.error(tt('common.operationFailed'));
+        }
+      }
+
       function exportCsv() {
         const url = '/admin.php/profit_center/exportCsv' + (queryString.value ? ('?' + queryString.value) : '');
         window.open(url, '_blank', 'noopener');
@@ -2150,35 +2554,43 @@
       watch(() => batchPreset.channel_type, () => {
         syncBatchPresetToRows(false);
       });
+      watch(() => pluginMappingForm.type, () => {
+        pluginMappingForm.store_id = '';
+        pluginMappingForm.account_id = '';
+      });
 
       onMounted(async () => {
         if (i18n) i18n.applyDom(document);
         try {
           await Promise.all([fetchStores(), fetchAccounts()]);
           await reloadAll();
+          await fetchPluginBootstrap();
         } catch (e) {
-          ElMessage.error(e.message || tt('common.loadingFailed'));
+          loadError.value = e.message || tt('common.loadingFailed');
+          ElMessage.error(loadError.value);
         }
       });
 
       return {
-        tt, filters, stores, accounts, entries, total, page, pageSize, loading, summaryLoading, summary,
+        tt, filters, stores, accounts, entries, total, page, pageSize, loading, summaryLoading, summary, loadError,
         fallbackCount, channelOptions, currencyOptions, entryDialogVisible, entrySaving, entryForm,
         batchDialogVisible, batchSaving, batchRows, batchResult, batchMode, batchPreset, batchPresetAccountOptions,
         entryAccountOptions, storeDialogVisible, storeLoading, storeForm, accountDialogVisible, accountLoading,
         accountForm, importDialogVisible, importLoading, importForm, importAccountOptions, fxDialogVisible,
         fxLoading, fxSyncing, fxRows, fxForm, formatMoney, formatRoi, formatPercent, fxStatusLabel, fxTagType, fxSourceLabel,
-        kpiTrends,
+        kpiTrends, pluginDialogVisible, pluginLoading, pluginLogsLoading, pluginTokenCreating, pluginBootstrapData,
+        pluginTokenForm, pluginMappingForm, pluginLogs, pluginTokenCount, pluginMapCount, pluginLastIngestAt,
         importFileName, selectedEntryStore, selectedEntryAccount, entryRoiPreview, entryWageCostPreview, activeStoreCount,
-        fetchEntries, reloadAll, resetFilter, openEntryCreate, openBatchEntry, openEntryEdit, saveEntry, deleteEntry,
+        fetchEntries, reloadAll, retryLoad, resetFilter, openEntryCreate, openBatchEntry, openEntryEdit, saveEntry, deleteEntry,
         addBatchRow, removeBatchRow, submitBatchEntries, batchAccountOptions, batchAccountName, onBatchStoreChange, onBatchPresetStoreChange, syncBatchPresetToRows, resetBatchDialog,
         fillStoreForm, saveStore, deleteStore, resetStoreForm, fillAccountForm, saveAccount, deleteAccount,
         resetAccountForm, submitImport, fetchFxRates, syncFx, exportCsv, downloadTemplate,
+        openPluginDialog, fetchPluginBootstrap, fetchPluginLogs, createPluginToken, revokePluginToken, savePluginMapping, deletePluginMapping, copyLatestPluginToken,
         onImportFileChange: (e) => { importFile.value = e.target && e.target.files ? e.target.files[0] : null; }
       };
     },
     template: `
-      <div class="pc-page">
+      <div class="pc-page" data-section="profit_overview">
         <div class="pc-toolbar">
           <div>
             <div class="pc-toolbar-title">{{ tt('page.profitCenter.title') }}</div>
@@ -2194,7 +2606,7 @@
           </div>
         </div>
 
-        <div class="pc-panel" v-loading="summaryLoading">
+        <div class="pc-panel" v-loading="summaryLoading" data-section="profit_kpi">
           <div class="pc-kpi-grid">
             <div class="pc-kpi-card">
               <div class="pc-kpi-head">
@@ -2249,7 +2661,7 @@
           </div>
         </div>
 
-        <div class="pc-panel pc-filter-panel">
+        <div class="pc-panel pc-filter-panel" data-section="profit_filter">
           <div class="pc-filter-grid">
             <div class="pc-filter-item">
               <label>{{ tt('page.profitCenter.filterDateFrom') }}</label>
@@ -2291,9 +2703,44 @@
           </div>
         </div>
 
-        <el-alert v-if="fallbackCount > 0" type="warning" :closable="false" :title="tt('page.profitCenter.warningFallback', {count: fallbackCount})" />
+        <div class="pc-panel pc-plugin-card" data-section="profit_plugin_bridge">
+          <div class="pc-plugin-head">
+            <div>
+              <h3 class="pc-plugin-title">{{ tt('page.profitCenter.pluginCardTitle') }}</h3>
+              <div class="pc-plugin-desc">{{ tt('page.profitCenter.pluginCardDesc') }}</div>
+            </div>
+            <div class="pc-inline-flex">
+              <el-button class="pc-btn-md pc-btn-ghost" :loading="pluginLoading" @click="fetchPluginBootstrap">{{ tt('common.refresh') }}</el-button>
+              <el-button class="pc-btn-md" type="primary" @click="openPluginDialog">{{ tt('page.profitCenter.pluginOpenDialog') }}</el-button>
+            </div>
+          </div>
+          <div class="pc-plugin-metrics">
+            <div class="pc-plugin-metric">
+              <div class="pc-plugin-metric-label">{{ tt('page.profitCenter.pluginMetricTokens') }}</div>
+              <div class="pc-plugin-metric-value">{{ pluginTokenCount }}</div>
+            </div>
+            <div class="pc-plugin-metric">
+              <div class="pc-plugin-metric-label">{{ tt('page.profitCenter.pluginMetricMappings') }}</div>
+              <div class="pc-plugin-metric-value">{{ pluginMapCount }}</div>
+            </div>
+            <div class="pc-plugin-metric">
+              <div class="pc-plugin-metric-label">{{ tt('page.profitCenter.pluginMetricLastIngest') }}</div>
+              <div class="pc-plugin-metric-value is-small">{{ pluginLastIngestAt }}</div>
+            </div>
+            <div class="pc-plugin-metric">
+              <div class="pc-plugin-metric-label">{{ tt('page.profitCenter.pluginMetricEndpoint') }}</div>
+              <div class="pc-plugin-metric-value is-small">{{ pluginBootstrapData.ingest_path || '/admin.php/profit_center/plugin/ingestBatch' }}</div>
+            </div>
+          </div>
+        </div>
 
-        <div class="pc-panel pc-table-panel">
+        <el-alert v-if="fallbackCount > 0" type="warning" :closable="false" :title="tt('page.profitCenter.warningFallback', {count: fallbackCount})" />
+        <div v-if="loadError" class="pc-inline-error" data-section="error_state">
+          <span>{{ loadError }}</span>
+          <el-button link type="primary" @click="retryLoad">{{ tt('common.refresh') }}</el-button>
+        </div>
+
+        <div class="pc-panel pc-table-panel" data-section="profit_entries">
           <div class="pc-table-head">
             <div class="pc-table-title">{{ tt('page.profitCenter.title') }}</div>
             <div class="pc-table-sub">{{ tt('page.profitCenter.kpiAdCompensation') }} ¥{{ formatMoney(summary.kpi.ad_compensation_cny) }}</div>
@@ -2814,10 +3261,132 @@
           <el-table-column :label="tt('page.profitCenter.colFallback')" width="110"><template #default="{row}"><el-tag :type="Number(row.is_fallback||0)===1?'warning':'success'" size="small">{{ Number(row.is_fallback||0)===1?tt('common.yes'):tt('common.no') }}</el-tag></template></el-table-column>
         </el-table>
       </el-dialog>
+
+      <el-dialog v-model="pluginDialogVisible" :title="tt('page.profitCenter.pluginDialogTitle')" width="1220px" class="pc-dialog pc-plugin-dialog" modal-class="pc-modal-overlay" align-center>
+        <div class="pc-plugin-layout">
+          <div class="pc-plugin-block">
+            <h4>{{ tt('page.profitCenter.pluginTokenTitle') }}</h4>
+            <div class="pc-plugin-block-sub">{{ tt('page.profitCenter.pluginTokenDesc') }}</div>
+            <div class="pc-plugin-form-grid">
+              <el-input v-model="pluginTokenForm.name" :placeholder="tt('page.profitCenter.pluginTokenNamePh')" />
+              <el-input-number class="pc-full" v-model="pluginTokenForm.expires_days" :min="0" :max="3650" />
+            </div>
+            <div class="pc-plugin-form-actions">
+              <el-button class="pc-btn-md" type="primary" :loading="pluginTokenCreating" @click="createPluginToken">{{ tt('page.profitCenter.pluginCreateToken') }}</el-button>
+              <el-button class="pc-btn-md pc-btn-ghost" :loading="pluginLoading" @click="fetchPluginBootstrap">{{ tt('common.refresh') }}</el-button>
+            </div>
+            <div v-if="pluginTokenForm.latest_token" class="pc-plugin-token-box">
+              <div>{{ tt('page.profitCenter.pluginTokenOnce') }}</div>
+              <el-input :model-value="pluginTokenForm.latest_token" readonly />
+              <div class="pc-plugin-form-actions">
+                <el-button class="pc-btn-sm" type="primary" @click="copyLatestPluginToken">{{ tt('page.profitCenter.pluginCopyToken') }}</el-button>
+              </div>
+            </div>
+            <el-table :data="pluginBootstrapData.tokens" size="small" max-height="260" class="pc-compact-table">
+              <el-table-column prop="token_name" :label="tt('page.profitCenter.pluginColTokenName')" min-width="140" />
+              <el-table-column prop="token_prefix" :label="tt('page.profitCenter.pluginColTokenPrefix')" width="140" />
+              <el-table-column :label="tt('common.status')" width="90">
+                <template #default="{row}">
+                  <el-tag size="small" :type="Number(row.status||0)===1?'success':'info'">{{ Number(row.status||0)===1?tt('common.statusEnabled'):tt('common.statusDisabled') }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="expires_at" :label="tt('page.profitCenter.pluginColExpiresAt')" min-width="140" />
+              <el-table-column prop="last_used_at" :label="tt('page.profitCenter.pluginColLastUsedAt')" min-width="140" />
+              <el-table-column :label="tt('page.profitCenter.colActions')" width="90">
+                <template #default="{row}">
+                  <el-button v-if="Number(row.status||0)===1" link type="danger" @click="revokePluginToken(row)">{{ tt('page.profitCenter.pluginRevokeToken') }}</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="pc-plugin-block">
+            <h4>{{ tt('page.profitCenter.pluginMappingTitle') }}</h4>
+            <div class="pc-plugin-block-sub">{{ tt('page.profitCenter.pluginMappingDesc') }}</div>
+            <div class="pc-plugin-form-grid">
+              <el-select v-model="pluginMappingForm.type">
+                <el-option value="store" :label="tt('page.profitCenter.colStore')" />
+                <el-option value="account" :label="tt('page.profitCenter.colAccount')" />
+              </el-select>
+              <el-input v-model="pluginMappingForm.alias" :placeholder="tt('page.profitCenter.pluginAliasPh')" />
+              <el-select v-if="pluginMappingForm.type==='store'" v-model="pluginMappingForm.store_id" filterable :placeholder="tt('page.profitCenter.colStore')">
+                <el-option v-for="s in stores" :key="'pms'+s.id" :label="s.store_name" :value="String(s.id)" />
+              </el-select>
+              <el-select v-else v-model="pluginMappingForm.account_id" filterable :placeholder="tt('page.profitCenter.colAccount')">
+                <el-option v-for="a in accounts" :key="'pma'+a.id" :label="a.account_name" :value="String(a.id)" />
+              </el-select>
+            </div>
+            <div class="pc-plugin-form-actions">
+              <el-button class="pc-btn-md" type="primary" @click="savePluginMapping">{{ tt('common.save') }}</el-button>
+            </div>
+            <div class="pc-plugin-tables">
+              <div>
+                <div class="pc-table-sub">{{ tt('page.profitCenter.colStore') }}</div>
+                <el-table :data="pluginBootstrapData.mappings.store" size="small" max-height="220">
+                  <el-table-column prop="alias" :label="tt('page.profitCenter.pluginColAlias')" min-width="120" />
+                  <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
+                  <el-table-column :label="tt('page.profitCenter.colActions')" width="80">
+                    <template #default="{row}">
+                      <el-button link type="danger" @click="deletePluginMapping('store', row)">{{ tt('common.delete') }}</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+              <div>
+                <div class="pc-table-sub">{{ tt('page.profitCenter.colAccount') }}</div>
+                <el-table :data="pluginBootstrapData.mappings.account" size="small" max-height="220">
+                  <el-table-column prop="alias" :label="tt('page.profitCenter.pluginColAlias')" min-width="120" />
+                  <el-table-column prop="account_name" :label="tt('page.profitCenter.colAccount')" min-width="120" />
+                  <el-table-column :label="tt('page.profitCenter.colActions')" width="80">
+                    <template #default="{row}">
+                      <el-button link type="danger" @click="deletePluginMapping('account', row)">{{ tt('common.delete') }}</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pc-plugin-logs">
+          <h4 class="pc-plugin-title">{{ tt('page.profitCenter.pluginLogsTitle') }}</h4>
+          <el-table :data="pluginLogs" size="small" max-height="240" v-loading="pluginLogsLoading">
+            <el-table-column prop="created_at" :label="tt('page.profitCenter.colDate')" width="170" />
+            <el-table-column prop="status" :label="tt('common.status')" width="100" />
+            <el-table-column prop="row_count" :label="tt('page.profitCenter.pluginColRows')" width="90" />
+            <el-table-column prop="saved_count" :label="tt('page.profitCenter.pluginColSaved')" width="90" />
+            <el-table-column prop="failed_count" :label="tt('page.profitCenter.pluginColFailed')" width="90" />
+            <el-table-column prop="trace_id" :label="tt('page.profitCenter.pluginColTraceId')" min-width="170" />
+            <el-table-column prop="source_page" :label="tt('page.profitCenter.pluginColSourcePage')" min-width="220" show-overflow-tooltip />
+          </el-table>
+        </div>
+        <template #footer>
+          <el-button class="pc-btn-md pc-btn-ghost" @click="pluginDialogVisible=false">{{ tt('common.close') }}</el-button>
+        </template>
+      </el-dialog>
       </div>
     `
-  }).use(ElementPlus).mount('#profitCenterApp');
+  };
+
+  function mountProfitCenterApp() {
+    return createApp(profitCenterAppOptions).use(ElementPlus).mount('#profitCenterApp');
+  }
+
+  if (window.AdminPageBootstrap && typeof window.AdminPageBootstrap.init === 'function') {
+    window.AdminPageBootstrap.init({
+      appId: 'profitCenterApp',
+      module: 'profit_center',
+      defaultSection: 'profit_entries',
+      sectionSelector: '[data-section]',
+      dependencies: ['Vue', 'ElementPlus'],
+      onLoad: function () {
+        return mountProfitCenterApp();
+      }
+    });
+  } else {
+    mountProfitCenterApp();
+  }
 })();
 {/literal}
 </script>
 {/block}
+

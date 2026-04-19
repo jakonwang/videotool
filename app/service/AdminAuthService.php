@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace app\service;
 
 use app\model\AdminUser;
+use think\facade\Db;
 use think\facade\Session;
 
 class AdminAuthService
@@ -36,11 +37,11 @@ class AdminAuthService
 
     public static function role(): string
     {
-        $r = trim((string) Session::get(self::SESSION_ROLE, ''));
-        if (!in_array($r, ['super_admin', 'operator', 'viewer'], true)) {
+        $role = trim((string) Session::get(self::SESSION_ROLE, ''));
+        if (!in_array($role, ['super_admin', 'operator', 'viewer'], true)) {
             return 'super_admin';
         }
-        return $r;
+        return $role;
     }
 
     public static function logout(): void
@@ -51,32 +52,53 @@ class AdminAuthService
         Session::delete(self::SESSION_ROLE);
     }
 
+    private static function tenantIsActive(int $tenantId): bool
+    {
+        $tenantId = $tenantId > 0 ? $tenantId : 1;
+        try {
+            Db::name('tenants')->where('id', 0)->find();
+        } catch (\Throwable $e) {
+            return true;
+        }
+        try {
+            $row = Db::name('tenants')->where('id', $tenantId)->find();
+            return $row ? ((int) ($row['status'] ?? 0) === 1) : false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /**
-     * @return array{ok:bool,msg:string,user?:array{id:int,username:string,role:string}}
+     * @return array{ok:bool,msg:string,user?:array{id:int,tenant_id:int,username:string,role:string}}
      */
     public static function attemptLogin(string $username, string $password, string $ip = ''): array
     {
         $username = trim($username);
         if ($username === '' || $password === '') {
-            return ['ok' => false, 'msg' => '请输入用户名和密码'];
+            return ['ok' => false, 'msg' => 'username_or_password_required'];
         }
 
         /** @var AdminUser|null $user */
         $user = AdminUser::where('username', $username)->find();
         if (!$user) {
-            return ['ok' => false, 'msg' => '用户名或密码错误'];
+            return ['ok' => false, 'msg' => 'invalid_credentials'];
         }
         if ((int) ($user->status ?? 0) !== 1) {
-            return ['ok' => false, 'msg' => '账号已禁用'];
+            return ['ok' => false, 'msg' => 'account_disabled'];
+        }
+
+        $tenantId = max(1, (int) ($user->tenant_id ?? 1));
+        if (!self::tenantIsActive($tenantId)) {
+            return ['ok' => false, 'msg' => 'tenant_disabled'];
         }
 
         $hash = (string) ($user->password_hash ?? '');
         if ($hash === '' || !password_verify($password, $hash)) {
-            return ['ok' => false, 'msg' => '用户名或密码错误'];
+            return ['ok' => false, 'msg' => 'invalid_credentials'];
         }
 
         Session::set(self::SESSION_UID, (int) $user->id);
-        Session::set(self::SESSION_TENANT_ID, max(1, (int) ($user->tenant_id ?? 1)));
+        Session::set(self::SESSION_TENANT_ID, $tenantId);
         Session::set(self::SESSION_UNAME, (string) $user->username);
         Session::set(self::SESSION_ROLE, (string) ($user->role ?: 'super_admin'));
 
@@ -86,10 +108,10 @@ class AdminAuthService
 
         return [
             'ok' => true,
-            'msg' => '登录成功',
+            'msg' => 'login_success',
             'user' => [
                 'id' => (int) $user->id,
-                'tenant_id' => max(1, (int) ($user->tenant_id ?? 1)),
+                'tenant_id' => $tenantId,
                 'username' => (string) $user->username,
                 'role' => (string) ($user->role ?: 'super_admin'),
             ],

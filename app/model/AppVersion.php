@@ -14,6 +14,7 @@ class AppVersion extends Model
 
     protected $schema = [
         'id'             => 'int',
+        'tenant_id'      => 'int',
         'version'        => 'string',
         'release_notes'  => 'string',
         'download_url'   => 'string',

@@ -15,6 +15,7 @@ class Device extends Model
     // 设置字段信息
     protected $schema = [
         'id'          => 'int',
+        'tenant_id'   => 'int',
         'platform_id' => 'int',
         'ip_address'  => 'string',
         'device_name' => 'string',

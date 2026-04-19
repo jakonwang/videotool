@@ -1,0 +1,27 @@
+﻿{
+  "manifest_version": 3,
+  "name": "TikStar Profit Capture",
+  "version": "1.0.0",
+  "description": "Capture TikTok Ads/Shop metrics and ingest to Profit Center.",
+  "permissions": ["storage", "tabs", "activeTab"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "action": {
+    "default_title": "Profit Capture",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://ads.tiktok.com/*",
+        "https://*.tiktokglobalshop.com/*",
+        "https://seller.tiktokglobalshop.com/*",
+        "https://*.tiktok.com/*"
+      ],
+      "js": ["shared/parser.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

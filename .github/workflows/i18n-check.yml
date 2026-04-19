@@ -8,6 +8,7 @@ on:
       - 'view/admin/**'
       - 'public/static/i18n/**'
       - 'scripts/check_i18n_keys.js'
+      - 'scripts/check_admin_template_stability.js'
       - '.github/workflows/i18n-check.yml'
   pull_request:
     branches:
@@ -16,6 +17,7 @@ on:
       - 'view/admin/**'
       - 'public/static/i18n/**'
       - 'scripts/check_i18n_keys.js'
+      - 'scripts/check_admin_template_stability.js'
       - '.github/workflows/i18n-check.yml'
   workflow_dispatch:
 
@@ -34,3 +36,6 @@ jobs:
 
       - name: Run i18n key check
         run: node scripts/check_i18n_keys.js --scope=all
+
+      - name: Run admin template stability check
+        run: node scripts/check_admin_template_stability.js

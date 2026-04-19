@@ -15,6 +15,7 @@ class DownloadLog extends Model
     // 设置字段信息
     protected $schema = [
         'id'            => 'int',
+        'tenant_id'     => 'int',
         'video_id'      => 'int',
         'download_type' => 'string',
         'downloaded_at' => 'datetime',

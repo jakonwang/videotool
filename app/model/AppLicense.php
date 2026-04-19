@@ -14,6 +14,7 @@ class AppLicense extends Model
 
     protected $schema = [
         'id'           => 'int',
+        'tenant_id'    => 'int',
         'license_key'  => 'string',
         'machine_id'   => 'string',
         'status'       => 'int',

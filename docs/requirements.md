@@ -2779,3 +2779,262 @@
 3. 发布后立即清缓存：
    - `runtime/cache/*`
    - `runtime/temp/*`
+
+## 2026-04-19 多租户计划补齐（已完成）
+
+### 1) 功能补齐
+- 新增页面：`view/admin/tenant/index.html`
+  - 提供 5 个子区域：租户、套餐、订阅、管理员、审计。
+  - 页面仅通过 JSON API 调用后端（前后端分离，不走模板内耦合查询）。
+- 新增脚本：`public/static/admin/tenant_center.js`
+  - 完成以下接口编排：
+    - `GET /admin.php/tenant/list`
+    - `POST /admin.php/tenant/save`
+    - `POST /admin.php/tenant/status`
+    - `POST /admin.php/tenant/switch`
+    - `GET /admin.php/tenant/package/list`
+    - `POST /admin.php/tenant/package/save`
+    - `POST /admin.php/tenant/subscription/save`
+    - `GET /admin.php/tenant/subscription/modules`
+    - `GET /admin.php/tenant/admin/list`
+    - `POST /admin.php/tenant/admin/save`
+    - `GET /admin.php/tenant/audit/list`
+- 多语言补齐（避免页面显示键值或参数串）：
+  - 更新 `public/static/i18n/i18n.js`
+  - 更新 `public/static/i18n/i18n.ops2.js`
+  - 增加租户菜单键与租户中心页面键（zh/en/vi）。
+- 后端返回码映射补齐：
+  - 在 `BACKEND_MSG_KEY_MAP` 增加租户/套餐/订阅/管理员相关错误码映射，前端提示可读化。
+
+### 2) 稳定性修复
+- 修复 `database/run_migration_tenant_saas_suite.php` 的 UTF-8 BOM 问题。
+  - 现象：`strict_types declaration must be the very first statement`。
+  - 处理：转为 UTF-8 无 BOM，迁移脚本可正常 `php -l`。
+
+### 3) 自动化测试与联调结果
+- 语法检查（Windows）：
+  - `php -l app/controller/admin/Tenant.php` ✅
+  - `php -l app/service/TenantScopeService.php` ✅
+  - `php -l app/service/StoreCurrencyService.php` ✅
+  - `php -l app/controller/admin/ProductSearchLive.php` ✅
+  - `php -l app/controller/admin/ProfitCenter.php` ✅
+  - `php -l app/service/OpsMaintenanceService.php` ✅
+  - `php -l app/service/DataImportService.php` ✅
+  - `php -l app/service/DataImportDispatchService.php` ✅
+  - `php -l app/service/MessageOutreachService.php` ✅
+  - `php -l app/service/AutoDmService.php` ✅
+  - `php -l route/admin.php` ✅
+  - `php -l database/run_migration_tenant_saas_suite.php` ✅
+- 前端脚本检查：
+  - `node --check public/static/admin/tenant_center.js` ✅
+  - `node --check public/static/admin/live_style_analysis.js` ✅
+- i18n 检查：
+  - `node scripts/check_i18n_keys.js --scope=all` ✅
+- HTTP 冒烟联调（本地内置服务器 + 登录态）：
+  - `/admin.php/tenant/list` 返回 JSON ✅
+  - `/admin.php/tenant/package/list` 返回 JSON ✅
+  - `/admin.php/tenant/admin/list` 返回 JSON ✅
+  - `/admin.php/tenant?tab=tenants` 页面渲染 `tenantCenterApp` 成功 ✅
+
+### 4) 迁移前置说明
+- 若出现以下返回码：
+  - `tenant_package_tables_missing`
+  - `tenant_subscription_tables_missing`
+- 说明数据库尚未执行租户 SaaS 套件迁移，请先执行：
+  - Windows：`php database\run_migration_tenant_saas_suite.php`
+  - Linux：`php database/run_migration_tenant_saas_suite.php`
+## 2026-04-19 后台稳定性优化（防空白页优先）
+
+### 1) 全局链路：trace_id + JSON 错误增强
+- 新增 `app/service/TraceIdService.php`：为每次请求生成/复用 `trace_id`。
+- 新增 `app/middleware/TraceIdJsonMiddleware.php`：
+  - 所有响应追加 `X-Trace-Id` Header。
+  - JSON 响应自动补齐 `trace_id`。
+  - 非 0 `code` 且缺失 `error_key` 时做最佳努力推断。
+- `app/BaseController.php` 的 `apiJsonOk/apiJsonErr` 已统一返回 `trace_id`。
+
+### 2) 权限与导航兜底
+- `app/middleware/AdminAuthMiddleware.php`：
+  - 模块禁用场景，非 JSON 请求改为返回标准无权限卡片页，而不是重定向造成“看起来空白”。
+  - JSON 识别路径补充 `ops_frontend`。
+- 新增无权限页面：`view/admin/common/no_access.html`。
+
+### 3) 前端统一启动与请求层
+- `view/admin/common/layout.html` 新增全局对象：
+  - `window.AdminApi`：统一 `requestJson/get/post`，支持 `error_key` 翻译、`trace_id` 透传、会话过期跳转登录。
+  - `window.AdminPageBootstrap.init(...)`：依赖检测、挂载异常捕获、`data-section` 可见性兜底、异常健康上报。
+
+### 4) 前端健康上报
+- 新增接口：`POST /admin.php/ops_frontend/health/save`
+  - 控制器：`app/controller/admin/OpsFrontend.php`
+  - 路由：`route/admin.php`
+  - 字段：`page/module/event/trace_id/detail`（并记录 tenant/admin/ip/ua）。
+- 新增迁移：`database/run_migration_ops_frontend_health.php`
+  - 新表：`ops_frontend_health_logs`。
+- 运维迁移清单已接入：`app/service/OpsMaintenanceService.php`。
+
+### 5) 第一批页面接入（租户中心/利润中心/商品管理）
+- 页面均新增 `data-section`，并接入 `AdminPageBootstrap`。
+- 页面列表加载失败新增“内联错误 + 重试按钮”，不再只依赖 toast。
+- 核心查询链路优先接入 `AdminApi`（租户中心全链路、利润中心核心查询、商品管理列表/删除）。
+
+### 6) 静态检查与 CI
+- 新增脚本：`scripts/check_admin_template_stability.js`
+  - 校验第一批核心页面是否包含 `data-section`。
+  - 校验 DOM 模板中是否存在 `el-*` 自闭合标签（忽略 `<script>` 内模板字符串）。
+- CI 更新：`.github/workflows/i18n-check.yml`
+  - 在 i18n 检查后执行 `node scripts/check_admin_template_stability.js`。
+
+### 7) 本地验证命令（Windows）
+1. `php -l app/service/TraceIdService.php`
+2. `php -l app/middleware/TraceIdJsonMiddleware.php`
+3. `php -l app/controller/admin/OpsFrontend.php`
+4. `php -l app/middleware/AdminAuthMiddleware.php`
+5. `php -l app/BaseController.php`
+6. `php -l route/admin.php`
+7. `node --check public/static/admin/tenant_center.js`
+8. `node --check scripts/check_admin_template_stability.js`
+9. `node scripts/check_i18n_keys.js --scope=all`
+10. `node scripts/check_admin_template_stability.js`
+
+### 8) 迁移命令
+- Windows：`php database\\run_migration_ops_frontend_health.php`
+- Linux：`php database/run_migration_ops_frontend_health.php`
+## 16. 后台稳定性防空白页（2026-04-19）
+
+### 16.1 目标
+- 后台页面在依赖失败、接口失败、权限不足、Tab/Section 状态异常时，不再出现“标题有但功能区空白”。
+- 输出可见错误态与可追踪 `trace_id`，便于快速定位线上问题。
+
+### 16.2 已落地能力
+- 新增前端统一启动器：`window.AdminPageBootstrap.init(...)`。
+  - 依赖检查（Vue/ElementPlus 等）
+  - Mount 失败兜底
+  - `data-section` 可见性检测与默认区块回退
+- 新增前端统一请求层：`window.AdminApi`。
+  - 统一 GET/POST JSON 请求
+  - `error_key` + `trace_id` 统一处理
+  - 会话过期自动跳转登录
+  - 异常健康上报（仅异常事件上报）
+- 后端统一可观测字段：
+  - `app/BaseController.php` 的 `apiJsonOk/apiJsonErr` 返回 `trace_id`
+  - `app/middleware/TraceIdJsonMiddleware.php` 补齐 `trace_id/error_key`（兜底）
+- 权限禁用模块时返回“无权限页面”而不是弱反馈空白。
+
+### 16.3 健康上报
+- 新增接口：`POST /admin.php/ops_frontend/health/save`
+- 字段：`page/module/event/trace_id/detail`
+- 数据表：`ops_frontend_health_logs`
+- 迁移脚本：`database/run_migration_ops_frontend_health.php`（幂等）
+
+### 16.4 首批接入模块
+- `租户中心`：`view/admin/tenant/index.html` + `public/static/admin/tenant_center.js`
+- `利润中心`：`view/admin/profit_center/index.html`
+- `商品管理`：`view/admin/product/index.html`
+
+### 16.5 静态检查与命令
+- 模板稳定性检查：`node scripts/check_admin_template_stability.js`
+  - 检查项：
+    - 首批页面必须包含 `data-section`
+    - DOM 模板禁止 `el-*` 自闭合写法
+- i18n 检查：`node scripts/check_i18n_keys.js --scope=all`
+
+### 16.6 Windows / Linux 执行
+1. 执行迁移
+   - Windows: `php database\run_migration_ops_frontend_health.php`
+   - Linux: `php database/run_migration_ops_frontend_health.php`
+2. 语法检查
+   - `php -l app/BaseController.php`
+   - `php -l app/middleware/TraceIdJsonMiddleware.php`
+   - `php -l app/controller/admin/OpsFrontend.php`
+   - `php -l app/middleware/AdminAuthMiddleware.php`
+3. 前端检查
+   - `node scripts/check_admin_template_stability.js`
+   - `node scripts/check_i18n_keys.js --scope=all`
+## Stability Checker Update (2026-04-19)
+- `scripts/check_admin_template_stability.js` now validates:
+  - required `data-section` markers
+  - required `data-module` marker
+  - required `AdminPageBootstrap.init(...)` wiring (tenant page allows external `tenant_center.js` bootstrap)
+  - disallow self-closing `el-*` tags in DOM template
+## 17. 稳定性自动化冒烟（2026-04-19）
+
+- 新增脚本：`scripts/admin_stability_smoke.ps1`
+- 目标：覆盖“防空白页优先”关键链路（登录、核心页面可见性、JSON trace_id/error_key、权限注入、静态检查）。
+
+### 覆盖项
+1. 登录流程（`/admin.php/auth/login`）
+2. 核心页面可见性
+   - `租户中心` `/admin.php/tenant`
+   - `利润中心` `/admin.php/profit_center`
+   - `商品管理` `/admin.php/product`
+3. API 结构
+   - `trace_id` 存在
+   - 异常响应 `error_key` 存在
+4. 权限注入
+   - 临时禁用 `profit_center` 模块并验证受限响应
+5. 静态校验联动
+   - `node scripts/check_admin_template_stability.js`
+   - `node scripts/check_i18n_keys.js --scope=all`
+
+### 运行命令（Windows）
+- `powershell -ExecutionPolicy Bypass -File scripts/admin_stability_smoke.ps1`
+
+### 说明
+- 脚本会创建临时租户与临时管理员，测试结束自动清理。
+- 若环境中健康上报保存失败（返回 `save_failed`），脚本会记录提示并继续执行其余校验。
+
+## 18. TikTok 浏览器插件自动回传 V1（2026-04-19）
+
+### 18.1 目标范围
+- 浏览器：Chrome / Edge（Manifest V3）。
+- 流程：一键抓取 -> 预览确认 -> 批量回传利润中心。
+- V1 字段：广告费、GMV、订单数（含日期、店铺/广告户引用、渠道、币种）。
+- 数据来源：TikTok Ads / TikTok Shop 页面。
+
+### 18.2 后端新增能力（利润中心）
+- Token 与桥接接口：
+  - `GET /admin.php/profit_center/plugin/bootstrap`
+  - `POST /admin.php/profit_center/plugin/tokenCreate`
+  - `POST /admin.php/profit_center/plugin/tokenRevoke`
+  - `POST /admin.php/profit_center/plugin/ingestBatch`
+  - `GET /admin.php/profit_center/plugin/ingestLogs`
+  - `POST /admin.php/profit_center/plugin/mappingSave`
+  - `POST /admin.php/profit_center/plugin/mappingDelete`
+- 安全：
+  - 插件使用 Bearer Token，不依赖后台登录态 Cookie。
+  - Token scope 固定 `profit_ingest`，支持过期和吊销。
+- 落库与审计：
+  - 新增插件 Token、回传日志、店铺别名映射、广告户别名映射四张表。
+  - 回传结果含 `trace_id/error_key`，便于排错。
+
+### 18.3 插件端目录
+- `tools/browser_plugin/profit_center_capture/`
+  - `manifest.json`
+  - `background.js`
+  - `content.js`
+  - `shared/parser.js`
+  - `popup.html`
+  - `popup.js`
+  - `popup.css`
+  - `README.md`
+  - `test/fixtures/*.html`
+
+### 18.4 回传冲突策略
+- 唯一键：`tenant + entry_date + store + account + channel`。
+- 同键重复回传：覆盖同字段并触发利润重算，不做重复累计。
+
+### 18.5 迁移与使用命令（Windows/Linux 通用）
+1. 执行迁移：
+   - `php database/run_migration_profit_plugin.php`
+2. 语法检查：
+   - `php -l app/service/ProfitPluginTokenService.php`
+   - `php -l app/controller/admin/ProfitCenter.php`
+   - `php -l app/middleware/AdminAuthMiddleware.php`
+3. 插件解析测试：
+   - `node scripts/profit_plugin_parser_test.js`
+
+### 18.6 验证结果（本轮）
+- `php -l`：通过（插件相关后端文件）。
+- `node scripts/profit_plugin_parser_test.js`：通过（3 组页面快照）。
+- `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`：通过。
