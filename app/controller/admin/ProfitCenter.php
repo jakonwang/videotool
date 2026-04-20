@@ -2128,7 +2128,7 @@ class ProfitCenter extends BaseController
 
         $adSpendAmount = $this->parseNullableDecimal($row['ad_spend_amount'] ?? null);
         $gmvAmount = $this->parseNullableDecimal($row['gmv_amount'] ?? null);
-        $orderCount = $this->parseNullableInt($row['order_count'] ?? null);
+        $orderCount = $this->resolvePluginOrderCount($row);
         $adSpendCurrency = trim((string) ($row['ad_spend_currency'] ?? ''));
         $gmvCurrency = trim((string) ($row['gmv_currency'] ?? ''));
 
@@ -2164,6 +2164,19 @@ class ProfitCenter extends BaseController
             $payload['gmv_currency'] = FxRateService::normalizeCurrency((string) $existing['gmv_currency']);
         } else {
             $payload['gmv_currency'] = FxRateService::normalizeCurrency((string) ($account['default_gmv_currency'] ?? 'VND'));
+        }
+
+        $sourcePage = strtolower(trim((string) ($row['source_page'] ?? '')));
+        if ($sourcePage !== '' && str_contains($sourcePage, 'ads.tiktok.com')) {
+            $payload['gmv_currency'] = (string) ($payload['ad_spend_currency'] ?? $payload['gmv_currency'] ?? 'USD');
+        }
+
+        $hasRawMetrics = array_key_exists('raw_metrics_json', $row) || array_key_exists('raw_metrics', $row);
+        if ($hasRawMetrics) {
+            $rawMetricsJson = $this->buildRawMetricsJson($row['raw_metrics_json'] ?? ($row['raw_metrics'] ?? null));
+            if ($rawMetricsJson !== null) {
+                $payload['raw_metrics_json'] = $rawMetricsJson;
+            }
         }
 
         $adValue = (float) ($payload['ad_spend_amount'] ?? 0);
@@ -2351,6 +2364,44 @@ class ProfitCenter extends BaseController
     }
 
     /**
+     * @param array<string, mixed> $row
+     */
+    private function resolvePluginOrderCount(array $row): ?int
+    {
+        $candidates = [
+            $row['order_count'] ?? null,
+            $row['sku_orders'] ?? null,
+            $row['sku_order_count'] ?? null,
+            $row['orders_count'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $parsed = $this->parseNullableInt($candidate);
+            if ($parsed !== null) {
+                return $parsed;
+            }
+        }
+
+        $rawMetrics = $row['raw_metrics_json'] ?? ($row['raw_metrics'] ?? null);
+        $rawMetricsArr = $this->decodeRawMetricsArray($rawMetrics);
+        if ($rawMetricsArr !== null) {
+            $fallback = [
+                $rawMetricsArr['total_orders'] ?? null,
+                $rawMetricsArr['order_count'] ?? null,
+                $rawMetricsArr['sku_orders'] ?? null,
+            ];
+            foreach ($fallback as $candidate) {
+                $parsed = $this->parseNullableInt($candidate);
+                if ($parsed !== null) {
+                    return $parsed;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param mixed $rawMetrics
      */
     private function buildRawMetricsJson($rawMetrics): ?string
@@ -2375,5 +2426,25 @@ class ProfitCenter extends BaseController
             return mb_substr($raw, 0, 2000);
         }
         return null;
+    }
+
+    /**
+     * @param mixed $rawMetrics
+     * @return array<string, mixed>|null
+     */
+    private function decodeRawMetricsArray($rawMetrics): ?array
+    {
+        if (is_array($rawMetrics)) {
+            return $rawMetrics;
+        }
+        if (!is_string($rawMetrics)) {
+            return null;
+        }
+        $raw = trim($rawMetrics);
+        if ($raw === '') {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : null;
     }
 }

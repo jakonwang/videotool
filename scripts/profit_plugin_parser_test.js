@@ -63,7 +63,117 @@ function makeDoc(html) {
         return text ? { textContent: text } : null;
       }
 
+      if (sel === '.p-avatar-image img[alt]' || sel === 'img[alt][src*="tiktok"]' || sel === 'img[alt]') {
+        const altMatch = raw.match(/<img[^>]*alt=["']([^"']+)["'][^>]*>/i);
+        if (!altMatch || !altMatch[1]) return null;
+        const altText = decodeHtml(String(altMatch[1] || '').trim());
+        if (!altText) return null;
+        return {
+          textContent: '',
+          getAttribute(name) {
+            return String(name || '').toLowerCase() === 'alt' ? altText : '';
+          }
+        };
+      }
+
       return null;
+    }
+  };
+}
+
+function makeTextNode(text) {
+  return {
+    innerText: String(text || ''),
+    textContent: String(text || '')
+  };
+}
+
+function makeTableRow(cellsText) {
+  const cells = (cellsText || []).map((item) => makeTextNode(item));
+  return {
+    innerText: cells.map((c) => c.innerText).join(' '),
+    textContent: cells.map((c) => c.textContent).join(' '),
+    querySelectorAll(selector) {
+      if (selector === 'td') return cells;
+      return [];
+    }
+  };
+}
+
+function makeTableDoc(options) {
+  const headers = Array.isArray(options && options.headers) ? options.headers : [];
+  const rows = Array.isArray(options && options.rows) ? options.rows : [];
+  const headerNodes = headers.map((h) => makeTextNode(h));
+  const bodyRows = rows.map((r) => makeTableRow(r));
+  const bodyText = String(options && options.bodyText ? options.bodyText : '').trim();
+  const tabNode = makeTextNode(options && options.selectedTabText ? options.selectedTabText : '');
+  const dateNode = Object.assign(makeTextNode(options && options.topDateRangeText ? options.topDateRangeText : ''), {
+    value: String(options && options.topDateRangeText ? options.topDateRangeText : ''),
+    getAttribute(name) {
+      if (name === 'value') return this.value;
+      return '';
+    },
+    getBoundingClientRect() {
+      return { top: Number(options && options.topDateTop != null ? options.topDateTop : 8) };
+    }
+  });
+
+  const table = {
+    querySelectorAll(selector) {
+      if (selector === 'thead th') return headerNodes;
+      if (selector === 'tbody tr') return bodyRows;
+      if (selector === 'tr') return bodyRows;
+      return [];
+    },
+    querySelector(selector) {
+      if (selector === 'tr') {
+        return {
+          querySelectorAll(innerSelector) {
+            if (innerSelector === 'th,td') return headerNodes;
+            return [];
+          }
+        };
+      }
+      return null;
+    }
+  };
+
+  return {
+    body: {
+      innerText: bodyText,
+      textContent: bodyText
+    },
+    querySelector(selector) {
+      const sel = String(selector || '');
+      if (sel === '[data-testid*="store"]') {
+        return makeTextNode(options.storeRef || '');
+      }
+      if (sel === '[data-testid*="account"]') {
+        return makeTextNode(options.accountRef || '');
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === 'table') return [table];
+      if (
+        options &&
+        options.selectedTabText &&
+        (
+          selector === '[role="tab"][aria-selected="true"]' ||
+          selector === '[role="tab"][aria-checked="true"]' ||
+          selector === '[role="tab"][data-selected="true"]' ||
+          selector === '[role="tab"][aria-current="page"]' ||
+          selector === '.ant-tabs-tab-active' ||
+          selector === '.el-tabs__item.is-active' ||
+          selector === '.is-active[role="tab"]'
+        )
+      ) {
+        return [tabNode];
+      }
+      if (options && options.topDateRangeText && /date/i.test(String(selector || ''))) {
+        return [dateNode];
+      }
+      return [];
     }
   };
 }
@@ -112,10 +222,31 @@ function run() {
       assertClose(row.ad_spend_amount, 1234.56, 'ad_spend_amount');
       assertEqual(row.ad_spend_currency, 'USD', 'ad_spend_currency');
       assertClose(row.gmv_amount, 12345678, 'gmv_amount');
-      assertEqual(row.gmv_currency, 'VND', 'gmv_currency');
+      assertEqual(row.gmv_currency, 'USD', 'gmv_currency');
       assertEqual(row.order_count, 321, 'order_count');
     }
   );
+
+  (function runAvatarAltStoreCase() {
+    const html = `
+      <div class="p-avatar-image">
+        <img src="https://p16-oec-va.ibyteimg.com/test.jpeg" alt="Banano VN" />
+      </div>
+      <div data-testid="account-name">GMV MAX US 01</div>
+      <div>Date: 2026-04-18</div>
+      <div>Ad spend: USD 100</div>
+      <div>GMV: USD 300</div>
+      <div>SKU orders: 12</div>
+    `;
+    const captured = parser.captureFromDocument(makeDoc(html), 'https://ads.tiktok.com/report/overview');
+    if (!captured || !captured.row) {
+      throw new Error('avatar alt capture row empty');
+    }
+    assertEqual(captured.row.store_ref, 'Banano VN', 'store_ref from avatar alt');
+    assertEqual(captured.row.account_ref, 'GMV MAX US 01', 'account_ref from testid');
+    assertEqual(captured.row.order_count, 12, 'order_count from sku orders');
+    console.log('OK: store name from avatar alt');
+  })();
 
   runCase(
     'shop dashboard vnd',
@@ -149,6 +280,121 @@ function run() {
       assertEqual(row.order_count, 66, 'order_count');
     }
   );
+
+  (function runCampaignAggregateCase() {
+    const doc = makeTableDoc({
+      storeRef: 'VN Jewelry Shop',
+      accountRef: 'GMV MAX US 01',
+      headers: ['Campaign', 'Ad Spend', 'GMV', 'Orders', 'ROI'],
+      rows: [
+        ['Product GMV Max / A', 'USD $100', 'USD $350', '10', '3.5'],
+        ['Product GMV Max / B', 'USD $200', 'USD $600', '20', '3.0'],
+        ['LIVE GMV Max / A', 'USD $80', 'USD $240', '8', '3.0'],
+        ['LIVE GMV Max / B', 'USD $120', 'USD $420', '12', '3.5']
+      ],
+      bodyText: 'Date: 2026-04-18 Product GMV Max LIVE GMV Max'
+    });
+    const captured = parser.captureFromDocument(doc, 'https://ads.tiktok.com/report/campaign');
+    if (!captured || !Array.isArray(captured.rows)) {
+      throw new Error('campaign aggregate rows empty');
+    }
+    assertEqual(captured.rows.length, 2, 'campaign aggregate row count');
+
+    const video = captured.rows.find((r) => r.channel_type === 'video');
+    const live = captured.rows.find((r) => r.channel_type === 'live');
+    if (!video || !live) {
+      throw new Error('campaign aggregate missing video/live rows');
+    }
+
+    assertClose(video.ad_spend_amount, 300, 'video ad spend');
+    assertClose(video.gmv_amount, 950, 'video gmv');
+    assertEqual(video.order_count, 30, 'video orders');
+    assertEqual(video.ad_spend_currency, 'USD', 'video ad currency');
+    assertEqual(video.gmv_currency, 'USD', 'video gmv currency');
+    assertClose(video.roi_value, 3.166667, 'video roi', 0.00001);
+    assertEqual(Number((video.raw_metrics_json || {}).campaign_count || 0), 2, 'video campaign count');
+
+    assertClose(live.ad_spend_amount, 200, 'live ad spend');
+    assertClose(live.gmv_amount, 660, 'live gmv');
+    assertEqual(live.order_count, 20, 'live orders');
+    assertEqual(live.ad_spend_currency, 'USD', 'live ad currency');
+    assertEqual(live.gmv_currency, 'USD', 'live gmv currency');
+    assertClose(live.roi_value, 3.3, 'live roi', 0.00001);
+    assertEqual(Number((live.raw_metrics_json || {}).campaign_count || 0), 2, 'live campaign count');
+
+    console.log('OK: campaign aggregate by channel');
+  })();
+
+  (function runTabAndTopDateCase() {
+    const doc = makeTableDoc({
+      storeRef: 'VN Jewelry Shop',
+      accountRef: 'xRgrSUUE0122Primary',
+      selectedTabText: 'LIVE GMV Max',
+      topDateRangeText: '2026-04-18 - 2026-04-18',
+      headers: ['Campaign', 'Cost', 'GMV', 'SKU orders'],
+      rows: [
+        ['Series A', 'USD 120.29', 'USD 360.87', '187'],
+        ['Series B', 'USD 80.00', 'USD 200.00', '45']
+      ],
+      bodyText: 'Date: 2026-02-02 LIVE GMV Max'
+    });
+    const captured = parser.captureFromDocument(doc, 'https://ads.tiktok.com/report/campaign');
+    if (!captured || !captured.row) {
+      throw new Error('tab/date capture empty');
+    }
+    const row = captured.row;
+    assertEqual(row.entry_date, '2026-04-18', 'top date from range');
+    assertEqual(row.channel_type, 'live', 'channel from selected tab');
+    assertClose(row.order_count, 232, 'sku orders aggregate', 0.001);
+    assertEqual(row.ad_spend_currency, 'USD', 'tab/date ad currency');
+    assertEqual(row.gmv_currency, 'USD', 'tab/date gmv currency');
+    console.log('OK: selected tab + top date + sku orders');
+  })();
+
+  (function runTabSkuNoOverrideCase() {
+    const doc = makeTableDoc({
+      storeRef: 'VN Jewelry Shop',
+      accountRef: 'xRgrSUUE0122Primary',
+      selectedTabText: 'LIVE GMV Max',
+      topDateRangeText: '2026-04-18 - 2026-04-18',
+      headers: ['Campaign', 'Cost', 'GMV', 'SKU orders'],
+      rows: [
+        ['Series A', 'USD 120.29', 'USD 360.87', '187'],
+        ['Series B', 'USD 80.00', 'USD 200.00', '45']
+      ],
+      bodyText: 'Date: 2026-02-02 LIVE GMV Max SKU orders 999'
+    });
+    const captured = parser.captureFromDocument(doc, 'https://ads.tiktok.com/report/campaign');
+    if (!captured || !captured.row) {
+      throw new Error('tab sku no override capture empty');
+    }
+    const row = captured.row;
+    assertEqual(row.channel_type, 'live', 'no override channel');
+    assertClose(row.order_count, 232, 'no override keep table sku orders', 0.001);
+    console.log('OK: selected tab sku orders no fallback override');
+  })();
+
+  (function runTabNoDataZeroCase() {
+    const doc = makeTableDoc({
+      storeRef: 'VN Jewelry Shop',
+      accountRef: 'GMV MAX US 01',
+      selectedTabText: 'LIVE GMV Max',
+      topDateRangeText: '2026-04-18 - 2026-04-18',
+      headers: [],
+      rows: [],
+      bodyText: 'Date: 2026-04-18 No data available Ad spend: USD 999.99 GMV: USD 3333.33 SKU orders: 88'
+    });
+    const captured = parser.captureFromDocument(doc, 'https://ads.tiktok.com/report/overview');
+    if (!captured || !captured.row) {
+      throw new Error('tab no data zero capture empty');
+    }
+    const row = captured.row;
+    assertEqual(row.channel_type, 'live', 'tab no data channel');
+    assertEqual(Number(row.ad_spend_amount || 0), 0, 'tab no data ad spend must be zero');
+    assertEqual(Number(row.gmv_amount || 0), 0, 'tab no data gmv must be zero');
+    assertEqual(Number(row.order_count || 0), 0, 'tab no data orders must be zero');
+    console.log('OK: selected tab no data returns zero row');
+  })();
 
   console.log('All parser tests passed.');
 }

@@ -609,14 +609,14 @@
   .pc-summary-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 12px;
+    gap: 16px;
+    margin-top: 14px;
   }
 
   .pc-summary-card {
     border: 1px solid #edf1f6;
     border-radius: 12px;
-    padding: 12px;
+    padding: 14px 16px;
     background: #fff;
   }
 
@@ -624,11 +624,11 @@
     font-size: 18px;
     font-weight: 700;
     color: #53617a;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
 
   .pc-summary-table .el-table__cell {
-    padding: 14px 16px !important;
+    padding: 12px 12px !important;
   }
 
   .pc-summary-table th.el-table__cell {
@@ -643,7 +643,22 @@
   }
 
   .pc-summary-table .cell {
-    line-height: 1.5;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pc-summary-table th.el-table__cell .cell {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .pc-summary-num {
+    display: inline-block;
+    width: 100%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 
   .pc-modal-overlay {
@@ -2811,28 +2826,30 @@
           <div class="pc-summary-card">
             <div class="pc-summary-title">{{ tt('page.profitCenter.byStore') }}</div>
             <el-table class="pc-summary-table" :data="summary.by_store" size="default" max-height="260">
-              <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="120" />
-              <el-table-column :label="tt('page.profitCenter.colNetProfit')" width="120">
-                <template #default="{row}">¥{{ formatMoney(row.net_profit_cny) }}</template>
+              <el-table-column prop="store_name" :label="tt('page.profitCenter.colStore')" min-width="180" show-overflow-tooltip />
+              <el-table-column :label="tt('page.profitCenter.colNetProfit')" min-width="170" align="right">
+                <template #default="{row}"><span class="pc-summary-num">¥{{ formatMoney(row.net_profit_cny) }}</span></template>
               </el-table-column>
-              <el-table-column :label="tt('page.profitCenter.kpiAdSpend')" width="120">
-                <template #default="{row}">¥{{ formatMoney(row.ad_spend_cny) }}</template>
+              <el-table-column :label="tt('page.profitCenter.kpiAdSpend')" min-width="170" align="right">
+                <template #default="{row}"><span class="pc-summary-num">¥{{ formatMoney(row.ad_spend_cny) }}</span></template>
               </el-table-column>
-              <el-table-column :label="tt('page.profitCenter.kpiGmv')" width="120">
-                <template #default="{row}">¥{{ formatMoney(row.gmv_cny) }}</template>
+              <el-table-column :label="tt('page.profitCenter.kpiGmv')" min-width="170" align="right">
+                <template #default="{row}"><span class="pc-summary-num">¥{{ formatMoney(row.gmv_cny) }}</span></template>
               </el-table-column>
             </el-table>
           </div>
           <div class="pc-summary-card">
             <div class="pc-summary-title">{{ tt('page.profitCenter.byChannel') }}</div>
             <el-table class="pc-summary-table" :data="summary.by_channel" size="default" max-height="260">
-              <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" min-width="120" />
-              <el-table-column :label="tt('page.profitCenter.colNetProfit')" width="120">
-                <template #default="{row}">¥{{ formatMoney(row.net_profit_cny) }}</template>
+              <el-table-column prop="channel_label" :label="tt('page.profitCenter.colChannel')" min-width="140" show-overflow-tooltip />
+              <el-table-column :label="tt('page.profitCenter.colNetProfit')" min-width="170" align="right">
+                <template #default="{row}"><span class="pc-summary-num">¥{{ formatMoney(row.net_profit_cny) }}</span></template>
               </el-table-column>
-              <el-table-column prop="order_count" :label="tt('page.profitCenter.colOrders')" width="96" />
-              <el-table-column :label="tt('page.profitCenter.kpiAvgRoi')" width="120">
-                <template #default="{row}">{{ formatRoi(row.avg_roi) }}</template>
+              <el-table-column :label="tt('page.profitCenter.colOrders')" min-width="120" align="right">
+                <template #default="{row}"><span class="pc-summary-num">{{ Number(row.order_count || 0) }}</span></template>
+              </el-table-column>
+              <el-table-column :label="tt('page.profitCenter.kpiAvgRoi')" min-width="130" align="right">
+                <template #default="{row}"><span class="pc-summary-num">{{ formatRoi(row.avg_roi) }}</span></template>
               </el-table-column>
             </el-table>
           </div>

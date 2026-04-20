@@ -3038,3 +3038,54 @@
 - `php -l`：通过（插件相关后端文件）。
 - `node scripts/profit_plugin_parser_test.js`：通过（3 组页面快照）。
 - `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`：通过。
+
+## 19. TikTok Profit Plugin Aggregation Update (2026-04-19)
+
+### 19.1 Scope
+- Browser plugin now supports campaign-level aggregation on TikTok Ads pages.
+- Channel mapping rule:
+  - `Product GMV Max` -> `video`
+  - `LIVE GMV Max` -> `live`
+
+### 19.2 Data Rules
+- For Ads pages, plugin aggregates multiple campaign rows by channel and sends totals.
+- Aggregated metrics: `ad_spend_amount`, `gmv_amount`, `order_count`, `total_roi`.
+- Currency rule on Ads pages: `gmv_currency` must equal `ad_spend_currency`.
+- Plugin sends `raw_metrics_json` with `capture_mode`, `campaign_count`, and `total_roi`.
+
+### 19.3 Backend Ingest
+- `preparePluginRowPayload()` now accepts and persists plugin `raw_metrics_json` / `raw_metrics` when provided.
+- If source page is Ads (`ads.tiktok.com`), backend enforces `gmv_currency = ad_spend_currency`.
+
+### 19.4 Validation
+- Parser test: `node scripts/profit_plugin_parser_test.js`.
+- Syntax checks:
+  - `node --check tools/browser_plugin/profit_center_capture/shared/parser.js`
+  - `node --check tools/browser_plugin/profit_center_capture/popup.js`
+  - `php -l app/controller/admin/ProfitCenter.php`
+- Smoke test: `powershell -ExecutionPolicy Bypass -File scripts/profit_center_smoke.ps1`.
+
+### 19.5 Parser Precision Fix (2026-04-19)
+- Plugin date extraction now prioritizes the top date-range control and uses the range start date as `entry_date`.
+- Channel selection now follows active tab first:
+  - `Product GMV Max` => `video`
+  - `LIVE GMV Max` => `live`
+- Orders extraction strengthened:
+  - supports `SKU orders` header in table/role-grid aggregation
+  - adds `sku orders` keyword fallback in text parsing.
+
+### 19.6 Profit Plugin SKU Orders Backend Compatibility (2026-04-19)
+- Profit plugin ingest now treats the following fields as order quantity aliases and writes them into `order_count`:
+  - `order_count`
+  - `sku_orders`
+  - `sku_order_count`
+  - `orders_count`
+- If those fields are absent, backend will also try `raw_metrics_json.total_orders` / `order_count` / `sku_orders`.
+- Browser plugin preview table header is updated to `SKU orders` to align with TikTok Ads terminology.
+- Store name extraction now supports avatar image alt text, e.g. `.p-avatar-image img[alt="Banano VN"]` -> `store_ref=Banano VN`.
+- Popup UX improved: row-level duplicate action, stronger table readability, and batch-date expansion for one-time multi-date submit.
+- Batch-date supports:
+  - newline/comma list: `2026-04-18, 2026-04-19`
+  - range syntax: `2026-04-01~2026-04-07`
+- Tab-safe zero rule:
+  - when `LIVE/Product` tab is selected but tab-level rows are unavailable/no-data, plugin returns zero metrics instead of using overview totals.

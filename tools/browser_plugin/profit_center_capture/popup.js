@@ -23,6 +23,9 @@
     captureBtn: document.getElementById('captureBtn'),
     addRowBtn: document.getElementById('addRowBtn'),
     clearRowsBtn: document.getElementById('clearRowsBtn'),
+    batchDatesInput: document.getElementById('batchDatesInput'),
+    expandByDatesBtn: document.getElementById('expandByDatesBtn'),
+    clearBatchDatesBtn: document.getElementById('clearBatchDatesBtn'),
     submitBtn: document.getElementById('submitBtn'),
     connectBadge: document.getElementById('connectBadge'),
     statusBar: document.getElementById('statusBar'),
@@ -71,8 +74,83 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  function dateToText(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function parseDateText(dateText) {
+    const normalized = normalizeDate(dateText);
+    if (!normalized) return null;
+    const dt = new Date(`${normalized}T00:00:00`);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+
+  function enumerateDateRange(startText, endText) {
+    const start = parseDateText(startText);
+    const end = parseDateText(endText);
+    if (!start || !end) return [];
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    if (startTime > endTime) return [];
+
+    const list = [];
+    const cursor = new Date(startTime);
+    while (cursor.getTime() <= endTime) {
+      list.push(dateToText(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+      if (list.length > 370) break;
+    }
+    return list;
+  }
+
+  function parseBatchDatesInput(rawText) {
+    const source = String(rawText || '').trim();
+    if (!source) return [];
+    const segments = source
+      .split(/[\n,，;；]+/)
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+
+    const result = [];
+    const seen = new Set();
+    segments.forEach((segment) => {
+      const rangeMatch = segment.match(/^(.+?)\s*(?:~|至|to)\s*(.+)$/i);
+      const picked = rangeMatch
+        ? enumerateDateRange(rangeMatch[1], rangeMatch[2])
+        : [normalizeDate(segment)];
+      picked.forEach((dateText) => {
+        const normalized = normalizeDate(dateText);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        result.push(normalized);
+      });
+    });
+    return result;
+  }
+
   function lowerTrim(text) {
     return String(text || '').trim().toLowerCase();
+  }
+
+  function normalizeRawMetrics(raw) {
+    if (raw == null || raw === '') return null;
+    if (typeof raw === 'object' && !Array.isArray(raw)) {
+      return Object.assign({}, raw);
+    }
+    if (typeof raw === 'string') {
+      const text = raw.trim();
+      if (!text) return null;
+      try {
+        const decoded = JSON.parse(text);
+        if (decoded && typeof decoded === 'object' && !Array.isArray(decoded)) {
+          return decoded;
+        }
+      } catch (_) {
+        return { raw_text: text.slice(0, 1000) };
+      }
+    }
+    return null;
   }
 
   function storageGet(key) {
@@ -262,20 +340,45 @@
       gmv_amount: '',
       gmv_currency: 'VND',
       order_count: '',
+      roi_value: '',
+      page_type: '',
+      raw_metrics_json: null,
       source_page: '',
       status: '',
       message: ''
     };
   }
 
+  function rowUniqueKey(row) {
+    const date = normalizeDate(row.entry_date || '');
+    const store = String(row.store_id || row.store_ref || '').trim().toLowerCase();
+    const account = String(row.account_id || row.account_ref || '').trim().toLowerCase();
+    const channel = String(row.channel_type || 'video').trim().toLowerCase();
+    return [date, store, account, channel].join('|');
+  }
+
+  function cloneRowWithDate(sourceRow, dateText) {
+    const cloned = Object.assign(rowDefaults(), sourceRow, {
+      id: state.seq++,
+      entry_date: dateText,
+      status: '',
+      message: ''
+    });
+    return cloned;
+  }
+
   function fillCurrencyByAccount(row) {
     const account = accountById(row.account_id);
-    if (!account) return;
-    if (!row.ad_spend_currency) {
-      row.ad_spend_currency = String(account.account_currency || 'USD').toUpperCase();
+    if (account) {
+      if (!row.ad_spend_currency) {
+        row.ad_spend_currency = String(account.account_currency || 'USD').toUpperCase();
+      }
+      if (!row.gmv_currency) {
+        row.gmv_currency = String(account.default_gmv_currency || 'VND').toUpperCase();
+      }
     }
-    if (!row.gmv_currency) {
-      row.gmv_currency = String(account.default_gmv_currency || 'VND').toUpperCase();
+    if (String(row.page_type || '').toLowerCase() === 'ad' && row.ad_spend_currency) {
+      row.gmv_currency = String(row.ad_spend_currency || '').toUpperCase();
     }
   }
 
@@ -290,6 +393,9 @@
       gmv_amount: raw.gmv_amount == null ? '' : String(raw.gmv_amount),
       gmv_currency: String(raw.gmv_currency || '').toUpperCase() || 'VND',
       order_count: raw.order_count == null ? '' : String(raw.order_count),
+      roi_value: raw.roi_value == null ? '' : String(raw.roi_value),
+      page_type: String(raw.page_type || '').trim().toLowerCase(),
+      raw_metrics_json: normalizeRawMetrics(raw.raw_metrics_json || raw.raw_metrics || null),
       source_page: String(raw.source_page || '').trim()
     });
 
@@ -396,7 +502,10 @@
           <td><input type="number" step="1" min="0" data-field="order_count" value="${escapeHtml(row.order_count)}" /></td>
           <td class="pcp-source" title="${escapeHtml(row.source_page)}">${escapeHtml(row.source_page)}</td>
           <td><span class="pcp-row-status ${statusClass}">${escapeHtml(statusText)}</span></td>
-          <td><button type="button" class="btn-link-danger" data-action="delete-row">删除</button></td>
+          <td>
+            <button type="button" class="btn-link" data-action="duplicate-row">复制</button>
+            <button type="button" class="btn-link-danger" data-action="delete-row">删除</button>
+          </td>
         </tr>`;
     }).join('');
 
@@ -408,9 +517,11 @@
     const invalid = state.rows.filter((row) => validateRow(row) !== '').length;
     const success = state.rows.filter((row) => row.status === 'ok').length;
     const failed = state.rows.filter((row) => row.status === 'fail').length;
+    const uniqueDates = new Set(state.rows.map((row) => normalizeDate(row.entry_date)).filter(Boolean)).size;
 
     refs.summaryBar.innerHTML = [
       `<div class="pcp-summary-item"><span>预览行数</span><strong>${total}</strong></div>`,
+      `<div class="pcp-summary-item"><span>覆盖日期</span><strong>${uniqueDates}</strong></div>`,
       `<div class="pcp-summary-item"><span>待修正</span><strong>${invalid}</strong></div>`,
       `<div class="pcp-summary-item"><span>最近成功</span><strong>${success}</strong></div>`,
       `<div class="pcp-summary-item"><span>最近失败</span><strong>${failed}</strong></div>`
@@ -452,8 +563,9 @@
     const adAmount = row.ad_spend_amount === '' ? null : Number(row.ad_spend_amount);
     const gmvAmount = row.gmv_amount === '' ? null : Number(row.gmv_amount);
     const orderCount = row.order_count === '' ? null : Number(row.order_count);
+    const roiValue = row.roi_value === '' ? null : Number(row.roi_value);
 
-    return {
+    const payload = {
       entry_date: normalizeDate(row.entry_date),
       store_ref: String(row.store_id || row.store_ref || '').trim(),
       account_ref: String(row.account_id || row.account_ref || '').trim(),
@@ -465,6 +577,22 @@
       order_count: Number.isFinite(orderCount) ? Math.floor(orderCount) : null,
       source_page: String(row.source_page || '').trim()
     };
+
+    if (String(row.page_type || '').toLowerCase() === 'ad' && payload.ad_spend_currency) {
+      payload.gmv_currency = payload.ad_spend_currency;
+    }
+
+    const rawMetrics = normalizeRawMetrics(row.raw_metrics_json);
+    if (rawMetrics) {
+      if (Number.isFinite(roiValue)) {
+        rawMetrics.total_roi = roiValue;
+      }
+      payload.raw_metrics_json = rawMetrics;
+    } else if (Number.isFinite(roiValue)) {
+      payload.raw_metrics_json = { total_roi: roiValue };
+    }
+
+    return payload;
   }
 
   function buildUrl(path) {
@@ -564,16 +692,35 @@
       setStatus('正在抓取当前页面...', '');
       const tab = await queryActiveTab();
       const result = await sendToTab(tab.id, { type: 'profit_plugin_capture' });
-      if (!result || !result.ok || !result.row) {
+      if (!result || !result.ok || (!Array.isArray(result.rows) && !result.row)) {
         throw new Error(result && result.error ? result.error : 'capture_failed');
       }
-      const row = normalizeCapturedRow(result.row);
-      if (!row.source_page && tab.url) {
-        row.source_page = String(tab.url);
+
+      const rawRows = Array.isArray(result.rows) && result.rows.length > 0
+        ? result.rows
+        : [result.row];
+      const normalizedRows = rawRows
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => normalizeCapturedRow(item));
+
+      if (normalizedRows.length === 0) {
+        throw new Error('empty_capture');
       }
-      state.rows.unshift(row);
+
+      for (let i = normalizedRows.length - 1; i >= 0; i -= 1) {
+        const row = normalizedRows[i];
+        if (!row.source_page && tab.url) {
+          row.source_page = String(tab.url);
+        }
+        state.rows.unshift(row);
+      }
+
       renderAll();
-      setStatus('抓取成功，已加入预览列表', 'success');
+      if (normalizedRows.length > 1) {
+        setStatus(`抓取成功，已加入 ${normalizedRows.length} 行汇总数据`, 'success');
+      } else {
+        setStatus('抓取成功，已加入预览列表', 'success');
+      }
     } catch (err) {
       setStatus(`抓取失败：${err && err.message ? err.message : 'unknown'}`, 'error');
     } finally {
@@ -591,6 +738,40 @@
     renderAll();
     refs.resultBox.textContent = '暂无提交记录';
     setStatus('已清空预览行', 'success');
+  }
+
+  function expandRowsByDates() {
+    const dates = parseBatchDatesInput(refs.batchDatesInput && refs.batchDatesInput.value);
+    if (dates.length === 0) {
+      setStatus('请先输入有效日期，示例：2026-04-18 或 2026-04-01~2026-04-07', 'error');
+      return;
+    }
+    if (state.rows.length === 0) {
+      setStatus('请先抓取至少一行，再按日期扩展', 'error');
+      return;
+    }
+
+    const keySet = new Set(state.rows.map((row) => rowUniqueKey(row)));
+    const snapshots = state.rows.slice();
+    const added = [];
+    snapshots.forEach((row) => {
+      dates.forEach((dateText) => {
+        const key = [dateText, String(row.store_id || row.store_ref || '').trim().toLowerCase(), String(row.account_id || row.account_ref || '').trim().toLowerCase(), String(row.channel_type || 'video').trim().toLowerCase()].join('|');
+        if (keySet.has(key)) return;
+        const cloned = cloneRowWithDate(row, dateText);
+        added.push(cloned);
+        keySet.add(key);
+      });
+    });
+
+    if (added.length === 0) {
+      setStatus('没有新增行（可能这些日期已存在）', 'success');
+      return;
+    }
+
+    state.rows = added.concat(state.rows);
+    renderAll();
+    setStatus(`已按日期新增 ${added.length} 行，可一次性提交`, 'success');
   }
 
   function updateRowField(row, field, value) {
@@ -630,6 +811,11 @@
     }
 
     if (field === 'channel_type' || field.endsWith('_currency')) {
+      if (field === 'ad_spend_currency' && String(row.page_type || '').toLowerCase() === 'ad') {
+        row.gmv_currency = String(row.ad_spend_currency || '').toUpperCase();
+        renderAll();
+        return;
+      }
       renderSummary();
     }
   }
@@ -740,18 +926,38 @@
       clearRows();
     });
 
+    refs.expandByDatesBtn.addEventListener('click', () => {
+      expandRowsByDates();
+    });
+
+    refs.clearBatchDatesBtn.addEventListener('click', () => {
+      if (refs.batchDatesInput) refs.batchDatesInput.value = '';
+      setStatus('已清空批量日期', 'success');
+    });
+
     refs.submitBtn.addEventListener('click', () => {
       submitRows();
     });
 
     refs.rowsBody.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-action="delete-row"]');
+      const button = event.target.closest('[data-action]');
       if (!button) return;
       const tr = event.target.closest('tr[data-id]');
       if (!tr) return;
       const id = Number(tr.getAttribute('data-id') || 0);
-      state.rows = state.rows.filter((row) => Number(row.id) !== id);
-      renderAll();
+      const action = String(button.getAttribute('data-action') || '');
+      if (action === 'delete-row') {
+        state.rows = state.rows.filter((row) => Number(row.id) !== id);
+        renderAll();
+        return;
+      }
+      if (action === 'duplicate-row') {
+        const target = rowById(id);
+        if (!target) return;
+        const cloned = cloneRowWithDate(target, normalizeDate(target.entry_date) || todayText());
+        state.rows.unshift(cloned);
+        renderAll();
+      }
     });
 
     refs.rowsBody.addEventListener('change', (event) => {

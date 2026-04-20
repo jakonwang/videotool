@@ -19,13 +19,16 @@
     }
 
     const captured = window.ProfitPluginParser.captureFromDocument(document, window.location.href);
-    if (!captured || !captured.row) {
+    const rows = Array.isArray(captured && captured.rows) ? captured.rows.filter((item) => item && typeof item === 'object') : [];
+    const primaryRow = captured && captured.row ? captured.row : (rows.length > 0 ? rows[0] : null);
+    if (!captured || !primaryRow) {
       throw new Error('empty_capture');
     }
 
     return {
       ok: true,
-      row: captured.row,
+      row: primaryRow,
+      rows: rows.length > 0 ? rows : [primaryRow],
       debug: captured.debug || {}
     };
   }
