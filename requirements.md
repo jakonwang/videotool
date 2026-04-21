@@ -3236,3 +3236,37 @@
 ### Windows Dev / Linux Deploy
 - No OS-specific path dependency added.
 - Same API contract works on Windows development and Linux deployment.
+
+## 2026-04-21 Desktop Agent Program (Auto Send on PC)
+
+### Scope
+- New runtime tool: `tools/desktop_agent/agent.py`
+- Purpose: run Auto DM task execution directly on desktop (Windows/Linux).
+
+### Capabilities
+- Pull task from `POST /admin.php/desktop_agent/pull_auto`.
+- Auto open chat page by channel (`wa` / `zalo`).
+- Auto input rendered text and optionally press Enter to send.
+- Report result to `POST /admin.php/desktop_agent/report_auto`.
+- Persist browser login/profile via `runtime/desktop_agent/browser_profile`.
+
+### Runtime Config
+- Required env:
+  - `DESKTOP_AGENT_ADMIN_BASE`
+  - `DESKTOP_AGENT_TOKEN`
+  - `DESKTOP_AGENT_DEVICE_CODE`
+- Optional env:
+  - `DESKTOP_AGENT_BROWSER_CHANNEL` (`msedge` default)
+  - `DESKTOP_AGENT_HEADLESS`
+  - `DESKTOP_AGENT_SEND_ENTER`
+  - `DESKTOP_AGENT_TASK_TYPES`
+  - `DESKTOP_AGENT_DRY_RUN`
+
+### Files
+- `tools/desktop_agent/agent.py`
+- `tools/desktop_agent/requirements.txt`
+- `tools/desktop_agent/README.md`
+
+### Usage Notes
+- First run requires login on WhatsApp Web / Zalo Web in persistent browser profile.
+- If Zalo input selector changes, task reports failed with clear error for retry.
