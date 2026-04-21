@@ -1193,8 +1193,12 @@ class ProductSearchLive extends BaseController
             $buildMetricsQuery = function (?int $sid = null) use ($tenantId, $styleCandidates, $dateFrom, $dateTo) {
                 $q = Db::name('growth_live_product_metrics')
                     ->where('tenant_id', $tenantId)
-                    ->where('is_matched', 1)
-                    ->whereIn('catalog_style_code', $styleCandidates);
+                    ->where(function ($w) use ($styleCandidates) {
+                        $w->whereIn('catalog_style_code', $styleCandidates)
+                            ->whereOr(function ($w2) use ($styleCandidates) {
+                                $w2->where('is_matched', 0)->whereIn('extracted_style_code', $styleCandidates);
+                            });
+                    });
                 if ($sid !== null && $sid > 0) {
                     $q->where('store_id', $sid);
                 }

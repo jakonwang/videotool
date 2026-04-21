@@ -778,6 +778,7 @@ class LiveStyleAnalysisService
             if (
                 $this->snapshotNeedsPayCvrRepair($scope, $storeKey, $windowType, $anchorDate, $sessionKey)
                 || $this->snapshotNeedsHashStyleRepair($scope, $storeKey, $windowType, $anchorDate, $sessionKey)
+                || $this->snapshotNeedsSessionCountRepair($scope, $storeKey, $windowType, $anchorDate, $sessionKey)
             ) {
                 if ($scope === self::SCOPE_STORE) {
                     $this->rebuildSnapshotsForAnchor($storeId, $anchorDate, $anchorSessionId);
@@ -833,7 +834,7 @@ class LiveStyleAnalysisService
                 ' . $styleExpr . ' as style_code,
                 MAX(NULLIF(m.image_url, "")) as image_url,
                 COUNT(*) as product_count,
-                COUNT(DISTINCT m.session_id) as session_count,
+                COUNT(DISTINCT CONCAT(IFNULL(m.session_date, ""), "#", IFNULL(m.session_name, ""))) as session_count,
                 COALESCE(SUM(m.gmv),0) as gmv_sum,
                 COALESCE(SUM(m.impressions),0) as impressions_sum,
                 COALESCE(SUM(m.clicks),0) as clicks_sum,
@@ -1763,6 +1764,53 @@ class LiveStyleAnalysisService
             ->count();
 
         return $actualHashStyles <= 0;
+    }
+
+    private function snapshotNeedsSessionCountRepair(
+        string $scope,
+        int $storeId,
+        string $windowType,
+        string $anchorDate,
+        int $anchorSessionId
+    ): bool {
+        if ($windowType === self::WINDOW_SESSION) {
+            return false;
+        }
+
+        [$windowStart, $windowEnd] = $this->resolveWindowRange($windowType, $anchorDate);
+        if ($windowEnd === '') {
+            return false;
+        }
+
+        $metrics = Db::name('growth_live_product_metrics')->alias('m')
+            ->where('m.tenant_id', $this->tenantId);
+        if ($scope === self::SCOPE_STORE) {
+            $metrics->where('m.store_id', $storeId);
+        }
+        if ($windowType === self::WINDOW_ALL) {
+            $metrics->where('m.session_date', '<=', $windowEnd);
+        } else {
+            $metrics->where('m.session_date', '>=', $windowStart)->where('m.session_date', '<=', $windowEnd);
+        }
+        $metrics->whereRaw("(TRIM(IFNULL(m.catalog_style_code, '')) <> '' OR TRIM(IFNULL(m.extracted_style_code, '')) <> '')");
+
+        $expectedSessions = (int) $metrics
+            ->fieldRaw('COUNT(DISTINCT CONCAT(IFNULL(m.session_date, ""), "#", IFNULL(m.session_name, ""))) AS c')
+            ->value('c');
+        if ($expectedSessions <= 1) {
+            return false;
+        }
+
+        $maxSnapshotSessionCount = (int) Db::name('growth_live_style_agg')
+            ->where('tenant_id', $this->tenantId)
+            ->where('scope', $scope)
+            ->where('store_id', $storeId)
+            ->where('window_type', $windowType)
+            ->where('window_end', $anchorDate)
+            ->where('anchor_session_id', $anchorSessionId)
+            ->max('session_count');
+
+        return $maxSnapshotSessionCount <= 1;
     }
 
     private function normalizeScope(string $scope): string
