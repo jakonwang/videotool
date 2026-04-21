@@ -9,6 +9,7 @@
   var reactive = Vue.reactive;
   var ref = Vue.ref;
   var computed = Vue.computed;
+  var watch = Vue.watch;
   var onMounted = Vue.onMounted;
   var ElMessage = ElementPlus.ElMessage;
   var ElMessageBox = ElementPlus.ElMessageBox;
@@ -1168,6 +1169,13 @@
           await fetchUnmatched();
         }
         await fetchRankings();
+      });
+
+      watch(activeTab, function (tab) {
+        if (tab === 'ranking') {
+          ranking.page = 1;
+          fetchRankings();
+        }
       });
 
       return {

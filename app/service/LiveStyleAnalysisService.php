@@ -607,6 +607,30 @@ class LiveStyleAnalysisService
             ->order('ranking', 'asc');
 
         $total = (int) $query->count();
+        if ($total <= 0) {
+            // Fallback: when selected anchor has no snapshot rows, use latest anchor with data.
+            $fallbackDate = $this->latestAnchorDate($scope, $storeId);
+            if ($fallbackDate !== '' && $fallbackDate !== $resolvedDate) {
+                $fallbackSessionId = $window === self::WINDOW_SESSION
+                    ? ($sessionId > 0 ? $sessionId : $this->latestSessionId($scope, $storeId, $fallbackDate))
+                    : 0;
+                $this->ensureSnapshot($scope, $storeId, $window, $fallbackDate, $fallbackSessionId);
+
+                $resolvedDate = $fallbackDate;
+                $resolvedSessionId = $fallbackSessionId;
+                $anchorSessionKey = $window === self::WINDOW_SESSION ? $resolvedSessionId : 0;
+
+                $query = Db::name('growth_live_style_agg')
+                    ->where('tenant_id', $this->tenantId)
+                    ->where('scope', $scope)
+                    ->where('store_id', $storeKey)
+                    ->where('window_type', $window)
+                    ->where('window_end', $resolvedDate)
+                    ->where('anchor_session_id', $anchorSessionKey)
+                    ->order('ranking', 'asc');
+                $total = (int) $query->count();
+            }
+        }
         $rows = $query->page($page, $pageSize)->select()->toArray();
 
         $items = [];
