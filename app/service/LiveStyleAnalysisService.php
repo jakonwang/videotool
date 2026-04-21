@@ -813,7 +813,7 @@ class LiveStyleAnalysisService
                 COALESCE(SUM(m.add_to_cart_count),0) as add_to_cart_sum,
                 COALESCE(SUM(m.orders_count),0) as orders_sum
             ')
-            ->groupRaw($styleExpr)
+            ->group($styleExpr)
             ->select()
             ->toArray();
 
