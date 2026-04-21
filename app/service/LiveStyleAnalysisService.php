@@ -1524,6 +1524,14 @@ class LiveStyleAnalysisService
         if ($productName === '') {
             return '';
         }
+        // 连写款号：A139 / A01 / AB189
+        if (preg_match('/\b([A-Za-z]{1,12}\d{1,8})\b/u', $productName, $m)) {
+            return $this->normalizeStyleCode((string) ($m[1] ?? ''));
+        }
+        // 空格分隔款号：A 139 / AB 01
+        if (preg_match('/\b([A-Za-z]{1,12})\s+(\d{1,8})\b/u', $productName, $m)) {
+            return $this->normalizeStyleCode(((string) ($m[1] ?? '')) . '-' . ((string) ($m[2] ?? '')));
+        }
         if (preg_match('/\b([A-Za-z]{1,12})\s*[-_]\s*(\d{1,8})\b/u', $productName, $m)) {
             return $this->normalizeStyleCode(((string) ($m[1] ?? '')) . '-' . ((string) ($m[2] ?? '')));
         }
