@@ -3270,3 +3270,20 @@
 ### Usage Notes
 - First run requires login on WhatsApp Web / Zalo Web in persistent browser profile.
 - If Zalo input selector changes, task reports failed with clear error for retry.
+
+## 2026-04-21 Desktop Agent GUI Launcher (Windows)
+
+### Scope
+- New launcher UI: `tools/desktop_agent/desktop_agent_gui.py`
+- One-click run script: `tools/desktop_agent/run_gui.bat`
+- One-click packaging script: `tools/desktop_agent/build_windows_exe.ps1`
+
+### User Flow
+- Open GUI launcher.
+- Fill `admin_base`, `token`, `device_code` once and save.
+- Click `Start agent` to run desktop auto-DM without command-line env setup.
+- Log file is persisted in `tools/desktop_agent/runtime_gui/desktop_agent.log`.
+
+### Deploy Notes
+- Windows dev and Linux deploy remain compatible (agent core unchanged).
+- GUI launcher is optional wrapper; backend API remains unchanged.

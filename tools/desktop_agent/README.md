@@ -12,7 +12,9 @@
 
 ---
 
-## 1. 安装（Windows）
+## 1. 最简方式（Windows 图形启动器）
+
+第一次：
 
 ```powershell
 cd tools\desktop_agent
@@ -22,7 +24,30 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-## 2. 安装（Linux）
+之后每次双击：
+
+- `tools\desktop_agent\run_gui.bat`
+
+会打开一个小窗口，你只需要填：
+- `Admin base URL`
+- `Agent token`
+- `Device code`
+
+点 `Start agent` 即可运行。
+
+---
+
+## 2. 安装（Windows 命令行）
+
+```powershell
+cd tools\desktop_agent
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+python -m playwright install chromium
+```
+
+## 3. 安装（Linux）
 
 ```bash
 cd tools/desktop_agent
@@ -34,7 +59,7 @@ python -m playwright install chromium
 
 ---
 
-## 3. 环境变量
+## 4. 环境变量
 
 必填：
 - `DESKTOP_AGENT_ADMIN_BASE` 例如 `http://127.0.0.1/admin.php`
@@ -52,7 +77,7 @@ python -m playwright install chromium
 
 ---
 
-## 4. 启动（Windows）
+## 5. 启动（Windows）
 
 ```powershell
 set DESKTOP_AGENT_ADMIN_BASE=http://127.0.0.1/admin.php
@@ -64,7 +89,7 @@ set DESKTOP_AGENT_SEND_ENTER=1
 python tools\desktop_agent\agent.py
 ```
 
-## 5. 启动（Linux）
+## 6. 启动（Linux）
 
 ```bash
 export DESKTOP_AGENT_ADMIN_BASE="http://127.0.0.1/admin.php"
@@ -77,7 +102,19 @@ python3 tools/desktop_agent/agent.py
 
 ---
 
-## 6. 故障排查
+## 7. 打包为 EXE（Windows）
+
+```powershell
+cd tools\desktop_agent
+powershell -ExecutionPolicy Bypass -File .\build_windows_exe.ps1
+```
+
+输出：
+- `tools\desktop_agent\dist\TikStarDesktopAgentLauncher.exe`
+
+---
+
+## 8. 故障排查
 
 1. 返回 `non-json response`  
    检查 `DESKTOP_AGENT_ADMIN_BASE` 是否正确（必须指向 `/admin.php` 入口）。
@@ -90,4 +127,3 @@ python3 tools/desktop_agent/agent.py
 
 4. 任务一直 `empty_queue`  
    检查活动是否在运行状态，且设备/活动的执行端策略允许 desktop。
-
