@@ -775,7 +775,10 @@ class LiveStyleAnalysisService
             ->where('anchor_session_id', $sessionKey)
             ->count();
         if ($exists > 0) {
-            if ($this->snapshotNeedsPayCvrRepair($scope, $storeKey, $windowType, $anchorDate, $sessionKey)) {
+            if (
+                $this->snapshotNeedsPayCvrRepair($scope, $storeKey, $windowType, $anchorDate, $sessionKey)
+                || $this->snapshotNeedsHashStyleRepair($scope, $storeKey, $windowType, $anchorDate, $sessionKey)
+            ) {
                 if ($scope === self::SCOPE_STORE) {
                     $this->rebuildSnapshotsForAnchor($storeId, $anchorDate, $anchorSessionId);
                 } else {
@@ -1574,6 +1577,16 @@ class LiveStyleAnalysisService
         if ($raw === '') {
             return '';
         }
+        $raw = str_replace(['＃', '﹟', '⩬', '－', '—', '–', '_'], ['#', '#', '#', '-', '-', '-', '-'], $raw);
+        if (preg_match('/#\s*(\d{1,8})/u', $raw, $m)) {
+            return $this->normalizeHashStyleCode((string) ($m[1] ?? ''));
+        }
+        if (preg_match('/\b([A-Za-z]{1,12})\s*[-_ ]?\s*(\d{1,8})\b/u', $raw, $m)) {
+            return $this->normalizeStyleCode(((string) ($m[1] ?? '')) . '-' . ((string) ($m[2] ?? '')));
+        }
+        if (preg_match('/^\s*(\d{1,8})\s*$/u', $raw, $m)) {
+            return $this->normalizeHashStyleCode((string) ($m[1] ?? ''));
+        }
         if (preg_match('/^#\s*(\d{1,8})$/', $raw, $m)) {
             return $this->normalizeHashStyleCode((string) ($m[1] ?? ''));
         }
@@ -1699,6 +1712,57 @@ class LiveStyleAnalysisService
             ->find();
 
         return is_array($row) && (int) ($row['id'] ?? 0) > 0;
+    }
+
+    private function snapshotNeedsHashStyleRepair(
+        string $scope,
+        int $storeId,
+        string $windowType,
+        string $anchorDate,
+        int $anchorSessionId
+    ): bool {
+        [$windowStart, $windowEnd] = $this->resolveWindowRange($windowType, $anchorDate);
+        if ($windowEnd === '') {
+            return false;
+        }
+
+        $query = Db::name('growth_live_product_metrics')->alias('m')
+            ->where('m.tenant_id', $this->tenantId)
+            ->whereRaw("(TRIM(IFNULL(m.extracted_style_code, '')) REGEXP '^[#＃﹟⩬][[:space:]]*[0-9]{1,8}$' OR TRIM(IFNULL(m.extracted_style_code, '')) REGEXP '^[0-9]{1,8}$')");
+
+        if ($scope === self::SCOPE_STORE) {
+            $query->where('m.store_id', $storeId);
+        }
+
+        if ($windowType === self::WINDOW_SESSION) {
+            if ($anchorSessionId > 0) {
+                $query->where('m.session_id', $anchorSessionId);
+            } else {
+                $query->where('m.session_date', $anchorDate);
+            }
+        } elseif ($windowType === self::WINDOW_ALL) {
+            $query->where('m.session_date', '<=', $windowEnd);
+        } else {
+            $query->where('m.session_date', '>=', $windowStart)
+                ->where('m.session_date', '<=', $windowEnd);
+        }
+
+        $expectedHashRows = (int) $query->count();
+        if ($expectedHashRows <= 0) {
+            return false;
+        }
+
+        $actualHashStyles = (int) Db::name('growth_live_style_agg')
+            ->where('tenant_id', $this->tenantId)
+            ->where('scope', $scope)
+            ->where('store_id', $storeId)
+            ->where('window_type', $windowType)
+            ->where('window_end', $anchorDate)
+            ->where('anchor_session_id', $anchorSessionId)
+            ->whereLike('style_code', '#%')
+            ->count();
+
+        return $actualHashStyles <= 0;
     }
 
     private function normalizeScope(string $scope): string
