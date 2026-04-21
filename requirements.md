@@ -3089,3 +3089,69 @@
   - range syntax: `2026-04-01~2026-04-07`
 - Tab-safe zero rule:
   - when `LIVE/Product` tab is selected but tab-level rows are unavailable/no-data, plugin returns zero metrics instead of using overview totals.
+
+## 2026-04-20 Plugin Update: TikTok Creative Three-Stage Analyzer (Local Only)
+
+### Scope
+- Module: `tools/browser_plugin/profit_center_capture`
+- Upgraded local creative workflow to three-stage diagnosis + actionable optimization suggestions.
+- No backend schema/API change in this phase.
+
+### Behaviors
+- Parse GMV Max creative rows and extract `video_id`, title, account, status, and visible metrics.
+- Generate structured diagnosis for each creative:
+  - `hook_score`, `retention_score`, `conversion_score`
+  - `material_type` (`bad|potential|scale`)
+  - `problem_position` (`front_3s|middle|conversion_tail|multi_stage`)
+  - `continue_delivery` (`yes|no`), `core_conclusion`, `actions[]`, `confidence`
+- Page rendering rule:
+  - only render tags on rows that contain a Boost button
+  - tag style: `优秀款 / 观察中 / 垃圾素材 / 忽略` (el-tag style)
+- Popup panel:
+  - displays full diagnosis and allows manual override
+  - supports one-click export of exclude candidate `video_id` list
+- Persist decisions in browser local storage key: `profit_plugin_creative_opt_v1`.
+
+### Rule Set (Balanced Mode, VN GMV Max baseline)
+- Hook stage: weighted by `Product ad click rate + 2s view rate`.
+- Retention stage: weighted by `6s + 25% + 50% + 75% view rate`.
+- Conversion stage: weighted by `Ad conversion rate + ROI + Cost per order + SKU orders`.
+- Type mapping:
+  - `bad`: conversion stage low and learning threshold reached
+  - `potential`: at least one stage strong but not closed-loop
+  - `scale`: conversion high and hook/retention not below mid
+- Missing metrics:
+  - per-stage weighted fallback over available metrics
+  - if insufficient metrics, reduce confidence and avoid aggressive downgrade.
+
+### Message Protocol (plugin internal)
+- `profit_plugin_creative_scan`
+- `profit_plugin_creative_apply_labels`
+- `profit_plugin_creative_export_excludes`
+
+### Notes
+- Works in Windows development and Linux deployment (extension-side logic only).
+- Recommended column set: `ROI`, `SKU orders`, `Ad conversion rate`, `Product ad click rate`, `2s/6s/25/50/75% view rate`.
+- This phase does not perform automated click actions on TikTok UI; it only provides diagnosis, tagging, and copyable IDs.
+
+## 2026-04-21 Live Catalog Import: Remote Image URL Cloud Upload
+
+### Scope
+- Module: `/admin.php/product_search/live` catalog import flow.
+- Applies to store product catalog import when image column value is `http/https` URL.
+
+### Behavior
+- During catalog import, if image value is remote URL:
+  - fetch image to runtime temp file
+  - upload directly to cloud storage (Qiniu)
+  - delete temp file immediately
+  - persist cloud URL into `growth_store_product_catalog.image_url`
+- If cloud upload fails, keep original remote URL as fallback (import does not block).
+
+### Storage Impact
+- No persistent write to `public/uploads` for URL image import in this flow.
+- Only short-lived runtime temp file is used and removed after upload.
+
+### Compatibility
+- Windows development and Linux deployment are both supported.
+- If Qiniu is disabled, system keeps original URL and continues import.

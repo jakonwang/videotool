@@ -8,6 +8,7 @@ use app\model\GrowthStoreProductCatalog as GrowthStoreProductCatalogModel;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use think\facade\Db;
+use think\facade\Log;
 
 class LiveStyleAnalysisService
 {
@@ -96,6 +97,7 @@ class LiveStyleAnalysisService
             if ($this->isInvalidImageValue($imageUrl)) {
                 $imageUrl = '';
             }
+            $imageUrl = $this->normalizeAndUploadCatalogImageUrl($imageUrl, $storeId, $styleCode, $jobId);
             $notes = trim((string) $this->pickFirstValue($row, [
                 'notes',
                 'remark',
@@ -1085,18 +1087,24 @@ class LiveStyleAnalysisService
             }
 
             if ($imageUrl === '' && !$this->isInvalidImageValue($imageRaw)) {
-                $resolved = ProductStyleImportService::resolveImage($imageRaw, $publicRoot);
-                $resolvedTemp = trim((string) ($resolved['temp'] ?? ''));
-                if (($resolved['ok'] ?? false) && $resolvedTemp !== '' && is_file($resolvedTemp)) {
-                    $saved = ProductStyleImportService::saveImportImageToProductsDir($resolvedTemp, $publicRoot);
-                    if (is_string($saved) && $saved !== '') {
-                        $imageUrl = $saved;
+                $normalizedRaw = $this->normalizeCatalogImage($imageRaw);
+                if (preg_match('#^https?://#i', $normalizedRaw)) {
+                    $imageUrl = $this->uploadRemoteCatalogImageUrl($normalizedRaw, 0, '', 0);
+                }
+                if ($imageUrl === '') {
+                    $resolved = ProductStyleImportService::resolveImage($imageRaw, $publicRoot);
+                    $resolvedTemp = trim((string) ($resolved['temp'] ?? ''));
+                    if (($resolved['ok'] ?? false) && $resolvedTemp !== '' && is_file($resolvedTemp)) {
+                        $saved = ProductStyleImportService::saveImportImageToProductsDir($resolvedTemp, $publicRoot);
+                        if (is_string($saved) && $saved !== '') {
+                            $imageUrl = $saved;
+                        }
+                        if (strpos($resolvedTemp, 'style_import') !== false && is_file($resolvedTemp)) {
+                            @unlink($resolvedTemp);
+                        }
+                    } else {
+                        $imageUrl = $normalizedRaw;
                     }
-                    if (strpos($resolvedTemp, 'style_import') !== false && is_file($resolvedTemp)) {
-                        @unlink($resolvedTemp);
-                    }
-                } else {
-                    $imageUrl = $this->normalizeCatalogImage($imageRaw);
                 }
             }
 
@@ -1204,6 +1212,122 @@ class LiveStyleAnalysisService
             return '';
         }
         return mb_substr($value, 0, 1024);
+    }
+
+    private function normalizeAndUploadCatalogImageUrl(string $rawImageUrl, int $storeId, string $styleCode, int $jobId = 0): string
+    {
+        $normalized = $this->normalizeCatalogImage($rawImageUrl);
+        if ($normalized === '') {
+            return '';
+        }
+        if (!preg_match('#^https?://#i', $normalized)) {
+            return $normalized;
+        }
+        if ($this->isQiniuHostedUrl($normalized)) {
+            return $normalized;
+        }
+        $uploaded = $this->uploadRemoteCatalogImageUrl($normalized, $storeId, $styleCode, $jobId);
+        if ($uploaded !== '') {
+            return $uploaded;
+        }
+        return $normalized;
+    }
+
+    private function uploadRemoteCatalogImageUrl(string $url, int $storeId, string $styleCode, int $jobId = 0): string
+    {
+        $sourceUrl = trim($url);
+        if ($sourceUrl === '' || !preg_match('#^https?://#i', $sourceUrl)) {
+            return '';
+        }
+
+        try {
+            $qiniu = new QiniuService();
+            if (!$qiniu->isEnabled()) {
+                return '';
+            }
+
+            $tmpPath = ProductStyleImportService::createTempImagePath($this->guessImageExtFromUrl($sourceUrl));
+            $timeout = 25;
+            $ctx = stream_context_create([
+                'http' => ['timeout' => $timeout],
+                'https' => ['timeout' => $timeout],
+            ]);
+            $bin = @file_get_contents($sourceUrl, false, $ctx);
+            if ($bin === false || $bin === '') {
+                return '';
+            }
+            @file_put_contents($tmpPath, $bin);
+            if (!is_file($tmpPath) || filesize($tmpPath) <= 0) {
+                return '';
+            }
+
+            $hash = md5($bin);
+            $stylePart = $styleCode !== '' ? $styleCode : 'style_unknown';
+            $datePart = date('Ymd');
+            $key = sprintf(
+                'catalog/live/%d/store_%d/%s/%s.%s',
+                $this->tenantId,
+                max(0, $storeId),
+                $datePart,
+                $hash . '_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $stylePart),
+                $this->guessImageExtFromUrl($sourceUrl)
+            );
+
+            $ret = $qiniu->upload($tmpPath, $key);
+            @unlink($tmpPath);
+            if (!is_array($ret) || empty($ret['success']) || empty($ret['url'])) {
+                if ($jobId > 0) {
+                    DataImportService::addJobLog($jobId, 'warn', 'catalog_image_upload_failed', [
+                        'store_id' => $storeId,
+                        'style_code' => $styleCode,
+                        'url' => $sourceUrl,
+                    ]);
+                }
+                return '';
+            }
+            return mb_substr((string) $ret['url'], 0, 1024);
+        } catch (\Throwable $e) {
+            if ($jobId > 0) {
+                DataImportService::addJobLog($jobId, 'warn', 'catalog_image_upload_error', [
+                    'store_id' => $storeId,
+                    'style_code' => $styleCode,
+                    'url' => $sourceUrl,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+            try {
+                Log::warning('live_catalog_image_upload_error: ' . $e->getMessage());
+            } catch (\Throwable $ignore) {
+            }
+            return '';
+        }
+    }
+
+    private function guessImageExtFromUrl(string $url): string
+    {
+        $ext = strtolower((string) pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+        if (!in_array($ext, ['jpg', 'png', 'gif', 'webp', 'bmp'], true)) {
+            $ext = 'jpg';
+        }
+        return $ext;
+    }
+
+    private function isQiniuHostedUrl(string $url): bool
+    {
+        $domain = trim((string) (QiniuService::getMergedQiniuConfig()['domain'] ?? ''));
+        if ($domain === '') {
+            return false;
+        }
+        $urlHost = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $domainHost = strtolower((string) parse_url($domain, PHP_URL_HOST));
+        if ($domainHost === '') {
+            $domainHost = strtolower(preg_replace('#^https?://#i', '', $domain));
+            $domainHost = strtolower(trim((string) preg_replace('#/.*$#', '', $domainHost)));
+        }
+        return $urlHost !== '' && $domainHost !== '' && $urlHost === $domainHost;
     }
 
     private function isInvalidImageValue(string $value): bool
