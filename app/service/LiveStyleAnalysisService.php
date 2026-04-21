@@ -1794,9 +1794,10 @@ class LiveStyleAnalysisService
         }
         $metrics->whereRaw("(TRIM(IFNULL(m.catalog_style_code, '')) <> '' OR TRIM(IFNULL(m.extracted_style_code, '')) <> '')");
 
-        $expectedSessions = (int) $metrics
+        $expectedRow = $metrics
             ->fieldRaw('COUNT(DISTINCT CONCAT(IFNULL(m.session_date, ""), "#", IFNULL(m.session_name, ""))) AS c')
-            ->value('c');
+            ->find();
+        $expectedSessions = (int) ($expectedRow['c'] ?? 0);
         if ($expectedSessions <= 1) {
             return false;
         }
