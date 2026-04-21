@@ -3155,3 +3155,20 @@
 ### Compatibility
 - Windows development and Linux deployment are both supported.
 - If Qiniu is disabled, system keeps original URL and continues import.
+
+## 2026-04-21 Live Ranking Fallback Style Support (#01 / #66)
+
+### Scope
+- Module: `/admin.php/product_search/live` session import + ranking aggregation.
+
+### Behavior
+- Style extraction now supports hash style IDs in product title:
+  - `#01`, `#02`, `#45`, `#66` etc.
+- Ranking aggregation now includes unmatched rows when extracted style exists:
+  - style key fallback: `catalog_style_code` first, otherwise `extracted_style_code`
+  - so rows without catalog binding can still appear in hot ranking.
+- If style has no image, ranking keeps `image_url` empty (frontend shows no image).
+
+### Matching Examples
+- Existing: `A-139`, `A139`, `D142`, `C-129`
+- Added fallback: `#01`, `#66`, `#123`

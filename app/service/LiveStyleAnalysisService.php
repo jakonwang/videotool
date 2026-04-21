@@ -781,10 +781,10 @@ class LiveStyleAnalysisService
             return;
         }
 
+        $styleExpr = "COALESCE(NULLIF(TRIM(IFNULL(m.catalog_style_code, '')), ''), NULLIF(TRIM(IFNULL(m.extracted_style_code, '')), ''))";
         $query = Db::name('growth_live_product_metrics')->alias('m')
             ->where('m.tenant_id', $this->tenantId)
-            ->where('m.is_matched', 1)
-            ->whereRaw("TRIM(IFNULL(m.catalog_style_code, '')) <> ''");
+            ->whereRaw($styleExpr . " IS NOT NULL");
 
         if ($scope === self::SCOPE_STORE) {
             $query->where('m.store_id', $storeId);
@@ -803,7 +803,7 @@ class LiveStyleAnalysisService
         }
 
         $rows = $query->fieldRaw('
-                m.catalog_style_code as style_code,
+                ' . $styleExpr . ' as style_code,
                 MAX(NULLIF(m.image_url, "")) as image_url,
                 COUNT(*) as product_count,
                 COUNT(DISTINCT m.session_id) as session_count,
@@ -813,13 +813,13 @@ class LiveStyleAnalysisService
                 COALESCE(SUM(m.add_to_cart_count),0) as add_to_cart_sum,
                 COALESCE(SUM(m.orders_count),0) as orders_sum
             ')
-            ->group('m.catalog_style_code')
+            ->groupRaw($styleExpr)
             ->select()
             ->toArray();
 
         $prepared = [];
         foreach ($rows as $row) {
-            $style = $this->normalizeStyleCode((string) ($row['style_code'] ?? ''));
+            $style = $this->normalizeAggStyleCode((string) ($row['style_code'] ?? ''));
             if ($style === '') {
                 continue;
             }
@@ -989,8 +989,7 @@ class LiveStyleAnalysisService
     {
         $query = Db::name('growth_live_product_metrics')
             ->where('tenant_id', $this->tenantId)
-            ->where('is_matched', 1)
-            ->whereRaw("TRIM(IFNULL(catalog_style_code, '')) <> ''");
+            ->whereRaw("(TRIM(IFNULL(catalog_style_code, '')) <> '' OR TRIM(IFNULL(extracted_style_code, '')) <> '')");
         if ($scope === self::SCOPE_STORE && $storeId > 0) {
             $query->where('store_id', $storeId);
         }
@@ -1524,6 +1523,10 @@ class LiveStyleAnalysisService
         if ($productName === '') {
             return '';
         }
+        // hash 款号：#01 / #66 / #123
+        if (preg_match('/#\s*(\d{1,8})\b/u', $productName, $m)) {
+            return $this->normalizeHashStyleCode((string) ($m[1] ?? ''));
+        }
         // 连写款号：A139 / A01 / AB189
         if (preg_match('/\b([A-Za-z]{1,12}\d{1,8})\b/u', $productName, $m)) {
             return $this->normalizeStyleCode((string) ($m[1] ?? ''));
@@ -1539,6 +1542,27 @@ class LiveStyleAnalysisService
             return $this->normalizeStyleCode((string) ($m[1] ?? ''));
         }
         return '';
+    }
+
+    private function normalizeAggStyleCode(string $value): string
+    {
+        $raw = trim($value);
+        if ($raw === '') {
+            return '';
+        }
+        if (preg_match('/^#\s*(\d{1,8})$/', $raw, $m)) {
+            return $this->normalizeHashStyleCode((string) ($m[1] ?? ''));
+        }
+        return $this->normalizeStyleCode($raw);
+    }
+
+    private function normalizeHashStyleCode(string $digits): string
+    {
+        $num = preg_replace('/\D+/', '', trim($digits)) ?? '';
+        if ($num === '') {
+            return '';
+        }
+        return '#' . substr($num, 0, 8);
     }
 
     private function normalizeStyleCode(string $value): string
