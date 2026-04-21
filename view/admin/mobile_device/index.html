@@ -119,13 +119,16 @@
       }
 
       function buildDeviceCode(platform) {
-        const p = String(platform || 'android').toLowerCase() === 'ios' ? 'ios' : 'android';
+        const raw = String(platform || 'android').toLowerCase();
+        const p = raw === 'ios' ? 'ios' : (raw === 'desktop' ? 'desktop' : 'android');
         return p + '_' + ymdText() + '_' + randText(6).toLowerCase();
       }
 
       function buildDeviceName(platform, code) {
-        const isIos = String(platform || 'android').toLowerCase() === 'ios';
-        const prefix = isIos ? tt('page.mobileDevice.platformIos') : tt('page.mobileDevice.platformAndroid');
+        const raw = String(platform || 'android').toLowerCase();
+        const prefix = raw === 'ios'
+          ? tt('page.mobileDevice.platformIos')
+          : (raw === 'desktop' ? tt('page.mobileDevice.platformDesktop') : tt('page.mobileDevice.platformAndroid'));
         const tail = String(code || '').split('_').pop() || randText(4).toLowerCase();
         return prefix + '-' + tail.toUpperCase();
       }
@@ -145,7 +148,8 @@
 
       const platformOptions = computed(() => [
         { value: 'android', label: tt('page.mobileDevice.platformAndroid') },
-        { value: 'ios', label: tt('page.mobileDevice.platformIos') }
+        { value: 'ios', label: tt('page.mobileDevice.platformIos') },
+        { value: 'desktop', label: tt('page.mobileDevice.platformDesktop') }
       ]);
 
       const statusOptions = computed(() => [
@@ -326,7 +330,7 @@
       function onPlatformChanged() {
         if (dialogMode.value !== 'create') return;
         const code = String(form.device_code || '');
-        if (/^(android|ios)_\d{8}_[a-z0-9]+$/.test(code)) {
+        if (/^(android|ios|desktop)_\d{8}_[a-z0-9]+$/.test(code)) {
           form.device_code = buildDeviceCode(form.platform);
         }
         const name = String(form.device_name || '');
@@ -402,7 +406,9 @@
           <el-table-column prop="device_name" :label="tt('page.mobileDevice.colName')" min-width="160" />
           <el-table-column :label="tt('page.mobileDevice.colPlatform')" width="120">
             <template #default="{ row }">
-              {{ row.platform === 'ios' ? tt('page.mobileDevice.platformIos') : tt('page.mobileDevice.platformAndroid') }}
+              {{ row.platform === 'ios'
+                ? tt('page.mobileDevice.platformIos')
+                : (row.platform === 'desktop' ? tt('page.mobileDevice.platformDesktop') : tt('page.mobileDevice.platformAndroid')) }}
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.mobileDevice.colToken')" min-width="230">

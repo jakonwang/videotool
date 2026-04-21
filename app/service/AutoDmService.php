@@ -23,6 +23,9 @@ class AutoDmService
 
     public const TASK_TYPE_ZALO_AUTO_DM = 'zalo_auto_dm';
     public const TASK_TYPE_WA_AUTO_DM = 'wa_auto_dm';
+    public const EXECUTE_CLIENT_BOTH = 'both';
+    public const EXECUTE_CLIENT_MOBILE = 'mobile';
+    public const EXECUTE_CLIENT_DESKTOP = 'desktop';
 
     public const EVENT_CREATED = 'created';
     public const EVENT_ASSIGNED = 'assigned';
@@ -159,6 +162,19 @@ class AutoDmService
         }
 
         return self::TASK_TYPE_ZALO_AUTO_DM;
+    }
+
+    public static function normalizeExecuteClient(string $raw): string
+    {
+        $value = strtolower(trim($raw));
+        if (in_array($value, [self::EXECUTE_CLIENT_MOBILE, 'phone', 'mobile_agent'], true)) {
+            return self::EXECUTE_CLIENT_MOBILE;
+        }
+        if (in_array($value, [self::EXECUTE_CLIENT_DESKTOP, 'pc', 'computer', 'desktop_agent'], true)) {
+            return self::EXECUTE_CLIENT_DESKTOP;
+        }
+
+        return self::EXECUTE_CLIENT_BOTH;
     }
 
     public static function buildIdempotencyKey(int $tenantId, int $influencerId, int $campaignId, string $day, int $stepNo = 0): string

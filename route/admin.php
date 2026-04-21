@@ -244,6 +244,8 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('mobile_agent/report', 'app\controller\admin\MobileAgent@report');
     Route::post('mobile_agent/pull_auto', 'app\controller\admin\MobileAgent@pullAuto');
     Route::post('mobile_agent/report_auto', 'app\controller\admin\MobileAgent@reportAuto');
+    Route::post('desktop_agent/pull_auto', 'app\controller\admin\MobileAgent@pullAuto');
+    Route::post('desktop_agent/report_auto', 'app\controller\admin\MobileAgent@reportAuto');
     Route::get('mobile_console/bootstrap', 'app\controller\admin\MobileConsole@bootstrap');
 
     // Sample management

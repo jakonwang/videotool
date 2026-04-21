@@ -101,6 +101,7 @@ class AutoDm extends BaseController
             'limit' => $limit,
             'stop_on_reply' => $stopOnReply,
             'reply_confirm_mode' => $replyConfirmMode,
+            'execute_client' => AutoDmService::normalizeExecuteClient((string) ($payload['execute_client'] ?? '')),
         ];
 
         $influencers = $this->pickInfluencers($filters);
@@ -372,6 +373,8 @@ class AutoDm extends BaseController
             $stats = AutoDmService::decodeJsonObject((string) ($arr['stats_json'] ?? ''));
             $abConfig = AutoDmService::decodeJsonObject((string) ($arr['ab_config_json'] ?? ''));
             $sequenceConfig = AutoDmService::decodeJsonObject((string) ($arr['sequence_config_json'] ?? ''));
+            $targetFilters = AutoDmService::decodeJsonObject((string) ($arr['target_filter_json'] ?? ''));
+            $executeClient = AutoDmService::normalizeExecuteClient((string) ($targetFilters['execute_client'] ?? ''));
             $metric = $campaignMetrics[(int) ($arr['id'] ?? 0)] ?? [
                 'funnel' => [
                     'pending' => 0,
@@ -407,6 +410,7 @@ class AutoDm extends BaseController
                 'stats' => $stats,
                 'ab_config' => $abConfig,
                 'sequence_config' => $sequenceConfig,
+                'execute_client' => $executeClient,
                 'funnel' => $metric['funnel'],
                 'reply_pending_count' => (int) ($metric['reply_pending'] ?? 0),
                 'unsubscribe_rate' => (float) ($metric['unsubscribe_rate'] ?? 0),

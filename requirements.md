@@ -3205,3 +3205,34 @@
 ### 使用说明
 1. 在“爆款榜”点击某个 `#xx` 款式的“详情”，现在会返回真实数据（无图片也可看指标）。
 2. 若历史快照场次数异常，重新点击“查询榜单”会自动触发修复并重算。
+
+## 2026-04-21 Auto DM Desktop Agent Support (Zalo/WhatsApp)
+
+### Scope
+- Module: `/admin.php/auto_dm` + agent endpoints.
+- Goal: Auto DM tasks can be executed by both phone devices and desktop devices.
+
+### Backend Changes
+- `mobile_devices.platform` now supports `desktop` in admin save flow.
+- Added desktop API aliases:
+  - `POST /admin.php/desktop_agent/pull_auto`
+  - `POST /admin.php/desktop_agent/report_auto`
+- Existing endpoints remain valid:
+  - `POST /admin.php/mobile_agent/pull_auto`
+  - `POST /admin.php/mobile_agent/report_auto`
+
+### Dispatch Rules
+- Auto DM campaign can carry optional `execute_client` in `target_filter_json`:
+  - `mobile`, `desktop`, `both` (default `both`).
+- Dispatcher behavior:
+  - if task is not executable on current device client, task is released back to `pending` (not blocked).
+  - avoids incorrect blocking when mixed mobile/desktop agents pull in parallel.
+
+### UI / i18n
+- Mobile device management page adds `Desktop` option in platform selector.
+- i18n keys added:
+  - `page.mobileDevice.platformDesktop` for `zh/en/vi`.
+
+### Windows Dev / Linux Deploy
+- No OS-specific path dependency added.
+- Same API contract works on Windows development and Linux deployment.

@@ -102,7 +102,7 @@ class MobileDevice extends BaseController
         $deviceCode = trim((string) ($payload['device_code'] ?? ''));
         $deviceName = trim((string) ($payload['device_name'] ?? ''));
         $platform = strtolower(trim((string) ($payload['platform'] ?? 'android')));
-        if (!in_array($platform, ['android', 'ios'], true)) {
+        if (!in_array($platform, ['android', 'ios', 'desktop'], true)) {
             $platform = 'android';
         }
 
@@ -301,7 +301,12 @@ class MobileDevice extends BaseController
 
     private function generateAvailableDeviceCode(string $platform): string
     {
-        $prefix = $platform === 'ios' ? 'ios' : 'android';
+        $prefixMap = [
+            'ios' => 'ios',
+            'desktop' => 'desktop',
+            'android' => 'android',
+        ];
+        $prefix = $prefixMap[$platform] ?? 'android';
         $date = date('Ymd');
         for ($i = 0; $i < 8; $i++) {
             try {
@@ -320,7 +325,12 @@ class MobileDevice extends BaseController
 
     private function suggestDeviceName(string $platform, string $deviceCode): string
     {
-        $prefix = $platform === 'ios' ? 'iOS' : 'Android';
+        $prefixMap = [
+            'ios' => 'iOS',
+            'desktop' => 'Desktop',
+            'android' => 'Android',
+        ];
+        $prefix = $prefixMap[$platform] ?? 'Android';
         $parts = explode('_', $deviceCode);
         $tail = strtoupper((string) end($parts));
         if ($tail === '') {

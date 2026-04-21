@@ -415,6 +415,7 @@ class MobileAgent extends BaseController
         }
 
         $requestedTypes = $this->normalizeAutoTaskTypeFilters($payload['task_types'] ?? []);
+        $deviceClient = $this->normalizeDeviceExecuteClient((string) ($device['platform'] ?? 'android'));
         $picked = null;
         $scanReason = '';
         $scanTimes = 0;
@@ -442,6 +443,7 @@ class MobileAgent extends BaseController
                         'c.min_interval_sec',
                         'c.fail_fuse_threshold',
                         'c.preferred_channel as c_preferred_channel',
+                        'c.target_filter_json as c_target_filter_json',
                     ])
                     ->order('t.priority', 'desc')
                     ->order('t.id', 'asc');
@@ -486,6 +488,7 @@ class MobileAgent extends BaseController
                         'c.min_interval_sec',
                         'c.fail_fuse_threshold',
                         'c.preferred_channel as c_preferred_channel',
+                        'c.target_filter_json as c_target_filter_json',
                     ])
                     ->find();
             });
@@ -493,13 +496,17 @@ class MobileAgent extends BaseController
             if (!$candidate) {
                 break;
             }
-            $decision = $this->validateAutoDispatchCandidate($candidate, $tenantId);
+            $decision = $this->validateAutoDispatchCandidate($candidate, $tenantId, $deviceClient);
             if (!(bool) ($decision['ok'] ?? false)) {
                 $status = (int) ($decision['task_status'] ?? AutoDmService::TASK_STATUS_BLOCKED);
                 $code = (string) ($decision['error_code'] ?? 'filtered');
                 $message = (string) ($decision['error_message'] ?? $code);
                 $scanReason = $code;
-                $this->settleAutoTaskBeforeDispatch($candidate, $status, $code, $message, $tenantId);
+                if ($status === AutoDmService::TASK_STATUS_PENDING) {
+                    $this->releaseAutoTaskForRedispatch($candidate);
+                } else {
+                    $this->settleAutoTaskBeforeDispatch($candidate, $status, $code, $message, $tenantId);
+                }
                 continue;
             }
             $picked = [
@@ -946,8 +953,10 @@ class MobileAgent extends BaseController
      * @param array<string, mixed> $task
      * @return array<string, mixed>
      */
-    private function validateAutoDispatchCandidate(array $task, int $tenantId): array
+    private function validateAutoDispatchCandidate(array $task, int $tenantId, string $deviceClient): array
     {
+        $targetFilter = AutoDmService::decodeJsonObject((string) ($task['c_target_filter_json'] ?? ''));
+        $campaignExecuteClient = AutoDmService::normalizeExecuteClient((string) ($targetFilter['execute_client'] ?? ''));
         $campaign = [
             'id' => (int) ($task['c_id'] ?? 0),
             'campaign_name' => (string) ($task['campaign_name'] ?? ''),
@@ -960,7 +969,17 @@ class MobileAgent extends BaseController
             'min_interval_sec' => max(10, (int) ($task['min_interval_sec'] ?? 90)),
             'fail_fuse_threshold' => max(1, (int) ($task['fail_fuse_threshold'] ?? 3)),
             'preferred_channel' => (string) ($task['c_preferred_channel'] ?? 'auto'),
+            'execute_client' => $campaignExecuteClient,
         ];
+        if (!$this->isCampaignExecutableByDevice($campaignExecuteClient, $deviceClient)) {
+            return [
+                'ok' => false,
+                'task_status' => AutoDmService::TASK_STATUS_PENDING,
+                'error_code' => 'client_not_allowed',
+                'error_message' => 'client_not_allowed',
+                'campaign' => $campaign,
+            ];
+        }
         if ($campaign['id'] <= 0 || $campaign['campaign_status'] !== AutoDmService::CAMPAIGN_STATUS_RUNNING) {
             return [
                 'ok' => false,
@@ -1091,6 +1110,26 @@ class MobileAgent extends BaseController
     /**
      * @param array<string, mixed> $task
      */
+    private function releaseAutoTaskForRedispatch(array $task): void
+    {
+        $taskId = (int) ($task['id'] ?? 0);
+        if ($taskId <= 0) {
+            return;
+        }
+        Db::name('auto_dm_tasks')
+            ->where('id', $taskId)
+            ->where('task_status', AutoDmService::TASK_STATUS_ASSIGNED)
+            ->update([
+                'task_status' => AutoDmService::TASK_STATUS_PENDING,
+                'device_id' => null,
+                'assigned_at' => null,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     */
     private function settleAutoTaskBeforeDispatch(array $task, int $taskStatus, string $errorCode, string $errorMessage, int $tenantId): void
     {
         $taskId = (int) ($task['id'] ?? 0);
@@ -1132,6 +1171,27 @@ class MobileAgent extends BaseController
                 'updated_at' => $now,
             ]);
         }
+    }
+
+    private function normalizeDeviceExecuteClient(string $platform): string
+    {
+        $raw = strtolower(trim($platform));
+        if ($raw === 'desktop') {
+            return AutoDmService::EXECUTE_CLIENT_DESKTOP;
+        }
+
+        return AutoDmService::EXECUTE_CLIENT_MOBILE;
+    }
+
+    private function isCampaignExecutableByDevice(string $campaignExecuteClient, string $deviceClient): bool
+    {
+        $campaignClient = AutoDmService::normalizeExecuteClient($campaignExecuteClient);
+        $agentClient = AutoDmService::normalizeExecuteClient($deviceClient);
+        if ($campaignClient === AutoDmService::EXECUTE_CLIENT_BOTH) {
+            return true;
+        }
+
+        return $campaignClient === $agentClient;
     }
 
     /**
