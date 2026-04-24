@@ -277,6 +277,7 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('ad_insight', 'app\controller\admin\AdInsight@index');
 
     // GMV Max creative insight assistant
+    Route::get('gmv_max', 'app\controller\admin\GmvMax@index');
     Route::post('gmv_max/creative/sync', 'app\controller\admin\GmvMax@creativeSync');
     Route::get('gmv_max/creative/baseline', 'app\controller\admin\GmvMax@creativeBaseline');
     Route::get('gmv_max/creative/recommendation', 'app\controller\admin\GmvMax@creativeRecommendation');

@@ -3408,3 +3408,36 @@
 2. 建议显示 `Creative / Cost / SKU orders / ROI / Product ad click rate / Ad conversion rate / 视频播放率` 等核心列。
 3. 在插件选择店铺，点击“同步到后端并生成建议”。
 4. 若页面缺少真实 Video ID，后端会先保存 `pseudo_xxx` 行；后续显示真实 ID 后再按真实 ID 继续沉淀；早期伪 ID 样本会保留用于当日诊断。
+## GMV Max 投放助手后台专页（2026-04-24）
+
+### 功能定位
+- 新增后台入口 `/admin.php/gmv_max`，菜单位于「增长分析 / GMV Max投放助手」。
+- 页面采用「SOP + 数据助手」模式：既能查看 TikTok GMV Max 从第 0 天到放量的执行流程，也能查看浏览器插件同步后的店铺历史基准、动态投放建议、素材排行和历史记录。
+- 核心方法论固定为：`ECPM = 点击率 × 转化率 × 出价`。运营先用素材提升点击率和转化率，再通过预算和目标 ROI 控制出价，小步放量。
+
+### 使用说明
+1. 先在 TikTok GMV Max 素材列表页使用浏览器插件同步素材数据。
+2. 进入后台「增长分析 / GMV Max投放助手」。
+3. 选择店铺、日期范围，可选填写 Campaign ID。
+4. 查看顶部店铺历史基准、动态投放建议、每日执行清单和从 0 到放量 SOP。
+5. 在「素材排行」中优先处理差素材和潜力素材，在「历史数据」中追踪素材从冷启动到放量的表现变化。
+
+### 接口依赖
+- 页面路由：`GET /admin.php/gmv_max`。
+- 店铺列表：`GET /admin.php/profit_center/storeList`。
+- 店铺基准：`GET /admin.php/gmv_max/creative/baseline`。
+- 动态建议：`GET /admin.php/gmv_max/creative/recommendation`。
+- 素材排行：`GET /admin.php/gmv_max/creative/ranking`。
+- 历史记录：`GET /admin.php/gmv_max/creative/history`。
+
+### 模块与权限
+- 新增内置模块 `gmv_max_assistant`，依赖 `growth_hub`，默认启用，`operator` 及以上角色可见。
+- 不新增数据库表，不改变插件同步口径；动态建议继续依赖现有 GMV Max 素材沉淀数据。
+
+### 兼容说明
+- Windows 开发环境与 Linux 部署环境均使用相同 PHP 控制器、ThinkPHP 路由和 CDN Vue/Element Plus 页面模式。
+- 无历史数据时，页面仍展示 SOP、每日清单和空状态提示，不影响其他后台页面。
+### GMV Max 页面高级交互升级（2026-04-24）
+- 新增页面级深浅主题切换（`light/dark`），默认跟随浏览器偏好并缓存到 `localStorage(gmv_max_theme)`。
+- 新增轻量入场动效：Hero、筛选、KPI、建议卡、SOP、表格按顺序渐入，`prefers-reduced-motion` 下自动关闭动画。
+- KPI 指标改为滚动数值：ROI、订单、花费、样本在基准数据刷新后平滑过渡，便于运营感知变化。

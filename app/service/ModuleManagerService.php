@@ -74,6 +74,15 @@ class ModuleManagerService
                 'dependencies' => ['growth_hub'],
                 'min_role' => self::ROLE_OPERATOR,
             ],
+            'gmv_max_assistant' => [
+                'name' => 'gmv_max_assistant',
+                'title' => 'GMV Max Assistant',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
             'data_import' => [
                 'name' => 'data_import',
                 'title' => 'Data Import',
@@ -1058,6 +1067,7 @@ class ModuleManagerService
         $industryEnabled = $growthEnabled && $isEnabled('industry_trend', 1);
         $competitorEnabled = $growthEnabled && $isEnabled('competitor_analysis', 1);
         $adInsightEnabled = $growthEnabled && $isEnabled('ad_insight', 1);
+        $gmvMaxAssistantEnabled = $growthEnabled && $isEnabled('gmv_max_assistant', 1);
         $dataImportEnabled = $growthEnabled && $isEnabled('data_import', 1);
         $profitCenterEnabled = $growthEnabled && $isEnabled('profit_center', 1);
 
@@ -1176,6 +1186,15 @@ class ModuleManagerService
                     'text_i18n' => 'admin.menu.adInsight',
                     'active' => self::controllerIs($currentController, 'adinsight', 'ad_insight'),
                     'badge' => ($badges['ad_total'] ?? 0) > 0 ? (string) $badges['ad_total'] : '',
+                ];
+            }
+            if ($gmvMaxAssistantEnabled) {
+                $growthChildren[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/gmv_max',
+                    'icon' => 'rocket',
+                    'text_i18n' => 'admin.menu.gmvMaxAssistant',
+                    'active' => self::controllerIs($currentController, 'gmvmax', 'gmv_max'),
                 ];
             }
             if ($dataImportEnabled) {

@@ -7,9 +7,15 @@ use app\BaseController;
 use app\service\AdminAuthService;
 use app\service\GmvMaxCreativeInsightService;
 use app\service\ProfitPluginTokenService;
+use think\facade\View;
 
 class GmvMax extends BaseController
 {
+    public function index()
+    {
+        return View::fetch('admin/gmv_max/index', []);
+    }
+
     private function jsonOk(array $data = [], string $msg = 'ok')
     {
         return $this->apiJsonOk($data, $msg);

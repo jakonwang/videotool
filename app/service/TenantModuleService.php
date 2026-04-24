@@ -248,6 +248,9 @@ class TenantModuleService
         if (preg_match('#^/ad_insight(/|$)#i', $path)) {
             return 'ad_insight';
         }
+        if (preg_match('#^/gmv_max(/|$)#i', $path)) {
+            return 'gmv_max_assistant';
+        }
         if (preg_match('#^/data_import(/|$)#i', $path)) {
             return 'data_import';
         }

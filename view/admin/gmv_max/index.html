@@ -1,0 +1,712 @@
+{extend name="admin/common/layout" /}
+{block name="title"}GMV Max 投放助手{/block}
+{block name="page_title"}<span data-i18n="page.gmvMax.title">GMV Max 投放助手</span>{/block}
+{block name="breadcrumb"}<span data-i18n="page.gmvMax.breadcrumb">增长分析 / GMV Max 投放助手</span>{/block}
+
+{block name="content"}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
+<style>
+  .gmv-max-page {
+    --gmv-page-bg: linear-gradient(180deg, #e9eef6 0%, #f3f6fb 100%);
+    --gmv-text-primary: #07152f;
+    --gmv-text-secondary: #64748b;
+    --gmv-card-bg: rgba(255, 255, 255, .88);
+    --gmv-card-border: rgba(148, 163, 184, .22);
+    --gmv-kpi-bg: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+    --gmv-soft-bg: #f8fafc;
+    --gmv-soft-border: #e2e8f0;
+    --gmv-table-header: #f8fafc;
+    --gmv-table-border: #e5e7eb;
+    min-height: calc(100vh - 120px);
+    padding: 6px 10px 30px;
+    color: var(--gmv-text-primary);
+    background: var(--gmv-page-bg);
+    border-radius: 20px;
+  }
+  .gmv-max-page.theme-dark {
+    --gmv-page-bg: radial-gradient(circle at 80% -10%, rgba(13, 148, 136, .20), transparent 35%), linear-gradient(180deg, #050b18 0%, #0a1426 100%);
+    --gmv-text-primary: #e2e8f0;
+    --gmv-text-secondary: #9fb0c7;
+    --gmv-card-bg: rgba(9, 19, 37, .84);
+    --gmv-card-border: rgba(71, 85, 105, .45);
+    --gmv-kpi-bg: linear-gradient(180deg, rgba(15, 23, 42, .95) 0%, rgba(15, 23, 42, .88) 100%);
+    --gmv-soft-bg: rgba(15, 23, 42, .80);
+    --gmv-soft-border: rgba(71, 85, 105, .55);
+    --gmv-table-header: rgba(15, 23, 42, .92);
+    --gmv-table-border: rgba(71, 85, 105, .40);
+  }
+  .gmv-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .gmv-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 30px;
+    padding: 30px;
+    color: #fff;
+    background:
+      radial-gradient(circle at 85% 12%, rgba(34, 211, 238, .35), transparent 30%),
+      radial-gradient(circle at 12% 88%, rgba(250, 204, 21, .24), transparent 34%),
+      linear-gradient(135deg, #071225 0%, #12346b 52%, #0891b2 100%);
+    box-shadow: 0 28px 70px rgba(13, 42, 86, .28);
+  }
+  .gmv-hero:before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(2, 6, 23, .58) 0%, rgba(15, 23, 42, .34) 42%, rgba(8, 145, 178, .18) 100%);
+    z-index: 0;
+  }
+  .gmv-hero:after {
+    content: '';
+    position: absolute;
+    right: -90px;
+    top: -110px;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    border: 42px solid rgba(255, 255, 255, .08);
+  }
+  .gmv-hero-content { position: relative; z-index: 1; max-width: 1040px; }
+  .gmv-theme-switch {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    z-index: 2;
+  }
+  .gmv-build-badge {
+    position: absolute;
+    left: 22px;
+    top: 18px;
+    z-index: 2;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #dbeafe;
+    background: rgba(15, 23, 42, .45);
+    border: 1px solid rgba(191, 219, 254, .45);
+    backdrop-filter: blur(8px);
+    letter-spacing: .4px;
+  }
+  .gmv-theme-switch .el-button {
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    font-weight: 700;
+    backdrop-filter: blur(10px);
+  }
+  .gmv-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid rgba(255, 255, 255, .22);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .10);
+    backdrop-filter: blur(12px);
+    font-size: 13px;
+    color: rgba(255, 255, 255, .88);
+  }
+  .gmv-hero h1 {
+    margin: 18px 0 10px;
+    font-size: clamp(30px, 4.4vw, 54px);
+    line-height: 1.04;
+    letter-spacing: -1.8px;
+    font-weight: 900;
+    color: #f8fbff !important;
+    text-shadow: 0 6px 24px rgba(2, 6, 23, .45);
+  }
+  .gmv-formula {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin: 14px 0 16px;
+    padding: 14px 18px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, .14);
+    border: 1px solid rgba(255, 255, 255, .18);
+    font-size: 20px;
+    font-weight: 800;
+    color: #f8fbff !important;
+  }
+  .gmv-hero p {
+    margin: 0;
+    max-width: 860px;
+    color: rgba(241, 245, 249, .94) !important;
+    font-size: 17px;
+    line-height: 1.8;
+    text-shadow: 0 4px 20px rgba(2, 6, 23, .32);
+  }
+  .gmv-toolbar,
+  .gmv-card {
+    border: 1px solid var(--gmv-card-border);
+    border-radius: 24px;
+    background: var(--gmv-card-bg);
+    box-shadow: 0 18px 50px rgba(15, 23, 42, .08);
+    backdrop-filter: blur(18px);
+  }
+  .gmv-toolbar { padding: 18px; }
+  .gmv-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.1fr) minmax(180px, 1fr) minmax(170px, .85fr) minmax(170px, .85fr) minmax(128px, auto);
+    gap: 14px;
+    align-items: center;
+  }
+  .gmv-filter-grid .el-button {
+    width: 100%;
+    min-width: 120px;
+    border-radius: 14px;
+    font-weight: 700;
+  }
+  .gmv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 15px; }
+  .gmv-kpi {
+    padding: 18px;
+    min-height: 118px;
+    border-radius: 22px;
+    background: var(--gmv-kpi-bg);
+    border: 1px solid var(--gmv-card-border);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, .06);
+  }
+  .gmv-kpi span { display: block; color: var(--gmv-text-secondary); font-size: 13px; margin-bottom: 12px; }
+  .gmv-kpi strong { display: block; color: var(--gmv-text-primary); font-size: 28px; line-height: 1.08; letter-spacing: -.6px; }
+  .gmv-kpi small { display: block; margin-top: 8px; color: var(--gmv-text-secondary); }
+  .gmv-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 18px; align-items: start; }
+  .gmv-card { padding: 22px; }
+  .gmv-card-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+  .gmv-card h2 { margin: 0; font-size: 20px; color: var(--gmv-text-primary); letter-spacing: -.2px; }
+  .gmv-card-desc { margin-top: 6px; color: var(--gmv-text-secondary); font-size: 13px; line-height: 1.6; }
+  .gmv-advice-main {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .gmv-advice-pill {
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--gmv-soft-bg);
+    border: 1px solid var(--gmv-soft-border);
+  }
+  .gmv-advice-pill span { display: block; color: var(--gmv-text-secondary); font-size: 12px; margin-bottom: 8px; }
+  .gmv-advice-pill strong { color: var(--gmv-text-primary); font-size: 16px; }
+  .gmv-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .gmv-action-box {
+    border-radius: 18px;
+    padding: 16px;
+    background: var(--gmv-soft-bg);
+    border: 1px solid var(--gmv-soft-border);
+  }
+  .gmv-action-box h3 { margin: 0 0 10px; font-size: 15px; color: var(--gmv-text-primary); }
+  .gmv-action-box ul { margin: 0; padding-left: 18px; color: var(--gmv-text-secondary); line-height: 1.8; font-size: 13px; }
+  .gmv-sop-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+  .gmv-sop-step {
+    min-height: 168px;
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(37, 99, 235, .16);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .92) 0%, rgba(239, 246, 255, .88) 100%);
+  }
+  .gmv-max-page.theme-dark .gmv-sop-step {
+    background: linear-gradient(180deg, rgba(15, 23, 42, .92) 0%, rgba(30, 41, 59, .86) 100%);
+    border: 1px solid rgba(59, 130, 246, .35);
+  }
+  .gmv-sop-step .day { color: #2563eb; font-weight: 900; font-size: 13px; }
+  .gmv-sop-step h3 { margin: 10px 0 8px; font-size: 15px; color: var(--gmv-text-primary); }
+  .gmv-sop-step p { margin: 0; color: var(--gmv-text-secondary); line-height: 1.65; font-size: 12px; }
+  .gmv-check-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .gmv-check-card {
+    padding: 18px;
+    border-radius: 20px;
+    background: var(--gmv-kpi-bg);
+    border: 1px solid var(--gmv-soft-border);
+  }
+  .gmv-check-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--gmv-text-primary); }
+  .gmv-check-card li { color: var(--gmv-text-secondary); line-height: 1.9; font-size: 13px; }
+  .gmv-table-card { overflow: hidden; padding: 0; }
+  .gmv-table-head { padding: 20px 22px 8px; }
+  .gmv-empty {
+    padding: 28px;
+    text-align: center;
+    color: var(--gmv-text-secondary);
+    background: var(--gmv-soft-bg);
+    border-radius: 18px;
+  }
+  .gmv-conclusion {
+    margin: 14px 0 0;
+    padding: 16px;
+    color: var(--gmv-text-primary);
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(37,99,235,.10), rgba(20,184,166,.10));
+    border: 1px solid rgba(37,99,235,.16);
+    font-weight: 700;
+    line-height: 1.7;
+  }
+  .gmv-max-page .el-table {
+    --el-table-header-bg-color: var(--gmv-table-header);
+    --el-table-border-color: var(--gmv-table-border);
+    --el-table-tr-bg-color: transparent;
+    --el-table-row-hover-bg-color: rgba(37, 99, 235, .08);
+    --el-table-text-color: var(--gmv-text-primary);
+    --el-table-header-text-color: var(--gmv-text-primary);
+    --el-bg-color: transparent;
+  }
+  .gmv-max-page.theme-dark .el-input__wrapper,
+  .gmv-max-page.theme-dark .el-select__wrapper,
+  .gmv-max-page.theme-dark .el-textarea__inner,
+  .gmv-max-page.theme-dark .el-date-editor.el-input__wrapper {
+    background: rgba(15, 23, 42, .78);
+    box-shadow: 0 0 0 1px rgba(71, 85, 105, .55) inset;
+  }
+  .gmv-max-page.theme-dark .el-input__inner,
+  .gmv-max-page.theme-dark .el-select__placeholder,
+  .gmv-max-page.theme-dark .el-date-editor .el-input__inner,
+  .gmv-max-page.theme-dark .el-table__empty-text {
+    color: #cbd5e1;
+  }
+  .gmv-max-page.theme-dark .el-table th.el-table__cell,
+  .gmv-max-page.theme-dark .el-table tr {
+    background-color: transparent !important;
+  }
+  .gmv-animate {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: gmvEnter .48s ease-out forwards;
+  }
+  .gmv-animate.gmv-a2 { animation-delay: .05s; }
+  .gmv-animate.gmv-a3 { animation-delay: .11s; }
+  .gmv-animate.gmv-a4 { animation-delay: .17s; }
+  .gmv-animate.gmv-a5 { animation-delay: .22s; }
+  .gmv-animate.gmv-a6 { animation-delay: .28s; }
+  .gmv-animate.gmv-a7 { animation-delay: .34s; }
+  @keyframes gmvEnter {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gmv-animate { opacity: 1; transform: none; animation: none; }
+  }
+  .gmv-type-tag { font-weight: 800; }
+  @media (max-width: 1500px) {
+    .gmv-filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .gmv-filter-grid .el-button { grid-column: span 4; }
+  }
+  @media (max-width: 1320px) {
+    .gmv-sop-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .gmv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .gmv-action-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 980px) {
+    .gmv-filter-grid, .gmv-layout, .gmv-action-grid, .gmv-check-grid { grid-template-columns: 1fr; }
+    .gmv-kpis, .gmv-sop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 680px) {
+    .gmv-max-page { padding: 4px 4px 22px; }
+    .gmv-hero { padding: 22px 18px; border-radius: 22px; }
+    .gmv-hero h1 { letter-spacing: -.8px; }
+    .gmv-formula { font-size: 18px; }
+    .gmv-kpis, .gmv-sop-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div id="gmvMaxApp" class="gmv-max-page" :class="themeClass" v-cloak>
+  <div class="gmv-shell">
+    <section class="gmv-hero gmv-animate gmv-a1">
+      <div class="gmv-build-badge">UI Build 2026-04-24.2</div>
+      <div class="gmv-theme-switch">
+        <el-button size="small" @click="toggleTheme">{{ themeButtonText }}</el-button>
+      </div>
+      <div class="gmv-hero-content">
+        <div class="gmv-eyebrow">{{ t('page.gmvMax.eyebrow') }}</div>
+        <h1>{{ t('page.gmvMax.heroTitle') }}</h1>
+        <div class="gmv-formula">ECPM = {{ t('page.gmvMax.ctr') }} × {{ t('page.gmvMax.cvr') }} × {{ t('page.gmvMax.bid') }}</div>
+        <p>{{ t('page.gmvMax.heroSummary') }}</p>
+      </div>
+    </section>
+
+    <section class="gmv-toolbar gmv-animate gmv-a2">
+      <div class="gmv-filter-grid">
+        <el-select v-model="filters.store_id" filterable clearable :placeholder="t('page.gmvMax.filterStore')" @change="refreshAll">
+          <el-option v-for="store in stores" :key="store.id" :label="store.store_name || store.name || ('Store #' + store.id)" :value="String(store.id)"></el-option>
+        </el-select>
+        <el-input v-model="filters.campaign_id" clearable :placeholder="t('page.gmvMax.filterCampaign')" @keyup.enter="refreshAll"></el-input>
+        <el-date-picker v-model="filters.date_from" type="date" value-format="YYYY-MM-DD" :placeholder="t('page.gmvMax.dateFrom')"></el-date-picker>
+        <el-date-picker v-model="filters.date_to" type="date" value-format="YYYY-MM-DD" :placeholder="t('page.gmvMax.dateTo')"></el-date-picker>
+        <el-button type="primary" size="large" :loading="loading" @click="refreshAll">{{ t('common.refresh') }}</el-button>
+      </div>
+    </section>
+
+    <section class="gmv-kpis gmv-animate gmv-a3">
+      <div class="gmv-kpi"><span>{{ t('page.gmvMax.kpiRoi') }}</span><strong>{{ fmtNum(animatedKpi.roi, 2) }}</strong><small>{{ t('page.gmvMax.kpiRoiSub') }}</small></div>
+      <div class="gmv-kpi"><span>{{ t('page.gmvMax.kpiOrders') }}</span><strong>{{ fmtNum(animatedKpi.orders, 0) }}</strong><small>{{ t('page.gmvMax.kpiOrdersSub') }}</small></div>
+      <div class="gmv-kpi"><span>{{ t('page.gmvMax.kpiCost') }}</span><strong>{{ fmtMoney(animatedKpi.cost) }}</strong><small>{{ t('page.gmvMax.kpiCostSub') }}</small></div>
+      <div class="gmv-kpi"><span>{{ t('page.gmvMax.kpiSample') }}</span><strong>{{ fmtNum(animatedKpi.samples, 0) }}</strong><small>{{ sampleLevelText(baseline.sample_level) }}</small></div>
+      <div class="gmv-kpi"><span>{{ t('page.gmvMax.kpiBaseline') }}</span><strong>{{ baselineModeText(baseline.baseline_mode) }}</strong><small>{{ baseline.metric_date || '-' }}</small></div>
+    </section>
+
+    <section class="gmv-layout gmv-animate gmv-a4">
+      <div class="gmv-card">
+        <div class="gmv-card-head">
+          <div>
+            <h2>{{ t('page.gmvMax.latestAdvice') }}</h2>
+            <div class="gmv-card-desc">{{ t('page.gmvMax.latestAdviceDesc') }}</div>
+          </div>
+          <el-tag v-if="recommendationData" type="success" effect="light">{{ recommendationData.snapshot_date || t('page.gmvMax.realtime') }}</el-tag>
+        </div>
+        <template v-if="recommendationData">
+          <div class="gmv-advice-main">
+            <div class="gmv-advice-pill"><span>{{ t('page.gmvMax.accountStage') }}</span><strong>{{ stageText(advice.stage) }}</strong></div>
+            <div class="gmv-advice-pill"><span>{{ t('page.gmvMax.mainProblem') }}</span><strong>{{ problemText(advice.main_problem) }}</strong></div>
+            <div class="gmv-advice-pill"><span>{{ t('page.gmvMax.actionLevel') }}</span><strong>{{ actionLevelText(advice.action_level) }}</strong></div>
+          </div>
+          <div class="gmv-action-grid">
+            <div class="gmv-action-box"><h3>{{ t('page.gmvMax.todayDo') }}</h3><ul><li v-for="item in listOf(advice.today_do)" :key="item">{{ item }}</li></ul></div>
+            <div class="gmv-action-box"><h3>{{ t('page.gmvMax.todayAvoid') }}</h3><ul><li v-for="item in listOf(advice.today_avoid)" :key="item">{{ item }}</li></ul></div>
+            <div class="gmv-action-box"><h3>{{ t('page.gmvMax.budgetAdvice') }}</h3><ul><li v-for="item in listOf(advice.budget_advice)" :key="item">{{ item }}</li></ul></div>
+            <div class="gmv-action-box"><h3>{{ t('page.gmvMax.roiAdvice') }}</h3><ul><li v-for="item in listOf(advice.roi_advice)" :key="item">{{ item }}</li></ul></div>
+            <div class="gmv-action-box"><h3>{{ t('page.gmvMax.creativeAdvice') }}</h3><ul><li v-for="item in listOf(advice.creative_advice)" :key="item">{{ item }}</li></ul></div>
+          </div>
+          <div class="gmv-conclusion">{{ advice.core_conclusion || t('page.gmvMax.defaultConclusion') }}</div>
+        </template>
+        <div v-else class="gmv-empty">{{ t('page.gmvMax.noAdvice') }}</div>
+      </div>
+
+      <div class="gmv-card">
+        <div class="gmv-card-head">
+          <div>
+            <h2>{{ t('page.gmvMax.dailyChecklist') }}</h2>
+            <div class="gmv-card-desc">{{ t('page.gmvMax.dailyChecklistDesc') }}</div>
+          </div>
+        </div>
+        <div class="gmv-check-grid">
+          <div class="gmv-check-card" v-for="group in copy.daily" :key="group.title">
+            <h3>{{ group.title }}</h3>
+            <ul><li v-for="item in group.items" :key="item">{{ item }}</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="gmv-card gmv-animate gmv-a5">
+      <div class="gmv-card-head">
+        <div>
+          <h2>{{ t('page.gmvMax.sopTitle') }}</h2>
+          <div class="gmv-card-desc">{{ t('page.gmvMax.sopDesc') }}</div>
+        </div>
+      </div>
+      <div class="gmv-sop-grid">
+        <div class="gmv-sop-step" v-for="step in copy.sop" :key="step.day">
+          <div class="day">{{ step.day }}</div>
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.desc }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="gmv-card gmv-table-card gmv-animate gmv-a6">
+      <div class="gmv-table-head">
+        <h2>{{ t('page.gmvMax.rankingTitle') }}</h2>
+        <div class="gmv-card-desc">{{ t('page.gmvMax.rankingDesc') }}</div>
+      </div>
+      <el-table :data="rankingItems" stripe v-loading="rankingLoading" empty-text="暂无数据" style="width:100%">
+        <el-table-column prop="video_id" :label="t('page.gmvMax.colVideo')" min-width="150"></el-table-column>
+        <el-table-column prop="title" :label="t('page.gmvMax.colTitle')" min-width="220" show-overflow-tooltip></el-table-column>
+        <el-table-column prop="roi" :label="t('page.gmvMax.colRoi')" width="90"><template #default="s">{{ fmtNum(s.row.roi, 2) }}</template></el-table-column>
+        <el-table-column prop="sku_orders" :label="t('page.gmvMax.colOrders')" width="120"><template #default="s">{{ fmtNum(s.row.sku_orders, 0) }}</template></el-table-column>
+        <el-table-column prop="ctr" :label="t('page.gmvMax.colCtr')" width="100"><template #default="s">{{ fmtPct(s.row.ctr) }}</template></el-table-column>
+        <el-table-column prop="cvr" :label="t('page.gmvMax.colCvr')" width="100"><template #default="s">{{ fmtPct(s.row.cvr) }}</template></el-table-column>
+        <el-table-column prop="cost" :label="t('page.gmvMax.colCost')" width="110"><template #default="s">{{ fmtMoney(s.row.cost) }}</template></el-table-column>
+        <el-table-column prop="gross_revenue" :label="t('page.gmvMax.colGmv')" width="120"><template #default="s">{{ fmtMoney(s.row.gross_revenue) }}</template></el-table-column>
+        <el-table-column prop="material_type" :label="t('page.gmvMax.colType')" width="120"><template #default="s"><el-tag class="gmv-type-tag" :type="materialTagType(s.row.material_type)">{{ materialTypeText(s.row.material_type) }}</el-tag></template></el-table-column>
+        <el-table-column prop="days" :label="t('page.gmvMax.colDays')" width="90"></el-table-column>
+      </el-table>
+    </section>
+
+    <section class="gmv-card gmv-table-card gmv-animate gmv-a7">
+      <div class="gmv-table-head">
+        <h2>{{ t('page.gmvMax.historyTitle') }}</h2>
+        <div class="gmv-card-desc">{{ t('page.gmvMax.historyDesc') }}</div>
+      </div>
+      <el-table :data="historyItems" stripe v-loading="historyLoading" empty-text="暂无数据" style="width:100%">
+        <el-table-column prop="metric_date" :label="t('page.gmvMax.colDate')" width="120"></el-table-column>
+        <el-table-column prop="campaign_id" :label="t('page.gmvMax.colCampaign')" min-width="150"></el-table-column>
+        <el-table-column prop="video_id" :label="t('page.gmvMax.colVideo')" min-width="150"></el-table-column>
+        <el-table-column prop="title" :label="t('page.gmvMax.colTitle')" min-width="220" show-overflow-tooltip></el-table-column>
+        <el-table-column prop="roi" :label="t('page.gmvMax.colRoi')" width="90"><template #default="s">{{ fmtNum(s.row.roi, 2) }}</template></el-table-column>
+        <el-table-column prop="sku_orders" :label="t('page.gmvMax.colOrders')" width="120"><template #default="s">{{ fmtNum(s.row.sku_orders, 0) }}</template></el-table-column>
+        <el-table-column prop="ctr" :label="t('page.gmvMax.colCtr')" width="100"><template #default="s">{{ fmtPct(s.row.ctr) }}</template></el-table-column>
+        <el-table-column prop="cvr" :label="t('page.gmvMax.colCvr')" width="100"><template #default="s">{{ fmtPct(s.row.cvr) }}</template></el-table-column>
+        <el-table-column prop="cost" :label="t('page.gmvMax.colCost')" width="110"><template #default="s">{{ fmtMoney(s.row.cost) }}</template></el-table-column>
+      </el-table>
+      <div style="display:flex;justify-content:flex-end;padding:16px 22px;">
+        <el-pagination background layout="prev, pager, next, sizes, total" :page-sizes="[20,50,100]" v-model:current-page="historyPage" v-model:page-size="historyPageSize" :total="historyTotal" @current-change="loadHistory" @size-change="loadHistory"></el-pagination>
+      </div>
+    </section>
+  </div>
+</div>
+{/block}
+
+{block name="script"}
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
+<script>
+{literal}
+(function () {
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
+  const { ElMessage } = ElementPlus;
+  const i18n = window.AppI18n || null;
+  const lang = i18n && i18n.getLang ? i18n.getLang('zh') : 'zh';
+  const t = (key, vars) => i18n && i18n.t ? i18n.t(key, vars) : key;
+
+  const COPY = {
+    zh: {
+      sop: [
+        { day: '第0天', title: '产品与素材准备', desc: '确认保本ROI、卖点、价格钩子、达人/UGC素材池；准备至少5-10条不同开头素材。' },
+        { day: '第1天', title: '建GMV Max计划', desc: '预算先按目标CPA的10-20倍，目标ROI从保本附近起步，不频繁改计划。' },
+        { day: '第2天', title: '判断素材抢量', desc: '看CTR、2秒率、曝光、消耗和订单；有点击无转化优先改转化段。' },
+        { day: '第3天', title: '优化素材结构', desc: '替换前3秒钩子、补充佩戴/对比/场景证据，保留有订单或高点击素材。' },
+        { day: '第4-7天', title: '小步放量', desc: '稳定出单后逐步加预算；ROI每次只上调0.3，掉量则回退。' },
+        { day: '第8-14天', title: '稳定循环', desc: '每天补新素材、排除明显垃圾素材，保持模型稳定，不频繁换品。' },
+        { day: '第15天+', title: '规模化复制', desc: '把放量素材复制到同品多计划/多店铺，沉淀店铺基准和素材模板。' }
+      ],
+      daily: [
+        { title: '上午', items: ['检查昨晚消耗、订单、ROI', '标记垃圾素材并准备排除', '补充3-5条新开头素材'] },
+        { title: '下午', items: ['观察新素材点击率与2秒率', '对高点击低转化素材改卖点和CTA', '只对稳定计划小幅加预算'] },
+        { title: '晚上', items: ['复盘全天ECPM竞争力', '整理次日素材脚本', '不要在学习期频繁换品或大幅调ROI'] }
+      ]
+    },
+    en: {
+      sop: [
+        { day: 'Day 0', title: 'Prepare product and creatives', desc: 'Lock breakeven ROI, hooks, pricing angles, and 5-10 UGC variations.' },
+        { day: 'Day 1', title: 'Launch GMV Max', desc: 'Set budget at 10-20x target CPA and start ROI near breakeven.' },
+        { day: 'Day 2', title: 'Read early traction', desc: 'Check CTR, 2s rate, spend, orders, and isolate weak stages.' },
+        { day: 'Day 3', title: 'Improve creative structure', desc: 'Refresh hooks, add wearing demos, comparisons, and stronger CTA proof.' },
+        { day: 'Day 4-7', title: 'Scale in small steps', desc: 'Increase budget only after stable orders; raise ROI by 0.3 each time.' },
+        { day: 'Day 8-14', title: 'Stabilize the loop', desc: 'Add new creatives daily and exclude clear waste without disturbing the model.' },
+        { day: 'Day 15+', title: 'Replicate winners', desc: 'Copy winning creatives to same-product plans and store benchmarks.' }
+      ],
+      daily: [
+        { title: 'Morning', items: ['Review spend, orders, ROI', 'Mark waste creatives', 'Prepare 3-5 new hooks'] },
+        { title: 'Afternoon', items: ['Watch CTR and 2s rate', 'Fix high-click low-CVR creatives', 'Scale stable plans only'] },
+        { title: 'Evening', items: ['Review ECPM strength', 'Prepare next scripts', 'Avoid frequent ROI/product changes'] }
+      ]
+    },
+    vi: {
+      sop: [
+        { day: 'Ngày 0', title: 'Chuẩn bị sản phẩm và video', desc: 'Xác nhận ROI hòa vốn, hook, giá bán và 5-10 biến thể UGC.' },
+        { day: 'Ngày 1', title: 'Tạo chiến dịch GMV Max', desc: 'Ngân sách 10-20 lần CPA mục tiêu, ROI bắt đầu gần mức hòa vốn.' },
+        { day: 'Ngày 2', title: 'Đọc tín hiệu đầu', desc: 'Theo dõi CTR, 2s rate, chi phí, đơn hàng và điểm yếu của video.' },
+        { day: 'Ngày 3', title: 'Tối ưu cấu trúc video', desc: 'Đổi 3 giây đầu, thêm đeo thử, so sánh, bối cảnh và CTA rõ hơn.' },
+        { day: 'Ngày 4-7', title: 'Tăng ngân sách từng bước', desc: 'Chỉ tăng khi đơn ổn định; ROI mỗi lần tăng khoảng 0.3.' },
+        { day: 'Ngày 8-14', title: 'Ổn định vòng lặp', desc: 'Bổ sung video mới mỗi ngày và loại video rác rõ ràng.' },
+        { day: 'Ngày 15+', title: 'Nhân rộng mẫu thắng', desc: 'Sao chép video thắng sang kế hoạch/sản phẩm tương tự và lưu benchmark.' }
+      ],
+      daily: [
+        { title: 'Sáng', items: ['Kiểm tra chi phí, đơn, ROI', 'Đánh dấu video rác', 'Chuẩn bị 3-5 hook mới'] },
+        { title: 'Chiều', items: ['Theo dõi CTR và 2s rate', 'Sửa video click cao nhưng CVR thấp', 'Chỉ tăng ngân sách kế hoạch ổn định'] },
+        { title: 'Tối', items: ['Rà soát sức cạnh tranh ECPM', 'Chuẩn bị kịch bản ngày mai', 'Không đổi ROI/sản phẩm liên tục'] }
+      ]
+    }
+  };
+
+  function today(offset) {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  createApp({
+    setup() {
+      const copy = COPY[lang] || COPY.zh;
+      const stores = ref([]);
+      const loading = ref(false);
+      const rankingLoading = ref(false);
+      const historyLoading = ref(false);
+      const filters = reactive({ store_id: '', campaign_id: '', date_from: today(-13), date_to: today(0) });
+      const baseline = ref({});
+      const recommendation = ref(null);
+      const rankingItems = ref([]);
+      const historyItems = ref([]);
+      const historyTotal = ref(0);
+      const historyPage = ref(1);
+      const historyPageSize = ref(50);
+      const theme = ref(readTheme());
+      const animatedKpi = reactive({ roi: 0, orders: 0, cost: 0, samples: 0 });
+      let rafMap = {};
+
+      const advice = computed(() => (recommendation.value && recommendation.value.recommendation) ? recommendation.value.recommendation : {});
+      const recommendationData = computed(() => recommendation.value && Object.keys(recommendation.value).length ? recommendation.value : null);
+      const themeClass = computed(() => theme.value === 'dark' ? 'theme-dark' : 'theme-light');
+      const themeButtonText = computed(() => theme.value === 'dark' ? t('page.gmvMax.switchLight') : t('page.gmvMax.switchDark'));
+
+      function readTheme() {
+        try {
+          const cached = String(window.localStorage.getItem('gmv_max_theme') || '').toLowerCase();
+          if (cached === 'dark' || cached === 'light') return cached;
+        } catch (e) {}
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      function toggleTheme() {
+        theme.value = theme.value === 'dark' ? 'light' : 'dark';
+        try { window.localStorage.setItem('gmv_max_theme', theme.value); } catch (e) {}
+      }
+
+      function qs(params) {
+        const sp = new URLSearchParams();
+        Object.keys(params || {}).forEach((k) => {
+          const v = params[k];
+          if (v !== undefined && v !== null && String(v) !== '') sp.append(k, String(v));
+        });
+        return sp.toString();
+      }
+
+      async function api(url) {
+        const res = await fetch(url, { headers: { 'Accept': 'application/json, text/javascript, */*;q=0.01', 'X-Requested-With': 'XMLHttpRequest' } });
+        const text = await res.text();
+        let json = {};
+        try { json = text ? JSON.parse(text) : {}; } catch (e) { throw new Error(t('common.loadingFailed')); }
+        if (!res.ok || Number(json.code || 0) !== 0) {
+          const msg = json.error_key && i18n && i18n.t ? i18n.t(json.error_key) : (json.msg || t('common.loadingFailed'));
+          throw new Error(msg);
+        }
+        return json.data || {};
+      }
+
+      async function loadStores() {
+        try {
+          const data = await api('/admin.php/profit_center/storeList');
+          stores.value = data.items || [];
+          if (!filters.store_id && stores.value.length) filters.store_id = String(stores.value[0].id);
+        } catch (e) {
+          ElMessage.error(e.message || t('common.loadingFailed'));
+        }
+      }
+
+      async function loadBaselineAndAdvice() {
+        const baseParams = { store_id: filters.store_id, window_days: 30 };
+        const recParams = { store_id: filters.store_id, campaign_id: filters.campaign_id };
+        const [base, rec] = await Promise.all([
+          api('/admin.php/gmv_max/creative/baseline?' + qs(baseParams)),
+          api('/admin.php/gmv_max/creative/recommendation?' + qs(recParams))
+        ]);
+        baseline.value = base || {};
+        recommendation.value = rec || null;
+        animateKpi('roi', Number((base || {}).avg_roi || 0));
+        animateKpi('orders', Number((base || {}).total_orders || 0));
+        animateKpi('cost', Number((base || {}).total_cost || 0));
+        animateKpi('samples', Number((base || {}).sample_count || 0));
+      }
+
+      async function loadRanking() {
+        rankingLoading.value = true;
+        try {
+          const data = await api('/admin.php/gmv_max/creative/ranking?' + qs({ store_id: filters.store_id, date_from: filters.date_from, date_to: filters.date_to, limit: 50 }));
+          rankingItems.value = data.items || [];
+        } finally {
+          rankingLoading.value = false;
+        }
+      }
+
+      async function loadHistory() {
+        historyLoading.value = true;
+        try {
+          const data = await api('/admin.php/gmv_max/creative/history?' + qs({ store_id: filters.store_id, campaign_id: filters.campaign_id, date_from: filters.date_from, date_to: filters.date_to, page: historyPage.value, page_size: historyPageSize.value }));
+          historyItems.value = data.items || [];
+          historyTotal.value = Number(data.total || 0);
+        } finally {
+          historyLoading.value = false;
+        }
+      }
+
+      async function refreshAll() {
+        loading.value = true;
+        try {
+          historyPage.value = 1;
+          await Promise.all([loadBaselineAndAdvice(), loadRanking(), loadHistory()]);
+        } catch (e) {
+          ElMessage.error(e.message || t('common.loadingFailed'));
+        } finally {
+          loading.value = false;
+        }
+      }
+
+      function fmtNum(v, digits) {
+        const n = Number(v || 0);
+        return n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      }
+      function fmtMoney(v) { return fmtNum(v, 2); }
+      function fmtPct(v) { return fmtNum(v, 2) + '%'; }
+      function listOf(v) {
+        if (Array.isArray(v)) return v.length ? v : ['-'];
+        if (typeof v === 'string' && v.trim()) return [v.trim()];
+        return ['-'];
+      }
+      function stageText(v) {
+        const map = { cold_start: '冷启动', learning: '学习期', scaling: '放量期', stable: '稳定期', decay: '衰退期' };
+        return map[v] || v || '-';
+      }
+      function problemText(v) {
+        const map = { hook: '前3秒钩子弱', retention: '中段留存弱', conversion: '转化段弱', cost: '成本偏高', creative: '素材不足', none: '暂无明显问题' };
+        return map[v] || v || '-';
+      }
+      function actionLevelText(v) {
+        const map = { conservative: '保守观察', normal: '平衡优化', aggressive: '积极放量', stop_loss: '止损排除' };
+        return map[v] || v || '-';
+      }
+      function sampleLevelText(v) {
+        const map = { low: '样本偏少', medium: '样本适中', high: '样本充足' };
+        return map[v] || '-';
+      }
+      function baselineModeText(v) {
+        const map = { store_history: '店铺历史', global_rule: '通用规则', mixed: '混合基准' };
+        return map[v] || '-';
+      }
+      function materialTypeText(v) {
+        const map = { scale: '放量素材', potential: '潜力素材', bad: '差素材', ignore: '忽略' };
+        return map[v] || v || '-';
+      }
+      function materialTagType(v) {
+        return v === 'scale' ? 'success' : (v === 'bad' ? 'danger' : (v === 'potential' ? 'warning' : 'info'));
+      }
+      function animateKpi(key, target) {
+        const end = Number.isFinite(target) ? target : 0;
+        const start = Number(animatedKpi[key] || 0);
+        const distance = Math.abs(end - start);
+        if (distance < 0.0001) {
+          animatedKpi[key] = end;
+          return;
+        }
+        if (rafMap[key]) cancelAnimationFrame(rafMap[key]);
+        const duration = Math.min(980, Math.max(420, distance * 12));
+        const begin = performance.now();
+        const step = (now) => {
+          const p = Math.min(1, (now - begin) / duration);
+          const eased = 1 - Math.pow(1 - p, 3);
+          animatedKpi[key] = start + (end - start) * eased;
+          if (p < 1) {
+            rafMap[key] = requestAnimationFrame(step);
+          } else {
+            animatedKpi[key] = end;
+          }
+        };
+        rafMap[key] = requestAnimationFrame(step);
+      }
+
+      onMounted(async () => {
+        await loadStores();
+        await refreshAll();
+      });
+
+      return { t, copy, stores, filters, loading, rankingLoading, historyLoading, baseline, animatedKpi, recommendationData, advice, rankingItems, historyItems, historyTotal, historyPage, historyPageSize, themeClass, themeButtonText, toggleTheme, refreshAll, loadHistory, fmtNum, fmtMoney, fmtPct, listOf, stageText, problemText, actionLevelText, sampleLevelText, baselineModeText, materialTypeText, materialTagType };
+    }
+  }).use(ElementPlus).mount('#gmvMaxApp');
+})();
+{/literal}
+</script>
+{/block}
