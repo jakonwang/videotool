@@ -82,6 +82,16 @@
       const importStatusText = ref('');
       const importLogs = ref([]);
       const importDone = ref(false);
+      const damiImportVisible = ref(false);
+      const damiLoading = ref(false);
+      const damiCommitting = ref(false);
+      const damiHeaders = ref([]);
+      const damiMapping = reactive({});
+      const damiSummary = reactive({ total: 0, inserted: 0, updated: 0, failed: 0 });
+      const damiPreviewRows = ref([]);
+      const damiFailedRows = ref([]);
+      const damiBatchRows = ref([]);
+      const damiBatchLoading = ref(false);
       let importPollTimer = null;
       const editVisible = ref(false);
       const editSaving = ref(false);
@@ -328,6 +338,168 @@
       function closeImportDialog() {
         stopImportPolling();
         importDialogVisible.value = false;
+      }
+
+      const damiFieldOptions = [
+        { key: 'tiktok_id', label: 'TikTok账号(@handle)' },
+        { key: 'source_influencer_id', label: '达秘达人ID' },
+        { key: 'nickname', label: '昵称' },
+        { key: 'avatar_url', label: '头像URL' },
+        { key: 'follower_count', label: '粉丝数' },
+        { key: 'contact_whatsapp', label: 'WhatsApp' },
+        { key: 'contact_zalo', label: 'Zalo' },
+        { key: 'contact_note', label: '联系备注' },
+        { key: 'region', label: '地区' },
+        { key: 'category_name', label: '分类' },
+        { key: 'profile_url', label: '主页链接' },
+      ];
+
+      function damiTemplateKey() {
+        return 'dami_mapping_template_v1';
+      }
+
+      function resetDamiState() {
+        damiHeaders.value = [];
+        damiPreviewRows.value = [];
+        damiFailedRows.value = [];
+        damiSummary.total = 0;
+        damiSummary.inserted = 0;
+        damiSummary.updated = 0;
+        damiSummary.failed = 0;
+        damiFieldOptions.forEach((f) => {
+          damiMapping[f.key] = '';
+        });
+      }
+
+      function loadDamiTemplate() {
+        try {
+          const txt = localStorage.getItem(damiTemplateKey()) || '';
+          if (!txt) return;
+          const parsed = JSON.parse(txt);
+          if (!parsed || typeof parsed !== 'object') return;
+          damiFieldOptions.forEach((f) => {
+            const v = parsed[f.key];
+            if (typeof v === 'string' || typeof v === 'number') damiMapping[f.key] = String(v);
+          });
+        } catch (_) {}
+      }
+
+      function saveDamiTemplate() {
+        const payload = {};
+        damiFieldOptions.forEach((f) => {
+          payload[f.key] = String(damiMapping[f.key] || '').trim();
+        });
+        try {
+          localStorage.setItem(damiTemplateKey(), JSON.stringify(payload));
+          ElMessage.success('映射模板已保存');
+        } catch (_) {
+          ElMessage.error('映射模板保存失败');
+        }
+      }
+
+      function openDamiImport() {
+        resetDamiState();
+        loadDamiTemplate();
+        damiImportVisible.value = true;
+      }
+
+      function buildDamiMappingPayload() {
+        const out = {};
+        damiFieldOptions.forEach((f) => {
+          const val = String(damiMapping[f.key] || '').trim();
+          if (val !== '') out[f.key] = val;
+        });
+        return out;
+      }
+
+      async function previewDamiImport() {
+        const input = document.getElementById('damiFileInput');
+        if (!input || !input.files || !input.files[0]) {
+          ElMessage.warning('请先选择达秘CSV/Excel文件');
+          return;
+        }
+        damiLoading.value = true;
+        try {
+          const fd = new FormData();
+          fd.append('file', input.files[0]);
+          fd.append('source_system', 'dami');
+          fd.append('mapping_json', JSON.stringify(buildDamiMappingPayload()));
+          const res = await fetch('/admin.php/influencer/source/importPreview', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+            body: fd,
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          const data = json.data || {};
+          damiHeaders.value = Array.isArray(data.headers) ? data.headers : [];
+          const mapping = data.mapping || {};
+          Object.keys(mapping).forEach((k) => {
+            if (mapping[k] != null) damiMapping[k] = String(mapping[k]);
+          });
+          const s = data.summary || {};
+          damiSummary.total = Number(s.total || 0);
+          damiSummary.inserted = Number(s.inserted || 0);
+          damiSummary.updated = Number(s.updated || 0);
+          damiSummary.failed = Number(s.failed || 0);
+          damiPreviewRows.value = Array.isArray(data.preview) ? data.preview : [];
+          damiFailedRows.value = Array.isArray(data.failed_rows) ? data.failed_rows : [];
+          ElMessage.success('预览完成');
+        } catch (e) {
+          ElMessage.error(e.message || '预览失败');
+        } finally {
+          damiLoading.value = false;
+        }
+      }
+
+      async function commitDamiImport() {
+        const input = document.getElementById('damiFileInput');
+        if (!input || !input.files || !input.files[0]) {
+          ElMessage.warning('请先选择达秘CSV/Excel文件');
+          return;
+        }
+        damiCommitting.value = true;
+        try {
+          const fd = new FormData();
+          fd.append('file', input.files[0]);
+          fd.append('source_system', 'dami');
+          fd.append('mapping_json', JSON.stringify(buildDamiMappingPayload()));
+          const res = await fetch('/admin.php/influencer/source/importCommit', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+            body: fd,
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.saveFailed'));
+          const d = json.data || {};
+          ElMessage.success(`导入完成：新增${Number(d.inserted||0)}，更新${Number(d.updated||0)}，失败${Number(d.failed||0)}`);
+          damiImportVisible.value = false;
+          await fetchList();
+          await fetchDamiBatches();
+        } catch (e) {
+          ElMessage.error(e.message || '导入失败');
+        } finally {
+          damiCommitting.value = false;
+        }
+      }
+
+      async function fetchDamiBatches() {
+        damiBatchLoading.value = true;
+        try {
+          const res = await fetch('/admin.php/influencer/source/importBatches?page=1&page_size=10', {
+            credentials: 'same-origin',
+            headers: { ...apiFetchHeaders },
+          });
+          const json = parseJsonBody(res, await res.text());
+          if (!json || json.code !== 0) throw new Error(resolveApiMessage(json, 'common.loadingFailed'));
+          damiBatchRows.value = (json.data && Array.isArray(json.data.items)) ? json.data.items : [];
+        } catch (e) {
+          ElMessage.error(e.message || '加载达秘批次失败');
+        } finally {
+          damiBatchLoading.value = false;
+        }
       }
 
       async function copyText(text) {
@@ -940,6 +1112,7 @@
         }
         loadCategoryOptions();
         fetchList();
+        fetchDamiBatches();
       });
       onUnmounted(() => { stopImportPolling(); });
 
@@ -957,6 +1130,17 @@
         importPercent,
         importStatusText,
         importLogs,
+        damiImportVisible,
+        damiLoading,
+        damiCommitting,
+        damiHeaders,
+        damiMapping,
+        damiSummary,
+        damiPreviewRows,
+        damiFailedRows,
+        damiBatchRows,
+        damiBatchLoading,
+        damiFieldOptions,
         tt,
         lang,
         headerCellStyle,
@@ -966,6 +1150,11 @@
         fetchList,
         doImport,
         closeImportDialog,
+        openDamiImport,
+        previewDamiImport,
+        commitDamiImport,
+        saveDamiTemplate,
+        fetchDamiBatches,
         copyText,
         statusLabel,
         statusTagType,
@@ -1038,9 +1227,36 @@
             <a class="el-button el-button--default" style="text-decoration:none;" href="/admin.php/influencer/exportCsv" rel="noopener">{{ tt('page.influencer.exportCsv') }}</a>
             <input type="file" id="infFileInput" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:220px;" />
             <el-button type="primary" size="default" :loading="importing" @click="doImport">{{ tt('page.influencer.importBtn') }}</el-button>
+            <el-button type="success" size="default" plain @click="openDamiImport">达秘导入向导</el-button>
           </div>
         </div>
         <div class="admin-inf-hint">{{ tt('page.influencer.hint') }}</div>
+
+        <el-card shadow="never" style="margin-bottom:12px;" v-loading="damiBatchLoading">
+          <template #header>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:600;">达秘来源 ROI 批次看板</span>
+              <el-button size="small" @click="fetchDamiBatches">刷新</el-button>
+            </div>
+          </template>
+          <el-table :data="damiBatchRows" size="small" max-height="260">
+            <el-table-column prop="batch_no" label="批次号" min-width="160" />
+            <el-table-column prop="created_at" label="导入时间" min-width="150" />
+            <el-table-column prop="influencer_count" label="达人数" width="88" />
+            <el-table-column prop="task_count" label="触达任务" width="90" />
+            <el-table-column prop="reply_count" label="回复数" width="90" />
+            <el-table-column prop="converted_count" label="转化数" width="90" />
+            <el-table-column label="触达率" width="90">
+              <template #default="{ row }">{{ Number(row.touch_rate||0).toFixed(2) }}%</template>
+            </el-table-column>
+            <el-table-column label="回复率" width="90">
+              <template #default="{ row }">{{ Number(row.reply_rate||0).toFixed(2) }}%</template>
+            </el-table-column>
+            <el-table-column label="转化率" width="90">
+              <template #default="{ row }">{{ Number(row.convert_rate||0).toFixed(2) }}%</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
 
         <el-form :inline="true" class="inf-filter-form" style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px;">
           <el-form-item>
@@ -1097,6 +1313,12 @@
           <el-table-column prop="tiktok_id" :label="tt('page.influencer.colHandle')" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="inf-nowrap">{{ row.tiktok_id }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="来源" width="92" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="String(row.source_system||'')==='dami'" type="success" size="small">达秘</el-tag>
+              <el-tag v-else size="small" type="info">手工</el-tag>
             </template>
           </el-table-column>
           <el-table-column :label="tt('page.influencer.colCategory')" width="100" show-overflow-tooltip>
@@ -1176,6 +1398,57 @@
             @update:page-size="(s)=>{ pageSize=s; page=1; fetchList(); }"
           />
         </div>
+
+        <el-dialog v-model="damiImportVisible" title="达秘导入向导" width="980px">
+          <el-alert type="info" :closable="false" title="流程：上传文件 -> 预览差异 -> 执行同步（只更新基础资料，不覆盖运营字段）" />
+          <div style="display:flex;gap:10px;align-items:center;margin:10px 0 12px;">
+            <input type="file" id="damiFileInput" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:280px;" />
+            <el-button :loading="damiLoading" @click="previewDamiImport">预览差异</el-button>
+            <el-button type="primary" plain @click="saveDamiTemplate">保存映射模板</el-button>
+          </div>
+          <el-row :gutter="12">
+            <el-col :span="10">
+              <el-card shadow="never">
+                <template #header><span>字段映射</span></template>
+                <el-form label-width="130px" size="small">
+                  <el-form-item v-for="field in damiFieldOptions" :key="field.key" :label="field.label">
+                    <el-select v-model="damiMapping[field.key]" clearable filterable style="width:100%;">
+                      <el-option v-for="(h, idx) in damiHeaders" :key="idx" :label="h" :value="String(idx)" />
+                    </el-select>
+                  </el-form-item>
+                </el-form>
+              </el-card>
+            </el-col>
+            <el-col :span="14">
+              <el-row :gutter="8" style="margin-bottom:8px;">
+                <el-col :span="6"><el-statistic title="总行数" :value="damiSummary.total" /></el-col>
+                <el-col :span="6"><el-statistic title="新增" :value="damiSummary.inserted" /></el-col>
+                <el-col :span="6"><el-statistic title="更新" :value="damiSummary.updated" /></el-col>
+                <el-col :span="6"><el-statistic title="失败" :value="damiSummary.failed" /></el-col>
+              </el-row>
+              <el-table :data="damiPreviewRows" size="small" max-height="280">
+                <el-table-column prop="row_no" label="行号" width="70" />
+                <el-table-column prop="action" label="动作" width="80">
+                  <template #default="{ row }">
+                    <el-tag :type="row.action==='insert' ? 'success' : 'warning'" size="small">{{ row.action==='insert' ? '新增' : '更新' }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="tiktok_id" label="TikTok账号" min-width="150" />
+                <el-table-column prop="source_influencer_id" label="达秘ID" min-width="120" />
+                <el-table-column prop="nickname" label="昵称" min-width="130" />
+                <el-table-column prop="follower_count" label="粉丝数" width="90" />
+              </el-table>
+              <el-table v-if="damiFailedRows.length" :data="damiFailedRows" size="small" max-height="120" style="margin-top:8px;">
+                <el-table-column prop="row_no" label="失败行" width="80" />
+                <el-table-column prop="reason" label="失败原因" min-width="220" />
+              </el-table>
+            </el-col>
+          </el-row>
+          <template #footer>
+            <el-button @click="damiImportVisible=false">取消</el-button>
+            <el-button type="primary" :loading="damiCommitting" @click="commitDamiImport">执行同步</el-button>
+          </template>
+        </el-dialog>
 
         <el-dialog v-model="importDialogVisible" :title="tt('page.influencer.importProgress')" width="520px" @close="closeImportDialog">
           <el-progress :percentage="importPercent" />

@@ -21,9 +21,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 
-import requests
-from playwright.sync_api import BrowserContext, Page, TimeoutError as PwTimeoutError, sync_playwright
+try:
+    from playwright.sync_api import BrowserContext, Page, TimeoutError as PwTimeoutError, sync_playwright
+except ModuleNotFoundError:
+    BrowserContext = Any  # type: ignore[assignment]
+    Page = Any  # type: ignore[assignment]
+    PwTimeoutError = TimeoutError  # type: ignore[assignment]
+    sync_playwright = None  # type: ignore[assignment]
 
 
 VERSION = "desktop-agent/1.0.0"
@@ -102,9 +110,9 @@ class AgentConfig:
 class DesktopAgent:
     def __init__(self, cfg: AgentConfig) -> None:
         self.cfg = cfg
-        self.http = requests.Session()
         self._pw = None
         self._ctx: Optional[BrowserContext] = None
+        self._working_url: Dict[str, str] = {}
 
     def run(self) -> None:
         self._validate()
@@ -133,6 +141,32 @@ class DesktopAgent:
     def _url(self, path: str) -> str:
         return f"{self.cfg.admin_base}/{path.lstrip('/')}"
 
+    def _candidate_urls(self, path: str) -> List[str]:
+        clean_path = path.lstrip("/")
+        base = self.cfg.admin_base.rstrip("/")
+        out: List[str] = []
+        seen = set()
+
+        def add(u: str) -> None:
+            if u and u not in seen:
+                seen.add(u)
+                out.append(u)
+
+        if base.endswith(".php"):
+            add(f"{base}/{clean_path}")
+            parsed = urlsplit(base)
+            q = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            q["s"] = clean_path
+            query = urlencode(q, doseq=True)
+            add(urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment)))
+        else:
+            add(f"{base}/{clean_path}")
+            add(f"{base}/admin.php/{clean_path}")
+            add(f"{base}/public/admin.php/{clean_path}")
+            add(f"{base}/admin.php?s={clean_path}")
+            add(f"{base}/public/admin.php?s={clean_path}")
+        return out
+
     def _headers(self) -> Dict[str, str]:
         return {
             "Accept": "application/json",
@@ -142,12 +176,38 @@ class DesktopAgent:
             "User-Agent": VERSION,
         }
 
-    def _safe_json(self, response: requests.Response) -> Dict[str, Any]:
-        text = response.text or ""
-        try:
-            return response.json()
-        except Exception as exc:
-            raise RuntimeError(f"non-json response({response.status_code}): {text[:300]}") from exc
+    def _post_json(self, urls: List[str], payload: Dict[str, Any]) -> tuple[Dict[str, Any], str]:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        last_exc: Optional[Exception] = None
+        for url in urls:
+            req = Request(url=url, data=body, headers=self._headers(), method="POST")
+            try:
+                with urlopen(req, timeout=self.cfg.request_timeout_sec) as resp:
+                    status = int(getattr(resp, "status", 200) or 200)
+                    raw = resp.read()
+                    text = raw.decode("utf-8", errors="replace")
+                try:
+                    data = json.loads(text)
+                    if not isinstance(data, dict):
+                        raise RuntimeError(f"non-json response({status}): {text[:300]}")
+                    return data, url
+                except Exception as exc:
+                    last_exc = RuntimeError(f"non-json response({status}): {text[:300]}")
+                    # If response indicates routing miss, continue trying fallback URLs.
+                    if "No input file specified" in text or status == 404:
+                        continue
+                    raise last_exc from exc
+            except HTTPError as exc:
+                raw = exc.read() if hasattr(exc, "read") else b""
+                text = raw.decode("utf-8", errors="replace")
+                last_exc = RuntimeError(f"http_error:{exc.code}:{text[:300]}")
+                if "No input file specified" in text or int(exc.code) == 404:
+                    continue
+            except URLError as exc:
+                last_exc = RuntimeError(f"network_error:{exc}")
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("request_failed:no_candidate_url")
 
     def pull_task(self) -> Optional[Dict[str, Any]]:
         payload: Dict[str, Any] = {
@@ -157,13 +217,10 @@ class DesktopAgent:
         }
         if self.cfg.task_types:
             payload["task_types"] = self.cfg.task_types
-        res = self.http.post(
-            self._url(self.cfg.pull_path),
-            headers=self._headers(),
-            data=json.dumps(payload, ensure_ascii=False),
-            timeout=self.cfg.request_timeout_sec,
-        )
-        data = self._safe_json(res)
+        key = "pull"
+        urls = [self._working_url[key]] if key in self._working_url else self._candidate_urls(self.cfg.pull_path)
+        data, used_url = self._post_json(urls, payload)
+        self._working_url[key] = used_url
         if int(data.get("code") or -1) != 0:
             raise RuntimeError(f"pull failed: {data}")
         task = (data.get("data") or {}).get("task")
@@ -200,19 +257,18 @@ class DesktopAgent:
         }
         if extra:
             payload.update(extra)
-        res = self.http.post(
-            self._url(self.cfg.report_path),
-            headers=self._headers(),
-            data=json.dumps(payload, ensure_ascii=False),
-            timeout=self.cfg.request_timeout_sec,
-        )
-        data = self._safe_json(res)
+        key = "report"
+        urls = [self._working_url[key]] if key in self._working_url else self._candidate_urls(self.cfg.report_path)
+        data, used_url = self._post_json(urls, payload)
+        self._working_url[key] = used_url
         if int(data.get("code") or -1) != 0:
             raise RuntimeError(f"report failed: {data}")
 
     def ensure_context(self) -> BrowserContext:
         if self._ctx is not None:
             return self._ctx
+        if sync_playwright is None:
+            raise RuntimeError("missing_playwright: 请先安装依赖并执行 python -m playwright install chromium")
         self._pw = sync_playwright().start()
         self._ctx = self._pw.chromium.launch_persistent_context(
             user_data_dir=str(self.cfg.user_data_dir),
@@ -378,4 +434,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

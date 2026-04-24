@@ -28,12 +28,19 @@ python -m playwright install chromium
 
 - `tools\desktop_agent\run_gui.bat`
 
-会打开一个小窗口，你只需要填：
-- `Admin base URL`
-- `Agent token`
-- `Device code`
+会打开中文启动器，支持：
+- 保存配置
+- 一键诊断（Python/后台可达性）
+- 安装/修复依赖（自动安装 playwright）
+- 启动代理 / 停止代理
+- 实时日志查看
 
-点 `Start agent` 即可运行。
+只需要填：
+- `后台地址`
+- `代理令牌`
+- `设备编码`
+
+点 `启动代理` 即可运行。
 
 ---
 
@@ -125,5 +132,8 @@ powershell -ExecutionPolicy Bypass -File .\build_windows_exe.ps1
 3. `zalo_input_not_found_for_id:*`  
    说明当前 Zalo 页面输入框未识别；先确认已登录 Zalo Web，且能打开对应会话。
 
-4. 任务一直 `empty_queue`  
-   检查活动是否在运行状态，且设备/活动的执行端策略允许 desktop。
+4. 点“启动代理”没有反应  
+   新版会自动弹出错误并写日志。优先点“一键诊断”和“安装/修复依赖”。
+
+5. 任务一直 `empty_queue`  
+   检查活动是否在运行状态，且设备/活动的执行端策略允许 `desktop` 或 `both`。

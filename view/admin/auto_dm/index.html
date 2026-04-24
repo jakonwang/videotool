@@ -125,6 +125,7 @@
         category_id: 0,
         region: '',
         quality_grade: '',
+        source_system: '',
         limit: 300,
         stop_on_reply: 1,
         reply_confirm_mode: 'manual',
@@ -160,6 +161,11 @@
       const replyConfirmModeOptions = computed(() => [
         { value: 'manual', label: tt('page.autoDm.replyModeManual') },
         { value: 'rule_manual', label: tt('page.autoDm.replyModeRuleManual') }
+      ]);
+      const sourceSystemOptions = computed(() => [
+        { value: '', label: '全部来源' },
+        { value: 'dami', label: '达秘导入' },
+        { value: 'manual', label: '手工/旧数据' }
       ]);
 
       function setConfirmLoading(id, loading) {
@@ -270,6 +276,7 @@
         form.category_id = 0;
         form.region = '';
         form.quality_grade = '';
+        form.source_system = '';
         form.limit = 300;
         form.stop_on_reply = 1;
         form.reply_confirm_mode = 'manual';
@@ -305,6 +312,7 @@
               category_id: Number(form.category_id || 0),
               region: String(form.region || '').trim(),
               quality_grade: String(form.quality_grade || '').trim(),
+              source_system: String(form.source_system || '').trim(),
               limit: Number(form.limit || 300),
               stop_on_reply: Number(form.stop_on_reply || 0),
               reply_confirm_mode: String(form.reply_confirm_mode || 'manual'),
@@ -474,6 +482,7 @@
         channelOptions,
         influencerStatusOptions,
         replyConfirmModeOptions,
+        sourceSystemOptions,
         fetchList,
         openCreate,
         createCampaign,
@@ -723,6 +732,13 @@
               <el-col :span="6">
                 <el-form-item :label="tt('page.autoDm.fieldQuality')">
                   <el-input v-model="form.quality_grade" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item label="达人来源">
+                  <el-select v-model="form.source_system" style="width:100%;">
+                    <el-option v-for="opt in sourceSystemOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="6">

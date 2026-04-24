@@ -22,6 +22,7 @@ class OpsMaintenanceService
             'run_migration_outreach.php',
             'run_migration_category_crm_outreach.php',
             'run_migration_influencers_crm.php',
+            'run_migration_influencer_source_dami.php',
             'run_migration_mobile_outreach.php',
             'run_migration_product_style_search.php',
             'run_migration_product_style_is_queue.php',

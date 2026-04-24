@@ -8,8 +8,11 @@ use app\model\Category as CategoryModel;
 use app\model\Influencer as InfluencerModel;
 use app\model\OutreachLog as OutreachLogModel;
 use app\service\AdminAuditService;
+use app\service\AdminAuthService;
+use app\service\AutoDmService;
 use app\service\InfluencerImportTaskRunner;
 use app\service\InfluencerService;
+use app\service\InfluencerSourceImportService;
 use app\service\InfluencerStatusFlowService;
 use think\facade\Db;
 use think\facade\Log;
@@ -124,6 +127,13 @@ class Influencer extends BaseController
                 'contact_display' => $contactDisplay,
                 'contact_channels' => $channels,
                 'region' => (string) ($row->region ?? ''),
+                'profile_url' => (string) ($row->profile_url ?? ''),
+                'data_source' => (string) ($row->data_source ?? ''),
+                'source_system' => (string) ($row->source_system ?? ''),
+                'source_influencer_id' => (string) ($row->source_influencer_id ?? ''),
+                'source_sync_at' => (string) ($row->source_sync_at ?? ''),
+                'last_crawled_at' => (string) ($row->last_crawled_at ?? ''),
+                'source_batch_id' => (int) ($row->source_batch_id ?? 0),
                 'status' => (int) ($row->status ?? 0),
                 'sample_tracking_no' => (string) ($row->sample_tracking_no ?? ''),
                 'sample_status' => (int) ($row->sample_status ?? 0),
@@ -152,6 +162,239 @@ class Influencer extends BaseController
             'page' => (int) $list->currentPage(),
             'page_size' => (int) $list->listRows(),
         ]);
+    }
+
+    /**
+     * 达秘导入预览：上传文件 + 映射，返回 insert/update 差异。
+     */
+    public function sourceImportPreview()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+            }
+            $file = $this->request->file('file');
+            if (!$file) {
+                return $this->jsonErr('file_required', 1, null, 'common.pickFile');
+            }
+            $ext = strtolower((string) $file->extension());
+            if ($ext === '') {
+                $ext = strtolower(pathinfo((string) $file->getOriginalName(), PATHINFO_EXTENSION));
+            }
+            if (!in_array($ext, ['csv', 'txt', 'xlsx', 'xls', 'xlsm'], true)) {
+                return $this->jsonErr('csv_only', 1, null, 'page.dataImport.csvOnly');
+            }
+            $sourceSystem = trim((string) $this->request->post('source_system', InfluencerSourceImportService::SOURCE_DAMI));
+            $mappingRaw = trim((string) $this->request->post('mapping_json', ''));
+            $mapping = [];
+            if ($mappingRaw !== '') {
+                $decoded = json_decode($mappingRaw, true);
+                if (is_array($decoded)) {
+                    $mapping = $decoded;
+                }
+            }
+
+            $parsed = InfluencerSourceImportService::readFile(
+                (string) $file->getPathname(),
+                $ext,
+                $sourceSystem,
+                $mapping,
+                500
+            );
+            $preview = InfluencerSourceImportService::previewRows(
+                (array) ($parsed['headers'] ?? []),
+                (array) ($parsed['rows'] ?? []),
+                (array) ($parsed['mapping'] ?? []),
+                $this->currentTenantId(),
+                120
+            );
+
+            return $this->jsonOk([
+                'source_system' => $sourceSystem,
+                'headers' => (array) ($parsed['headers'] ?? []),
+                'mapping' => (array) ($parsed['mapping'] ?? []),
+                'field_keys' => InfluencerSourceImportService::fieldKeys(),
+                'summary' => [
+                    'total' => (int) ($preview['total'] ?? 0),
+                    'inserted' => (int) ($preview['inserted'] ?? 0),
+                    'updated' => (int) ($preview['updated'] ?? 0),
+                    'failed' => (int) ($preview['failed'] ?? 0),
+                ],
+                'preview' => (array) ($preview['preview'] ?? []),
+                'failed_rows' => (array) ($preview['failed_rows'] ?? []),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('influencer sourceImportPreview: ' . $e->getMessage());
+            return $this->jsonErr('loading_failed', 1, ['message' => $e->getMessage()], 'common.loadingFailed');
+        }
+    }
+
+    /**
+     * 达秘导入执行：上传文件 + 映射，执行 upsert 并生成批次审计。
+     */
+    public function sourceImportCommit()
+    {
+        try {
+            if (!$this->request->isPost()) {
+                return $this->jsonErr('only_post', 1, null, 'common.onlyPost');
+            }
+            $file = $this->request->file('file');
+            if (!$file) {
+                return $this->jsonErr('file_required', 1, null, 'common.pickFile');
+            }
+            $ext = strtolower((string) $file->extension());
+            if ($ext === '') {
+                $ext = strtolower(pathinfo((string) $file->getOriginalName(), PATHINFO_EXTENSION));
+            }
+            if (!in_array($ext, ['csv', 'txt', 'xlsx', 'xls', 'xlsm'], true)) {
+                return $this->jsonErr('csv_only', 1, null, 'page.dataImport.csvOnly');
+            }
+            $sourceSystem = trim((string) $this->request->post('source_system', InfluencerSourceImportService::SOURCE_DAMI));
+            $mappingRaw = trim((string) $this->request->post('mapping_json', ''));
+            $mapping = [];
+            if ($mappingRaw !== '') {
+                $decoded = json_decode($mappingRaw, true);
+                if (is_array($decoded)) {
+                    $mapping = $decoded;
+                }
+            }
+
+            $parsed = InfluencerSourceImportService::readFile(
+                (string) $file->getPathname(),
+                $ext,
+                $sourceSystem,
+                $mapping,
+                0
+            );
+            $result = InfluencerSourceImportService::commitRows(
+                (array) ($parsed['headers'] ?? []),
+                (array) ($parsed['rows'] ?? []),
+                (array) ($parsed['mapping'] ?? []),
+                $this->currentTenantId(),
+                AdminAuthService::userId(),
+                (string) $file->getOriginalName(),
+                $sourceSystem
+            );
+
+            return $this->jsonOk($result, 'updated');
+        } catch (\Throwable $e) {
+            Log::error('influencer sourceImportCommit: ' . $e->getMessage());
+            return $this->jsonErr('save_failed', 1, ['message' => $e->getMessage()], 'common.saveFailed');
+        }
+    }
+
+    /**
+     * 达秘导入批次 + 外联漏斗统计。
+     */
+    public function sourceImportBatches()
+    {
+        try {
+            $page = max(1, (int) $this->request->param('page', 1));
+            $pageSize = (int) $this->request->param('page_size', 10);
+            if ($pageSize <= 0) {
+                $pageSize = 10;
+            }
+            if ($pageSize > 100) {
+                $pageSize = 100;
+            }
+
+            $query = Db::name('influencer_source_import_batches')
+                ->where('source_system', InfluencerSourceImportService::SOURCE_DAMI)
+                ->order('id', 'desc');
+            if ($this->tableHasTenantId('influencer_source_import_batches')) {
+                $query->where('tenant_id', $this->currentTenantId());
+            }
+            $list = $query->paginate([
+                'list_rows' => $pageSize,
+                'page' => $page,
+                'query' => $this->request->param(),
+            ]);
+
+            $items = [];
+            foreach ($list as $row) {
+                $arr = is_array($row) ? $row : $row->toArray();
+                $batchId = (int) ($arr['id'] ?? 0);
+
+                $infQuery = Db::name('influencers')->where('source_batch_id', $batchId);
+                if ($this->tableHasTenantId('influencers')) {
+                    $infQuery->where('tenant_id', $this->currentTenantId());
+                }
+                $influencerCount = (int) $infQuery->count();
+
+                $taskQuery = Db::name('auto_dm_tasks')
+                    ->alias('t')
+                    ->join('influencers i', 'i.id=t.influencer_id')
+                    ->where('i.source_batch_id', $batchId);
+                if ($this->tableHasTenantId('auto_dm_tasks')) {
+                    $taskQuery->where('t.tenant_id', $this->currentTenantId());
+                }
+                if ($this->tableHasTenantId('influencers')) {
+                    $taskQuery->where('i.tenant_id', $this->currentTenantId());
+                }
+                $taskRows = $taskQuery->field('t.id,t.task_status,t.reply_state')->select()->toArray();
+                $taskCount = count($taskRows);
+                $sentCount = 0;
+                $replyCount = 0;
+                foreach ($taskRows as $taskRow) {
+                    if ((int) ($taskRow['task_status'] ?? 0) === AutoDmService::TASK_STATUS_SENT) {
+                        $sentCount++;
+                    }
+                    if ((int) ($taskRow['reply_state'] ?? 0) > AutoDmService::REPLY_STATE_NONE) {
+                        $replyCount++;
+                    }
+                }
+
+                $reviewQuery = Db::name('auto_dm_reply_reviews')
+                    ->alias('rr')
+                    ->join('influencers i', 'i.id=rr.influencer_id')
+                    ->where('i.source_batch_id', $batchId);
+                if ($this->tableHasTenantId('auto_dm_reply_reviews')) {
+                    $reviewQuery->where('rr.tenant_id', $this->currentTenantId());
+                }
+                if ($this->tableHasTenantId('influencers')) {
+                    $reviewQuery->where('i.tenant_id', $this->currentTenantId());
+                }
+                $reviewRows = $reviewQuery->field('rr.confirm_category')->select()->toArray();
+                $converted = 0;
+                foreach ($reviewRows as $reviewRow) {
+                    $cat = strtolower(trim((string) ($reviewRow['confirm_category'] ?? '')));
+                    if (in_array($cat, ['intent', 'inquiry'], true)) {
+                        $converted++;
+                    }
+                }
+
+                $items[] = [
+                    'id' => $batchId,
+                    'batch_no' => (string) ($arr['batch_no'] ?? ''),
+                    'source_system' => (string) ($arr['source_system'] ?? ''),
+                    'file_name' => (string) ($arr['file_name'] ?? ''),
+                    'total_rows' => (int) ($arr['total_rows'] ?? 0),
+                    'inserted_rows' => (int) ($arr['inserted_rows'] ?? 0),
+                    'updated_rows' => (int) ($arr['updated_rows'] ?? 0),
+                    'skipped_rows' => (int) ($arr['skipped_rows'] ?? 0),
+                    'failed_rows' => (int) ($arr['failed_rows'] ?? 0),
+                    'created_at' => (string) ($arr['created_at'] ?? ''),
+                    'influencer_count' => $influencerCount,
+                    'task_count' => $taskCount,
+                    'sent_count' => $sentCount,
+                    'reply_count' => $replyCount,
+                    'converted_count' => $converted,
+                    'touch_rate' => $influencerCount > 0 ? round($taskCount * 100 / $influencerCount, 2) : 0.0,
+                    'reply_rate' => $taskCount > 0 ? round($replyCount * 100 / $taskCount, 2) : 0.0,
+                    'convert_rate' => $taskCount > 0 ? round($converted * 100 / $taskCount, 2) : 0.0,
+                ];
+            }
+
+            return $this->jsonOk([
+                'items' => $items,
+                'total' => (int) $list->total(),
+                'page' => (int) $list->currentPage(),
+                'page_size' => (int) $list->listRows(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('influencer sourceImportBatches: ' . $e->getMessage());
+            return $this->jsonErr('loading_failed', 1, ['message' => $e->getMessage()], 'common.loadingFailed');
+        }
     }
 
     public function importCsv()

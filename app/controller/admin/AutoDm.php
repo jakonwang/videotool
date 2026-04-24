@@ -97,6 +97,7 @@ class AutoDm extends BaseController
             'category_id' => max(0, (int) ($payload['category_id'] ?? 0)),
             'region' => trim((string) ($payload['region'] ?? '')),
             'quality_grade' => strtoupper(trim((string) ($payload['quality_grade'] ?? ''))),
+            'source_system' => strtolower(trim((string) ($payload['source_system'] ?? ''))),
             'influencer_ids' => $influencerIds,
             'limit' => $limit,
             'stop_on_reply' => $stopOnReply,
@@ -990,6 +991,7 @@ class AutoDm extends BaseController
             $categoryId = (int) ($filters['category_id'] ?? 0);
             $region = trim((string) ($filters['region'] ?? ''));
             $qualityGrade = strtoupper(trim((string) ($filters['quality_grade'] ?? '')));
+            $sourceSystem = strtolower(trim((string) ($filters['source_system'] ?? '')));
             $limit = max(1, min(5000, (int) ($filters['limit'] ?? 300)));
             if ($keyword !== '') {
                 $query->where(function ($sub) use ($keyword): void {
@@ -1010,6 +1012,17 @@ class AutoDm extends BaseController
             }
             if ($qualityGrade !== '') {
                 $query->where('quality_grade', $qualityGrade);
+            }
+            if ($sourceSystem !== '') {
+                if ($sourceSystem === 'manual') {
+                    $query->where(function ($sub): void {
+                        $sub->whereNull('source_system')
+                            ->whereOr('source_system', '')
+                            ->whereOr('source_system', 'manual');
+                    });
+                } else {
+                    $query->where('source_system', $sourceSystem);
+                }
             }
             $query->limit($limit);
         }
