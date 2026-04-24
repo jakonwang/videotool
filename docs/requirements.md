@@ -3287,3 +3287,106 @@
 ### Deploy Notes
 - Windows dev and Linux deploy remain compatible (agent core unchanged).
 - GUI launcher is optional wrapper; backend API remains unchanged.
+
+## 13. 达秘协同（CSV先落地，2026-04-21）
+
+### 13.1 目标
+- 不重复建设达人主数据系统，达秘作为主数据来源。
+- 我方系统聚焦运营执行与结果闭环（Auto DM + 回传 + ROI看板）。
+
+### 13.2 数据模型
+- `influencers` 新增字段：
+  - `profile_url`
+  - `data_source`
+  - `source_system`
+  - `source_influencer_id`
+  - `source_sync_at`
+  - `source_hash`
+  - `last_crawled_at`
+  - `source_batch_id`
+- 新增审计表：`influencer_source_import_batches`
+  - 记录批次号、文件名、映射、总数、成功/更新/失败等。
+
+### 13.3 新增接口
+- `POST /admin.php/influencer/source/importPreview`
+  - 上传 CSV/Excel，返回字段映射、差异预览与失败行。
+- `POST /admin.php/influencer/source/importCommit`
+  - 执行同步（同 `tiktok_id` 更新，不重复新增）。
+- `GET /admin.php/influencer/source/importBatches`
+  - 返回导入批次及触达/回复/转化统计。
+
+### 13.4 页面能力
+- 达人页新增“达秘导入向导”：
+  - 上传 -> 字段映射 -> 预览差异 -> 执行同步。
+- 达人页新增“达秘来源 ROI 批次看板”：
+  - 达人数、触达任务、回复数、转化数、触达率、回复率、转化率。
+- 达人列表新增“来源”列：`达秘` / `手工`。
+
+### 13.5 Auto DM 联动
+- 创建活动时支持 `source_system` 过滤：
+  - `dami`（达秘导入）
+  - `manual`（手工/旧数据）
+- 仅筛选出有可用联系方式的达人参与发送链路。
+
+### 13.6 迁移与运行
+- Windows:
+  - `php database\\run_migration_influencer_source_dami.php`
+- Linux:
+  - `php database/run_migration_influencer_source_dami.php`
+
+### 13.7 说明
+- 本地运营字段不被导入覆盖（状态、标签、备注、外联结果等）。
+- 仍以 `tiktok_id` 作为业务主键；若缺失则可用 `source_influencer_id` 暂存映射。
+- 本期为 CSV/Excel 适配器，已预留后续 API 适配器扩展位。
+
+## 2026-04-21 Desktop Agent Launcher 可用性增强（已完成）
+- 文件：`tools/desktop_agent/desktop_agent_gui.py`
+- 目标：解决“点击启用无反应 / requests 缺失 / 启动失败不可见”。
+
+### 本次增强
+1. 启动器改为中文界面，增加实时状态与健康度显示。
+2. 增加“一键诊断”按钮（Python 可用性 + 后台地址可达性）。
+3. 增加“安装/修复依赖”按钮（自动准备 venv、安装依赖、安装 Chromium）。
+4. 增加实时日志面板，启动失败会明确弹窗提示。
+5. 启动逻辑统一走 `.venv` Python，避免系统 Python 缺少依赖导致失败。
+
+### Agent 兼容性修复
+- 文件：`tools/desktop_agent/agent.py`
+- 变更：移除对 `requests` 的硬依赖，改为内置 `urllib` 发起 HTTP 请求。
+- 效果：即使未安装 requests，也可正常拉任务/回报任务。
+
+### 启动脚本修复
+- 文件：`tools/desktop_agent/run_gui.bat`
+- 变更：依赖检测从 `requests+playwright` 调整为仅检测 `playwright`，减少误报。
+
+### 使用说明（Windows）
+1. 双击 `tools/desktop_agent/run_gui.bat`。
+2. 填写后台地址、代理令牌、设备编码。
+3. 点“安装/修复依赖”（首次建议执行一次）。
+4. 点“启动代理”，首次登录 Zalo/WhatsApp Web 后保持程序后台运行。
+- Hotfix（2026-04-22）：`tools/desktop_agent/agent.py` 增加后台路由自动兼容，支持 `/admin.php/xxx` 与 `admin.php?s=xxx` 等候选地址自动重试，修复本地环境 `No input file specified` 导致桌面代理 404 的问题。
+## 2026-04-24 GMV Max 动态投放助手（店铺历史基准）
+
+- 浏览器插件 `tools/browser_plugin/profit_center_capture` 新增“GMV Max 动态投放助手”面板。
+- 插件可将当前 TikTok GMV Max 素材页数据同步到后端，按 `tenant_id + store_id + campaign_id + metric_date + video_id` 覆盖更新。
+- 新增迁移脚本：`php database/run_migration_gmv_max_creative_insights.php`。
+- 新增数据表：
+  - `gmv_max_creative_daily`：素材每日指标。
+  - `gmv_max_store_baselines`：店铺 7/14/30 天及全历史基准。
+  - `gmv_max_recommendation_snapshots`：每日投放建议快照。
+- 新增接口：
+  - `POST /admin.php/gmv_max/creative/sync`
+  - `GET /admin.php/gmv_max/creative/baseline`
+  - `GET /admin.php/gmv_max/creative/recommendation`
+  - `GET /admin.php/gmv_max/creative/history`
+  - `GET /admin.php/gmv_max/creative/ranking`
+- 推荐逻辑：
+  - 历史样本不少于 30 条时使用店铺历史基准。
+  - 历史样本不足时使用越南 GMV Max 通用基准，并返回 `baseline_mode=regional_default`。
+  - 输出账户阶段、主问题、动作级别、今日该做、今日不要做、预算建议、ROI 建议、素材新增方向、放量视频 ID、排除视频 ID。
+- 使用说明：
+  1. 在插件中连接利润中心 Token。
+  2. 打开 TikTok GMV Max 素材列表页并勾选核心指标列。
+  3. 在“GMV Max 动态投放助手”选择店铺，选填目标 ROI 和预算。
+  4. 点击“同步到后端并生成建议”。
+  5. 根据后端建议执行放量、优化或排除。

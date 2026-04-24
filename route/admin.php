@@ -177,6 +177,9 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('influencer/importCsv', 'app\controller\admin\Influencer@importCsv');
     Route::get('influencer/importTaskStatus', 'app\controller\admin\Influencer@importTaskStatus');
     Route::post('influencer/importTaskTick', 'app\controller\admin\Influencer@importTaskTick');
+    Route::post('influencer/source/importPreview', 'app\controller\admin\Influencer@sourceImportPreview');
+    Route::post('influencer/source/importCommit', 'app\controller\admin\Influencer@sourceImportCommit');
+    Route::get('influencer/source/importBatches', 'app\controller\admin\Influencer@sourceImportBatches');
     Route::get('influencer/sampleCsv', 'app\controller\admin\Influencer@sampleCsv');
     Route::get('influencer/exportCsv', 'app\controller\admin\Influencer@exportCsv');
     Route::post('influencer/update', 'app\controller\admin\Influencer@update');
@@ -272,6 +275,13 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::post('ad_insight/importCsv', 'app\controller\admin\AdInsight@importCsv');
     Route::get('ad_insight/exportCsv', 'app\controller\admin\AdInsight@exportCsv');
     Route::get('ad_insight', 'app\controller\admin\AdInsight@index');
+
+    // GMV Max creative insight assistant
+    Route::post('gmv_max/creative/sync', 'app\controller\admin\GmvMax@creativeSync');
+    Route::get('gmv_max/creative/baseline', 'app\controller\admin\GmvMax@creativeBaseline');
+    Route::get('gmv_max/creative/recommendation', 'app\controller\admin\GmvMax@creativeRecommendation');
+    Route::get('gmv_max/creative/history', 'app\controller\admin\GmvMax@creativeHistory');
+    Route::get('gmv_max/creative/ranking', 'app\controller\admin\GmvMax@creativeRanking');
 
     // Profit center (multi-store multi-currency)
     Route::get('profit_center/summary', 'app\controller\admin\ProfitCenter@summaryJson');

@@ -95,6 +95,13 @@ body {
   grid-template-columns: 1fr 1fr;
 }
 
+.pcp-assistant-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .pcp-field {
   display: flex;
   flex-direction: column;
@@ -226,6 +233,38 @@ select:focus {
 
 .pcp-status.is-success {
   color: var(--success);
+}
+
+.pcp-advice-block {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+}
+
+.pcp-advice-block h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.pcp-advice-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.pcp-advice-block li {
+  margin: 4px 0;
+}
+
+.pcp-advice-strong {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.pcp-advice-warn {
+  color: #b45309;
+  font-weight: 700;
 }
 
 .pcp-batch-panel {
@@ -370,6 +409,110 @@ select:focus {
   border-radius: 8px;
   padding: 10px;
   min-height: 76px;
+}
+
+.pcp-creative-table-wrap {
+  max-height: 320px;
+}
+
+.pcp-creative-table {
+  min-width: 1560px;
+}
+
+.pcp-creative-table th,
+.pcp-creative-table td {
+  padding: 8px 10px;
+}
+
+.pcp-creative-title {
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcp-badge-mini {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pcp-badge-mini.excellent {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.pcp-badge-mini.optimize {
+  color: #d46b08;
+  background: #fff7e6;
+  border-color: #ffd591;
+}
+
+.pcp-badge-mini.keep {
+  color: #1d39c4;
+  background: #f0f5ff;
+  border-color: #adc6ff;
+}
+
+.pcp-badge-mini.exclude_candidate {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.pcp-badge-mini.ignore {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #dbeafe;
+}
+
+.pcp-badge-mini.observe {
+  color: #1d39c4;
+  background: #f0f5ff;
+  border-color: #adc6ff;
+}
+
+.pcp-badge-mini.garbage {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.pcp-badge-mini.bad {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.pcp-badge-mini.scale {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.pcp-metric-inline {
+  color: #475569;
+  font-size: 12px;
+  white-space: normal;
+}
+
+.pcp-diagnosis {
+  display: grid;
+  gap: 4px;
+}
+
+.pcp-actions-list {
+  margin: 6px 0 0;
+  padding-left: 14px;
+  color: #334155;
+}
+
+.pcp-actions-list li {
+  margin-bottom: 2px;
 }
 
 @media (max-width: 1024px) {

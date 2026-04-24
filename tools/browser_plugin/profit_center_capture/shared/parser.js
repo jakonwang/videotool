@@ -988,11 +988,527 @@
     };
   }
 
+  function normalizeMetricKey(text) {
+    const raw = String(text || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw.includes('creative')) return 'creative';
+    if (raw.includes('tiktok account')) return 'tiktok_account';
+    if (raw.includes('authorization type')) return 'authorization_type';
+    if (raw.includes('status')) return 'status';
+    if (raw.includes('time posted')) return 'time_posted';
+    if (raw === 'cost' || raw.includes('ad spend') || raw.includes('spend')) return 'cost';
+    if (raw.includes('sku orders')) return 'sku_orders';
+    if (raw.includes('cost per order')) return 'cost_per_order';
+    if (raw.includes('gross revenue') || raw.includes('gmv')) return 'gross_revenue';
+    if (raw === 'roi' || raw.includes('roas')) return 'roi';
+    if (raw.includes('product ad impressions')) return 'product_ad_impressions';
+    if (raw.includes('product ad clicks')) return 'product_ad_clicks';
+    if (raw.includes('product ad click rate')) return 'product_ad_click_rate';
+    if (raw.includes('ad conversion rate')) return 'ad_conversion_rate';
+    if (raw.includes('2-second ad video view rate')) return 'view_rate_2s';
+    if (raw.includes('6-second ad video view rate')) return 'view_rate_6s';
+    if (raw.includes('25% ad video view rate')) return 'view_rate_25';
+    if (raw.includes('50% ad video view rate')) return 'view_rate_50';
+    if (raw.includes('75% ad video view rate')) return 'view_rate_75';
+    if (raw.includes('100% ad video view rate')) return 'view_rate_100';
+    if (raw.includes('creative boost')) return 'creative_boost';
+    return '';
+  }
+
+  function textContentSafe(node) {
+    if (!node) return '';
+    return String(node.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function parseMetricNumber(raw) {
+    const text = String(raw || '').trim();
+    if (!text || /^(n\/a|--|-)$/i.test(text)) return null;
+    const parsed = parseNumber(text);
+    if (parsed === null || !Number.isFinite(parsed)) return null;
+    return Number(parsed);
+  }
+
+  function detectCampaignId(doc, pageUrl, pageText) {
+    const text = String(pageText || '');
+    const fromText = text.match(/Campaign ID\s*[:：]?\s*(\d{6,})/i);
+    if (fromText && fromText[1]) return fromText[1];
+
+    const fromDom = pickText(doc, [
+      '[data-testid*="campaign"]',
+      '[class*="campaign"]'
+    ]);
+    const fromDomMatch = String(fromDom || '').match(/(\d{6,})/);
+    if (fromDomMatch && fromDomMatch[1]) return fromDomMatch[1];
+
+    const urlMatch = String(pageUrl || '').match(/[?&](?:campaign_id|campaignId|id)=(\d{6,})/i);
+    return urlMatch && urlMatch[1] ? urlMatch[1] : '';
+  }
+
+  function detectVideoIdFromCell(cellText) {
+    const text = String(cellText || '');
+    let m = text.match(/Video\s*[:：]?\s*([0-9]{6,})/i);
+    if (m && m[1]) return m[1];
+    m = text.match(/([0-9]{8,})/);
+    if (m && m[1]) return m[1];
+    return '';
+  }
+
+  function detectCreativeTitleFromCell(cellText) {
+    const text = String(cellText || '').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    const rows = text.split(/Video\s*[:：]/i);
+    const title = String(rows[0] || '').trim();
+    if (title) return title;
+    return text.slice(0, 120);
+  }
+
+  function normalizeCreativeLabel(raw) {
+    const label = String(raw || '').trim().toLowerCase();
+    if (label === 'excellent') return 'excellent';
+    if (label === 'scale') return 'excellent';
+    if (label === 'observe') return 'observe';
+    if (label === 'optimize') return 'optimize';
+    if (label === 'potential') return 'observe';
+    if (label === 'garbage') return 'garbage';
+    if (label === 'bad') return 'garbage';
+    if (label === 'ignore') return 'ignore';
+    if (label === 'exclude_candidate') return 'garbage';
+    if (label === 'keep') return 'observe';
+    return 'observe';
+  }
+
+  function labelReadable(label) {
+    const key = normalizeCreativeLabel(label);
+    if (key === 'excellent') return '优秀款';
+    if (key === 'optimize') return '优化素材';
+    if (key === 'garbage') return '垃圾素材';
+    if (key === 'ignore') return '忽略';
+    return '观察中';
+  }
+
+  function scoreBand(score) {
+    const v = Number(score);
+    if (!Number.isFinite(v)) return 'insufficient_data';
+    if (v >= 70) return 'high';
+    if (v >= 40) return 'mid';
+    return 'low';
+  }
+
+  function safeMetric(metrics, key) {
+    if (!metrics || typeof metrics !== 'object') return null;
+    const raw = metrics[key];
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function scoreHigher(value, low, high) {
+    if (value == null) return null;
+    if (value <= low) return 0;
+    if (value >= high) return 100;
+    return ((value - low) * 100) / (high - low);
+  }
+
+  function scoreLower(value, high, low) {
+    if (value == null) return null;
+    if (value <= low) return 100;
+    if (value >= high) return 0;
+    return ((high - value) * 100) / (high - low);
+  }
+
+  function weightedScore(parts) {
+    let totalWeight = 0;
+    let weighted = 0;
+    let dimensions = 0;
+    (parts || []).forEach((part) => {
+      if (!part || part.score == null) return;
+      const weight = Number(part.weight || 0);
+      if (weight <= 0) return;
+      totalWeight += weight;
+      weighted += Number(part.score) * weight;
+      dimensions += 1;
+    });
+    if (totalWeight <= 0) {
+      return { score: null, dimensions: 0 };
+    }
+    return {
+      score: roundTo(weighted / totalWeight, 4),
+      dimensions
+    };
+  }
+
+  function toBandNumeric(band) {
+    if (band === 'high') return 3;
+    if (band === 'mid') return 2;
+    if (band === 'low') return 1;
+    return 0;
+  }
+
+  function resolveProblemPosition(hookBand, retentionBand, conversionBand, hookScore, retentionScore, conversionScore) {
+    const scored = [
+      { key: 'front_3s', band: hookBand, score: hookScore },
+      { key: 'middle', band: retentionBand, score: retentionScore },
+      { key: 'conversion_tail', band: conversionBand, score: conversionScore }
+    ];
+
+    const lowStages = scored.filter((item) => item.band === 'low');
+    if (lowStages.length >= 2) return 'multi_stage';
+    if (lowStages.length === 1) return lowStages[0].key;
+
+    const midStages = scored.filter((item) => item.band === 'mid');
+    if (midStages.length >= 2) return 'multi_stage';
+    if (midStages.length === 1) return midStages[0].key;
+
+    let weakest = scored[0];
+    scored.slice(1).forEach((item) => {
+      const current = Number(item.score);
+      const best = Number(weakest.score);
+      if (Number.isFinite(current) && Number.isFinite(best) && current < best) {
+        weakest = item;
+      }
+    });
+    return weakest.key;
+  }
+
+  function actionSetByPosition(position) {
+    if (position === 'front_3s') {
+      return [
+        '前3秒首帧改为佩戴近景+价格锚点，0.5秒内出现核心卖点，目标提升CTR与2秒率。',
+        '开场文案改成强问题句+利益点（如“黑皮也显白？”），并保留产品特写，目标提升点击率。',
+        '首屏节奏压缩到3秒内完成“痛点-结果”对比，减少空镜，目标提升初始留存。'
+      ];
+    }
+    if (position === 'middle') {
+      return [
+        '中段增加“佩戴前后对比”与多角度转场，每3-4秒一个信息点，目标提升6秒率与25%/50%播放率。',
+        '加入场景化证据（通勤/约会/直播实拍）并减少重复镜头，目标提升75%播放率。',
+        '把卖点拆成“材质-舒适度-搭配”三段结构，强化连贯叙事，目标提升中段留存。'
+      ];
+    }
+    if (position === 'conversion_tail') {
+      return [
+        '尾段补充信任背书（买家评价/实拍细节）+明确优惠时效，目标提升转化率与ROI。',
+        '加入价格对比锚点（原价-活动价-到手价）并口播CTA，目标降低Cost per order。',
+        '结尾固定“下单路径+售后承诺”双CTA，缩短决策链路，目标提升SKU orders。'
+      ];
+    }
+    return [
+      '重拍前3秒钩子（强利益点+特写），先解决点击不足问题。',
+      '中段补齐场景证据与对比展示，降低观众流失。',
+      '尾段增加信任背书与促单结构，提升转化闭环。'
+    ];
+  }
+
+  function materialTypeText(materialType) {
+    if (materialType === 'scale') return '放量素材（可加预算）';
+    if (materialType === 'bad') return '差素材（直接淘汰）';
+    if (materialType === 'optimize') return '优化素材（改稿再投）';
+    return '观察素材（继续测试）';
+  }
+
+  function conclusionByProfile(hookBand, retentionBand, conversionBand, materialType) {
+    if (materialType === 'scale') return '三段能力闭环，可作为放量主力素材。';
+    if (hookBand === 'high' && (conversionBand === 'low' || conversionBand === 'mid')) return '钩子强但转化偏弱，需强化尾段成交结构。';
+    if (conversionBand === 'high' && hookBand === 'low') return '转化能力不差，但前3秒吸引不足。';
+    if (retentionBand === 'low') return '中段留存不足，导致有效流量无法进入转化段。';
+    if (materialType === 'bad') return '整体效率偏弱且消耗已达门槛，建议淘汰。';
+    return '具备优化空间，建议按弱项段位定向改稿。';
+  }
+
+  function buildCreativeDiagnosis(row) {
+    const metrics = row && row.metrics ? row.metrics : {};
+    const title = String(row && row.title || '').trim().toLowerCase();
+    const ignore = !!(row && row.ignore) || /product\s*card/i.test(title);
+    if (ignore) {
+      return {
+        hook_score: 'insufficient_data',
+        retention_score: 'insufficient_data',
+        conversion_score: 'insufficient_data',
+        hook_score_value: null,
+        retention_score_value: null,
+        conversion_score_value: null,
+        material_type: 'ignore',
+        material_type_text: '忽略',
+        problem_position: 'multi_stage',
+        continue_delivery: 'no',
+        core_conclusion: '素材不具备评估条件，建议忽略。',
+        actions: ['该行缺少可评估数据，建议先补齐指标后再判定。'],
+        confidence: 0.2
+      };
+    }
+
+    const ctr = safeMetric(metrics, 'product_ad_click_rate');
+    const view2 = safeMetric(metrics, 'view_rate_2s');
+    const view6 = safeMetric(metrics, 'view_rate_6s');
+    const view25 = safeMetric(metrics, 'view_rate_25');
+    const view50 = safeMetric(metrics, 'view_rate_50');
+    const view75 = safeMetric(metrics, 'view_rate_75');
+    const cvr = safeMetric(metrics, 'ad_conversion_rate');
+    const roi = safeMetric(metrics, 'roi');
+    const cpo = safeMetric(metrics, 'cost_per_order');
+    const skuOrders = safeMetric(metrics, 'sku_orders');
+    const cost = safeMetric(metrics, 'cost');
+    const impressions = safeMetric(metrics, 'product_ad_impressions');
+    const clicks = safeMetric(metrics, 'product_ad_clicks');
+
+    const hookCalc = weightedScore([
+      { score: scoreHigher(ctr, 0.6, 1.5), weight: 0.55 },
+      { score: scoreHigher(view2, 28, 45), weight: 0.45 }
+    ]);
+    const retentionCalc = weightedScore([
+      { score: scoreHigher(view6, 10, 18), weight: 0.35 },
+      { score: scoreHigher(view25, 6, 11), weight: 0.25 },
+      { score: scoreHigher(view50, 3.5, 7), weight: 0.25 },
+      { score: scoreHigher(view75, 2.2, 4.8), weight: 0.15 }
+    ]);
+    const conversionCalc = weightedScore([
+      { score: scoreHigher(cvr, 1.0, 2.5), weight: 0.32 },
+      { score: scoreHigher(roi, 1.0, 2.2), weight: 0.38 },
+      { score: scoreLower(cpo, 2.2, 0.9), weight: 0.15 },
+      { score: scoreHigher(skuOrders, 1, 4), weight: 0.15 }
+    ]);
+
+    const hookScoreValue = hookCalc.score;
+    const retentionScoreValue = retentionCalc.score;
+    const conversionScoreValue = conversionCalc.score;
+    const hookBand = scoreBand(hookScoreValue);
+    const retentionBand = scoreBand(retentionScoreValue);
+    const conversionBand = scoreBand(conversionScoreValue);
+
+    const learningReached = (cost != null && cost >= 1.2)
+      || (impressions != null && impressions >= 800)
+      || (clicks != null && clicks >= 20);
+    const evidenceCount = [roi, cvr, skuOrders].filter((v) => v != null).length;
+    const lowEvidence = evidenceCount < 2;
+    const earlyStage = !learningReached || (cost != null && cost < 1.2);
+
+    const hardBad = learningReached
+      && conversionBand === 'low'
+      && (
+        (roi != null && roi < 0.9)
+        || (skuOrders != null && skuOrders <= 0)
+        || (cvr != null && cvr < 0.9)
+      );
+
+    const strongScale = (roi != null && roi >= 2.2)
+      && (skuOrders != null && skuOrders >= 3)
+      && (cvr != null && cvr >= 2.0);
+    const isScale = (learningReached || strongScale) && conversionBand === 'high'
+      && toBandNumeric(hookBand) >= 2
+      && toBandNumeric(retentionBand) >= 2;
+
+    let materialType = 'observe';
+    if (hardBad) materialType = 'bad';
+    else if (isScale) materialType = 'scale';
+    else if (lowEvidence || earlyStage) materialType = 'observe';
+    else {
+      const lowStages = [hookBand, retentionBand, conversionBand].filter((v) => v === 'low').length;
+      materialType = lowStages >= 1 ? 'optimize' : 'observe';
+    }
+
+    const position = resolveProblemPosition(
+      hookBand,
+      retentionBand,
+      conversionBand,
+      hookScoreValue,
+      retentionScoreValue,
+      conversionScoreValue
+    );
+    const actions = actionSetByPosition(position);
+    const continueDelivery = materialType === 'bad' ? 'no' : 'yes';
+    const confidenceParts = [hookCalc.dimensions, retentionCalc.dimensions, conversionCalc.dimensions];
+    const filledDimensions = confidenceParts.reduce((sum, v) => sum + Number(v || 0), 0);
+    const confidence = roundTo(Math.min(1, Math.max(0.3, filledDimensions / 10)), 2);
+
+    return {
+      hook_score: hookBand,
+      retention_score: retentionBand,
+      conversion_score: conversionBand,
+      hook_score_value: hookScoreValue == null ? null : roundTo(hookScoreValue, 2),
+      retention_score_value: retentionScoreValue == null ? null : roundTo(retentionScoreValue, 2),
+      conversion_score_value: conversionScoreValue == null ? null : roundTo(conversionScoreValue, 2),
+      material_type: materialType,
+      material_type_text: materialTypeText(materialType),
+      problem_position: position,
+      continue_delivery: continueDelivery,
+      core_conclusion: conclusionByProfile(hookBand, retentionBand, conversionBand, materialType),
+      actions,
+      confidence
+    };
+  }
+
+  function percentileRank(value, list) {
+    if (!Number.isFinite(Number(value)) || !Array.isArray(list) || list.length === 0) return null;
+    const sorted = list.slice().map((v) => Number(v)).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+    if (sorted.length === 0) return null;
+    if (sorted.length === 1) return 1;
+    let count = 0;
+    for (let i = 0; i < sorted.length; i += 1) {
+      if (Number(value) >= sorted[i]) count += 1;
+    }
+    return (count - 1) / (sorted.length - 1);
+  }
+
+  function metricHash(metrics) {
+    const keys = [
+      'cost',
+      'sku_orders',
+      'cost_per_order',
+      'gross_revenue',
+      'roi',
+      'product_ad_clicks',
+      'product_ad_click_rate',
+      'ad_conversion_rate',
+      'view_rate_75'
+    ];
+    return keys.map((k) => {
+      const v = metrics && metrics[k];
+      return `${k}:${v == null ? 'null' : Number(v)}`;
+    }).join('|');
+  }
+
+  function classifyCreativeRows(rows) {
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const diagnosis = buildCreativeDiagnosis(row);
+      row.diagnosis = diagnosis;
+      row.hook_score = diagnosis.hook_score;
+      row.retention_score = diagnosis.retention_score;
+      row.conversion_score = diagnosis.conversion_score;
+      row.material_type = diagnosis.material_type;
+      row.problem_position = diagnosis.problem_position;
+      row.continue_delivery = diagnosis.continue_delivery;
+      row.core_conclusion = diagnosis.core_conclusion;
+      row.actions = Array.isArray(diagnosis.actions) ? diagnosis.actions.slice(0, 3) : [];
+      row.confidence = diagnosis.confidence;
+
+      let autoLabel = 'observe';
+      if (diagnosis.material_type === 'scale') autoLabel = 'excellent';
+      else if (diagnosis.material_type === 'bad') autoLabel = 'garbage';
+      else if (diagnosis.material_type === 'optimize') autoLabel = 'optimize';
+      else if (diagnosis.material_type === 'ignore') autoLabel = 'ignore';
+
+      row.auto_label = autoLabel;
+      row.auto_label_text = labelReadable(autoLabel);
+      row.auto_reasons = [
+        `hook:${diagnosis.hook_score}`,
+        `retention:${diagnosis.retention_score}`,
+        `conversion:${diagnosis.conversion_score}`,
+        `problem:${diagnosis.problem_position}`
+      ];
+    });
+    return rows || [];
+  }
+
+  function captureCreativeRows(doc, pageUrl) {
+    if (!doc || typeof doc.querySelectorAll !== 'function') {
+      return { rows: [], context: {} };
+    }
+
+    const pageText = sanitizeText(doc);
+    const dateRange = detectTopDateFromDom(doc, pageText) || '';
+    const host = (() => {
+      try { return new URL(String(pageUrl || '')).hostname.toLowerCase(); } catch (_) { return ''; }
+    })();
+    const campaignId = detectCampaignId(doc, pageUrl, pageText);
+
+    const tableRoot = doc.querySelector('[data-testid^="creative-table-index"]')
+      || doc.querySelector('.core-table')
+      || doc.querySelector('[class*="creative-table"]');
+    if (!tableRoot) {
+      return {
+        rows: [],
+        context: {
+          host,
+          campaign_id: campaignId,
+          date_range: dateRange
+        }
+      };
+    }
+
+    const headerNodes = Array.from(tableRoot.querySelectorAll('.core-table-th'));
+    const headers = headerNodes.map((node) => {
+      const title = textContentSafe(node.querySelector('.core-table-th-item-title') || node);
+      return normalizeMetricKey(title);
+    });
+
+    const rowNodes = Array.from(tableRoot.querySelectorAll('.core-table-tr')).filter((node) => {
+      if (node.classList.contains('core-table-tr') && node.querySelector('.core-table-th')) return false;
+      return node.querySelectorAll('.core-table-td').length > 0;
+    });
+
+    const rows = [];
+    rowNodes.forEach((node, index) => {
+      const cellNodes = Array.from(node.querySelectorAll('.core-table-td'));
+      const metrics = {};
+      let creativeText = '';
+      let tiktokAccount = '';
+      let status = '';
+      let canBoost = false;
+
+      cellNodes.forEach((cell, colIndex) => {
+        const key = headers[colIndex] || '';
+        const cellText = textContentSafe(cell);
+        if (!key) return;
+
+        if (key === 'creative') {
+          creativeText = cellText;
+        } else if (key === 'tiktok_account') {
+          tiktokAccount = cellText;
+        } else if (key === 'status') {
+          status = cellText;
+        } else if (key === 'creative_boost') {
+          canBoost = /boost/i.test(cellText);
+        } else {
+          metrics[key] = parseMetricNumber(cellText);
+        }
+      });
+
+      const videoId = detectVideoIdFromCell(creativeText);
+      const title = detectCreativeTitleFromCell(creativeText);
+      if (!videoId && !title) return;
+
+      const allMetricValues = Object.keys(metrics).map((k) => metrics[k]).filter((v) => v != null);
+      const ignore = /product\s*card/i.test(title) || (!videoId && allMetricValues.length === 0);
+
+      rows.push({
+        row_index: index + 1,
+        row_key: `row_${index + 1}`,
+        video_id: String(videoId || ''),
+        title: String(title || ''),
+        tiktok_account: String(tiktokAccount || ''),
+        status: String(status || ''),
+        can_boost: !!canBoost,
+        ignore: !!ignore,
+        metrics,
+        metrics_hash: metricHash(metrics),
+        auto_label: 'observe',
+        auto_label_text: labelReadable('observe'),
+        auto_reasons: []
+      });
+    });
+
+    classifyCreativeRows(rows);
+
+    return {
+      rows,
+      context: {
+        host,
+        campaign_id: campaignId,
+        date_range: dateRange
+      }
+    };
+  }
+
   const api = {
     normalizeDate,
     parseNumber,
     detectCurrency,
-    captureFromDocument
+    captureFromDocument,
+    captureCreativeRows,
+    classifyCreativeRows,
+    buildCreativeDiagnosis,
+    normalizeCreativeLabel,
+    labelReadable
   };
 
   global.ProfitPluginParser = api;

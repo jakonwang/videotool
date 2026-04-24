@@ -36,6 +36,8 @@ class AdminAuthMiddleware
             || $path === '/mobile_agent/report'
             || $path === '/mobile_agent/pull_auto'
             || $path === '/mobile_agent/report_auto'
+            || $path === '/desktop_agent/pull_auto'
+            || $path === '/desktop_agent/report_auto'
         ) {
             if ($this->passesMobileAgentAuth($request)) {
                 return $next($request);
@@ -137,7 +139,7 @@ class AdminAuthMiddleware
         if (preg_match('#/(list|summary|sourceList|adapterList|jobList|jobLogs|nextTask)$#i', $path)) {
             return true;
         }
-        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|profit_center|stats|mobile_task|mobile_device|mobile_agent|auto_dm|ops_frontend)/#i', $path)) {
+        if (preg_match('#^/(product_search|offline_order|influencer|category|extension|message_template|outreach_workspace|sample|industry_trend|competitor_analysis|ad_insight|data_import|profit_center|gmv_max|stats|mobile_task|mobile_device|mobile_agent|auto_dm|ops_frontend)/#i', $path)) {
             return true;
         }
         if (preg_match('#^/tenant/#i', $path)) {
@@ -195,7 +197,8 @@ class AdminAuthMiddleware
     private function isProfitPluginPublicPath(string $path): bool
     {
         return $path === '/profit_center/plugin/bootstrap'
-            || $path === '/profit_center/plugin/ingestBatch';
+            || $path === '/profit_center/plugin/ingestBatch'
+            || $path === '/gmv_max/creative/sync';
     }
 
     private function passesProfitPluginAuth(Request $request): bool
