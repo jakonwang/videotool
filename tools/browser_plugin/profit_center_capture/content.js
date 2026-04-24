@@ -151,6 +151,20 @@
     return m && m[1] ? String(m[1]) : '';
   }
 
+  function hashText(input) {
+    const text = String(input || '');
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i += 1) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
+  function fallbackVideoId(seed, idx) {
+    return `pseudo_${hashText(`${seed || 'creative'}|${idx + 1}|${window.location.pathname || ''}`)}`;
+  }
+
   function parseNumberLike(text) {
     const raw = String(text || '').replace(/,/g, '').trim();
     if (!raw || /^(n\/a|--|-)$/i.test(raw)) return null;
@@ -245,7 +259,8 @@
       const text = String(th.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
       if (!text) return;
       if (text.includes('creative')) map.creative = idx;
-      if (text.includes('cost')) map.cost = idx;
+      if (text.includes('cost per order')) map.cost_per_order = idx;
+      else if (text === 'cost' || text.includes(' ad cost') || text.includes('spend')) map.cost = idx;
       if (text.includes('sku order')) map.sku_orders = idx;
       if (text === 'roi' || text.includes(' roi')) map.roi = idx;
       if (text.includes('ad conversion rate')) map.ad_conversion_rate = idx;
@@ -258,36 +273,56 @@
       if (text.includes('100% ad video view rate')) map.view_rate_100 = idx;
       if (text.includes('product ad clicks')) map.product_ad_clicks = idx;
       if (text.includes('product ad impressions')) map.product_ad_impressions = idx;
-      if (text.includes('cost per order')) map.cost_per_order = idx;
     });
     return map;
   }
 
-  function fallbackBuildRows() {
-    const buttons = getBoostButtons();
+  function collectCandidateRowNodes() {
     const rows = [];
-    buttons.forEach((btn, idx) => {
-      const rowNode = btn.closest('.core-table-tr') || btn.closest('tr');
-      if (!rowNode) return;
+    const seen = new Set();
+    const add = (node) => {
+      if (!node || seen.has(node)) return;
+      const cells = node.querySelectorAll('.core-table-td, td');
+      if (!cells || cells.length === 0) return;
+      const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!text || /^creative\s+/i.test(text)) return;
+      seen.add(node);
+      rows.push(node);
+    };
+
+    getBoostButtons().forEach((btn) => add(btn.closest('.core-table-tr') || btn.closest('tr')));
+    document.querySelectorAll('.core-table-tr, table tr').forEach((node) => add(node));
+    return rows;
+  }
+
+  function fallbackBuildRows() {
+    const rowNodes = collectCandidateRowNodes();
+    const rows = [];
+    rowNodes.forEach((rowNode, idx) => {
       const cells = Array.from(rowNode.querySelectorAll('.core-table-td, td'));
       if (!cells.length) return;
       const header = detectHeaderIndexMap(rowNode);
       const creativeCell = cells[header.creative != null ? header.creative : 0];
       const creativeText = String(creativeCell && creativeCell.textContent || '').replace(/\s+/g, ' ').trim();
-      const videoId = detectVideoIdFromText(creativeText);
+      const rowText = String(rowNode.textContent || '').replace(/\s+/g, ' ').trim();
+      const rawVideoId = detectVideoIdFromText(creativeText) || detectVideoIdFromText(rowText);
+      const videoId = rawVideoId || fallbackVideoId(creativeText || rowText, idx);
       const metrics = {};
       Object.keys(header).forEach((key) => {
         if (key === 'creative') return;
         const cell = cells[header[key]];
         metrics[key] = parseNumberLike(cell && cell.textContent);
       });
+      const hasBoost = !!rowNode.querySelector('button[data-uid^="creativeboostentrance:button"], button[data-tid="m4b_button"], button[class*="boost-action-button"]')
+        || /\bBoost\b/i.test(rowText);
       const autoLabel = classifyFallback(metrics, creativeText);
       rows.push({
         row_index: idx + 1,
-        row_key: `row_${idx + 1}`,
+        row_key: `row_${idx + 1}_${hashText(videoId || creativeText || rowText).slice(0, 8)}`,
         video_id: videoId,
+        source_video_id_type: rawVideoId ? 'actual' : 'pseudo',
         title: creativeText.slice(0, 120),
-        can_boost: true,
+        can_boost: hasBoost,
         ignore: /product\s*card/i.test(creativeText),
         metrics,
         metrics_hash: `${videoId}|${Object.keys(metrics).map((k) => `${k}:${metrics[k]}`).join('|')}`,
@@ -339,8 +374,21 @@
   function normalizeRow(raw, idx) {
     const row = Object.assign({}, raw || {});
     row.row_index = Number(row.row_index || idx + 1);
-    row.row_key = String(row.row_key || `row_${row.row_index}`);
+    const seed = [
+      row.video_id,
+      row.title,
+      row.tiktok_account,
+      row.metrics_hash,
+      row.row_index
+    ].join('|');
     row.video_id = String(row.video_id || '').trim();
+    if (!row.video_id) {
+      row.video_id = fallbackVideoId(seed, idx);
+      row.source_video_id_type = 'pseudo';
+    } else if (!row.source_video_id_type) {
+      row.source_video_id_type = 'actual';
+    }
+    row.row_key = String(row.row_key || `row_${row.row_index}_${hashText(seed || row.video_id).slice(0, 8)}`);
     row.auto_label = normalizeLabel(row.auto_label);
     row.manual_label = row.manual_label ? normalizeLabel(row.manual_label) : '';
     row.exclude_flag = row.exclude_flag ? 1 : 0;

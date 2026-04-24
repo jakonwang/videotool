@@ -158,4 +158,6 @@ php database/run_migration_gmv_max_creative_insights.php
 - 同一天同店铺同广告系列同视频 ID 重复同步会覆盖更新，不重复累计。
 - 店铺历史样本不足 30 条时，建议会降级为通用基准，并在结果中显示 `baseline_mode=regional_default`。
 - 插件不会自动点击 TikTok 后台按钮，只负责同步数据、生成建议和复制排除 ID。
+- 若 TikTok 页面未渲染真实 `Video ID`，插件会为当前行生成 `pseudo_xxx` 稳定伪 ID 用于历史沉淀，避免出现“没有可同步的素材”；后续页面显示真实 ID 时会按真实 ID 继续沉淀；早期伪 ID 样本会保留用于当日诊断。
+- 投放助手默认固定展示“GMV Max 从0到放量 SOP”，即使暂未同步后端数据，也能查看冷启动、首测、放量、止损、账户养护和每日执行节奏。
 

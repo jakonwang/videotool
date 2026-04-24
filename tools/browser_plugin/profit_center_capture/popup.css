@@ -267,6 +267,40 @@ select:focus {
   font-weight: 700;
 }
 
+.pcp-playbook {
+  margin: 12px 0 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+  border: 1px solid #cfe4ff;
+}
+
+.pcp-playbook h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.pcp-playbook ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.pcp-playbook li {
+  margin: 6px 0;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.pcp-playbook-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #075985;
+  font-weight: 600;
+}
+
 .pcp-batch-panel {
   margin-bottom: 10px;
   padding: 10px 12px;

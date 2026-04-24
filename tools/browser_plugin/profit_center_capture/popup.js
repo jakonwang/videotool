@@ -208,6 +208,29 @@
     return `${creativeContextKey(context)}|${String(videoId || '').trim()}`;
   }
 
+  function hashText(input) {
+    const text = String(input || '');
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i += 1) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
+  function syncVideoId(row, index) {
+    const raw = String(row && row.video_id || '').trim();
+    if (raw && raw.toLowerCase() !== 'n/a') return raw;
+    const seed = [
+      row && row.row_key,
+      row && row.title,
+      row && row.tiktok_account,
+      row && row.metrics_hash,
+      index
+    ].join('|');
+    return `pseudo_${hashText(seed)}`;
+  }
+
   function readCreativeStore() {
     return storageGet(CREATIVE_STORAGE_KEY).then((res) => {
       const payload = res && res[CREATIVE_STORAGE_KEY];
@@ -588,12 +611,32 @@
     return `<ul>${list.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
   }
 
+  function renderGmvMaxPlaybook() {
+    const steps = [
+      '冷启动准备：先算清保本 ROI、毛利、客单价和可承受 CPA；同一产品准备 5-10 条不同钩子素材，不要只靠一条素材起量。',
+      '首测设置：新产品先用保本或略低于保本的目标 ROI 起量，预算按预估 CPA 的 10-20 倍设置；前 24 小时不要频繁改 ROI、预算、商品和定向。',
+      '素材判断：前3秒看 CTR+2秒播放率，中段看 6秒/25%/50%/75% 播放率，转化段看 CVR+ROI+SKU orders；先优化素材，再考虑降 ROI 抢量。',
+      '放量动作：素材 ROI 稳定高于目标且有订单时，预算每次加 20%-30%；高 ROI 但没量时，目标 ROI 每次下调 0.3 观察，不要一次性大幅降。',
+      '止损动作：有花费无订单、ROI 低、转化率低且点击充足的素材，先排除或重剪；钩子弱就换首帧和前3秒，不要只改后半段。',
+      '账户养护：新账户先让系统打标签，目标累计 20-30 单、消耗 700-1000 美金；同一账户不要频繁换完全不同产品，避免模型混乱。',
+      '每日节奏：上午同步素材数据并排除垃圾，下午补 3-5 条新素材测试，晚上复盘放量素材和失败原因，第二天围绕胜出素材做变体。'
+    ];
+    return `<div class="pcp-playbook">
+      <h3>GMV Max 从0到放量 SOP</h3>
+      <ol>${steps.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>
+      <p class="pcp-playbook-note">核心公式：ECPM = 点击率 × 转化率 × 出价。点击率和转化率主要靠素材，出价由预算和目标 ROI 决定。</p>
+    </div>`;
+  }
+
   function renderAssistantRecommendation() {
     if (!refs.assistantSummaryBar || !refs.assistantResultBox) return;
     const rec = state.assistantRecommendation;
     if (!rec) {
       refs.assistantSummaryBar.innerHTML = '';
-      refs.assistantResultBox.textContent = '暂无建议。请先打开 TikTok GMV Max 素材页，点击“同步到后端并生成建议”。';
+      refs.assistantResultBox.innerHTML = [
+        '<div class="pcp-advice-block"><h3>动态建议</h3><p>暂无后端建议。请先打开 TikTok GMV Max 素材列表页，勾选核心指标列后点击“同步到后端并生成建议”。</p></div>',
+        renderGmvMaxPlaybook()
+      ].join('');
       return;
     }
     const stats = rec.stats || {};
@@ -613,7 +656,8 @@
       `<div class="pcp-advice-block"><h3>ROI建议</h3><p>${escapeHtml(rec.roi_advice || '-')}</p></div>`,
       `<div class="pcp-advice-block"><h3>素材新增方向</h3>${renderList(rec.creative_advice)}</div>`,
       `<div class="pcp-advice-block"><h3>放量视频ID</h3><p>${escapeHtml((rec.scale_video_ids || []).join('\\n') || '-')}</p></div>`,
-      `<div class="pcp-advice-block"><h3>待排除视频ID</h3><p class="pcp-advice-warn">${escapeHtml((rec.exclude_video_ids || []).join('\\n') || '-')}</p></div>`
+      `<div class="pcp-advice-block"><h3>待排除视频ID</h3><p class="pcp-advice-warn">${escapeHtml((rec.exclude_video_ids || []).join('\\n') || '-')}</p></div>`,
+      renderGmvMaxPlaybook()
     ].join('');
   }
 
@@ -709,8 +753,15 @@
       confidence: 0
     }, raw || {});
 
+    row.row_key = String(row.row_key || '').trim();
     row.video_id = String(row.video_id || '').trim();
     row.title = String(row.title || '').trim();
+    if (!row.video_id) {
+      row.video_id = syncVideoId(row, Number(row.row_index || 0));
+      row.source_video_id_type = 'pseudo';
+    } else if (!row.source_video_id_type) {
+      row.source_video_id_type = String(row.video_id).startsWith('pseudo_') ? 'pseudo' : 'actual';
+    }
     row.auto_label = normalizeCreativeLabel(row.auto_label);
     row.manual_label = row.manual_label ? normalizeCreativeLabel(row.manual_label) : '';
     row.exclude_flag = row.exclude_flag ? 1 : 0;
@@ -898,6 +949,8 @@
     const tab = await queryActiveTab();
     const payloadRows = state.creativeRows.map((row) => ({
       video_id: row.video_id,
+      row_key: row.row_key || '',
+      source_video_id_type: row.source_video_id_type || '',
       auto_label: normalizeCreativeLabel(row.auto_label),
       manual_label: row.manual_label ? normalizeCreativeLabel(row.manual_label) : '',
       exclude_flag: row.exclude_flag ? 1 : 0
@@ -951,9 +1004,11 @@
 
   function creativeRowsForSync() {
     return state.creativeRows
-      .filter((row) => row && row.video_id && effectiveCreativeLabel(row) !== 'ignore')
-      .map((row) => ({
-        video_id: row.video_id,
+      .filter((row) => row && effectiveCreativeLabel(row) !== 'ignore')
+      .map((row, index) => ({
+        video_id: syncVideoId(row, index),
+        source_video_id_type: row.source_video_id_type || (String(row.video_id || '').startsWith('pseudo_') ? 'pseudo' : 'actual'),
+        row_key: row.row_key || '',
         title: row.title || '',
         tiktok_account: row.tiktok_account || '',
         status: row.status || '',
@@ -971,7 +1026,8 @@
         actions: Array.isArray(row.actions) ? row.actions.slice(0, 3) : [],
         diagnosis: row.diagnosis || null,
         source_page: state.creativeContext && state.creativeContext.host ? `https://${state.creativeContext.host}` : ''
-      }));
+      }))
+      .filter((row) => row.video_id && (row.title || Object.keys(row.metrics || {}).length > 0));
   }
 
   async function syncAssistantToBackend() {
@@ -982,19 +1038,21 @@
       if (!state.connected || !state.bootstrap) {
         await connectBootstrap();
       }
-      if (state.creativeRows.length === 0) {
-        await scanCreativeRows();
-        await saveCreativeDecisions();
-        await applyCreativeLabelsToPage();
-      }
+      await scanCreativeRows();
+      await saveCreativeDecisions();
+      await applyCreativeLabelsToPage();
 
       const storeId = refs.assistantStoreSelect ? String(refs.assistantStoreSelect.value || '').trim() : '';
       if (!storeId) {
         throw new Error('请先选择店铺');
       }
-      const rows = creativeRowsForSync();
+      let rows = creativeRowsForSync();
       if (rows.length === 0) {
-        throw new Error('没有可同步的素材，请确认当前是 TikTok GMV Max 素材列表页');
+        await scanCreativeRows();
+        rows = creativeRowsForSync();
+      }
+      if (rows.length === 0) {
+        throw new Error('没有识别到可同步素材。请确认当前是 TikTok GMV Max 素材列表页，并至少显示 Creative、Cost、ROI 或 SKU orders 等指标列');
       }
 
       const ctx = state.creativeContext || {};
