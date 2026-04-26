@@ -83,6 +83,15 @@ class ModuleManagerService
                 'dependencies' => ['growth_hub'],
                 'min_role' => self::ROLE_OPERATOR,
             ],
+            'ai_commander' => [
+                'name' => 'ai_commander',
+                'title' => 'AI Commander',
+                'version' => '1.0.0',
+                'default_enabled' => 1,
+                'can_uninstall' => 0,
+                'dependencies' => ['growth_hub'],
+                'min_role' => self::ROLE_OPERATOR,
+            ],
             'data_import' => [
                 'name' => 'data_import',
                 'title' => 'Data Import',
@@ -1068,6 +1077,7 @@ class ModuleManagerService
         $competitorEnabled = $growthEnabled && $isEnabled('competitor_analysis', 1);
         $adInsightEnabled = $growthEnabled && $isEnabled('ad_insight', 1);
         $gmvMaxAssistantEnabled = $growthEnabled && $isEnabled('gmv_max_assistant', 1);
+        $aiCommanderEnabled = $isEnabled('ai_commander', 1);
         $dataImportEnabled = $growthEnabled && $isEnabled('data_import', 1);
         $profitCenterEnabled = $growthEnabled && $isEnabled('profit_center', 1);
 
@@ -1088,17 +1098,27 @@ class ModuleManagerService
         $menus = [];
 
         if ($overviewEnabled) {
+            $overviewItems = [
+                [
+                    'kind' => 'link',
+                    'href' => '/admin.php',
+                    'icon' => 'layout-dashboard',
+                    'text_i18n' => 'admin.menu.dashboard',
+                    'active' => self::controllerIs($currentController, 'index'),
+                ],
+            ];
+            if ($aiCommanderEnabled) {
+                $overviewItems[] = [
+                    'kind' => 'link',
+                    'href' => '/admin.php/ai_center',
+                    'icon' => 'brain',
+                    'text_i18n' => 'admin.menu.aiCommander',
+                    'active' => self::controllerIs($currentController, 'aicenter', 'ai_center'),
+                ];
+            }
             $menus[] = [
                 'section_i18n' => 'admin.menu.overview',
-                'items' => [
-                    [
-                        'kind' => 'link',
-                        'href' => '/admin.php',
-                        'icon' => 'layout-dashboard',
-                        'text_i18n' => 'admin.menu.dashboard',
-                        'active' => self::controllerIs($currentController, 'index'),
-                    ],
-                ],
+                'items' => $overviewItems,
             ];
         }
 

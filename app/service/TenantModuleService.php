@@ -251,6 +251,9 @@ class TenantModuleService
         if (preg_match('#^/gmv_max(/|$)#i', $path)) {
             return 'gmv_max_assistant';
         }
+        if (preg_match('#^/ai_center(/|$)#i', $path)) {
+            return 'ai_commander';
+        }
         if (preg_match('#^/data_import(/|$)#i', $path)) {
             return 'data_import';
         }

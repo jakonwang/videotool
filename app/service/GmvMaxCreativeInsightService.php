@@ -272,6 +272,7 @@ class GmvMaxCreativeInsightService
         $stage = self::resolveStage($stats, $sampleLevel);
         $mainProblem = self::resolveMainProblem($stats, $p70);
         $actionLevel = self::resolveActionLevel($stats, $targetRoi);
+        $trend = self::buildRecentTrend($tenantId, $storeId, $campaignId, $metricDate);
 
         $scaleRows = array_values(array_filter($rows, static function ($row) use ($targetRoi, $p70) {
             $roi = (float) ($row['roi'] ?? 0);
@@ -341,6 +342,9 @@ class GmvMaxCreativeInsightService
         $excludeIds = array_values(array_unique(array_filter(array_map(static function ($row) {
             return (string) ($row['video_id'] ?? '');
         }, $garbageRows))));
+        $fatigueAlert = self::buildFatigueAlert($stats, $trend, $rows);
+        $scaleGuard = self::buildScaleGuard($stats, $trend, $targetRoi, $actionLevel);
+        $budgetSplit = self::buildBudgetSplit($scaleGuard, $stats);
 
         return [
             'tenant_id' => $tenantId,
@@ -362,8 +366,244 @@ class GmvMaxCreativeInsightService
             'creative_advice' => array_values(array_unique($creativeAdvice)),
             'exclude_video_ids' => $excludeIds,
             'scale_video_ids' => $scaleIds,
+            'fatigue_alert' => $fatigueAlert,
+            'scale_guard' => $scaleGuard,
+            'budget_split' => $budgetSplit,
+            'trend' => $trend,
             'core_conclusion' => self::conclusion($stage, $mainProblem, $actionLevel),
         ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private static function buildRecentTrend(int $tenantId, int $storeId, string $campaignId, string $metricDate): array
+    {
+        $query = Db::name('gmv_max_creative_daily')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $storeId)
+            ->where('metric_date', '<=', $metricDate)
+            ->where('metric_date', '>=', date('Y-m-d', strtotime($metricDate . ' -6 days')))
+            ->where('material_type', '<>', 'ignore');
+        if ($campaignId !== '') {
+            $query->where('campaign_id', $campaignId);
+        }
+        $rows = $query->fieldRaw('
+            metric_date,
+            SUM(cost) AS total_cost,
+            SUM(sku_orders) AS total_orders,
+            SUM(gross_revenue) AS total_revenue,
+            SUM(product_ad_impressions) AS total_impressions,
+            AVG(roi) AS avg_roi,
+            AVG(product_ad_click_rate) AS avg_ctr,
+            AVG(ad_conversion_rate) AS avg_cvr
+        ')
+            ->group('metric_date')
+            ->order('metric_date', 'asc')
+            ->select()
+            ->toArray();
+        $series = array_map(static function ($row) {
+            $impressions = max(0.0, (float) ($row['total_impressions'] ?? 0));
+            $cost = (float) ($row['total_cost'] ?? 0);
+            $cpm = $impressions > 0 ? ($cost * 1000.0 / $impressions) : 0.0;
+            return [
+                'metric_date' => (string) ($row['metric_date'] ?? ''),
+                'total_cost' => round($cost, 4),
+                'total_orders' => (int) ($row['total_orders'] ?? 0),
+                'total_revenue' => round((float) ($row['total_revenue'] ?? 0), 4),
+                'avg_roi' => round((float) ($row['avg_roi'] ?? 0), 4),
+                'avg_ctr' => round((float) ($row['avg_ctr'] ?? 0), 4),
+                'avg_cvr' => round((float) ($row['avg_cvr'] ?? 0), 4),
+                'avg_cpm' => round($cpm, 4),
+            ];
+        }, $rows);
+
+        $recent = array_slice($series, -3);
+        $previous = array_slice($series, -6, 3);
+
+        $avgField = static function (array $items, string $key): float {
+            if ($items === []) {
+                return 0.0;
+            }
+            $sum = array_reduce($items, static function ($carry, $row) use ($key) {
+                return $carry + (float) ($row[$key] ?? 0);
+            }, 0.0);
+            return $sum / max(1, count($items));
+        };
+
+        $recentAvg = [
+            'roi' => round($avgField($recent, 'avg_roi'), 4),
+            'ctr' => round($avgField($recent, 'avg_ctr'), 4),
+            'cvr' => round($avgField($recent, 'avg_cvr'), 4),
+            'cpm' => round($avgField($recent, 'avg_cpm'), 4),
+            'orders' => round($avgField($recent, 'total_orders'), 4),
+        ];
+        $previousAvg = [
+            'roi' => round($avgField($previous, 'avg_roi'), 4),
+            'ctr' => round($avgField($previous, 'avg_ctr'), 4),
+            'cvr' => round($avgField($previous, 'avg_cvr'), 4),
+            'cpm' => round($avgField($previous, 'avg_cpm'), 4),
+            'orders' => round($avgField($previous, 'total_orders'), 4),
+        ];
+        $changePct = static function (float $newValue, float $oldValue): float {
+            if (abs($oldValue) < 0.0001) {
+                return 0.0;
+            }
+            return round((($newValue - $oldValue) / $oldValue) * 100.0, 2);
+        };
+
+        return [
+            'days' => count($series),
+            'series' => $series,
+            'recent_avg' => $recentAvg,
+            'previous_avg' => $previousAvg,
+            'delta_pct' => [
+                'roi' => $changePct((float) $recentAvg['roi'], (float) $previousAvg['roi']),
+                'ctr' => $changePct((float) $recentAvg['ctr'], (float) $previousAvg['ctr']),
+                'cvr' => $changePct((float) $recentAvg['cvr'], (float) $previousAvg['cvr']),
+                'cpm' => $changePct((float) $recentAvg['cpm'], (float) $previousAvg['cpm']),
+                'orders' => $changePct((float) $recentAvg['orders'], (float) $previousAvg['orders']),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $stats
+     * @param array<string,mixed> $trend
+     * @param array<int,array<string,mixed>> $rows
+     * @return array<string,mixed>
+     */
+    private static function buildFatigueAlert(array $stats, array $trend, array $rows): array
+    {
+        $delta = is_array($trend['delta_pct'] ?? null) ? $trend['delta_pct'] : [];
+        $signals = [];
+        if ((float) ($delta['ctr'] ?? 0) <= -20) {
+            $signals[] = 'ctr_drop_20';
+        }
+        if ((float) ($delta['cvr'] ?? 0) <= -20) {
+            $signals[] = 'cvr_drop_20';
+        }
+        if ((float) ($delta['roi'] ?? 0) <= -20) {
+            $signals[] = 'roi_drop_20';
+        }
+        if ((float) ($delta['cpm'] ?? 0) >= 18) {
+            $signals[] = 'cpm_rise_18';
+        }
+
+        $level = 'normal';
+        if (count($signals) >= 3) {
+            $level = 'high';
+        } elseif (count($signals) >= 2) {
+            $level = 'medium';
+        } elseif (count($signals) === 1) {
+            $level = 'low';
+        }
+
+        $affected = array_values(array_filter(array_map(static function ($row) {
+            $cost = (float) ($row['cost'] ?? 0);
+            $roi = (float) ($row['roi'] ?? 0);
+            $orders = (int) ($row['sku_orders'] ?? 0);
+            if ($cost >= 1.5 && ($roi < 1.0 || $orders <= 0)) {
+                return (string) ($row['video_id'] ?? '');
+            }
+            return '';
+        }, $rows)));
+
+        $summary = '暂无明显疲劳信号，继续观察素材变化。';
+        if ($level === 'high') {
+            $summary = '疲劳风险高：近期点击/转化/ROI明显走弱，同时竞价成本上升，建议立即补新素材并回收低效预算。';
+        } elseif ($level === 'medium') {
+            $summary = '疲劳风险中等：核心指标出现下滑，建议优先替换前3秒和成交段并限制加预算。';
+        } elseif ($level === 'low') {
+            $summary = '出现早期疲劳信号：建议开始上新素材，避免后续掉量。';
+        }
+
+        return [
+            'level' => $level,
+            'signals' => $signals,
+            'summary' => $summary,
+            'affected_video_ids' => array_slice(array_values(array_unique($affected)), 0, 30),
+            'garbage_count' => (int) ($stats['garbage_count'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $stats
+     * @param array<string,mixed> $trend
+     * @return array<string,mixed>
+     */
+    private static function buildScaleGuard(array $stats, array $trend, float $targetRoi, string $actionLevel): array
+    {
+        $delta = is_array($trend['delta_pct'] ?? null) ? $trend['delta_pct'] : [];
+        $roiGate = $targetRoi > 0 ? max(1.0, $targetRoi * 0.9) : 1.6;
+        $evaluated = max(1, (int) ($stats['evaluated_count'] ?? 0));
+        $garbageRatio = ((int) ($stats['garbage_count'] ?? 0)) / $evaluated;
+
+        $checks = [
+            'roi_safe' => (float) ($stats['avg_roi'] ?? 0) >= $roiGate,
+            'order_safe' => (int) ($stats['total_orders'] ?? 0) >= 3,
+            'fatigue_safe' => (float) ($delta['roi'] ?? 0) > -20 && (float) ($delta['ctr'] ?? 0) > -20,
+            'garbage_safe' => $garbageRatio <= 0.35,
+            'action_safe' => $actionLevel !== 'stop_loss',
+        ];
+
+        $blockers = [];
+        if (!$checks['roi_safe']) {
+            $blockers[] = 'roi_not_safe';
+        }
+        if (!$checks['order_safe']) {
+            $blockers[] = 'orders_not_enough';
+        }
+        if (!$checks['fatigue_safe']) {
+            $blockers[] = 'fatigue_trend';
+        }
+        if (!$checks['garbage_safe']) {
+            $blockers[] = 'garbage_ratio_high';
+        }
+        if (!$checks['action_safe']) {
+            $blockers[] = 'stop_loss_mode';
+        }
+
+        $passCount = count(array_filter($checks));
+        $score = (int) round(($passCount / max(1, count($checks))) * 100);
+
+        return [
+            'can_scale' => $blockers === [],
+            'score' => $score,
+            'checks' => $checks,
+            'blockers' => $blockers,
+            'summary' => $blockers === []
+                ? '通过放量护栏，可按20%-30%小步加预算并观察24小时。'
+                : '未通过放量护栏，先处理阻塞项再加预算。',
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $scaleGuard
+     * @param array<string,mixed> $stats
+     * @return array<string,mixed>
+     */
+    private static function buildBudgetSplit(array $scaleGuard, array $stats): array
+    {
+        $canScale = (bool) ($scaleGuard['can_scale'] ?? false);
+        $garbageCount = (int) ($stats['garbage_count'] ?? 0);
+        $scaleCount = (int) ($stats['scale_count'] ?? 0);
+        $optCount = (int) ($stats['optimize_count'] ?? 0);
+
+        if (!$canScale) {
+            $split = ['scale' => 20, 'potential' => 35, 'observe' => 30, 'test' => 10, 'waste_control' => 5];
+            if ($garbageCount > max(2, (int) floor(((int) ($stats['evaluated_count'] ?? 0)) * 0.4))) {
+                $split = ['scale' => 10, 'potential' => 30, 'observe' => 25, 'test' => 10, 'waste_control' => 25];
+            }
+            return ['mode' => 'defensive', 'split' => $split];
+        }
+
+        $base = ['scale' => 55, 'potential' => 25, 'observe' => 12, 'test' => 8, 'waste_control' => 0];
+        if ($scaleCount <= 0 && $optCount > 0) {
+            $base = ['scale' => 35, 'potential' => 35, 'observe' => 18, 'test' => 12, 'waste_control' => 0];
+        }
+
+        return ['mode' => 'scale', 'split' => $base];
     }
 
     /**

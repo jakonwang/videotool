@@ -11,8 +11,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-    <script src="/static/i18n/i18n.js?v=20260418_menu_gmv_2"></script>
-    <script src="/static/i18n/i18n.ops2.js?v=20260418_menu_gmv_2"></script>
+    <script src="/static/i18n/i18n.js?v=20260426_ai_center_2"></script>
+    <script src="/static/i18n/i18n.ops2.js?v=20260426_ai_center_2"></script>
+    <script src="/static/i18n/i18n.hotfix.ai.js?v=20260426_ai_center_2"></script>
     <style>
         :root {
             --dash-bg: #f5f7ff;
@@ -62,8 +63,8 @@
             --dash-sidebar-border: rgba(255,255,255,0.06);
             --dash-sidebar-text: #c9d8ef;
             --dash-sidebar-text-active: #EAF1FF;
-            --primary-rgb: 99,102,241;
-            --dash-sidebar-primary: #7C83FF;
+            --primary-rgb: 0,82,208;
+            --dash-sidebar-primary: #0052D0;
             --dash-sidebar-hover-bg: rgba(var(--primary-rgb),0.14);
             --dash-sidebar-hover-text: #e2ebff;
             --dash-sidebar-expanded-bg: rgba(var(--primary-rgb),0.16);
@@ -76,7 +77,7 @@
             --dash-sidebar-subitem-h: 36px;
             --dash-sidebar-tooltip-bg: rgba(15,23,42,0.96);
             --dash-sidebar-rail-w: 80px;
-            --dash-sidebar-full-w: 214px;
+            --dash-sidebar-full-w: 236px;
             --dash-topbar-h: 0px;
             --dash-footer-h: 3.25rem;
             --dash-brand-h: 80px;
@@ -346,15 +347,15 @@
             color: var(--dash-sidebar-hover-text);
         }
         .dark-dashboard .sidebar .admin-sidenav-link.active {
-            background: var(--dash-sidebar-active-bg);
-            color: var(--dash-sidebar-text-active);
-            border-color: rgba(var(--primary-rgb),0.26);
-            box-shadow: none;
+            background: #0052D0;
+            color: #ffffff;
+            border-color: rgba(121,157,255,0.45);
+            box-shadow: 0 10px 22px rgba(0,82,208,0.28);
         }
         .dark-dashboard .sidebar .admin-sidenav-link.active .admin-sidenav-txt,
         .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot .admin-sidenav-txt,
         .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) .admin-sidenav-txt {
-            color: var(--dash-sidebar-primary);
+            color: #ffffff;
             font-weight: 700;
         }
         .dark-dashboard .sidebar .admin-sidenav-link.active::before,
@@ -378,23 +379,28 @@
         .dark-dashboard .sidebar .admin-sidenav-link.active .admin-sidenav-ico,
         .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) .admin-sidenav-ico,
         .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot .admin-sidenav-ico {
-            color: var(--dash-sidebar-primary);
+            color: #ffffff;
             background: transparent;
             border: none;
             box-shadow: none;
         }
         .dark-dashboard .sidebar .admin-sidenav-group-head.admin-sidenav-group-head--hot,
         .dark-dashboard .sidebar .admin-sidenav-group-head:not(.collapsed) {
-            background: var(--dash-sidebar-expanded-bg);
-            border-color: rgba(var(--primary-rgb),0.24);
-            color: var(--dash-sidebar-hover-text);
+            background: #0052D0;
+            border-color: rgba(121,157,255,0.45);
+            color: #ffffff;
+            box-shadow: 0 10px 22px rgba(0,82,208,0.24);
         }
         .dark-dashboard .sidebar .admin-sidenav-txt {
             flex: 1 1 auto;
+            min-width: 0;
             font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 15px;
+            font-weight: 600;
             letter-spacing: 0.01em;
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
         }
         .dark-dashboard .sidebar .admin-sidenav-chev {
             margin-left: auto;
@@ -452,7 +458,10 @@
             flex: 1 1 auto;
             min-width: 0;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
         }
         .dark-dashboard .sidebar .admin-sidenav-badge {
             margin-left: 8px;
@@ -720,7 +729,7 @@
         }
         .dark-dashboard .content-wrapper {
             background: transparent;
-            padding-top: 16px;
+            padding-top: 0;
         }
         .dark-dashboard .card {
             background: var(--dash-panel);
@@ -1529,6 +1538,9 @@
         .admin-shell-visible .content-header {
             display: none !important;
         }
+        .dark-dashboard .content-header {
+            display: none !important;
+        }
         .admin-shell-tabs-active .admin-modern-card > .admin-header-actions > .admin-breadcrumb {
             display: none !important;
         }
@@ -1582,7 +1594,11 @@
         }
         .admin-content-tabs-shell {
             display: none;
-            padding: 0 0 14px;
+            padding: 0;
+        }
+        .admin-content-tabs-shell > .container-fluid {
+            padding-left: 0;
+            padding-right: 0;
         }
         .admin-content-tabs-shell.is-visible {
             display: block;

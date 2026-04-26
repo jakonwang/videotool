@@ -1148,6 +1148,21 @@
         await fetchRankings();
       }
 
+      function showImportHint() {
+        ElMessageBox.alert(
+          [
+            '1) 先在「店铺商品库管理」维护款式编号和商品图片；',
+            '2) 直播场次只导入指标数据，系统会自动提取标题款号并匹配商品库；',
+            '3) 未匹配数据可在「未匹配处理」里手动绑定并回算榜单。'
+          ].join('<br>'),
+          '导入说明',
+          {
+            dangerouslyUseHTMLString: true,
+            confirmButtonText: '知道了'
+          }
+        );
+      }
+
       async function resetRankingFilters() {
         ranking.window_type = 'd7';
         ranking.anchor_date = '';
@@ -1185,6 +1200,7 @@
         storesLoading: storesLoading,
         selectedStoreId: selectedStoreId,
         onStoreChange: onStoreChange,
+        showImportHint: showImportHint,
         storeManager: storeManager,
         storeDialogVisible: storeDialogVisible,
         storeSaving: storeSaving,
@@ -1279,7 +1295,10 @@
       />
     </el-select>
     <el-button @click="activeTab='store_manage'">店铺管理</el-button>
-    <span class="live-style-muted">店铺商品图片与款式编号来自店铺商品库，直播表只导入指标数据。</span>
+    <span class="live-style-inline-help">
+      <span class="live-style-muted">直播导入仅需指标数据</span>
+      <el-button link type="primary" @click="showImportHint">查看说明</el-button>
+    </span>
   </div>
 
   <el-tabs v-model="activeTab">

@@ -10,25 +10,50 @@
     .content-header { display: none; }
     .hint-box { font-size: 13px; color: #4b5563; line-height: 1.6; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
     .hint-box code { font-size: 12px; }
+    .style-help-dialog .hint-box { margin-bottom: 0; }
+    .style-top-actionbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .style-top-action-group { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 12px; background: #eef2f6; }
+    .style-top-action-label { font-size: 12px; color: #64748b; font-weight: 600; padding: 0 4px; white-space: nowrap; }
+    .style-top-action-divider { width: 1px; height: 22px; background: #e2e8f0; margin: 0 2px; }
+    .style-top-btn { border-radius: 10px !important; border-color: #dbe3ef !important; background: #fff !important; color: #243244 !important; font-weight: 600 !important; height: 36px; padding: 0 14px; }
+    .style-toolbar-icon { font-size: 13px; color: #64748b; margin-right: 6px; }
+    .style-top-link { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid transparent; color: #475569; font-size: 13px; font-weight: 600; text-decoration: none !important; background: transparent; }
+    .style-top-link:hover { color: #1e3a8a; background: #eef4ff; border-color: #d7e6ff; }
+    .style-top-link.is-help { color: #0f4dc6; background: #eaf1ff; border-color: #cfe1ff; }
     .import-log-viewer { background: #0f172a; color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.55; max-height: 240px; overflow-y: auto; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; }
     .import-log-viewer .log-line { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; }
-    .style-search-main-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
-    .style-search-extra-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
-    .style-search-keyword { width: 320px; max-width: 100%; }
-    .style-image-dropzone { width: 280px; max-width: 100%; min-height: 54px; border: 1px dashed #94a3b8; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; transition: all .2s ease; }
+    .admin-filter-section { background: #ffffff; border: 1px solid #eef2f7; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+    .style-search-main-row { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+    .style-search-extra-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; border: 1px solid #edf1f5; border-radius: 12px; padding: 12px 14px; background: #f5f8fc; }
+    .style-search-extra-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .style-search-extra-right { display: flex; align-items: center; gap: 10px; }
+    .style-search-extra-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 4px; }
+    .style-import-pick-btn { display: inline-flex; align-items: center; justify-content: center; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid #d5dfeb; background: #fff; color: #1f2937; font-weight: 600; cursor: pointer; margin: 0; }
+    .style-import-pick-btn:hover { border-color: #9fb3d8; background: #f8fbff; }
+    .style-import-filename { max-width: 320px; font-size: 13px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .style-search-keyword { flex: 1 1 420px; min-width: 280px; width: auto; }
+    .style-search-main-row .el-select { flex: 0 0 132px; }
+    .style-image-dropzone { flex: 0 0 auto; min-width: 112px; height: 38px; border: 1px dashed #c1cbd8; border-radius: 10px; background: #f8fafc; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; cursor: pointer; transition: all .2s ease; white-space: nowrap; }
     .style-image-dropzone:hover { border-color: #2563eb; background: #eff6ff; }
     .style-image-dropzone.is-dragover { border-color: #16a34a; background: #f0fdf4; }
     .style-image-dropzone.is-loading { opacity: .7; pointer-events: none; }
-    .style-image-drop-icon { width: 30px; height: 30px; border-radius: 9999px; background: #e2e8f0; color: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    .style-image-drop-icon { width: 14px; height: 14px; border-radius: 9999px; background: transparent; color: #64748b; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
     .style-image-drop-text { min-width: 0; }
-    .style-image-drop-title { font-size: 13px; font-weight: 600; color: #0f172a; line-height: 1.25; }
-    .style-image-drop-sub { font-size: 12px; color: #64748b; line-height: 1.2; }
+    .style-image-drop-title { font-size: 13px; font-weight: 700; color: #475569; line-height: 1; white-space: nowrap; }
+    .style-image-drop-sub { display: none; }
     .style-advanced-panel { margin-top: 8px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; padding: 12px 12px 4px; }
-    .style-card-grid-wrap { min-height: 220px; }
-    .style-card-col { margin-bottom: 16px; }
-    .style-card { border-radius: 12px; overflow: hidden; }
-    .style-card-media { position: relative; width: 100%; aspect-ratio: 1 / 1; background: #f3f4f6; overflow: hidden; }
+    .style-main-filter-btn { height: 38px; padding: 0 20px; border-radius: 10px !important; }
+    .style-main-reset-btn { height: 38px; padding: 0 20px; border-radius: 10px !important; background: #e7ecf2 !important; border-color: #e2e8f0 !important; color: #475569 !important; font-weight: 700 !important; }
+    .style-main-adv-btn { color: #1d4ed8 !important; font-weight: 700 !important; flex: 0 0 auto; }
+    .style-main-primary-btn { height: 38px; padding: 0 24px; border-radius: 10px !important; border: none !important; background: linear-gradient(135deg,#0052D0,#799DFF) !important; box-shadow: 0 10px 20px rgba(0,82,208,0.24); font-weight: 700 !important; }
+    .style-main-reset-btn, .style-main-primary-btn { flex: 0 0 auto; }
+    .style-card-grid-wrap { min-height: 220px; border-top: 1px solid #eef2f7; padding-top: 14px; }
+    .style-product-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+    .style-card { border-radius: 12px; overflow: hidden; border: 1px solid #eef2f7; box-shadow: 0 2px 8px rgba(15,23,42,0.04); background: #fff; }
+    .style-card-media { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #f3f4f6; overflow: hidden; }
     .style-card-media .el-image { width: 100%; height: 100%; display: block; }
+    .style-card-tag { position: absolute; left: 8px; top: 8px; background: #0052D0; color: #fff; font-size: 10px; font-weight: 800; border-radius: 6px; padding: 3px 6px; letter-spacing: .04em; text-transform: uppercase; z-index: 4; }
+    .style-card-tag.hot { background: #7e22ce; }
     .style-card-fallback { font-size: 12px; color: #64748b; padding: 12px; line-height: 1.45; word-break: break-all; }
     .style-card-body { padding: 10px 12px 12px; }
     .style-card-name { font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -38,8 +63,21 @@
     .style-card-levels { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
     .style-card-check { position: absolute; left: 10px; top: 10px; z-index: 4; background: rgba(255, 255, 255, .9); border-radius: 999px; padding: 2px 6px 2px 2px; }
     .style-card-ai-btn { position: absolute; right: 10px; top: 10px; z-index: 4; border: 0; border-radius: 999px; width: 30px; height: 30px; background: rgba(15, 23, 42, .86); color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .style-card-actions-layer { position: absolute; inset: 0; z-index: 3; display: flex; gap: 8px; align-items: center; justify-content: center; background: rgba(15, 23, 42, .56); opacity: 0; pointer-events: none; transition: opacity .2s ease; padding: 10px; }
+    .style-card-actions-layer { position: absolute; inset: 0; z-index: 3; display: flex; gap: 8px; align-items: center; justify-content: center; background: rgba(15, 23, 42, .35); opacity: 0; pointer-events: none; transition: opacity .2s ease; padding: 10px; }
     .style-card:hover .style-card-actions-layer { opacity: 1; pointer-events: auto; }
+    .style-card-check, .style-card-ai-btn { display: none; }
+    .style-card-action-icon { width: 34px; height: 34px; border-radius: 999px; border: none; background: #fff; color: #111827; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .style-card-action-icon:hover { background: #0052D0; color: #fff; }
+    .style-card-action-icon.delete:hover { background: #ef4444; color: #fff; }
+    .style-card-body { padding: 10px 10px 12px; }
+    .style-card-code { margin-top: 0; font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; }
+    .style-card-name { margin-top: 4px; font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.3; min-height: 34px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .style-card-pricing { margin-top: 8px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .style-card-price-label, .style-card-moq-label { font-size: 10px; color: #94a3b8; font-weight: 600; }
+    .style-card-price { font-size: 24px; line-height: 1; font-weight: 800; color: #2563eb; margin-top: 4px; }
+    .style-card-moq { text-align: right; }
+    .style-card-moq-value { font-size: 12px; color: #334155; font-weight: 700; margin-top: 4px; }
+    .style-card-price::before { content: "¥"; font-size: 13px; font-weight: 700; margin-right: 1px; vertical-align: 4px; }
     .style-detail-image-wrap { width: 180px; height: 180px; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb; background: #f8fafc; flex-shrink: 0; }
     .style-detail-image-wrap .el-image { width: 100%; height: 100%; display: block; }
     .style-detail-top { display: flex; gap: 14px; margin-bottom: 12px; }
@@ -51,12 +89,22 @@
     .style-profit-note { margin: 4px 0 10px; font-size: 12px; color: #64748b; line-height: 1.5; }
     .style-profit-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
     @media (max-width: 768px) {
-        .style-search-keyword { width: 100%; }
-        .style-image-dropzone { width: 100%; }
-        .style-card-pricing { grid-template-columns: 1fr; }
+        .style-search-main-row { flex-wrap: wrap; }
+        .style-search-keyword { width: 100%; min-width: 0; flex: 1 1 100%; }
+        .style-search-main-row .el-select { flex: 1 1 100%; }
+        .style-image-dropzone { width: auto; }
         .style-detail-top { flex-direction: column; }
         .style-detail-image-wrap { width: 100%; height: 240px; }
         .style-profit-card .el-form-item { margin-right: 0 !important; }
+        .style-search-extra-row { flex-direction: column; align-items: stretch; }
+        .style-search-extra-right { justify-content: flex-end; }
+        .style-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1400px) {
+        .style-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1180px) {
+        .style-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 </style>
 {/block}
@@ -67,7 +115,7 @@
 
 {block name="script"}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.min.css">
-<script src="/static/i18n/i18n.js?v=20260407_product_search_cards"></script>
+<script src="/static/i18n/i18n.js?v=20260426_style_toolbar_grouped"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.8/dist/index.full.min.js"></script>
@@ -118,6 +166,7 @@
       });
       const categoryOptions = ref([]);
       const advancedVisible = ref(false);
+      const helpDialogVisible = ref(false);
       const currentRole = ref('super_admin');
       const isAdminView = computed(() => currentRole.value !== 'viewer');
       const pythonOk = ref(false);
@@ -142,6 +191,7 @@
       const volcArkEnabled = ref(false);
       const visionAnyProviderReady = ref(true);
       const importDialogVisible = ref(false);
+      const importFileName = ref('');
       const importTaskId = ref(0);
       const importPercent = ref(0);
       const importStatusText = ref('');
@@ -424,6 +474,7 @@
             ElMessage.success(msg);
             if (d.errors && d.errors.length) console.warn(d.errors);
             input.value = '';
+            importFileName.value = '';
             fetchList();
           } else {
             ElMessage.error((json && json.msg) || tt('page.styleSearch.importFailHttp', { status: res.status }));
@@ -433,6 +484,18 @@
         } finally {
           importing.value = false;
         }
+      }
+
+      function openImportPicker() {
+        const input = document.getElementById('csvFileInput');
+        if (input) input.click();
+      }
+
+      function onImportFileChange(e) {
+        const files = e && e.target && e.target.files ? e.target.files : null;
+        if (!files || !files[0]) return;
+        importFileName.value = files[0].name || '';
+        doImport();
       }
 
       function closeImportDialog() {
@@ -1187,6 +1250,7 @@
         openTokenDialog, generateTokenLink, copyTokenLink,
         openSharePoster, buildSharePoster, downloadSharePoster,
         imageDisplayUrl, isImagePreviewable, formatCurrency, formatQty, formatPercent,
+        helpDialogVisible, importFileName, openImportPicker, onImportFileChange,
       };
     },
     template: `
@@ -1195,37 +1259,16 @@
           <div class="admin-breadcrumb">{{ tt('page.styleSearch.breadcrumb') }}</div>
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div style="font-size:18px;font-weight:600;color:#111827;">{{ tt('page.styleSearch.pageTitle') }}</div>
-            <div class="admin-action-buttons">
-              <el-button type="default" @click="openH5">{{ tt('page.styleSearch.openH5') }}</el-button>
-              <el-button type="default" @click="openCatalogH5">{{ tt('page.styleSearch.openCatalogH5') }}</el-button>
-              <el-button type="default" @click="copyCatalogLink">{{ tt('page.product.copyLink') }}</el-button>
-              <el-button type="default" @click="openTokenDialog">{{ tt('page.styleSearch.customerCatalogLink') }}</el-button>
-              <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/sampleCsv" style="border-radius:8px;">{{ tt('page.styleSearch.sampleCsv') }}</a>
-              <a class="btn btn-outline-secondary btn-sm" href="/admin.php/product_search/exportCsv" rel="noopener" style="border-radius:8px;">{{ tt('page.styleSearch.exportCsv') }}</a>
-            </div>
           </div>
-        </div>
-
-        <div class="hint-box">
-          <div v-if="!pythonOk" style="color:#b45309;margin-bottom:8px;">
-            <strong>{{ tt('page.styleSearch.pythonWarnTitle') }}</strong>{{ tt('page.styleSearch.pythonWarnBody') }}
-            <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">{{ tt('page.styleSearch.pythonDiagLabel') }}{{ pythonDiag }}</div>
-          </div>
-          <div>{{ tt('page.styleSearch.hintImportMain') }}</div>
-          <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">{{ tt('page.styleSearch.volcEnabledLine') }}</div>
-          <div v-if="visionDescribeOnImport && !visionAnyProviderReady" style="margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;line-height:1.55;">
-            {{ tt('page.styleSearch.volcNotReady') }}
-          </div>
-          <div v-if="volcArkEnabled" style="margin-top:8px;color:#0f766e;">
-            {{ tt('page.styleSearch.volcDescIntro') }} <strong>{{ visionDescCount }}</strong> {{ tt('page.styleSearch.volcDescUnit') }}
-            <span v-if="visionDescribeOnImport">{{ tt('page.styleSearch.volcDescOn') }}</span>
-            <span v-else>{{ tt('page.styleSearch.volcDescOff') }}</span>
-          </div>
-          <div v-if="!volcArkEnabled" style="margin-top:8px;color:#64748b;">{{ tt('page.styleSearch.volcDisabledHint') }}</div>
         </div>
 
         <div class="admin-filter-section">
           <div class="style-search-main-row">
+            <el-input v-model="query.keyword" clearable size="default" class="style-search-keyword"
+              :placeholder="tt('page.styleSearch.keywordPlaceholder')" @keyup.enter="triggerSearch" />
+            <el-select v-model="query.category" clearable :placeholder="tt('page.styleSearch.filterCategoryAll')" style="width:140px;">
+              <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
             <div class="style-image-dropzone"
               :class="{ 'is-dragover': imageDragOver, 'is-loading': imageSearching }"
               @click="triggerImageSearchInput"
@@ -1234,25 +1277,44 @@
               @drop.prevent="onImageDrop"
             >
               <input ref="imageSearchInputRef" type="file" accept="image/*" style="display:none;" @change="onImageSearchInputChange" />
-              <div class="style-image-drop-icon">{{ tt('page.styleSearch.imageSearchBadge') }}</div>
+              <div class="style-image-drop-icon"><i class="fa fa-camera"></i></div>
               <div class="style-image-drop-text">
                 <div class="style-image-drop-title">{{ imageSearching ? tt('page.styleSearch.imageSearching') : tt('page.styleSearch.imageSearchTitle') }}</div>
                 <div class="style-image-drop-sub">{{ tt('page.styleSearch.imageSearchSubtitle') }}</div>
               </div>
             </div>
-            <el-input v-model="query.keyword" clearable size="default" class="style-search-keyword"
-              :placeholder="tt('page.styleSearch.keywordPlaceholder')" @keyup.enter="triggerSearch" />
-            <el-button type="primary" @click="triggerSearch">{{ tt('common.filter') }}</el-button>
-            <el-button @click="resetFilters">{{ tt('common.reset') }}</el-button>
-            <el-button text @click="toggleAdvanced">{{ advancedVisible ? tt('page.styleSearch.hideAdvanced') : tt('page.styleSearch.showAdvanced') }}</el-button>
+            <el-button text class="style-main-adv-btn" @click="toggleAdvanced">{{ advancedVisible ? tt('page.styleSearch.hideAdvanced') : tt('page.styleSearch.showAdvanced') }}</el-button>
+            <el-button class="style-main-reset-btn" @click="resetFilters">{{ tt('common.reset') }}</el-button>
+            <el-button type="primary" class="style-main-primary-btn" @click="triggerSearch">{{ tt('common.filter') }}</el-button>
           </div>
+
+          <div class="style-top-actionbar">
+            <div class="style-top-action-group">
+              <span class="style-top-action-label">{{ tt('page.styleSearch.groupEntrance') }}</span>
+              <el-button class="style-top-btn" type="default" @click="openH5"><i class="fa fa-camera style-toolbar-icon"></i>{{ tt('page.styleSearch.openH5') }}</el-button>
+              <el-button class="style-top-btn" type="default" @click="openCatalogH5"><i class="fa fa-book style-toolbar-icon"></i>{{ tt('page.styleSearch.openCatalogH5') }}</el-button>
+              <el-button class="style-top-btn" type="default" @click="openTokenDialog"><i class="fa fa-link style-toolbar-icon"></i>{{ tt('page.styleSearch.customerCatalogLink') }}</el-button>
+            </div>
+            <div class="style-search-extra-right">
+              <a class="style-top-link" href="/admin.php/product_search/sampleCsv"><i class="fa fa-file-text-o style-toolbar-icon"></i>{{ tt('page.styleSearch.sampleCsv') }}</a>
+              <a class="style-top-link" href="/admin.php/product_search/exportCsv" rel="noopener"><i class="fa fa-download style-toolbar-icon"></i>{{ tt('page.styleSearch.exportCsv') }}</a>
+              <a class="style-top-link is-help" href="javascript:void(0);" @click.prevent="helpDialogVisible = true"><i class="fa fa-info-circle style-toolbar-icon"></i>{{ tt('page.styleSearch.guideBtn') }}</a>
+            </div>
+          </div>
+
           <div class="style-search-extra-row">
-            <input id="csvFileInput" type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="max-width:240px;" />
-            <el-button type="success" :loading="importing" @click="doImport">{{ tt('common.import') }}</el-button>
-            <el-checkbox :model-value="allCurrentSelected" @change="toggleSelectAllCurrent">{{ tt('page.styleSearch.selectCurrentPage') }}</el-checkbox>
-            <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">
-              {{ tt('page.styleSearch.batchDelete') }} ({{ selectedRows.length }})
-            </el-button>
+            <div class="style-search-extra-left">
+              <el-checkbox :model-value="allCurrentSelected" @change="toggleSelectAllCurrent">{{ tt('page.styleSearch.selectCurrentPage') }}</el-checkbox>
+              <span class="style-search-extra-divider"></span>
+              <input id="csvFileInput" type="file" accept=".csv,.txt,.xlsx,.xls,.xlsm" style="display:none;" @change="onImportFileChange" />
+              <button type="button" class="style-import-pick-btn" :disabled="importing" @click="openImportPicker"><i class="fa fa-upload style-toolbar-icon"></i>{{ tt('page.styleSearch.pickAndImport') }}</button>
+              <span v-if="importFileName" class="style-import-filename">{{ importFileName }}</span>
+            </div>
+            <div class="style-search-extra-right">
+              <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">
+                <i class="fa fa-trash-o style-toolbar-icon"></i>{{ tt('page.styleSearch.batchDelete') }} ({{ selectedRows.length }})
+              </el-button>
+            </div>
           </div>
           <el-collapse-transition>
             <div v-show="advancedVisible" class="style-advanced-panel">
@@ -1276,56 +1338,71 @@
           </el-collapse-transition>
         </div>
 
+        <el-dialog v-model="helpDialogVisible" class="style-help-dialog" :title="tt('page.styleSearch.guideTitle')" width="760px" append-to-body>
+          <div class="hint-box">
+            <div v-if="!pythonOk" style="color:#b45309;margin-bottom:8px;">
+              <strong>{{ tt('page.styleSearch.pythonWarnTitle') }}</strong>{{ tt('page.styleSearch.pythonWarnBody') }}
+              <div v-if="pythonDiag" style="margin-top:8px;font-size:12px;color:#92400e;word-break:break-all;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">{{ tt('page.styleSearch.pythonDiagLabel') }}{{ pythonDiag }}</div>
+            </div>
+            <div>{{ tt('page.styleSearch.hintImportMain') }}</div>
+            <div v-if="volcArkEnabled" style="margin-top:8px;color:#b45309;">{{ tt('page.styleSearch.volcEnabledLine') }}</div>
+            <div v-if="visionDescribeOnImport && !visionAnyProviderReady" style="margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;color:#9a3412;font-size:13px;line-height:1.55;">
+              {{ tt('page.styleSearch.volcNotReady') }}
+            </div>
+            <div v-if="volcArkEnabled" style="margin-top:8px;color:#0f766e;">
+              {{ tt('page.styleSearch.volcDescIntro') }} <strong>{{ visionDescCount }}</strong> {{ tt('page.styleSearch.volcDescUnit') }}
+              <span v-if="visionDescribeOnImport">{{ tt('page.styleSearch.volcDescOn') }}</span>
+              <span v-else>{{ tt('page.styleSearch.volcDescOff') }}</span>
+            </div>
+            <div v-if="!volcArkEnabled" style="margin-top:8px;color:#64748b;">{{ tt('page.styleSearch.volcDisabledHint') }}</div>
+          </div>
+        </el-dialog>
+
         <div class="style-card-grid-wrap" v-loading="loading">
-          <el-row :gutter="16">
-            <el-col v-for="row in items" :key="row.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="6" class="style-card-col">
-              <el-card class="style-card" shadow="hover" :body-style="{ padding: '0' }">
-                <div class="style-card-media">
-                  <el-image
-                    v-if="isImagePreviewable(row.image_ref)"
-                    :src="imageDisplayUrl(row.image_ref)"
-                    :preview-src-list="[imageDisplayUrl(row.image_ref)]"
-                    fit="cover"
-                    lazy
-                    preview-teleported
-                    style="cursor:zoom-in;"
-                  >
-                    <template #error>
-                      <div class="style-card-fallback">{{ tt('page.styleSearch.imgLoadFail') }}</div>
-                    </template>
-                  </el-image>
-                  <div v-else class="style-card-fallback">{{ row.image_ref || tt('page.styleSearch.emDash') }}</div>
+          <div class="style-product-grid">
+            <div v-for="row in items" :key="row.id" class="style-card">
+              <div class="style-card-media">
+                <el-image
+                  v-if="isImagePreviewable(row.image_ref)"
+                  :src="imageDisplayUrl(row.image_ref)"
+                  :preview-src-list="[imageDisplayUrl(row.image_ref)]"
+                  fit="cover"
+                  lazy
+                  preview-teleported
+                  style="cursor:zoom-in;"
+                >
+                  <template #error>
+                    <div class="style-card-fallback">{{ tt('page.styleSearch.imgLoadFail') }}</div>
+                  </template>
+                </el-image>
+                <div v-else class="style-card-fallback">{{ row.image_ref || tt('page.styleSearch.emDash') }}</div>
 
-                  <el-checkbox class="style-card-check" :model-value="isRowSelected(row.id)" @change="(v)=>toggleRowSelected(row.id, v)" @click.stop />
-                  <button type="button" class="style-card-ai-btn" @click.stop="openAiDialog(row)">AI</button>
-
-                  <div class="style-card-actions-layer">
-                    <el-button size="small" @click.stop="openDetail(row)">{{ tt('page.styleSearch.btnDetail') }}</el-button>
-                    <el-button size="small" type="primary" @click.stop="openEdit(row)">{{ tt('common.edit') }}</el-button>
-                    <el-button size="small" type="success" @click.stop="openSharePoster(row)">{{ tt('page.styleSearch.sharePoster') }}</el-button>
-                    <el-button size="small" type="danger" @click.stop="doDelete(row)">{{ tt('common.delete') }}</el-button>
+                <div class="style-card-tag" :class="{ hot: String(row.hot_type || '').toLowerCase().indexOf('hot') >= 0 }">
+                  {{ (row.hot_type || 'AI RECOMMEND').slice(0, 14) }}
+                </div>
+                <div class="style-card-actions-layer">
+                  <button type="button" class="style-card-action-icon" @click.stop="openDetail(row)"><i class="fa fa-eye"></i></button>
+                  <button type="button" class="style-card-action-icon" @click.stop="openEdit(row)"><i class="fa fa-pencil"></i></button>
+                  <button type="button" class="style-card-action-icon" @click.stop="openSharePoster(row)"><i class="fa fa-share-alt"></i></button>
+                  <button type="button" class="style-card-action-icon delete" @click.stop="doDelete(row)"><i class="fa fa-trash-o"></i></button>
+                </div>
+              </div>
+              <div class="style-card-body">
+                <div class="style-card-code">{{ row.product_code || tt('page.styleSearch.emDash') }}</div>
+                <div class="style-card-name">{{ row.hot_type || tt('page.styleSearch.unnamedStyle') }}</div>
+                <div class="style-card-pricing">
+                  <div>
+                    <div class="style-card-price-label">{{ tt('page.styleSearch.colWholesalePrice') }}</div>
+                    <div class="style-card-price">{{ formatCurrency(row.wholesale_price).replace('¥', '') }}</div>
+                  </div>
+                  <div class="style-card-moq">
+                    <div class="style-card-moq-label">{{ tt('page.styleSearch.colMinOrderQty') }}</div>
+                    <div class="style-card-moq-value">{{ formatQty(row.min_order_qty) }}件起</div>
                   </div>
                 </div>
-                <div class="style-card-body">
-                  <div class="style-card-name">{{ row.hot_type || tt('page.styleSearch.unnamedStyle') }}</div>
-                  <div class="style-card-code">{{ tt('page.styleSearch.codePrefix') }}{{ row.product_code || tt('page.styleSearch.emDash') }}</div>
-                  <div class="style-card-pricing">
-                    <div>
-                      <div>{{ tt('page.styleSearch.colWholesalePrice') }}</div>
-                      <div class="value">{{ formatCurrency(row.wholesale_price) }}</div>
-                    </div>
-                    <div>
-                      <div>{{ tt('page.styleSearch.colMinOrderQty') }}</div>
-                      <div class="value">{{ formatQty(row.min_order_qty) }}</div>
-                    </div>
-                  </div>
-                  <div v-if="isAdminView && row.level_badges && row.level_badges.length" class="style-card-levels">
-                    <el-tag v-for="badge in row.level_badges" :key="badge.key" size="small" effect="light" :type="badge.type">{{ badge.text }}</el-tag>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+              </div>
+            </div>
+          </div>
           <el-empty v-if="!loading && !items.length" :description="tt('common.noData')" />
         </div>
 

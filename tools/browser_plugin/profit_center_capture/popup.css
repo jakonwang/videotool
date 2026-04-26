@@ -9,6 +9,11 @@
   --card: #ffffff;
   --danger: #dc2626;
   --success: #16a34a;
+  --font-mini: 13px;
+  --font-small: 14px;
+  --font-base: 16px;
+  --font-title: 20px;
+  --font-subtitle: 18px;
 }
 
 * {
@@ -24,7 +29,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 14px;
+  font-size: var(--font-base);
   line-height: 1.45;
 }
 
@@ -42,13 +47,13 @@ body {
 
 .pcp-header h1 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--font-title);
   font-weight: 700;
 }
 
 .pcp-header p {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--font-small);
   color: var(--muted);
 }
 
@@ -57,7 +62,7 @@ body {
   align-items: center;
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--font-small);
   border: 1px solid transparent;
 }
 
@@ -82,7 +87,7 @@ body {
 
 .pcp-card h2 {
   margin: 0 0 10px;
-  font-size: 16px;
+  font-size: var(--font-subtitle);
   font-weight: 700;
 }
 
@@ -110,7 +115,7 @@ body {
 
 .pcp-field span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-small);
 }
 
 input,
@@ -120,7 +125,7 @@ select {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0 10px;
-  font-size: 14px;
+  font-size: var(--font-base);
   background: #fff;
   color: var(--text);
 }
@@ -139,7 +144,7 @@ select:focus {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--font-small);
   line-height: 1.5;
   background: #fff;
   color: var(--text);
@@ -157,13 +162,13 @@ select:focus {
   padding: 0 12px;
   border: 1px solid transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-small);
   font-weight: 600;
 }
 
 .btn-lg {
   height: 40px;
-  font-size: 14px;
+  font-size: var(--font-base);
 }
 
 .btn-primary {
@@ -223,7 +228,7 @@ select:focus {
 
 .pcp-status {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--font-small);
   color: var(--muted);
 }
 
@@ -245,7 +250,7 @@ select:focus {
 
 .pcp-advice-block h3 {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: var(--font-base);
 }
 
 .pcp-advice-block ul {
@@ -277,7 +282,7 @@ select:focus {
 
 .pcp-playbook h3 {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: var(--font-base);
   color: #0f172a;
 }
 
@@ -326,14 +331,14 @@ select:focus {
 
 .pcp-summary-item span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-small);
   display: block;
 }
 
 .pcp-summary-item strong {
   margin-top: 2px;
   display: block;
-  font-size: 16px;
+  font-size: var(--font-subtitle);
 }
 
 .pcp-table-wrap {
@@ -360,7 +365,7 @@ select:focus {
 .pcp-table th {
   background: #f1f5fd;
   color: #334155;
-  font-size: 12px;
+  font-size: var(--font-small);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -418,7 +423,7 @@ select:focus {
 }
 
 .pcp-row-status {
-  font-size: 12px;
+  font-size: var(--font-small);
 }
 
 .pcp-row-status.ok {
@@ -436,7 +441,7 @@ select:focus {
 .pcp-result {
   white-space: pre-wrap;
   line-height: 1.55;
-  font-size: 13px;
+  font-size: var(--font-small);
   color: #0f172a;
   background: #f8fafc;
   border: 1px solid var(--border);
@@ -470,7 +475,7 @@ select:focus {
   border-radius: 999px;
   padding: 2px 8px;
   border: 1px solid transparent;
-  font-size: 12px;
+  font-size: var(--font-small);
   font-weight: 600;
 }
 
@@ -530,7 +535,7 @@ select:focus {
 
 .pcp-metric-inline {
   color: #475569;
-  font-size: 12px;
+  font-size: var(--font-small);
   white-space: normal;
 }
 

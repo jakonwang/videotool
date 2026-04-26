@@ -283,6 +283,13 @@ if (defined('ENTRY_FILE') && ENTRY_FILE === 'admin') {
     Route::get('gmv_max/creative/recommendation', 'app\controller\admin\GmvMax@creativeRecommendation');
     Route::get('gmv_max/creative/history', 'app\controller\admin\GmvMax@creativeHistory');
     Route::get('gmv_max/creative/ranking', 'app\controller\admin\GmvMax@creativeRanking');
+    Route::post('ai_center/chat', 'app\controller\admin\AiCenter@chat');
+    Route::post('ai_center/plan/generate', 'app\controller\admin\AiCenter@planGenerate');
+    Route::post('ai_center/plan/execute', 'app\controller\admin\AiCenter@planExecute');
+    Route::get('ai_center/plan/status', 'app\controller\admin\AiCenter@planStatus');
+    Route::post('ai_center/feedback', 'app\controller\admin\AiCenter@feedback');
+    Route::get('ai_center/insight/daily', 'app\controller\admin\AiCenter@dailyInsight');
+    Route::get('ai_center', 'app\controller\admin\AiCenter@index');
 
     // Profit center (multi-store multi-currency)
     Route::get('profit_center/summary', 'app\controller\admin\ProfitCenter@summaryJson');

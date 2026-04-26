@@ -990,9 +990,10 @@
 
   function normalizeMetricKey(text) {
     const raw = String(text || '').trim().toLowerCase();
+    const compact = raw.replace(/[\s._\-:/]+/g, '');
     if (!raw) return '';
     if (raw.includes('creative')) return 'creative';
-    if (raw.includes('tiktok account')) return 'tiktok_account';
+    if (raw.includes('tiktok account') || compact.includes('tiktokaccount') || compact.includes('tiktoaccount')) return 'tiktok_account';
     if (raw.includes('authorization type')) return 'authorization_type';
     if (raw.includes('status')) return 'status';
     if (raw.includes('time posted')) return 'time_posted';
@@ -1011,7 +1012,7 @@
     if (raw.includes('50% ad video view rate')) return 'view_rate_50';
     if (raw.includes('75% ad video view rate')) return 'view_rate_75';
     if (raw.includes('100% ad video view rate')) return 'view_rate_100';
-    if (raw.includes('creative boost')) return 'creative_boost';
+    if (raw.includes('creative boost') || compact.includes('creativeboost')) return 'creative_boost';
     return '';
   }
 
@@ -1026,6 +1027,14 @@
     const parsed = parseNumber(text);
     if (parsed === null || !Number.isFinite(parsed)) return null;
     return Number(parsed);
+  }
+
+  function parseBoostAvailability(raw) {
+    const text = String(raw || '').trim().toLowerCase();
+    if (!text) return null;
+    if (/(n\/a|not\s*available|unavailable|disabled|exclude|excluded|none|不可|无|停用)/i.test(text)) return false;
+    if (/(boost|available|enable|enabled|active|可加热|可加推|可投放|可提升|可用)/i.test(text)) return true;
+    return null;
   }
 
   function detectCampaignId(doc, pageUrl, pageText) {
@@ -1044,12 +1053,60 @@
     return urlMatch && urlMatch[1] ? urlMatch[1] : '';
   }
 
-  function detectVideoIdFromCell(cellText) {
-    const text = String(cellText || '');
-    let m = text.match(/Video\s*[:：]?\s*([0-9]{6,})/i);
+  function detectVideoIdFromText(text) {
+    const raw = String(text || '');
+    let m = raw.match(/Video[^0-9]{0,10}([0-9][0-9\s]{7,30})/i);
+    if (m && m[1]) {
+      const compact = String(m[1]).replace(/\s+/g, '');
+      if (/^[0-9]{8,25}$/.test(compact)) return compact;
+    }
+    m = raw.match(/Video\s*[:：]?\s*([0-9]{8,25})/i);
+    if (m && m[1]) return String(m[1]);
+    m = raw.match(/(?:^|\D)(\d{16,22})(?:\D|$)/);
     if (m && m[1]) return m[1];
-    m = text.match(/([0-9]{8,})/);
+    m = raw.match(/(?:^|\D)(\d{8,15})(?:\D|$)/);
     if (m && m[1]) return m[1];
+    return '';
+  }
+
+  function detectVideoIdFromCell(cellNode, cellText) {
+    const direct = detectVideoIdFromText(cellText);
+    if (direct) return direct;
+    if (!cellNode || typeof cellNode.querySelectorAll !== 'function') return '';
+
+    const attrs = [
+      'title',
+      'aria-label',
+      'data-title',
+      'data-tooltip',
+      'data-tooltip-content',
+      'data-original-title',
+      'data-tip',
+      'data-content',
+      'data-balloon',
+      'data-popup',
+      'content'
+    ];
+    const probes = [];
+    const pushProbe = (value) => {
+      const txt = String(value || '').trim();
+      if (txt) probes.push(txt);
+    };
+
+    pushProbe(cellNode.textContent);
+    attrs.forEach((key) => pushProbe(cellNode.getAttribute && cellNode.getAttribute(key)));
+
+    const nodes = Array.from(cellNode.querySelectorAll('*'));
+    nodes.forEach((node) => {
+      attrs.forEach((key) => {
+        if (typeof node.getAttribute === 'function') pushProbe(node.getAttribute(key));
+      });
+    });
+
+    for (let i = 0; i < probes.length; i += 1) {
+      const hit = detectVideoIdFromText(probes[i]);
+      if (hit) return hit;
+    }
     return '';
   }
 
@@ -1441,9 +1498,10 @@
       const cellNodes = Array.from(node.querySelectorAll('.core-table-td'));
       const metrics = {};
       let creativeText = '';
+      let creativeCellNode = null;
       let tiktokAccount = '';
       let status = '';
-      let canBoost = false;
+      let canBoost = null;
 
       cellNodes.forEach((cell, colIndex) => {
         const key = headers[colIndex] || '';
@@ -1452,18 +1510,24 @@
 
         if (key === 'creative') {
           creativeText = cellText;
+          creativeCellNode = cell;
         } else if (key === 'tiktok_account') {
           tiktokAccount = cellText;
         } else if (key === 'status') {
           status = cellText;
         } else if (key === 'creative_boost') {
-          canBoost = /boost/i.test(cellText);
+          const parsedBoost = parseBoostAvailability(cellText);
+          if (parsedBoost !== null) canBoost = parsedBoost;
+          else if (/boost/i.test(cellText)) canBoost = true;
         } else {
           metrics[key] = parseMetricNumber(cellText);
         }
       });
 
-      const videoId = detectVideoIdFromCell(creativeText);
+      const hasBoostButton = !!node.querySelector('button[data-uid^="creativeboostentrance:button"], button[data-tid="m4b_button"], button[class*="boost-action-button"]');
+      if (hasBoostButton) canBoost = true;
+
+      const videoId = detectVideoIdFromCell(creativeCellNode || cellNodes[0], creativeText);
       const title = detectCreativeTitleFromCell(creativeText);
       if (!videoId && !title) return;
 
@@ -1477,7 +1541,7 @@
         title: String(title || ''),
         tiktok_account: String(tiktokAccount || ''),
         status: String(status || ''),
-        can_boost: !!canBoost,
+        can_boost: canBoost === true,
         ignore: !!ignore,
         metrics,
         metrics_hash: metricHash(metrics),

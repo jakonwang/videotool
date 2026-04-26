@@ -39,6 +39,7 @@ class OpsMaintenanceService
             'run_migration_profit_center.php',
             'run_migration_profit_store_currency.php',
             'run_migration_profit_plugin.php',
+            'run_migration_ai_center.php',
             'run_migration_ops_frontend_health.php',
             'run_migration_auto_dm_v1.php',
             'run_migration_auto_dm_v2.php',
