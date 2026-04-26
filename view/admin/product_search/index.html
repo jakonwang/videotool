@@ -1312,7 +1312,7 @@
             </div>
             <div class="style-search-extra-right">
               <el-button type="danger" plain :disabled="!selectedRows.length" :loading="batchDeleting" @click="doBatchDelete">
-                <i class="fa fa-trash-o style-toolbar-icon"></i>{{ tt('page.styleSearch.batchDelete') }} ({{ selectedRows.length }})
+                <i class="fa fa-trash style-toolbar-icon"></i>{{ tt('page.styleSearch.batchDelete') }} ({{ selectedRows.length }})
               </el-button>
             </div>
           </div>
@@ -1384,7 +1384,7 @@
                   <button type="button" class="style-card-action-icon" @click.stop="openDetail(row)"><i class="fa fa-eye"></i></button>
                   <button type="button" class="style-card-action-icon" @click.stop="openEdit(row)"><i class="fa fa-pencil"></i></button>
                   <button type="button" class="style-card-action-icon" @click.stop="openSharePoster(row)"><i class="fa fa-share-alt"></i></button>
-                  <button type="button" class="style-card-action-icon delete" @click.stop="doDelete(row)"><i class="fa fa-trash-o"></i></button>
+                  <button type="button" class="style-card-action-icon delete" @click.stop="doDelete(row)"><i class="fa fa-trash"></i></button>
                 </div>
               </div>
               <div class="style-card-body">
