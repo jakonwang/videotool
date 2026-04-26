@@ -3895,3 +3895,12 @@ Usage:
 
 ### 文件
 - `view/admin/product_search/index.html`
+
+## 2026-04-26 /product_search 分页数量口径修正
+
+### 修正
+- 文件：`view/admin/product_search/index.html`
+- 每页默认展示数量由 `12` 调整为 `15`。
+
+### 目的
+- 与当前业务期望（每页15个）保持一致。
